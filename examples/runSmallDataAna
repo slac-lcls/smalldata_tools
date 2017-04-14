@@ -1,0 +1,83 @@
+#! /bin/bash
+
+usage()
+{
+cat << EOF
+usage: $0 options
+
+Make a pedestal file for offline use
+
+OPTIONS:
+-r runnumber
+-e <expname> 
+-d <directory for littleData file>
+-f <filename is not standard>
+EOF
+}
+
+RUN=-1
+EXP='xxx'
+DIRNAME='xxx'
+FLOCNAME='xxx'
+while getopts "r:e:d:f:h" OPTION
+do
+    case $OPTION in
+	h)
+	    usage
+	    exit 1
+	    ;;
+	r)
+	    RUN=$OPTARG
+	    ;;
+	e)
+	    EXP=$OPTARG
+	    ;;
+	d)
+	    DIRNAME=$OPTARG
+	    ;;
+	f)
+	    FLOCNAME=$OPTARG
+	    ;;
+	?)
+	    usage
+	    exit
+	    ;;
+    esac
+ done
+
+## use for new environment scheme
+unset PYTHONPATH
+unset LD_LIBRARY_PATH
+	    
+IN_PROMPT="--PromptManager.in_template='LDana In [\#]: '"
+OUT_PROMPT="--PromptManager.out_template='LDana Out[\#]: '"
+
+## source the analysis environment script
+source /reg/g/psdm/bin/conda_setup ''
+
+LDAP='./examples'
+
+if [ $RUN -le 0 ]; then
+    CMD="%run $LDAP/LoadSmallDataAna.py"
+    EXP=`/reg/g/xpp/scripts/get_curr_exp`
+elif  [ $EXP != 'xxx' ]; then
+    CMD="%run $LDAP/LoadSmallDataAna.py --run $RUN --exp $EXP"
+else
+    CMD="%run $LDAP/LoadSmallDataAna.py --run $RUN"
+    EXP=`/reg/g/xpp/scripts/get_curr_exp`
+fi
+if  [ $DIRNAME != 'xxx' ]; then
+    CMD="$CMD --dir $DIRNAME"
+fi
+if  [ $FLOCNAME != 'xxx' ]; then
+    CMD="$CMD --file $FLOCNAME"
+fi
+
+echo $CMD 
+if [[ $EXP =~ 'xpp' ]]; then
+    HUTCH='xpp'
+else
+    HUTCH='xcs'
+fi
+
+ipython --no-banner --no-confirm-exit --pylab='auto' -i -c "$CMD"
