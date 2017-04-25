@@ -7,7 +7,7 @@ import argparse
 import socket
 import os
 
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject,checkDet,getCfgOutput
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject,checkDet,getCfgOutput,getUserData,getUserEnvData
 #from SmallDataUtils import *
 #from utilities_wSmallData import *
 #from DetObject import DetObject

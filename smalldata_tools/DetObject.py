@@ -27,34 +27,39 @@ class ROIObject(dropObject):
     self.name = name
     if isinstance(ROI_limit, list):
       ROI = np.array(ROI_limit)
-    if ROI.ndim==1:
+    else:
+      ROI=ROI_limit
+    if ROI.ndim==1 and ROI.shape[0]>2:
       ROI = ROI.reshape(ROI.shape[0]/2,2)        
-    self.addField('bound', ROI)
+    self.addField('bound', ROI.astype(int))
     self.writeArea = writeArea
     self.rebin = False
     if rms is not None:
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
-    #ideally would check this from FrameFexConfig and not on every events
-    new_bound=[]
-    for dim,arsz in zip(self.bound, array.shape):
-      if (abs(dim[1]-dim[0])) > arsz:
-        new_bound.append([dim[0], arsz])
-      else:
-        new_bound.append([dim[0], dim[1]])
-    self.bound = np.array(new_bound)
-    #this needs to be more generic....of maybe just ugly spelled out for now.
-    if array.ndim < len(self.bound):
+    if array.ndim < self.bound.ndim:
       print 'array has fewer dimensions that bound: ',array.ndim,' ',len(self.bound)
-    if len(self.bound)==1:
-      subarr = array[self.bound[0,0]:self.bound[0,1]]
-    elif len(self.bound)==2:
+      return array
+    #ideally would check this from FrameFexConfig and not on every events
+    self.bound = np.array(self.bound)
+    if array.ndim == self.bound.ndim:
+      new_bound=[]
+      for dim,arsz in zip(self.bound, array.shape):
+        if max(dim) > arsz:
+          new_bound.append([min(dim), arsz])
+        else:
+          new_bound.append([min(dim), max(dim)])
+      self.bound = np.array(new_bound)
+    elif self.bound.ndim==1:
+      self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])])
+    #this needs to be more generic....of maybe just ugly spelled out for now.
+    if self.bound.ndim==1:
+      subarr = array[self.bound[0]:self.bound[1]]
+    elif self.bound.ndim==2:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1]]
-    elif len(self.bound)==3:
+    elif self.bound.ndim==3:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1],self.bound[2,0]:self.bound[2,1]]
     return subarr.copy()
-  def arraySize(self):
-    return [abs(ROI[1]-ROI[0]) for ROI in self.bound]
   #calculates center of mass of first 2 dim of array within ROI using the mask
   def centerOfMass(self, array):    
     array=array.squeeze()
@@ -62,11 +67,14 @@ class ROIObject(dropObject):
       return np.nan, np.nan
     #why do I need to invert this?
     X, Y = np.meshgrid(np.arange(array.shape[0]), np.arange(array.shape[1]))
-    imagesums = np.sum(np.sum(array,axis=0),axis=0)
-    centroidx = np.sum(np.sum(array*X.T,axis=0),axis=0)
-    centroidy = np.sum(np.sum(array*Y.T,axis=0),axis=0)
-    return centroidx/imagesums,centroidy/imagesums 
-  def addRebin(self,shape=[]):
+    try:
+      imagesums = np.sum(np.sum(array,axis=0),axis=0)
+      centroidx = np.sum(np.sum(array*X.T,axis=0),axis=0)
+      centroidy = np.sum(np.sum(array*Y.T,axis=0),axis=0)
+      return centroidx/imagesums,centroidy/imagesums 
+    except:
+      return np.nan,np.nan
+  def addRebin(self,shape=[],asImage=False):
     self.rebin = True
     self.__dict__['rebin'] = shape
   def Rebin(self, array):
@@ -239,6 +247,8 @@ class DetObject(dropObject):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], ab.azimuthalBinning) ]
     def getAzAvKeys(self):
       return [ key for key in self.__dict__.keys() if isinstance(self[key], ab.azimuthalBinning) ]
+    def saveFull(self):
+      self.__dict__['full']=ROIObject([0,1e6], name='full', writeArea=True, rms=self.rms)
     def addROI(self, ROIname, ROI_limit, writeArea=False):
       self.__dict__[ROIname]=ROIObject(ROI_limit, name=ROIname, writeArea=writeArea, rms=self.rms)
     def getROIs(self):
@@ -248,35 +258,22 @@ class DetObject(dropObject):
         print 'no data for', self._name,' , let mpiDataSource take care of this'
         return
       for ROI in self.getROIs():
-          #self.evt.__dict__['write_'+ROI.name+'_max'] = np.nan
-          #self.evt.__dict__['write_'+ROI.name+'_sum'] = np.nan
-          #self.evt.__dict__['write_'+ROI.name+'_com'] = [np.nan, np.nan]
-          #nanAr = np.empty(ROI.arraySize())
-          #nanAr[:]=np.nan
-          #if ROI.writeArea:
-          #  self.evt.__dict__['write_'+ROI.name] = nanAr.squeeze()
-          #for pj in ROI.getProjs():
-          #  #self.__dict__['proj'+pjName]=[axis, singlePhoton, mean, cutADU, cutRms, 'proj'+pjName]
-          #  self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]] = nanAr.squeeze().sum(axis=pj[0])
-          #if ROI.rebin:
-          #  self.evt.__dict__['write_'+ROI.name+'_rebin'] = ROI.Rebin(nanAr.squeeze())
-        #else:
-          if self.mask is not None:
-            ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(self.mask.astype(bool))))
-          else:
-            ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(np.ones_like(self.evt.dat).astype(bool))))
-          #print 'ROI shape ', ROI.area.shape
-          if ROI.writeArea:
-            self.evt.__dict__['write_'+ROI.name] = ROI.area.squeeze()
-          self.evt.__dict__['write_'+ROI.name+'_max'] = ROI.area.astype(np.float64).max()
-          self.evt.__dict__['write_'+ROI.name+'_sum'] = ROI.area.astype(np.float64).sum()
-          self.evt.__dict__['write_'+ROI.name+'_com'] = ROI.centerOfMass(ROI.area)
-          for pj in ROI.getProjs():
-            self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]] = ROI.projection(ROI.area, pj[:-1])
-            self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_max'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].max()
-            self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_sum'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].sum()
-          if ROI.rebin:
-            self.evt.__dict__['write_'+ROI.name+'_rebin'] = ROI.Rebin(ROI.area)
+        #print 'ROI: ',ROI.name
+        if self.mask is not None:
+          ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(self.mask.astype(bool))))
+        else:
+          ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(np.ones_like(self.evt.dat).astype(bool))))
+        if ROI.writeArea:
+          self.evt.__dict__['write_'+ROI.name] = ROI.area.squeeze()
+        self.evt.__dict__['write_'+ROI.name+'_max'] = ROI.area.astype(np.float64).max()
+        self.evt.__dict__['write_'+ROI.name+'_sum'] = ROI.area.astype(np.float64).sum()
+        self.evt.__dict__['write_'+ROI.name+'_com'] = ROI.centerOfMass(ROI.area)
+        for pj in ROI.getProjs():
+          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]] = ROI.projection(ROI.area, pj[:-1])
+          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_max'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].max()
+          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_sum'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].sum()
+        if ROI.rebin:
+          self.evt.__dict__['write_'+ROI.name+'_rebin'] = ROI.Rebin(ROI.area)
 
     def getDroplets(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], droplet.droplet)  or isinstance(self[key], droplet.droplet) ]

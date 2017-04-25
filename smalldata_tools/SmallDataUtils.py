@@ -109,7 +109,9 @@ def getUserData(det):
     det_dict= {}
     try:
         userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('write_')>=0 ]
+        #print 'getting keys: ',userData_keys
         for key in userData_keys:
+            #print 'getting data for key: ',key
             if isinstance(det.evt[key], np.ndarray):
                 if isinstance(det.evt[key], np.ma.masked_array):
                     data = det.evt[key].data

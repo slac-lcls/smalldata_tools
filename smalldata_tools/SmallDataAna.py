@@ -281,7 +281,7 @@ class droplets(object):
  
  
 class Cube(object):
-    def __init__(self, binVar, bins=[], cubeName=None, SelName=None):
+    def __init__(self, binVar='', bins=[], cubeName=None, SelName=None):
         self.binVar = binVar
         self.bins = bins
         self.SelName = SelName
@@ -434,10 +434,18 @@ class SmallDataAna(object):
                 self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='EvtID__time') 
                 self._fields['/EvtID/time'][1]=True
         self._addXarray()
-        #self._readXarrayData()
+        self._readXarrayData()
 
     def __del__(self):
-        self._writeNewData()
+        try:
+            from mpi4py import MPI
+        except:
+            self._writeNewData()
+            return
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        if rank==0:
+            self._writeNewData()
         return
 
     def _getXarrayDims(self,key,tleaf_name):
@@ -544,7 +552,8 @@ class SmallDataAna(object):
             return
         else:
             #FIXME
-            print 'addVar: figure out what this case is....'
+            #this is data read in from netcdf files made previouly. Not sure what to do. make same as read from h5 for NOW
+            self._fields[name]=[data.shape, True, True]
 
     def _updateFromXarray(self):
         for key in self.xrData.keys():
@@ -557,9 +566,9 @@ class SmallDataAna(object):
         print 'save derived data to be loaded next time:'
         for key in self._fields.keys():
             if not self._fields[key][2]:
-                print 'saving data for field: ',key
+                print 'saving data for field: ',key, self._fields[key]
                 data = self.getVar(key)
-                print 'DEBUG: shape ',data.shape
+                #print 'DEBUG: shape ',data.shape
                 if key[0]=='/': key = key[1:]
                 if isinstance(data, xr.DataArray):
                     print 'get xarray for ',key
@@ -591,6 +600,10 @@ class SmallDataAna(object):
                     add_xrDataSet = xr.open_dataset(self.dirname+'/'+fname,engine='h5netcdf')
                     key = fname.replace('xr_','').replace('%s_Run%03d.nc'%(self.expname,self.run),'')
                     if key[-1]=='_':key=key[:-1]
+                    if len(add_xrDataSet[key].shape)>2:
+                        continue
+                    if (len(add_xrDataSet[key].shape)==2 and add_xrDataSet[key].shape[1]<10):
+                        continue
                     self._fields[key]=[add_xrDataSet[key].shape, True, True]
                     values = add_xrDataSet[key].values
                     self.addVar(key, values)
@@ -1298,7 +1311,7 @@ class SmallDataAna(object):
     #########################################################
 
     #cube might be better to be its own class
-    def addCube(self, cubeName, binVar, bins, SelName):    
+    def addCube(self, cubeName, binVar='', bins=[], SelName=''):    
         self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, SelName=SelName)
         
     def addToCube(self, cubeName, targetVariable):
@@ -1338,30 +1351,39 @@ class SmallDataAna(object):
         #now look through targetVars & split out ones not in xarray/hdf5
         targetVarsLocal = []
         for tVar in cube.targetVars:
-            if tVar not in self._fields.keys() and '/%s'%tVar not in self._fields.keys():
-                cube.targetVarsXtc.append(tVar)
+            if isinstance(tVar, basestring):
+                if tVar not in self._fields.keys() and '/%s'%tVar not in self._fields.keys():
+                    cube.targetVarsXtc.append(tVar)
+                else:
+                    targetVarsLocal.append(tVar)
             else:
-                targetVarsLocal.append(tVar)
+                cube.targetVarsXtc.append(tVar)
         cube.targetVars = targetVarsLocal
 
-        #IMPLEMENT ME
         #now get the filter & create a new one taking bins & detector damage into account.
         orgSel = cube.SelName
-        self.Sels['%s_%s'%(cube.cubeName,cube.SelName)] = Selection()
-        self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].add(self.Sels[orgSel])
-        self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut(cube.binVar, min(Bins), max(Bins) )
-        #add cuts with detector damage - if we have damage detector info.
-        for txVar in cube.targetVarsXtc:
-            if 'damage/%s'%txVar  in self._fields.keys(): 
-                newSel.addCut('damage/%s'%txVar,0.5,1.5)
-        for txVar in targetVarsLocal:
-            if txVar[0]=='/':txVar=txVar[1:] 
-            if 'damage/%s'%txVar  in self._fields.keys(): 
-                newSel.addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
+        if orgSel.find(cube.cubeName)!=0:
+            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)] = Selection()
+            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].add(self.Sels[orgSel])
+            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut(cube.binVar, min(Bins), max(Bins) )
+            #add cuts with detector damage - if we have damage detector info.
+            for txVar in targetVarsLocal:
+                if txVar[0]=='/':txVar=txVar[1:] 
+                if 'damage/%s'%txVar  in self._fields.keys(): 
+                    newSel.addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
+            for txVar in cube.targetVarsXtc:
+                if isinstance(txVar, dict):
+                    try:
+                        txVar=txVar['source']
+                    except:
+                        continue
+                if 'damage/%s'%txVar  in self._fields.keys(): 
+                        newSel.addCut('damage/%s'%txVar,0.5,1.5)
+            cube.SelName='%s_%s'%(cube.cubeName,cube.SelName)
 
         return cube
 
-    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False):
+    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False):
         cube = self.prepCubeData(cubeName)
         if cube is None:
             return 
@@ -1373,8 +1395,15 @@ class SmallDataAna(object):
         else:
             binVar = self.get1dVar(cube.binVar)
 
-        cube.printCube(self.Sels['%s_%s'%(cube.cubeName,cube.SelName)])
-        cubeFilter = self.getFilter('%s_%s'%(cube.cubeName,cube.SelName))
+        cube.printCube(self.Sels[cube.SelName])
+        cubeFilter = self.getFilter(cube.SelName)
+        [cubeOn, cubeOff] = self.getFilterLaser(cube.SelName, ignoreVar=[])
+        if onoff==1:
+            cubeFilter = cubeOn
+            cubeName = cubeName+'_laserOn'
+        elif onoff==0:
+            cubeFilter = cubeOff
+            cubeName = cubeName+'_laserOff'
 
         binVar = binVar[cubeFilter]
         if binVar.shape[0] == 0:
@@ -1384,103 +1413,71 @@ class SmallDataAna(object):
         if debug:
             print 'bin boundaries: ',Bins
 
-        if old:
-            timeStartOld=time.time()
-            binNum = np.digitize(binVar, Bins,right=True)
-            nEvts_bin = np.bincount(binNum, minlength=numBin)
-            if debug:
-                print 'events/bin: ',nEvts_bin
+        timeFiltered = self._tStamp[cubeFilter]
+        newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
+        newXr = xr.merge([newXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+        for tVar in cube.targetVars:
+            if tVar[0]=='/':
+                tVar=tVar[1:]
+            if not self.hasKey(tVar):
+                continue
+            #print 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape
+            filteredVar = self.getVar(tVar,cubeFilter).squeeze()
+            tVar=tVar.replace('/','__')
+            if len(filteredVar.shape)==1:
+                newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
+            else:
+                coords={'time': timeFiltered}
+                dims = ['time']
+                dataShape = filteredVar.shape
+                for dim in range(len(dataShape)-1):
+                    thisDim = np.arange(0, dataShape[dim+1])
+                    dimStr = 'dim%d'%dim
+                    coords[dimStr] = thisDim
+                    dims.append(dimStr)
+                newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
 
-            cubes = {'bins': Bins}
-            cubes['nEntries'] = nEvts_bin
-            for tVar in cube.targetVars:
-                #if not self.hasKey(tVar):
-                #    continue
-                var_binned1d = None
-                tVarFilter = self.getVar(tVar,Filter=cubeFilter)
-                if replaceNan:
-                    tVarFilter = np.nan_to_num(tVarFilter)
+        cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).sum(dim='time')                  
+        #could add error using the std of the values.
+        cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).std(dim='time')
+        for key in cubeDataErr:
+            if key.replace('std_','').replace('__','/') in cube.targetVars:
+                cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
+        for key in cubeDataErr:
+            if key not in cubeData.keys():
+                cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
-                if len(tVarFilter.shape)==1:
-                    var_binned = np.bincount(binNum, tVarFilter, minlength=numBin)
-                    cubes[tVar.replace('/','_')] = var_binned
-                elif len(tVarFilter.shape)==2:
-                    var_binned = np.array([ np.bincount(binNum,tVarFilter[:,i], minlength=numBin) for i in np.arange(tVarFilter.shape[1]) ])
-                    var_binned1d = np.bincount(binNum, tVarFilter.squeeze().mean(axis=1), minlength=numBin)
-                    cubes[tVar.replace('/','_')] = var_binned
-                    cubes[tVar.replace('/','_')+'_1d'] = var_binned1d
-                else:
-                    var_binned1d = np.bincount(binNum, tVarFilter.squeeze().mean(axis=1).mean(axis=1), minlength=numBin)
-                    cubes[tVar.replace('/','_')+'_1d'] = var_binned1d
-                    
-                    var_bin2d = tVarFilter.squeeze().mean(axis=1)
-                    var_binned2d = np.array([ np.bincount(binNum,var_bin2d[:,i]) for i in np.arange(var_bin2d.shape[1]) ])
-                    var_bin2d2 = tVarFilter.squeeze().mean(axis=2)
-                    var_binned2d2 = np.array([ np.bincount(binNum,var_bin2d2[:,i]) for i in np.arange(var_bin2d2.shape[1]) ])
-                    cubes[tVar.replace('/','_')+'_2d_0'] = var_binned2d
-                    cubes[tVar.replace('/','_')+'_2d_1'] = var_binned2d2
-                    arsz = 1; arShape=();nevtSel = tVarFilter.shape[0]
-                    for sz in tVarFilter.shape[1:]:
-                        if [sz != 1]:
-                            arsz*=sz
-                            arShape+=(sz,)
-                    arShapeBin=arShape+(numBin,)
-                    newAr = tVarFilter.values.reshape(nevtSel, arsz)
-                    var_binned = np.array([ np.bincount(binNum, newAr[:,i], minlength=numBin) for i in np.arange(newAr.shape[1]) ])
-                    var_binned = var_binned.transpose()
-                    var_binned = np.array([ binDat.reshape(arShape) for binDat in var_binned])
-                    cubes[tVar.replace('/','_')] = var_binned
+        if toHdf5:
+            fname = 'Cube_%s_Run%03d.nc'%(cubeName, self.run)
+            cubeData.to_netcdf(fname,engine='h5netcdf')
+        
+        if not returnIdx:
+            return cubeData
 
-                timeOld=time.time()-timeStartOld
-                if toHdf5:
-                    fname = 'Cube_%s_Run%03d.h5'%(cubeName, self.run)
-                    dictToHdf5(fname,cubes)
-
+        if '/fiducial' in self.Keys():
+            evtIDXr = xr.DataArray(self.getVar('/fiducial',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
+            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/evt_time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
+            evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+        elif '/EvtID/fid' in self.Keys():
+            evtIDXr = xr.DataArray(self.getVar('/EvtID/fid',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
+            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/EvtID/time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
+            evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
         else:
-            #xArray based way to do this.
-            timeStartNew=time.time()
-            timeFiltered = self._tStamp[cubeFilter]
-            newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='count')
-            newXr = xr.merge([newXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
-            for tVar in cube.targetVars:
-                if tVar[0]=='/':
-                    tVar=tVar[1:]
-                if not self.hasKey(tVar):
-                    continue
-                #print 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape
-                filteredVar = self.getVar(tVar,cubeFilter).squeeze()
-                tVar=tVar.replace('/','__')
-                if len(filteredVar.shape)==1:
-                    newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
-                else:
-                    coords={'time': timeFiltered}
-                    dims = ['time']
-                    dataShape = filteredVar.shape
-                    for dim in range(len(dataShape)-1):
-                        thisDim = np.arange(0, dataShape[dim+1])
-                        dimStr = 'dim%d'%dim
-                        coords[dimStr] = thisDim
-                        dims.append(dimStr)
-                    newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
+            print 'could not find event idx in data'
+            return cubeData,None
+        cubeIdxData = evtIDXr.groupby_bins('binVar',Bins)   
+        keys = cubeIdxData.groups.keys()
+        keys.sort()
 
-            print 'made xarray, now bin'
-            cubeData = newXr.groupby_bins('binVar',Bins).sum(dim='time')                  
-            timeNew=time.time()-timeStartNew
-            #could add error using the std of the values.
-            cubeDataErr = newXr.groupby_bins('binVar',Bins).std(dim='time')
-            for key in cubeDataErr:
-                if key.replace('std_','').replace('__','/') in cube.targetVars:
-                    cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
-            for key in cubeDataErr:
-                if key not in cubeData.keys():
-                    cubeData = xr.merge([cubeData, cubeDataErr[key]])
-
-            if toHdf5:
-                fname = 'Cube_%s_Run%03d.nc'%(cubeName, self.run)
-                cubeData.to_netcdf(fname,engine='h5netcdf')
-
-        print 'time to make cube: old %f , new %f '%(timeOld, timeNew) 
-        return cubes, cubeData
+        fidArray=[]
+        timeArray=[]
+        for key in keys:
+            fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
+            timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
+        retDict={'keys': keys}
+        retDict['fiducial']=fidArray
+        retDict['evttime']=timeArray
+        return cubeData,retDict
 
     #CHECK ME: REWRITE ACCESS TO NON-SMALL data....
     def submitCube(self, cubeName, run=None, expname=None, image=False, rebin=-1):                                    

@@ -7,7 +7,7 @@ from fitCenter import  fitCenter
 from photons import  photon,photon2,photon3
 from SmallDataAna_psana import  SmallDataAna_psana
 from SmallDataAna import  photons,droplets,Cube,Selection,SmallDataAna
-from SmallDataUtils import  defaultDetectors,lightStatus,ipmDetector,bmmonDetector,epicsDetector,encoderDetector,controlDetector,aiDetector,ttDetector,damageDetector,ttRawDetector,xtcavDetector,detData,getCfgOutput
-from utilities import  dropObject,hist2d,printMsg,checkDet
+from SmallDataUtils import  defaultDetectors,lightStatus,ipmDetector,bmmonDetector,epicsDetector,encoderDetector,controlDetector,aiDetector,ttDetector,damageDetector,ttRawDetector,xtcavDetector,detData,getCfgOutput,getUserData
+from utilities import  dropObject,hist2d,printMsg,checkDet,rebin,addToHdf5
 
 

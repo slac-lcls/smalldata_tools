@@ -49,9 +49,6 @@ do
 unset PYTHONPATH
 unset LD_LIBRARY_PATH
 	    
-IN_PROMPT="--PromptManager.in_template='LDana In [\#]: '"
-OUT_PROMPT="--PromptManager.out_template='LDana Out[\#]: '"
-
 ## source the analysis environment script
 source /reg/g/psdm/bin/conda_setup ''
 

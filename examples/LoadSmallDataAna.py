@@ -4,8 +4,10 @@ import argparse
 from matplotlib import pyplot as plt
 import socket
 import os
-from smalldata_tools import droplets,hist2d
+from smalldata_tools import droplets,hist2d,getUserData,rebin,addToHdf5
+from smalldata_tools import dropObject
 from IPython.terminal.prompts import Prompts,Token
+import itertools
 
 class myPrompt(Prompts):
     def in_prompt_tokens(self, cli=None):
@@ -93,12 +95,7 @@ if ana is not None:
     ana.addCut('lightStatus/laser',0.5,1.5,'on')
     ana.addCut('lightStatus/xray',0.5,1.5,'off')
     ana.addCut('lightStatus/laser',-0.5,0.5,'off')
-
-    #drop = droplets(ana.fh5,'epix_alcove','droplet')
-    ana.addCube('cube','ipm2/sum',np.arange(0.,2.,0.5),'on')
-    ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels'])
-    ana.getVar('/cs140_rob/ROI')
-    ana.addToCube('cube',['cs140_rob/ROI'])
+    
     #delay=ana.getDelay()
-    #vals = ana.fh5.get_node('/cs140_rob','ROI').read().squeeze()
-    #ana.addVar(name='newVar',data=vals)
+    ana.addCube('cube','delay',np.arange(13.,15.5,0.5),'on')
+

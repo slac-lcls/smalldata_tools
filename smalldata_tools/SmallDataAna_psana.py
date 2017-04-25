@@ -10,10 +10,17 @@ import psana
 import SmallDataAna as sda
 from DetObject import DetObject
 from utilities import fitCircle
+from SmallDataUtils import getUserData
+from utilities import addToHdf5
 from utilities import dropObject
 import azimuthalBinning as ab
 import RegDB.experiment_info
 from utilities_FitCenter import FindFitCenter
+from mpi4py import MPI
+import h5py
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 class SmallDataAna_psana(object):
     def __init__(self, expname='', run=-1,dirname='', filename=''):
@@ -144,8 +151,15 @@ class SmallDataAna_psana(object):
                 detname = raw_input("Select detector to get detector info for?:\n")
         print 'try to make psana Detector with: ',detname
 
+        detnameDict=None
+        if isinstance(detname, dict):
+            detnameDict = detname
+            if 'common_mode' in detnameDict.keys():
+                common_mode=detnameDict['common_mode']
+            detname = detnameDict['source']
+
         #only do this if information is not in object yet
-        if detname in self.__dict__.keys() and self.__dict__[detname].common_mode==common_mode:
+        if detname in self.__dict__.keys() and self.__dict__[detname].common_mode==common_mode and detnameDict is not None:
             return detname
 
         if detname in self.__dict__.keys():
@@ -160,6 +174,14 @@ class SmallDataAna_psana(object):
         self.__dict__[detname+'_y']=det.y
         self.__dict__[detname+'_iX']=det.iX
         self.__dict__[detname+'_iY']=det.iY
+
+        if detnameDict is not None:
+            for key in detnameDict.keys():
+                if key=='full' or key=='Full':
+                    self.__dict__[detname].saveFull()
+                if key.find('ROI')==0:
+                    self.__dict__[detname].addROI(key,detnameDict[key],writeArea=True)
+        
         return detname
 
     def _getDetName(self, detname='None'):
@@ -1385,3 +1407,187 @@ class SmallDataAna_psana(object):
             plt.colorbar(imC)
             imCS = plt.subplot(gsCM[icm*2+1]).imshow(imgs[icm*2+1],clim=limsStd,interpolation='none',aspect='auto')
             plt.colorbar(imCS)
+
+    def makeCubeData(self, cubeName, dirname='', nEvtsPerBin=-1):
+        if self.sda is None:
+            return
+        if dirname=='':
+            dirname=self.sda.dirname
+
+        #myCube = self.sda.cubes[cubeName]
+        myCube = self.sda.prepCubeData(cubeName)
+        
+        print 'variables to be read from xtc: ',myCube.targetVarsXtc
+
+        detInData=[]
+        for k in self.Keys():
+            if k.alias()!='':
+                detInData.append(k.alias())
+
+        detNames=[]
+        for idet,det in enumerate(myCube.targetVarsXtc):
+            if isinstance(det, dict):
+                dName = det['source']
+            else:
+                dName = det
+            if dName in detInData:
+                detNames.append(dName)
+            else:
+                print 'detector with this alias not in data ',det
+                myCube.targetVarsXtc.pop(idet)
+            myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in myCube.targetVarsXtc]
+
+        for det in myCube.targetVarsXtc:
+            self.addDetInfo(det)
+
+        #littleData only version: only run on single core
+        if len(self.sda.cubes['cube'].targetVarsXtc)<=0:
+            if rank==0:
+                outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
+                fout = h5py.File(outFileName, "w")
+                print 'bin the data now....be patient'
+                cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)  
+                print 'now write outputfile (only little data) to : ',outFileName
+                for key in cubeData.keys():
+                    addToHdf5(fout, key, cubeData[key].values)
+                fout.close()
+            return
+
+        #only run on rank=0 & broadcast.
+        outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5.inprogress'%cubeName)
+        if rank==0:
+            print 'now write outputfile to : ',outFileName
+        fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
+
+        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)  
+        #add small data to hdf5
+        for key in cubeData.keys():
+            addToHdf5(fout, key, cubeData[key].values)
+
+        runIdx = self.dsIdxRun
+        numBin = cubeData.nEntries.shape[0]
+        bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
+
+        detShapes=[]
+        detArrays=[]
+        detSArrays=[] #for error calculation
+        detMArrays=[] #for error calculation
+        binID=np.ones(bins_per_job,dtype=int); binID*=-1
+        for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
+            if  thisdetDict.has_key('image'):
+                detShape = self.__dict__[thisdetName].imgShape
+            else:
+                detShape = self.__dict__[thisdetName].ped.shape
+            lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
+            detShapes.append(csShape)
+            det_arrayBin=np.zeros(csShape)
+            detArrays.append(det_arrayBin)
+            detSArrays.append(det_arrayBin)
+            detMArrays.append(det_arrayBin)
+            if rank==0:
+                print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
+
+        for ib,fids,evttimes in itertools.izip(itertools.count(), eventIdxDict['fiducial'],eventIdxDict['evttime']):
+            if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
+                continue
+            print 'bin: %d has %d events'%(ib, len(fids))
+            binID[ib%bins_per_job]=ib
+
+            nEvts_bin=0
+            for ievt,evtfid, evttime in itertools.izip(itertools.count(),fids,evttimes):
+                if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin:
+                    break
+                nEvts_bin=nEvts_bin+1
+
+                evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
+                evt = runIdx.event(evtt)
+                #now loop over detectors in this event
+                for thisdetName,thisdetDict,dArray,dMArray,dSArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays):
+                    det = self.__dict__[thisdetName]
+                    det.evt = dropObject()
+                    det.getData(evt)
+                    det.processDetector()
+                    
+                    thisDetDataDict=getUserData(det)
+                    for key in thisDetDataDict.keys():
+                        if not (key=='full' or key.find('ROI')>=0):
+                            continue
+                        if thisdetDict.has_key('thresADU'):
+                            thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
+                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                        elif thisdetDict.has_key('thresRms'):
+                            thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
+                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                        else:
+                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+            
+                        x = thisDetDataDict[key]
+                        oldM = dMArray
+                        dMArray = dMArray + (x-dMArray)/(ievt+1)
+                        dSArray = dSArray + (x-dMArray)*(x-oldM)
+
+        #loop over arrays & bins, make image & rebin if requested.
+        for detName, dArray, dSArray, dMArray, detDict in zip(detNames, detArrays, detSArrays,detMArrays, (myCube.targetVarsXtc)):
+            det = self.__dict__[detName]
+            imgArray=[]
+            imgSArray=[]
+            imgMArray=[]
+            for binData,binSData,binMData in zip(dArray,dSArray,dMArray):
+                if  detDict.has_key('image'):
+                    thisImg = det.det.image(run, binData)
+                    thisImgS = det.det.image(run, binSData)
+                    thisImgM = det.det.image(run, binMData)
+                else:
+                    thisImg = binData
+                    thisImgS = binSData
+                    thisImgM = binMData
+                if  detDict.has_key('rebin'):
+                    thisImg = rebin(thisImg, detDict['rebin'])
+                    imgArray.append(thisImg)
+                    thisImgS = rebin(thisImgS, detDict['rebin'])
+                    imgSArray.append(thisImgS)
+                    thisImgM = rebin(thisImgS, detDict['rebin'])
+                    imgMArray.append(thisImgM)
+                else:
+                    imgArray.append(thisImg)
+                    imgSArray.append(thisImgS)
+                    imgMArray.append(thisImgM)
+
+            #write hdf5 file w/ mpi for big array
+            arShape=(numBin,)
+            for i in range(0,len(imgArray[0].shape)):
+                arShape+=(imgArray[0].shape[i],)
+#            if rank==0:
+#                print 'print array shape before saving: ',arShape
+            cubeBigData = fout.create_dataset('%s'%detName,arShape)
+            cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
+            cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
+            for iSlice,Slice,SliceS,SliceM in itertools.izip(itertools.count(),imgArray,imgSArray,imgMArray):
+                if np.nansum(Slice)>0:
+                    cubeBigData[rank*bins_per_job+iSlice,:] = Slice
+                    print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
+                if np.nansum(SliceS)>0:
+                    cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
+                if np.nansum(SliceM)>0:
+                    cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
+
+            if det.rms is not None:
+                if not detDict.has_key('image'):
+                    addToHdf5(fout, detName+'_ped', det.ped)
+                    addToHdf5(fout, detName+'_rms', det.rms)
+                    if det.x is not None:
+                        addToHdf5(fout, detName+'_x', det.x)
+                        addToHdf5(fout, detName+'_y', det.y)
+                else:
+                    addToHdf5(fout, detName+'_ped', det.det.image(run,det.ped))
+                    addToHdf5(fout, detName+'_rms', det.det.image(run,det.rms))
+
+        comm.Barrier()
+        if rank==0:
+            print 'first,last img mean: ',np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])
+        fout.close()
+        if rank==0:
+            print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
+            os.rename(outFileName, outFileName.replace('.inprogress',''))
+
+        return outFileName
