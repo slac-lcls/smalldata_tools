@@ -127,7 +127,10 @@ class controlDetector(defaultDetector):
         try:
             self.stepPV = psana.Detector('scan_current_step')
         except:
-            self.stepPV = None
+            try:
+                self.stepPV = psana.Detector('Scan_current_step')
+            except:
+                self.stepPV = None
     def data(self, evt):
         dl={}
         if self.stepPV is not None:

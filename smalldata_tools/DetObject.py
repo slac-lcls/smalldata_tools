@@ -155,7 +155,7 @@ class DetObject(dropObject):
           self.ped = np.zeros([npix, npix])
           self.imgShape = [npix, npix]
         elif self.det.dettype == 6:
-          if env.configStore().get(psana.TimeTool.ConfigV2, psana.Source(srcName)).write_image()==0:
+          if env.configStore().get(psana.TimeTool.ConfigV2, psana.Source(srcName)) is not None and env.configStore().get(psana.TimeTool.ConfigV2, psana.Source(srcName)).write_image()==0:
             self.ped=np.array([[-1,-1],[-1,-1]])
           else:
             fexCfg = env.configStore().get(psana.Camera.FrameFexConfigV1, psana.Source(srcName))

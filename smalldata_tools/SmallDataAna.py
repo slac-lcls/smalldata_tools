@@ -420,7 +420,7 @@ class SmallDataAna(object):
             evttime_sec = evttime >> 32
             evttime_nsec = evttime - (evttime_sec << 32)
             self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
-            self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
+            #self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
             self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='event_time')
             self._fields['/event_time'][1]=True
         else:
@@ -666,7 +666,7 @@ class SmallDataAna(object):
                 for tleaf in node._f_list_nodes():   
                     if isinstance(tleaf, tables.group.Group):
                         for leaf in tleaf._f_list_nodes():   
-                            keys.append('%s/%s/%s'%(key,tleaf._v_pathname,leaf.name))
+                            keys.append('%s/%s'%(tleaf._v_pathname,leaf.name))
                     else:
                         keys.append('%s/%s'%(key,tleaf.name))
 
@@ -677,7 +677,10 @@ class SmallDataAna(object):
                 if areaDet and (len(thiskey.split('/'))==2 or len(fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape)<=2):
                     continue
                 keysFiltered.append(thiskey)
-                keyShapes.append(fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape)
+                if len(thiskey.split('/')) > 2:
+                    keyShapes.append(fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape)
+                else:
+                    keyShapes.append(fh5.get_node(thiskey).shape)
                 if printKeys:
                     print thiskey
         if returnShape:
@@ -1383,7 +1386,7 @@ class SmallDataAna(object):
 
         return cube
 
-    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False):
+    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=''):
         cube = self.prepCubeData(cubeName)
         if cube is None:
             return 
@@ -1454,14 +1457,18 @@ class SmallDataAna(object):
         if not returnIdx:
             return cubeData
 
-        if '/fiducial' in self.Keys():
-            evtIDXr = xr.DataArray(self.getVar('/fiducial',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
-            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/evt_time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
+        if '/fiducials' in self.Keys():
+            evtIDXr = xr.DataArray(self.getVar('/fiducials',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
+            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/event_time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
             evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+            if addIdxVar!='':
+                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
         elif '/EvtID/fid' in self.Keys():
             evtIDXr = xr.DataArray(self.getVar('/EvtID/fid',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
             evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/EvtID/time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
             evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+            if addIdxVar!='':
+                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
         else:
             print 'could not find event idx in data'
             return cubeData,None
@@ -1471,12 +1478,17 @@ class SmallDataAna(object):
 
         fidArray=[]
         timeArray=[]
+        addArray=[]
         for key in keys:
             fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
             timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
+            if addIdxVar!='':
+                addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
         retDict={'keys': keys}
         retDict['fiducial']=fidArray
         retDict['evttime']=timeArray
+        if addIdxVar!='':
+            retDict[addIdxVar]=addArray
         return cubeData,retDict
 
     #CHECK ME: REWRITE ACCESS TO NON-SMALL data....

@@ -170,6 +170,10 @@ if [ ! -d  $LOGDIR ]; then
     mkdir $LOGDIR
 fi
 
+source /reg/g/pcds/setup/pathmunge.sh
+LDAP='./'
+pythonpathmunge $LDAP
+
 if [ $SINGLEJOB -eq 1 ]; then
     echo 'so I will run a new job for run ' $RUN
     if [ $NJOBS -le 8 ]; then
