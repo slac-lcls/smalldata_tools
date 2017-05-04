@@ -507,3 +507,9 @@ class dropObject(object):
     return [tk for tk in self.__dict__.keys() if not tk[0]=='_']
 
 
+def shapeFromKey_h5(fh5, thiskey):
+    if len(thiskey.split('/')) > 2:
+        return fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape
+    else:
+        return fh5.get_node(thiskey).shape
+

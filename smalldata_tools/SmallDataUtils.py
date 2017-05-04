@@ -51,6 +51,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     try:
         dets.append(encoderDetector('usbencoder','enc'))
     except:
+        print 'did not add encoder detector'
         pass
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage')

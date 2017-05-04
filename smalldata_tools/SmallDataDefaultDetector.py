@@ -116,9 +116,12 @@ class encoderDetector(defaultDetector):
         defaultDetector.__init__(self, detname, name)
     def data(self, evt):
         dl={}
-        for desc,value in zip(self.det.descriptions(), self.det.values(evt)):
-            if desc!='':
-                dl[desc]=value
+        if self.det.descriptions() is None:
+            dl['ch0']=self.det.values(evt)[0]
+        else:
+            for desc,value in zip(self.det.descriptions(), self.det.values(evt)):
+                if desc!='':
+                    dl[desc]=value
         return dl
 
 class controlDetector(defaultDetector):

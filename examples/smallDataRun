@@ -34,8 +34,9 @@ DAYSHIFT=1
 QUEUEREQ='xxx'
 XTCAV=0
 FFB=0
+LIVE=0
 
-while getopts "e:d:r:n:q:j:g:hxsf" OPTION
+while getopts "e:d:r:n:q:j:g:hxsfl" OPTION
 do
     case $OPTION in
 	h)
@@ -65,6 +66,9 @@ do
 	    ;;
 	f)
 	    FFB=1
+	    ;;
+	l)
+	    LIVE=1
 	    ;;
 	x)
 	    XTCAV=1
@@ -122,6 +126,9 @@ echo 'will use queue: ' $QUEUE
 ARGSTR=''
 if [ $XTCAV -gt 0 ]; then
     ARGSTR=$ARGSTR' --xtcav'
+fi
+if [ $LIVE -gt 0 ]; then
+    ARGSTR=$ARGSTR' --live'
 fi
 if [ $NUMBER_OF_EVENTS -ne 0 ]; then
     ARGSTR=$ARGSTR' --nev '$NUMBER_OF_EVENTS

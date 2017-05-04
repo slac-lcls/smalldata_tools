@@ -11,12 +11,10 @@ from pylab import ginput
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from scipy import interpolate
-from utilities import getTTstr
-from utilities import hasKey as util_hasKey
-from utilities import getDelay as util_getDelay
 from utilities import getBins as util_getBins
 from utilities import dictToHdf5
 from utilities import hist2d
+from utilities import shapeFromKey_h5
 import time
 import json
 import subprocess
@@ -24,6 +22,11 @@ import socket
 from scipy import sparse
 import tables
 import xarray as xr
+#works from ana-1.2.9 on
+try:
+    from pscache import client
+except:
+    pass
 
 class photons(object):
     def __init__(self,h5file,detName='epix',photName='photon'):
@@ -376,8 +379,11 @@ class Selection(object):
         self._filter=None
 
 class SmallDataAna(object):
-    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None):
+    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None):
         self._fields={}
+        self._live_fields=[]
+        if isinstance(liveList, list) and intable=='redis':
+            self._live_fields=liveList
         self.expname=expname
         self.run=run
         if len(expname)>3:
@@ -400,30 +406,50 @@ class SmallDataAna(object):
         self.Sels = {}
         self.cubes = {}
         self.jobIds=[]
-        if intable is not None:
-            self.fh5 = intable
+        self._isRedis=False
+        if run == -1 or (intable is not None and intable == 'redis'):
+            self.fh5=client.ExptClient(expname, host='psdb3')
+            self._isRedis=True
+        elif intable is not None:
+            if intable == 'redis':
+                self.fh5=client.ExptClient(expname, host='psdb3')
+                self._isRedis=True
+            elif isinstance(intable, basestring) and path.isfile(intable):
+                self.fh5=tables.open_file(self.fname,'r')
+            else:
+                print 'pass unknown input parameter or file cannot be found: ',intable
+                return None
         elif path.isfile(self.fname):
             self.fh5=tables.open_file(self.fname,'r')
-            self.ttCorr, self.ttBaseStr = getTTstr(self.fh5)
         else: #if path.isfile(self.fname):
             print 'could not find file: ',self.fname
             return None
 
+        self.xrData = {}
         #keep keys in here. Start w/ Keys from original hdf5/table/REDIS
         self.Keys(printKeys=False, areaDet=False, cfgOnly=False, returnShape=True)
+        #check that required live fields are actually present
+        for key in self._live_fields:
+            if not key in self._fields.keys():
+                print 'cannot find required variable %s, will return None!'%key
+                return None
+        self.ttCorr, self.ttBaseStr = self._getTTstr()
 
         #keep an Xarray that will become bigger on request.
         #start w/ certain fields (all 1-d & ipm channels)?
-        if '/event_time' in self._fields.keys():
+        if 'event_time' in self._fields.keys():
             #cannot use getVar as getVar is using the presence of self._tStamp
-            evttime = self.fh5.get_node('/event_time').read()
+            if self._isRedis:
+                evttime = self.fh5.fetch_data(self.run,['event_time'])['event_time']
+            else:
+                evttime = self.fh5.get_node('/event_time').read()
+            self._fields['event_time'][1]='inXr'
             evttime_sec = evttime >> 32
             evttime_nsec = evttime - (evttime_sec << 32)
             self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
             #self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
             self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='event_time')
-            self._fields['/event_time'][1]=True
-        else:
+        elif not self._isRedis:
             timeData = self.fh5.get_node('/EvtID','time').read()
             if timeData is None:
                 print 'could not find eventtime data ',self._fields.keys()
@@ -432,9 +458,14 @@ class SmallDataAna(object):
                 evttime = (timeData[:,0].astype(np.int64) << 32 | timeData[:,1])
                 self._tStamp = np.array([np.datetime64(int(ttime[0]*1e9+ttime[1]), 'ns') for ttime in timeData])
                 self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='EvtID__time') 
-                self._fields['/EvtID/time'][1]=True
+                self._fields['EvtID/time'][1]='inXr'
+        else:
+            print 'could not create xarray'
+            return
         self._addXarray()
-        self._readXarrayData()
+        #there won't be any xarray files of correct size when running "live"
+        if not self._isRedis:
+            self._readXarrayData()
 
     def __del__(self):
         try:
@@ -448,41 +479,63 @@ class SmallDataAna(object):
             self._writeNewData()
         return
 
-    def _getXarrayDims(self,key,tleaf_name):
+    def addToLive(self, liveKeys=[]):
+        if isinstance(liveKeys, basestring):
+            if liveKeys in self._fields.keys():
+                self._live_fields.append(liveKeys)
+        else:
+            for key in liveKeys:
+                if key in self._fields.keys():
+                    self._live_fields.append(key)
+
+    def _getXarrayDims(self,key,tleaf_name=None, setNevt=-1):
         coords=None
         dims=None
         try:
-            dataShape =  self.fh5.get_node(key,tleaf_name).shape
+            if self._isRedis:
+                dataShapeIn = self.fh5.keyinfo(run=self.run)[key][0]
+                if setNevt<0:
+                    setNevt = self._tStamp.shape[0]
+                dataShape = [setNevt]
+                for shp in dataShapeIn:
+                    dataShape.append(shp)
+                dataShape = tuple(dataShape)
+                #dataShape = self.fh5.keyinfo(run=-1)[key]
+                if tleaf_name is None:
+                    tleaf_name = key
+            else:                
+                dataShape = self.fh5.get_node(key,tleaf_name).shape
+                setNevt = dataShape[0]
         except:
             return np.array(0), coords, dims
         if len(dataShape)==1:
-            coords={'time': self._tStamp}
+            coords={'time': self._tStamp[:setNevt]}
             dims=('time')
         elif len(dataShape)==2:
             if dataShape[1]==1:
-                coords={'time': self._tStamp}
+                coords={'time': self._tStamp[:setNevt]}
                 dims=('time')
             elif key=='/EvtID':
                 return dataShape, coords, dims
             elif tleaf_name=='channels':
-                dimArr = ['0','1','2','3']
-                coords={'time': self._tStamp,'channels':dimArr}
+                dimArr = ['%d'%i for i in range(0,dataShape[1])]
+                coords={'time': self._tStamp[:setNevt],'channels':dimArr}
                 dims=('time','channels')
             elif tleaf_name.find('AngPos')>=0:
                 dimArr = ['AngX','AngY','PosX','PosY']
-                coords={'time': self._tStamp,'AngPos':dimArr}
+                coords={'time': self._tStamp[:setNevt],'AngPos':dimArr}
                 dims=('time','AngPos')
             elif tleaf_name.find('com')>=0:
                 dimArr = ['axis0','axis1']
-                coords={'time': self._tStamp,'axes':dimArr}
+                coords={'time': self._tStamp[:setNevt],'axes':dimArr}
                 dims=('time','axes')
             else: #currently save all 1-d data.
                 dimArr = np.arange(0, dataShape[1])
-                coords={'time': self._tStamp,'dim0':dimArr}
+                coords={'time': self._tStamp[:setNevt],'dim0':dimArr}
                 dims=('time','dim0')
                 #print '1-d data per event, not IPM-channels: ',key,tleaf_name, dataShape
         else:
-            coords={'time': self._tStamp}
+            coords={'time': self._tStamp[:setNevt]}
             dims = ['time']
             for dim in range(len(dataShape)-1):
                 thisDim = np.arange(0, dataShape[dim+1])
@@ -493,26 +546,89 @@ class SmallDataAna(object):
 
         return dataShape, coords, dims
 
+    def _updateXarray_fromREDIS(self):
+        if not self._isRedis:
+            return
+        #redisInfo = self.fh5.keyinfo(run=-1)
+        keys_for_xarray=[]
+        if len(self._live_fields)>0:
+            keys_for_xarray = self._live_fields
+        else:
+            redisInfo = self.fh5.keyinfo(run=self.run)
+            for key in redisInfo.keys():
+                #1-dim date
+                if len(redisInfo[key][0])<=2:
+                    keys_for_xarray.append(key)
+        nEvts = self.fh5.fetch_data(run=self.run, keys=['event_time'])['event_time'].shape[0]
+        nEvts_in_Xarray = -1
+        try:
+            nEvts_in_Xarray = self.xrData['event_time'].shape[0]
+            #print 'DEBUG:---events--',nEvts_in_Xarray, nEvts
+            if nEvts == nEvts_in_Xarray:
+                #print 'DEBUG: no update needed'
+                return
+        except:
+            pass
+
+        #FIX ME: don't know how to deal with added datasets on update here. Bummer
+        #KLUDGE ME: for now, just need to put all that code into the update function for the notebook
+        keys_for_xarray.append('event_time')
+        data_for_xarray = self.fh5.fetch_data(self.run,keys=keys_for_xarray)
+        evttime = data_for_xarray['event_time']
+        #print 'update from %d events to %d '%(nEvts_in_Xarray, evttime.shape[0])
+        self._fields['event_time'][1]='inXr'
+        evttime_sec = evttime >> 32
+        evttime_nsec = evttime - (evttime_sec << 32)
+        self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
+        #print 'DEBUG: ',self._tStamp.shape,data_for_xarray['event_time'].shape,' -- ',data_for_xarray['ipm2/sum'].shape
+        minNevt=data_for_xarray[keys_for_xarray[0]].shape[0]
+        for key in keys_for_xarray:
+            if data_for_xarray[key].shape[0]<minNevt:
+                #print 'DEBUG: mismatched data...',key
+                minNevt=data_for_xarray[key].shape[0]
+        self.xrData = xr.DataArray(evttime[:minNevt], coords={'time': self._tStamp[:minNevt]}, dims=('time'),name='event_time')
+        for key in keys_for_xarray:
+            if key == 'event_time':
+                continue
+            dataShape, coords, dims = self._getXarrayDims(key, setNevt=minNevt)
+            tArrName = key.replace('/','__')
+            self.xrData = xr.merge([self.xrData, xr.DataArray(data_for_xarray[key].squeeze()[:minNevt], coords=coords, dims=dims,name=tArrName) ])
+        #now make xarray summary reflect new smaller xarray.
+        for key in self._fields.keys():
+            if key in keys_for_xarray:
+                self._fields[key][1]='inXr'
+            else:
+                self._fields[key][1]='onDisk'
+
+        return
+
     def _addXarray(self):
+        #filling info from redis.
+        if self._isRedis:
+            self._updateXarray_fromREDIS()
+            return
+        #methods for h5-files.
         for node in self.fh5.root._f_list_nodes():
             key = node._v_pathname
             if not isinstance(node, tables.group.Group):
+                fieldkey = key[1:]
                 #if key != '/event_time':
-                if not self._fields[key][1]:
+                if self._fields[fieldkey][1]=='onDisk':
                     self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:]) ])
-                    self._fields[key][1]=True
+                    self._fields[fieldkey][1]='inXr'
                 continue
             for tleaf in node._f_list_nodes():
                 if not isinstance(tleaf, tables.group.Group):         
-                    tArrName = '%s__%s'%(key[1:],tleaf.name)
-                    fieldName = key+'/'+tleaf.name
+                    fieldkey = key[1:]
+                    tArrName = '%s__%s'%(fieldkey,tleaf.name)
+                    fieldName = fieldkey+'/'+tleaf.name
                     if self.fh5.get_node(key,tleaf.name).shape[0]!=self._tStamp.shape[0]: 
                         continue
                     dataShape, coords,dims = self._getXarrayDims(key,tleaf.name)
                     #limit on dimensions here!
                     if len(dataShape)<=2 and coords is not None:
                         self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key,tleaf.name).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
-                        self._fields[fieldName][1]=True
+                        self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
         if not isinstance(data, np.ndarray):
@@ -521,9 +637,12 @@ class SmallDataAna(object):
             except:
                 print 'data is not array and could not be cast to one either'
                 return
-        if data.shape[0] != self._tStamp.shape[0]:
+        if data.shape[0] < self._tStamp.shape[0]:
             print 'only adding event based data is implemented so far'
             return
+        if data.shape[0] > self._tStamp.shape[0]:
+            print 'have more events, only attach ones matching time stamps'
+            data=data[self._tStamp.shape[0]]
 
         if len(data.shape)==1:
             self.xrData = xr.merge([self.xrData, xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name) ])
@@ -540,32 +659,35 @@ class SmallDataAna(object):
             newArray = xr.DataArray(data, coords=coords, dims=dims,name=name)
             self.xrData = xr.merge([self.xrData, newArray])
 
-        if name[0]!='/': name='/'+name
-        if name.replace('__','/') not in self._fields.keys():
-            print 'add a new variable to Xarray: ',name
-            self._fields[name]=[data.shape, True, False]
-            return
-
+        #if not self._isRedis and name[0]!='/': name='/'+name
         name = name.replace('__','/')
-        if self._fields[name][2]:
-            self._fields[name]=[data.shape, True, True]
-            return
+        if name not in self._fields.keys():
+            #print 'add a new variable to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'mem']
+        elif self._fields[name][2]=='main':
+            #print 'add a variable from the main data to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'main']
         else:
-            #FIXME
-            #this is data read in from netcdf files made previouly. Not sure what to do. make same as read from h5 for NOW
-            self._fields[name]=[data.shape, True, True]
+            #print 'add a variable from an netcdf to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'xrfile']
 
     def _updateFromXarray(self):
+        """
+        this function looks for keys in the xarray that are NOT from the original files (e.g. created by xr.assign...)
+        """
         for key in self.xrData.keys():
-            fieldName = '/'+key.replace('__','/')
+            fieldName = key.replace('__','/')
             if fieldName not in self._fields.keys():
                 print 'added new data field %s to list',key
-                self._fields[fieldName]={self.xrData[key].shape, True, False}
+                self._fields[fieldName]={self.xrData[key].shape, 'inXr', 'mem'}
 
     def _writeNewData(self):
+        """
+        write newly created fields to netcdf fiels that can be loaded in future sessions
+        """
         print 'save derived data to be loaded next time:'
         for key in self._fields.keys():
-            if not self._fields[key][2]:
+            if self._fields[key][2] == 'mem':
                 print 'saving data for field: ',key, self._fields[key]
                 data = self.getVar(key)
                 #print 'DEBUG: shape ',data.shape
@@ -596,7 +718,7 @@ class SmallDataAna(object):
     def _readXarrayData(self):
         for (dirpath, dirnames, filenames) in walk(self.dirname):        
             for fname in filenames:
-                if fname.find('xr')==0:
+                if fname.find('xr')==0 and fname.find('Run%03d'%self.run)>=0:
                     add_xrDataSet = xr.open_dataset(self.dirname+'/'+fname,engine='h5netcdf')
                     key = fname.replace('xr_','').replace('%s_Run%03d.nc'%(self.expname,self.run),'')
                     if key[-1]=='_':key=key[:-1]
@@ -604,12 +726,14 @@ class SmallDataAna(object):
                         continue
                     if (len(add_xrDataSet[key].shape)==2 and add_xrDataSet[key].shape[1]<10):
                         continue
-                    self._fields[key]=[add_xrDataSet[key].shape, True, True]
+                    key = key.replace('__','/')
+                    self._fields[key]=[add_xrDataSet[key].shape, 'inXr', 'xrfile']
                     values = add_xrDataSet[key].values
                     self.addVar(key, values)
                     #need to print this dataset, otherwise this does not work. Why #DEBUG ME
                     print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
 
+    #FIX ME: need to fix this! this will NOT work anymore....
     def setRun(self, run):
         self.run=run
         self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
@@ -644,14 +768,34 @@ class SmallDataAna(object):
             self.fh5=tables.open_file(self.fname,'r')
     def Keys2d(self, inh5 = None, printKeys=False):
         return self.Keys(inh5 = inh5, printKeys=printKeys, areaDet=True)
+
     def Keys(self, name=None, inh5 = None, printKeys=False, areaDet=False, cfgOnly=False, returnShape=False):
-        keysFiltered = []
+        """
+        return list of available keys, allowing for filter to only print subsets/
+        returnShape=True will fill the initial _fields dict
+        """
         keys = []
+        keyShapes=[]
+        keysFiltered = []
+        keyShapesFiltered=[]
+
         if inh5 == None and self.fh5:
             fh5 = self.fh5
         else:
             fh5 = inh5        
-        if fh5:
+
+        #DEBUG ME - do not go back to hdf5 or redis if fields are already loaded.
+        if len(self._fields.keys())>0 and not returnShape:
+            keys=self._fields.keys()
+            for key in keys:
+                keyShapes.append((0,))
+        elif self._isRedis:
+            #redisInfo = self.fh5.keyinfo(run=-1)
+            redisInfo = self.fh5.keyinfo(run=self.run)
+            for key in redisInfo.keys():
+                keys.append(key)
+                keyShapes.append(redisInfo[key][0])
+        elif fh5:
             for node in fh5.root._f_list_nodes() :
                 key = node._v_pathname
                 if cfgOnly and not key.find('Cfg')>=0:
@@ -660,33 +804,38 @@ class SmallDataAna(object):
                     continue
                 if isinstance(name, basestring) and key.find(name)<0:
                     continue
+                thiskey=''
                 if not isinstance(node, tables.group.Group):
-                    keys.append('%s'%key)
-                    continue
-                for tleaf in node._f_list_nodes():   
-                    if isinstance(tleaf, tables.group.Group):
-                        for leaf in tleaf._f_list_nodes():   
-                            keys.append('%s/%s'%(tleaf._v_pathname,leaf.name))
-                    else:
-                        keys.append('%s/%s'%(key,tleaf.name))
-
-            keyShapes=[]
-            for thiskey in keys:
-                if isinstance(name, basestring) and thiskey.find(name)<0:
-                    continue
-                if areaDet and (len(thiskey.split('/'))==2 or len(fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape)<=2):
-                    continue
-                keysFiltered.append(thiskey)
-                if len(thiskey.split('/')) > 2:
-                    keyShapes.append(fh5.get_node('/'.join(thiskey.split('/')[:-1]),thiskey.split('/')[-1]).shape)
+                    thiskey='%s'%key
+                    keys.append(thiskey)
+                    keyShapes.append(shapeFromKey_h5(fh5, thiskey))
                 else:
-                    keyShapes.append(fh5.get_node(thiskey).shape)
-                if printKeys:
-                    print thiskey
+                    for tleaf in node._f_list_nodes():   
+                        if isinstance(tleaf, tables.group.Group):
+                            for leaf in tleaf._f_list_nodes():   
+                                thiskey='%s/%s'%(tleaf._v_pathname,leaf.name)
+                                keys.append(thiskey)
+                                keyShapes.append(shapeFromKey_h5(fh5, thiskey))
+                        else:
+                            thiskey='%s/%s'%(key,tleaf.name)
+                            keys.append(thiskey)
+                            keyShapes.append(shapeFromKey_h5(fh5, thiskey))
+
+        for thiskey,thiskeyshape in zip(keys,keyShapes):
+            if isinstance(name, basestring) and thiskey.find(name)<0:
+                continue
+            if areaDet and len(thiskeyshape)<=2:
+                continue
+            if thiskey[0]=='/': thiskey=thiskey[1:]
+            keysFiltered.append(thiskey)
+            keyShapesFiltered.append(thiskeyshape)
+            if printKeys:
+                print thiskey
         if returnShape:
-            for tkey, tshape in zip(keysFiltered, keyShapes):
+            for tkey, tshape in zip(keysFiltered, keyShapesFiltered):
                 if tkey not in self._fields.keys():
-                    self._fields[tkey] = [tshape, False, True]
+                    self._fields[tkey] = [tshape, 'onDisk', 'main']
+
         return keysFiltered
         
     def printSelection(self, selName=None, brief=True):
@@ -705,10 +854,10 @@ class SmallDataAna(object):
                 print '--------------------------'
 
     def nEvts(self,printThis=False):
-        if ('/fiducials' in self._fields.keys()):
-            nent = self._fields['/fiducials'][0][0]
-        elif ('/EvtID/fid' in self._fields.keys()):
-            nent = self._fields['/EvtID/fid'][0][0]
+        if ('fiducials' in self._fields.keys()):
+            nent = self._fields['fiducials'][0][0]
+        elif ('EvtID/fid' in self._fields.keys()):
+            nent = self._fields['EvtID/fid'][0][0]
         else:
             print 'could not find dataset with fiducials'
             nent=-1
@@ -723,15 +872,32 @@ class SmallDataAna(object):
         if scanVar is not None:
             isScan=True
         if isScan:
-            nPoints=np.unique(self.getVar('/scan/%s'%scanVar)).shape[0]
+            nPoints=np.unique(self.getVar('scan/%s'%scanVar)).shape[0]
             print 'this run is a scan of %s with %d points'%(scanVar,nPoints)
 
-    def hasKey(self, inkey, inh5=None, printThis=False):
-        if inh5 == None and self.fh5:
-            fh5 = self.fh5
-        else:
-            fh5 = hf5
-        return util_hasKey(inkey, fh5, printThis)
+    def hasKey(self, inkey):
+        if inkey in self._fields.keys():
+            return True
+
+    def _getTTstr(self):
+        """
+        function to determine the string for the timetool variables in the desired run
+        necessary as naming scheme evolved over time
+        """
+        ttCorr = None
+        ttBaseStr = 'tt/'
+        if 'tt/ttCorr' in self._fields.keys():
+            ttCorr = 'tt/ttCorr'
+        elif 'ttCorr/tt' in self._fields.keys():
+            ttCorr = 'ttCorr/tt'
+        if not ttBaseStr+'AMPL' in self._fields.keys():
+            if 'tt/XPP_TIMETOOL_AMPL'  in self._fields.keys():
+                ttBaseStr = 'tt/XPP_TIMETOOL_'
+            elif 'tt/TIMETOOL_AMPL'  in self._fields.keys():
+                ttBaseStr = 'tt/TIMETOOL_'
+            elif 'tt/TTSPEC_AMPL'  in self._fields.keys():
+                ttBaseStr = 'tt/TTSPEC_'
+        return ttCorr, ttBaseStr
 
     def addCut(self, varName, cmin, cmax, SelName):
         if not self.Sels.has_key(SelName):
@@ -766,7 +932,10 @@ class SmallDataAna(object):
         return [FilterOn.squeeze() , FilterOff.squeeze()]
         
     def getFilter(self, SelName=None, ignoreVar=[]):
-        total_filter=np.ones_like(self.getVar('scan/var0')).astype(bool)
+        try:
+            total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
+        except:
+            total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
         if SelName==None or SelName not in self.Sels.keys():
             return total_filter
         if self.Sels[SelName]._filter is not None and len(ignoreVar)==0:
@@ -792,9 +961,12 @@ class SmallDataAna(object):
         if self.hasKey('EvtID'):
             fids = self.getVar('/EvtID/fid')
             times = self.getVar('/EvtID/time')
-        else:
-            fids = self.getVar('/EvtID/fiducials')
-            times = self.getVar('/EvtID/event_time')
+        elif self.hasKey('/fiducials'):
+            fids = self.getVar('/fiducials')
+            times = self.getVar('/event_time')
+        elif self.hasKey('fiducials'):
+            fids = self.getVar('fiducials')
+            times = self.getVar('event_time')
         Filter =  self.getFilter(SelName)
         selfids = [ (ifid,itime) for ifid,itime in zip(fids[Filter],times[Filter])]
         return selfids
@@ -807,18 +979,15 @@ class SmallDataAna(object):
         else:
             sigROI=[]
 
-        if plotvar[0]!=['/'] and plotvar[0]!='/':
-            plotvar='/'+plotvar
-
         if isinstance(Filter,basestring):
             Filter = self.getFilter(Filter)
 
-        if self._fields[plotvar][1]==True:
-            fullData = self.xrData[plotvar[1:].replace('/','__')]
+        if self._fields[plotvar][1]=='inXr':
+            fullData = self.xrData[plotvar.replace('/','__')]
             if Filter is None:
-                return fullData
+                return fullData.values
             else:
-                return fullData[Filter]
+                return fullData[Filter].values
 
         #check if this variable has been added to xarray and needs to be added to fields
         if plotvar not in self._fields.keys():
@@ -833,19 +1002,25 @@ class SmallDataAna(object):
         #if only few events are picked, just get those events.
         try:
             if Filter is None:
-                if len(plotvar.split('/'))>2:
-                    vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
+                if not self._isRedis:
+                    if len(plotvar.split('/'))>1:
+                        vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
+                    else:
+                        vals = self.fh5.get_node(plotvar).read()
                 else:
-                    vals = self.fh5.get_node(plotvar).read()
+                    vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar]
                 if vals.shape[0]==self._tStamp.shape[0]:
-                    tArrName = plotvar[1:].replace('/','__')
+                    tArrName = plotvar.replace('/','__')
                     if addToXarray:
                         self.addVar(tArrName, vals)
             else:
-                if len(plotvar.split('/'))>2:
-                    vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__(Filter)
+                if not self._isRedis:
+                    if len(plotvar.split('/'))>1:
+                        vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__(Filter)
+                    else:
+                        vals = self.fh5.get_node(plotvar).__getitem__(Filter)
                 else:
-                    vals = self.fh5.get_node(plotvar).__getitem__(Filter)
+                    vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar][Filter]
             return vals.squeeze()
         except:
             print 'failed to get data for ',plotvar
@@ -890,7 +1065,63 @@ class SmallDataAna(object):
 
     #make delay another Xarray variable.
     def getDelay(self, use_ttCorr=True, addEnc=False):
-        delay = util_getDelay(self.fh5, use_ttCorr, addEnc)
+        """
+        function to get the xray-laser delay from the data
+        usage:
+        getDelay(): get the delay from lxt and/or encoder stage, add the timetool correction
+        getDelay(use_ttCorr=False): get the delay from lxt and/or encoder stage, NO timetool correction
+        getDelay(addEnc=True): get the delay from lxt, add encoder stage and timetool correction
+        """
+        ttCorrStr, ttBaseStr = self._getTTstr()
+        if self.ttCorr is not None:
+            ttCorr=self.getVar(self.ttCorr)
+        if (np.nanstd(ttCorr)==0):
+            ttCorr=self.getVar(self.ttBaseStr+'FLTPOS_PS')
+        nomDelay=np.zeros_like(ttCorr)
+
+        isDaqDelayScan=False
+        scanVar = self.getScanName()
+        if scanVar.find('lxt')>=0:
+            isDaqDelayScan=True
+            #print 'DEBUG: found that we have a delay scan'
+            nomDelay=self.getVar('scan/%s'%scanVar)*1e12
+
+        if not isDaqDelayScan:
+            if self.hasKey('enc/lasDelay'):
+                encVal = self.getVar('enc/lasDelay')
+                #print 'DEBUG: encoder info',encVal.std()
+                if encVal.std()>1e-9:
+                    nomDelay=encVal
+                    addEnc=False
+                elif encVal.std()>1e-15:
+                    nomDelay=encVal*1e12
+                    addEnc=False
+                elif self.hasKey('enc/ch0'):
+                    encVal = self.getVar('enc/ch0')
+                    if encVal.std()>1e-15 and encVal.std()<1e-9:
+                        nomDelay=encVal*1e12
+                        #now look at the EPICS PV if everything else has failed.
+                    elif encVal.std()>1e-3:
+                        nomDelay=encVal
+                    else:
+                        print 'strange encoder value for runs taken before encoder FEX....', encCal.std()
+                else:
+                    epics_delay = self.getVar('epics/lxt_ttc')
+                    if epics_delay.std()!=0:
+                        nomDelay = epics_delay
+
+        if addEnc and self.hasKey('enc/lasDelay'):
+            print 'required to add encoder value, did not find encoder!'
+        if addEnc and self.hasKey('enc/lasDelay'):
+            if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
+                nomDelay+=getVar(fh5,'enc/lasDelay').value
+
+        if use_ttCorr:
+            #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()
+            delay = (ttCorr+nomDelay)
+        else:
+            delay = nomDelay
+
         self.addVar('delay', delay)
         return delay
 
@@ -951,7 +1182,7 @@ class SmallDataAna(object):
         else:
             pmin=min(limits[0],limits[1])
             pmax=max(limits[0],limits[1])
-        hst = np.histogram(vals,np.linspace(pmin,pmax,numBins))
+        hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
         print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
         if fig is None:
             fig=plt.figure(figsize=(8,5))
@@ -1022,7 +1253,8 @@ class SmallDataAna(object):
             ind1 = np.digitize(v1, binEdges1)
             ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
             iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
-            plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]],clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
+            extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
+            plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
             plt.xlabel(plotvars[1])
             plt.ylabel(plotvars[0])
         if setCuts is not None and self.Sels.has_key(setCuts):
@@ -1032,14 +1264,14 @@ class SmallDataAna(object):
             self.Sels[setCuts].addCut(plotvars[0],min(p0),max(p0))
             self.Sels[setCuts].addCut(plotvars[1],min(p1),max(p1))
         if asHist:
-            return iSig
+            return iSig, extent
         else:
-            return vals
+            return vals[0][total_filter], val[1][total_filter]
 
     def getScanName(self):
-        for key in self.Keys('/scan'):
-            if key.find('var')<0 and key.find('none')<0:
-                return key.replace('/scan/','')
+        for key in self.Keys('scan'):
+            if key.find('var')<0 and key.find('none')<0 and key.find('damage')<=0:
+                return key.replace('/scan/','').replace('scan/','')
 
     def getScanValues(self,ttCorr=False,addEnc=False):
         #get the scan variable & time correct if desired
@@ -1294,6 +1526,8 @@ class SmallDataAna(object):
         else:
             pmin = np.percentile(scan[total_filter],0.1)
             pmax = np.percentile(scan[total_filter],99.9)
+        values = scan[total_filter]
+        values = values[~np.isnan(values)]
         hst = np.histogram(scan[total_filter],np.linspace(pmin,pmax,100))
         plt.subplot(gs[2]).plot(hst[1][:-1],hst[0],'o')
         #plt.subplot(gs[2]).xlabel(scanVarName)
@@ -1355,7 +1589,7 @@ class SmallDataAna(object):
         targetVarsLocal = []
         for tVar in cube.targetVars:
             if isinstance(tVar, basestring):
-                if tVar not in self._fields.keys() and '/%s'%tVar not in self._fields.keys():
+                if tVar not in self._fields.keys() in self._fields.keys():
                     cube.targetVarsXtc.append(tVar)
                 else:
                     targetVarsLocal.append(tVar)
@@ -1398,7 +1632,8 @@ class SmallDataAna(object):
         else:
             binVar = self.get1dVar(cube.binVar)
 
-        cube.printCube(self.Sels[cube.SelName])
+        if debug:
+            cube.printCube(self.Sels[cube.SelName])
         cubeFilter = self.getFilter(cube.SelName)
         [cubeOn, cubeOff] = self.getFilterLaser(cube.SelName, ignoreVar=[])
         if onoff==1:
@@ -1420,9 +1655,7 @@ class SmallDataAna(object):
         newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
         newXr = xr.merge([newXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
         for tVar in cube.targetVars:
-            if tVar[0]=='/':
-                tVar=tVar[1:]
-            if not self.hasKey(tVar):
+            if not self.hasKey(tVar):                
                 continue
             #print 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape
             filteredVar = self.getVar(tVar,cubeFilter).squeeze()
@@ -1457,18 +1690,20 @@ class SmallDataAna(object):
         if not returnIdx:
             return cubeData
 
-        if '/fiducials' in self.Keys():
-            evtIDXr = xr.DataArray(self.getVar('/fiducials',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
-            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/event_time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
-            evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
-            if addIdxVar!='':
-                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
+        fidVar='fiducials'
+        evttVar='event_time'
+        if 'fiducials' in self.Keys():
+            fidVar='/fiducials'
+            evttVar='/event_time'
         elif '/EvtID/fid' in self.Keys():
-            evtIDXr = xr.DataArray(self.getVar('/EvtID/fid',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
-            evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar('/EvtID/time',cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
-            evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
-            if addIdxVar!='':
-                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
+            fidVar='/EvtID/fid'
+            fidVar='/EvtID/time'
+
+        evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
+        evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evtVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
+        evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+        if addIdxVar!='':
+            evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
         else:
             print 'could not find event idx in data'
             return cubeData,None
