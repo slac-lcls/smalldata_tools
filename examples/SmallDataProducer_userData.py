@@ -1,16 +1,13 @@
 # importing generic python modules
 import numpy as np
-import h5py
 import psana
 import time
 import argparse
 import socket
 import os
 
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject,checkDet,getCfgOutput,getUserData,getUserEnvData
-#from SmallDataUtils import *
-#from utilities_wSmallData import *
-#from DetObject import DetObject
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
 ########################################################## 
 ##
 ## User Input start --> 
@@ -19,9 +16,6 @@ from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetO
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
-# none for now, start w/ full image saving to see if 
-# start works with the new smallData
-#
 def getAzIntParams(run):
     ret_dict = {'eBeam': 8.015}
     ret_dict['cspad_center'] = [87697.946016760892, 94865.383526655729]
@@ -235,6 +229,15 @@ for eventNr,evt in enumerate(ds.events()):
         except:
             pass
     smldata.event(userDict)
+
+    #here you can add any data you like: example is a product of the maximumof two area detectors.
+    try:
+        cspadMax = cspad.evt.dat.max()
+        epix_vonHamosMax = epix_vonHamos.evt.dat.max()
+        combDict = {'userValue': cspadMax*epix_vonHamosMax}
+        smldata.event(combDict)
+    except:
+        pass
 
 #gather whatever event did not make it to the gather interval
 print 'I am finished, call save to be safe...'    

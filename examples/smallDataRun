@@ -10,7 +10,9 @@ OPTIONS:
 -e expname (def: current experiment, example: xppe7815)
 -d directory for output files (default: ftc diretory of specified experiment)
 -q queue name (default: psanaq if exp specified, psneh(hi)prioq for current exp)
--n number of events
+-j #: run on # number of cores
+-n number of events (for testing)
+-s run locally
 EOF
 }
 
