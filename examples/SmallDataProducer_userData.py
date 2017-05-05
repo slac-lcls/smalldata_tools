@@ -33,7 +33,6 @@ def getNmaxDrop(run):
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = [] 
@@ -60,13 +59,13 @@ parser.add_argument("--offline", help="run offline (def for current exp from ffb
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
 args = parser.parse_args()
+hostname=socket.gethostname()
 if not args.run:
     run=raw_input("Run Number:\n")
 else:
     run=args.run
 if not args.exp:
     hutches=['amo','sxr','xpp','xcs','mfx','cxi','mec']
-    hostname=socket.gethostname()
     hutch=None
     for thisHutch in hutches:
         if hostname.find(thisHutch)>=0:
@@ -124,6 +123,12 @@ except:
 ## User Input start --> 
 ##
 ########################################################## 
+#ttCalib=[0.,2.,0.]
+#setParameter(defaultDets, ttCalib, 'tt')
+##this gives the analog input channels friendlier names
+#aioParams=[[1],['laser']]
+#setParameter(defaultDets, aioParams, 'ai')
+
 nDrop = getNmaxDrop(int(run))
 azIntParams = getAzIntParams(run)
 epixnames = ['epix_vonHamos']

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
+CURREXP=`get_curr_exp`
+if [[ $CURREXP =~ 'xpp' ]]; then
+    HUTCH='xpp'
+else
+    HUTCH='xcs'
+fi
+cd /reg/d/psdm/$HUTCH/$CURREXP/results/littleData
+#LASTRUN=4
+LASTRUN=`get_lastRun`
+while true; do
+	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
+	EXP_RUN=`get_lastRun`
+        LDATRUN_H5=`ls -t /reg/d/psdm/$HUTCH/$CURREXP/hdf5/smalldata/ldat*h5 | head -n1 | sed s:/reg/d/psdm/$HUTCH/$CURREXP/hdf5/smalldata/ldat_$CURREXP\_Run::g | sed s/.h5//g`
+        HASH5=`ls -t /reg/d/psdm/$HUTCH/$CURREXP/hdf5/smalldata/ldat*Run*$LASTRUN*h5 | wc | awk {'print $1'}`
+	echo 'Last Run: '$EXP_RUN ', latest littleData file: ' $LDATRUN_H5 ', checked at ' $CREATE_TIME ', checking to process run ' $LASTRUN
+
+	if [ $EXP_RUN -ge $LASTRUN ]; then
+	    if [ $HASH5 -eq 1 ]; then
+		echo 'we have processed run ' $LASTRUN 'offline already'
+		let "LASTRUN+=1" 
+	    else
+		echo 'send ffb job for run ' $LASTRUN 
+		./littleDataRun -r $LASTRUN
+		let "LASTRUN+=1" 
+		sleep 30
+	    fi
+	fi
+	sleep 10
+done

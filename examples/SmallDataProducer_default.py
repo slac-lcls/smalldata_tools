@@ -16,7 +16,6 @@ from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
 epicsPV = [''] 
 ########################################################## 
@@ -40,6 +39,7 @@ parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/sm
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
+hostname=socket.gethostname()
 args = parser.parse_args()
 if not args.run:
     run=raw_input("Run Number:\n")
@@ -47,7 +47,6 @@ else:
     run=args.run
 if not args.exp:
     hutches=['amo','sxr','xpp','xcs','mfx','cxi','mec']
-    hostname=socket.gethostname()
     hutch=None
     for thisHutch in hutches:
         if hostname.find(thisHutch)>=0:
@@ -99,8 +98,24 @@ except:
 
 
 defaultDets = defaultDetectors(hutch)
+########################################################## 
+##
+## User Input start --> 
+##
+########################################################## 
+##########################################################
+# run independent parameters 
+##########################################################
 #ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
+#setParameter(defaultDets, ttCalib, 'tt')
+##this gives the analog input channels friendlier names
+#aioParams=[[1],['laser']]
+#setParameter(defaultDets, aioParams, 'ai')
+########################################################## 
+##
+## <-- User Input end
+##
+########################################################## 
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
