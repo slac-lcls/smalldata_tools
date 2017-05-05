@@ -20,7 +20,7 @@ export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
 CURREXP=`get_curr_exp`
 
 RUN=-1
-#16 works ok for default littleData
+#16 works ok for default smalleData
 #also when using MPI, use only one node.....
 #for bigger ROI on short run, 32 jobs is better, 64 did not have gain
 #NJOBS=16
@@ -197,27 +197,18 @@ if [ $SINGLEJOB -eq 1 ]; then
 else
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME
-#    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/littleData_$EXP\_$RUN\_%J.out \
+#    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
 #        mpirun --mca btl ^openib \
 #        python ./SmallDataProducer.py \
 #	$ARGSTR \
 #        --run $RUN`
-    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/littleData_$EXP\_$RUN\_%J.out \
+    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
         mpirun python ./examples/SmallDataProducer.py \
 	$ARGSTR \
         --run $RUN`
 fi
 
 #source /reg/g/psdm/bin/conda_setup ""
-
-#if [ -d './xppmodules/scripts/' ]; then
-#    LDAP='xppmodules' 
-#else
-#    echo 'could not find code, please run from /reg/d/psdm/<hutch>/<expname>/res/littleData or your own local setup'
-#fi
-#source /reg/g/pcds/setup/pathmunge.sh
-#pythonpathmunge $LDAP/src
-#pythonpathmunge $LDAP/scripts
 
 echo $CMD
 $CMD

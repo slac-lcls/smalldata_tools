@@ -685,6 +685,9 @@ class SmallDataAna(object):
         """
         write newly created fields to netcdf fiels that can be loaded in future sessions
         """
+        #do not write files for REDIS (as you are likely auto-updating...)
+        if self._isRedis:
+            return
         print 'save derived data to be loaded next time:'
         for key in self._fields.keys():
             if self._fields[key][2] == 'mem':
@@ -1004,9 +1007,9 @@ class SmallDataAna(object):
             if Filter is None:
                 if not self._isRedis:
                     if len(plotvar.split('/'))>1:
-                        vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
+                        vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
                     else:
-                        vals = self.fh5.get_node(plotvar).read()
+                        vals = self.fh5.get_node('/'+plotvar).read()
                 else:
                     vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar]
                 if vals.shape[0]==self._tStamp.shape[0]:
@@ -1016,9 +1019,13 @@ class SmallDataAna(object):
             else:
                 if not self._isRedis:
                     if len(plotvar.split('/'))>1:
-                        vals = self.fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__(Filter)
+                        #seems like this is not how it works.
+                        #vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__[Filter]
+                        vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()[Filter]
                     else:
-                        vals = self.fh5.get_node(plotvar).__getitem__(Filter)
+                        #seems like this is not how it works.
+                        #vals = self.fh5.get_node('/'+plotvar).__getitem__(Filter)
+                        vals = self.fh5.get_node('/'+plotvar).read()[Filter]
                 else:
                     vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar][Filter]
             return vals.squeeze()
@@ -1275,7 +1282,7 @@ class SmallDataAna(object):
 
     def getScanValues(self,ttCorr=False,addEnc=False):
         #get the scan variable & time correct if desired
-        scanOrg = self.getVar('/scan/var0')
+        scanOrg = self.getVar('scan/var0')
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
             delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
@@ -1399,6 +1406,7 @@ class SmallDataAna(object):
             scanOffPoints, scanOffIdx = np.unique(scan[FilterOff], return_inverse=True)
             if len(scanOffPoints) > len(scanPoints):
                 scanOffPoints = scanPoints.copy()
+                
             scanOffIdx = np.digitize(scan[FilterOff], scanOffPoints)
             OffData = True
 
@@ -1431,9 +1439,9 @@ class SmallDataAna(object):
             iNorm = np.bincount(scanOnIdx, i0Val[FilterOn])
             iSig = np.bincount(scanOnIdx, sigVal[FilterOn])
 
-        print 'evts ',np.bincount(scanOnIdx)
-        print 'i0',iNorm
-        print 'sig',iSig
+        #print 'evts ',np.bincount(scanOnIdx)
+        #print 'i0',iNorm
+        #print 'sig',iSig
         scan = iSig/iNorm
         #scan = scan/np.mean(scan[1]) # normalize to 1 for first energy point?
 
@@ -1442,6 +1450,13 @@ class SmallDataAna(object):
             iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff])
             iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff])
             scanoff = iSigoff/iNormoff
+            if scanOffIdx.shape > scanOffPoints.shape:
+                shapeDiff = abs(scanOnIdx.max()+1-scanPoints.shape[0])
+                shapeDiff = abs(scanOffIdx.max()+1-scanOffPoints.shape[0])
+                if scanOffIdx.min()>0:
+                    scanoff=scanoff[shapeDiff:]
+                else:
+                    scanoff=scanoff[:-shapeDiff]
         if (not OffData):
             plotDiff = False
         #now save data if desired
@@ -1456,7 +1471,7 @@ class SmallDataAna(object):
         if binVar is not None:
             returnDict['binPoints']=binPoints
         if plotThis:
-            print 'retData: ',returnDict
+            #print 'retData: ',returnDict
             self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig)
         return returnDict
 
@@ -1465,7 +1480,7 @@ class SmallDataAna(object):
         scanVarName = returnDict['scanVarName']
         scanPoints = returnDict['scanPoints']
         scan = returnDict['scan']
-        print 'plot ',plotVarName, scanVarName, ' shape ',scan.shape
+        print 'plot ',plotVarName, scanVarName, ' shape ',scan.shape,' plot diff ',plotDiff
 
         if interpolation!='' and returnDict.has_key('scanOffPoints'):
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
@@ -1476,22 +1491,24 @@ class SmallDataAna(object):
             extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
             plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
             plt.xlabel(scanVarName)
-        elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
+        #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
+        elif plotDiff and returnDict.has_key('scanOffPoints'):
             if fig is None:
                 fig=plt.figure(figsize=(10,10))
             gs=gridspec.GridSpec(2,1,width_ratios=[1])
-            fig = plt.subplot(gs[0])
-            plt.xlabel(scanVarName)
-            plt.ylabel(plotVarName)
-            fig.plot(scanPoints, scan, 'ro--', markersize=5)
+            plt.subplot(gs[0]).set_xlabel(scanVarName)
+            plt.subplot(gs[0]).set_ylabel(plotVarName)
+            plt.subplot(gs[0]).plot(scanPoints, scan, 'ro--', markersize=5)
             if interpolation!='':
-                fig.plot(scanPoints[:-1], scanoff_interp, 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-            fig.plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
-            plt.ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
-            fig1 = plt.subplot(gs[1])
-            fig1.plot(scanPoints[:-1], (scan[:-1]-scanoff_interp), 'bo--', markersize=5)
-            plt.xlabel(scanVarName)
-            plt.ylabel(plotVarName)
+                plt.subplot(gs[0]).plot(scanPoints[:-1], scanoff_interp, 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
+            plt.subplot(gs[0]).plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
+            plt.subplot(gs[0]).set_ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
+            if interpolation!='':
+                plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-scanoff_interp), 'bo--', markersize=5)
+            else:
+                plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-returnDict['scanOff'][:-1]), 'bo--', markersize=5)
+            plt.subplot(gs[1]).set_xlabel(scanVarName)
+            plt.subplot(gs[1]).set_ylabel(plotVarName)
         else:
             if fig is None:
                 fig=plt.figure(figsize=(10,5))

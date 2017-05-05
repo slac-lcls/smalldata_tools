@@ -39,6 +39,7 @@ parser.add_argument("--nevt", help="number of events", type=int)
 parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/smalldata)")
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
+parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
 args = parser.parse_args()
 if not args.run:
     run=raw_input("Run Number:\n")
@@ -89,6 +90,8 @@ try:
     if ds.rank==0:
         print 'saving data in file: %s with gatherINterval %f'%(smldataFile,gatherInterval)
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
+    if args.live:
+        smldata.connect_redis()
 except:
     print 'we seem to not have small data, you need to use the idx file based Ldat_standard code....',dsname
     import sys
@@ -119,4 +122,5 @@ for eventNr,evt in enumerate(ds.events()):
     defData = detData(defaultDets, evt)
     smldata.event(defData)
 
+print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()
