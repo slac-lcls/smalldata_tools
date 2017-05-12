@@ -105,77 +105,7 @@ if ana is not None:
         binRange = np.arange(8.5,13,0.03)
     if run==153 or run == 304:
         binRange = np.arange(12,15,0.05)
-    ana.addCube('cube','delay',binRange,'on')
-    ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
-    ana.addCube('cubeOff','delay',binRange,'off')
-    ana.addToCube('cubeOff',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
-    #ana.getVar('cs140_rob/ROI')
-    #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_sum','cs140_rob/ROI'])
-
-    cubeData = ana.makeCubeData('cube')
-    cubeDataOff = ana.makeCubeData('cubeOff')
-
-    #works for run 65.
-    if run == 65:
-        plt.plot(cubeData['binVar_bins'],cubeData['cs140_rob__ROI_0_sum']/cubeData['ipm2__sum'],'o-')
-        plt.plot(cubeDataOff['binVar_bins'],cubeDataOff['cs140_rob__ROI_0_sum']/cubeDataOff['ipm2__sum'],'o-')
-
-    #works for run 153.
-    if run == 153 or run == 304:
-        plt.plot(cubeData['binVar_bins'],cubeData['diodeU__channels'][:,1]/cubeData['ipm2__sum'],'o-')
-        plt.plot(cubeDataOff['binVar_bins'],cubeDataOff['diodeU__channels'][:,1]/cubeDataOff['ipm2__sum'],'o-')
-
-
-    ##stuff for tim's data.
-    ##this here is specifically for xpp00316, Tim's data.
-    #ana.addCut('ipm3/sum',0.5,10.,'on')
-    #ana.addCut('ipm3/sum',0.5,10.,'off')
-    #ana.addCut('tt/AMPL',0.03,10.,'on')
-
-    ##delay=ana.getDelay()
-    ##encOffset=1306521.2
-    #encOffset=1343965.
-    #conv=20e-9
-    #speedLight = 2.99792458e8
-    #encScale=2 * conv / speedLight
-    ##ana.xrData = ana.xrData.assign(newDelay = (ana.xrData.enc__ch0-encOffset)*encScale*1e12 + ana.xrData.tt_ttCorr))
-    #newDelay = (ana.xrData.enc__ch0-encOffset)*encScale*1e12 + ana.xrData.tt__ttCorr
-    #ana.addVar('newDelay', newDelay)
-
-    #ana.addCube('cube','newDelay',np.arange(-2.,2.,0.025),'on')
-    #ana.xrData = ana.xrData.assign(cspad__ROI1 = (ana.xrData.cspad__ROI_0_sum + ana.xrData.cspad__ROI_1_sum)) 
-    #ana.xrData = ana.xrData.assign(cspad__ROI2 = (ana.xrData.cspad__ROI_2_sum + ana.xrData.cspad__ROI_3_sum  + ana.xrData.cspad__ROI_4_sum)) 
-    ##ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','/cspad/ROI_0_sum','/cspad/ROI_1_sum','/cspad/ROI_2_sum','/cspad/ROI_3_sum','/cspad/ROI_4_sum'])
-    #azav = ana.getVar('cspad/azav')
-    #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','/cspad/ROI_0_sum','/cspad/ROI_1_sum','/cspad/ROI_2_sum','/cspad/ROI_3_sum','/cspad/ROI_4_sum','cspad/azav'])
-
+    #ana.addCube('cube','delay',binRange,'on')
+    #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
     #cubeData = ana.makeCubeData('cube')
-
-    #azav = cubeData['cspad__azav'].mean(axis=1)
-
-    #azavt0_2d = cubeData['cspad__azav'][:10].mean(axis=0)
-    #azavt0_2d = azavt0_2d / azavt0_2d.max()
-
-    #azavt10t20_2d = cubeData['cspad__azav'][10:20].mean(axis=0)
-    #azavt10t20_2d = azavt10t20_2d / azavt10t20_2d.max()
-    #azavt10t20_2d = azavt10t20_2d / azavt0_2d
-    #azavt50t60_2d = cubeData['cspad__azav'][50:60].mean(axis=0)
-    #azavt50t60_2d = azavt50t60_2d / azavt50t60_2d.max()
-    #azavt50t60_2d = azavt50t60_2d / azavt0_2d
-    #azavtm10_2d = cubeData['cspad__azav'][-10:].mean(axis=0)
-    #azavtm10_2d = azavtm10_2d / azavtm10_2d.max()
-    #azavtm10_2d = azavtm10_2d / azavt0_2d
-
-    #f, ax = plt.subplots(nrows=2, ncols=2)
-    #ax[0,0].imshow(azavt10t20_2d, interpolation='none', aspect='auto')
-    #ax[1,0].imshow(azavt50t60_2d, interpolation='none', aspect='auto')
-    #ax[1,1].imshow(azavtm10_2d, interpolation='none', aspect='auto')
-
-    #azavnorm = np.array([ azavb/azavb.max() for azavb in azav])
-    #azavt0 = azav[:10].mean(axis=0)
-    #azavt0 = azavt0/azavt0.max()
-    #azavnrel = np.array([azavn/azavt0 for azavn in azavnorm])
-    #plt.imshow(azavnrel, interpolation='none', aspect='auto')
-    #plt.figure()
-    #plt.imshow(azavnrel,  interpolation='none', aspect='auto')
 
