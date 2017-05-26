@@ -163,8 +163,11 @@ elif [ $FFB == 1 ]; then
     ARGSTR=$ARGSTR' --ffb '     
 fi
 
-
-LOGDIR=/reg/d/psdm/$HUTCH/$EXP/results/logs
+BASEDIR=/reg/d/psdm/$HUTCH/$EXP/results
+if [ ! -d  $BASEDIR ]; then
+    BASEDIR=/reg/d/psdm/$HUTCH/$EXP/res
+fi
+LOGDIR=$BASEDIR/logs
 if [ $DIRNAME != 'xxx' ]; then
     ARGSTR=$ARGSTR' --dir '$DIRNAME
     LOGDIR=$DIRNAME/logs

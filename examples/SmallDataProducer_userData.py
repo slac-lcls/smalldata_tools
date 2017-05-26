@@ -7,7 +7,7 @@ import socket
 import os
 
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
-from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
 ########################################################## 
 ##
 ## User Input start --> 
@@ -230,7 +230,9 @@ for eventNr,evt in enumerate(ds.events()):
             det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det)
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
