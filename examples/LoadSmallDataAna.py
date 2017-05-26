@@ -89,23 +89,66 @@ else:
 if ana is not None:
     ana.printRunInfo()
 
-    #somewhat non-obvious: if lower==upper; REJECT this point (e.g. FLTPOS==0)
     ana.addCut('lightStatus/xray',0.5,1.5,'xon')
+
     ana.addCut('lightStatus/xray',0.5,1.5,'on')
     ana.addCut('lightStatus/laser',0.5,1.5,'on')
+
     ana.addCut('lightStatus/xray',0.5,1.5,'off')
     ana.addCut('lightStatus/laser',-0.5,0.5,'off')
     
-    ana.addCut('ipm3/sum',0.03,10.,'on')
-    ana.addCut('ipm3/sum',0.03,10.,'off')
-    ana.addCut('tt/AMPL',0.025,10.,'on')
+    #delay=ana.getDelay()
+    ana.addCube('cube','scan/varStep',np.arange(-0.5,ana.xrData.scan__varStep.max()+0.5,1),'on')
 
-    binRange = np.arange(13.,15.5,0.03)
-    if run==65:
-        binRange = np.arange(8.5,13,0.03)
-    if run==153 or run == 304:
-        binRange = np.arange(12,15,0.05)
-    #ana.addCube('cube','delay',binRange,'on')
-    #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
-    #cubeData = ana.makeCubeData('cube')
+    #make an "opt" cube using the best image in a set of event indices rather than the sum
+    addVar='userValues/mycalc'
+    ana.addToCube('cube',['scan/nano_y','scan/nano_z',addVar])
 
+    cubeData, eventIdxDict = ana.makeCubeData('cube', returnIdx=True, addIdxVar=addVar)
+
+    nano_y=cubeData['scan__nano_y'].values/cubeData['nEntries'].values
+    nano_z=cubeData['scan__nano_z'].values/cubeData['nEntries'].values
+
+    import psana
+    from smalldata_tools import dropObject
+
+    #selecting the highest userVal event here. Can do whatever though.
+    maxVar_fiducials=[]
+    maxVar_evt_times=[]
+    targetVal = np.nanpercentile(ana.getVar(addVar),50)
+    for fids,times,addVars in zip(eventIdxDict['fiducial'],eventIdxDict['evttime'],eventIdxDict[addVar]):
+        #maxUserVal = np.argmax(addVars).values.tolist()        
+        maxUserVal = np.argmax(np.abs(addVars-targetVal)).values.tolist()
+        maxVar_fiducials.append(fids[maxUserVal].values.tolist())
+        maxVar_evt_times.append(times[maxUserVal].values.tolist())
+    maxVar_fiducials=np.array(maxVar_fiducials)
+    maxVar_evt_times=np.array(maxVar_evt_times)
+
+
+
+    runIdx = anaps.dsIdxRun
+    cs140_dict = {'source': 'cs140_dump', 'full': 1, 'common_mode':1}
+    anaps.addDetInfo(cs140_dict)
+    det = anaps.cs140_dump
+    det.evt = dropObject()
+    cs140_data = []
+    cs140_img = []
+    for evtfid,evttime in itertools.izip(maxVar_fiducials, maxVar_evt_times):
+        evtt = psana.EventTime(evttime,evtfid)
+        evt = runIdx.event(evtt)
+        #now loop over detectors in this event
+        det.getData(evt)
+        det.processDetector()
+        cs140_data.append(det.evt.write_full)
+        cs140_img.append(det.det.image(run,det.evt.write_full))
+
+    #now write hdf5 file & add detector info to it.
+    #note that cs140_data is a masked array.....
+    cs140_data = np.array(cs140_data)
+    cs140_img = np.array(cs140_img)
+    import h5py
+    fh5 = h5py.File('test_out.h5','w')
+    fh5['cs140_raw']=cs140_data.astype(float)
+    fh5['nano_y']=nano_y.astype(float)
+    fh5['nano_z']=nano_z.astype(float)
+    fh5.close()

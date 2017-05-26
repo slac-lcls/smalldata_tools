@@ -258,7 +258,6 @@ class DetObject(dropObject):
         print 'no data for', self._name,' , let mpiDataSource take care of this'
         return
       for ROI in self.getROIs():
-        #print 'ROI: ',ROI.name
         if self.mask is not None:
           ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(self.mask.astype(bool))))
         else:

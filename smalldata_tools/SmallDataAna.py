@@ -1273,7 +1273,7 @@ class SmallDataAna(object):
         if asHist:
             return iSig, extent
         else:
-            return vals[0][total_filter], val[1][total_filter]
+            return vals[0][total_filter], vals[1][total_filter]
 
     def getScanName(self):
         for key in self.Keys('scan'):
@@ -1709,15 +1709,15 @@ class SmallDataAna(object):
 
         fidVar='fiducials'
         evttVar='event_time'
-        if 'fiducials' in self.Keys():
+        if '/fiducials' in self.Keys():
             fidVar='/fiducials'
             evttVar='/event_time'
         elif '/EvtID/fid' in self.Keys():
             fidVar='/EvtID/fid'
-            fidVar='/EvtID/time'
+            evttVar='/EvtID/time'
 
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
-        evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evtVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
+        evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
         if addIdxVar!='':
             evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
