@@ -173,6 +173,20 @@ class aiDetector(defaultDetector):
             dl[chName]=self.det.get(evt).channelVoltages()[ichn]*chnScale+chnOffset
         return dl
 
+class adcDetector(defaultDetector):
+    def __init__(self, detname, name=None):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        defaultDetector.__init__(self, detname, name)
+
+    def data(self, evt):
+        dl={}
+        for ichn,chv in enumerate(self.det.get(evt).channelValue()):
+            dl['ch%d'%ichn]=chv
+        return dl
+
 class ttDetector(defaultDetector):
     def __init__(self, name='tt', baseName='TTSPEC:'):
         self.name = name
