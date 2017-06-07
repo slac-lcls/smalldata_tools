@@ -1441,11 +1441,11 @@ class SmallDataAna_psana(object):
             self.addDetInfo(det)
 
         #littleData only version: only run on single core
-        if len(self.sda.cubes['cube'].targetVarsXtc)<=0:
+        if len(self.sda.cubes[cubeName].targetVarsXtc)<=0:
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
                 fout = h5py.File(outFileName, "w")
-                print 'bin the data now....be patient'
+                print 'no big data, bin the data now....be patient'
                 cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)  
                 print 'now write outputfile (only little data) to : ',outFileName
                 for key in cubeData.keys():
@@ -1453,6 +1453,7 @@ class SmallDataAna_psana(object):
                 fout.close()
             return
 
+        print 'now make big cube'
         #only run on rank=0 & broadcast.
         outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5.inprogress'%cubeName)
         if rank==0:

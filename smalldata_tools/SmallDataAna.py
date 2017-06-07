@@ -1606,7 +1606,7 @@ class SmallDataAna(object):
         targetVarsLocal = []
         for tVar in cube.targetVars:
             if isinstance(tVar, basestring):
-                if tVar not in self._fields.keys() in self._fields.keys():
+                if tVar not in self._fields.keys():
                     cube.targetVarsXtc.append(tVar)
                 else:
                     targetVarsLocal.append(tVar)
@@ -1685,7 +1685,7 @@ class SmallDataAna(object):
                 dataShape = filteredVar.shape
                 for dim in range(len(dataShape)-1):
                     thisDim = np.arange(0, dataShape[dim+1])
-                    dimStr = 'dim%d'%dim
+                    dimStr = '%s_dim%d'%(tVar,dim)
                     coords[dimStr] = thisDim
                     dims.append(dimStr)
                 newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
@@ -1712,18 +1712,18 @@ class SmallDataAna(object):
         if '/fiducials' in self.Keys():
             fidVar='/fiducials'
             evttVar='/event_time'
-        elif '/EvtID/fid' in self.Keys():
-            fidVar='/EvtID/fid'
-            evttVar='/EvtID/time'
+        elif 'EvtID/fid' in self.Keys():
+            fidVar='EvtID/fid'
+            evttVar='EvtID/time'
 
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
         if addIdxVar!='':
             evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
-        else:
-            print 'could not find event idx in data'
-            return cubeData,None
+        #else:
+        #    print 'could not find event idx in data'
+        #    return cubeData,None
         cubeIdxData = evtIDXr.groupby_bins('binVar',Bins)   
         keys = cubeIdxData.groups.keys()
         keys.sort()
