@@ -45,6 +45,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     dets.append(ipmDetector('XppSb4_Pim','diode2'))
     dets.append(ipmDetector('XppEnds_Ipm0','diodeU'))
     dets.append(aiDetector('XPP-AIN-01','ai'))
+    dets.append(adcDetector('adc','adc'))
     dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
     #dets.append(ttDetector(baseName='TTSPEC:'))
     dets.append(bmmonDetector('HX2-BEAMMON-01','ipm_hx2'))
