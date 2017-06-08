@@ -1,16 +1,18 @@
+###
+# run this like:
+# python ./examples/MakeCube.py --run 302 --exp xppo5616
+#
+# submit to queue like:
+# bsub -q psanaq -n <njobs> -o <path_to_logfile> python ./examples/MakeCube.py --run 302 --exp xppo5616
+###
 import sys
 import numpy as np
 import argparse
-from matplotlib import pyplot as plt
 import socket
 import os
-from smalldata_tools import droplets,hist2d,getUserData,rebin,addToHdf5
-from smalldata_tools import dropObject
-import itertools
-
-print '---------'
-print sys.path
-print '---------'
+sys.path.append('./smalldata_tools')
+from SmallDataAna import SmallDataAna
+from SmallDataAna_psana import SmallDataAna_psana
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--run", help="run",type=int)
@@ -61,15 +63,8 @@ fname=''
 if args.file:
     fname = args.file
 
-from smalldata_tools import SmallDataAna
 ana = None
-anaps = None
-try:
-    from smalldata_tools import SmallDataAna_psana
-    anaps = SmallDataAna_psana(expname,run,dirname,fname)
-except:
-    pass
-
+anaps = SmallDataAna_psana(expname,run,dirname,fname)
 if anaps and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
     print 'create ana module from anaps'
     ana = anaps.sda
@@ -89,10 +84,17 @@ if ana is not None:
     ana.addCut('lightStatus/xray',0.5,1.5,'off')
     ana.addCut('lightStatus/laser',-0.5,0.5,'off')
     
-    ana.addCube('cube','delay',np.arange(13.,15.5,0.05),'on')
-    cs140Dict = {'source':'cs140_rob','full':1}
-    ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels', cs140Dict])
+    ana.addCut('lightStatus/xray',0.5,1.5,'onSel')
+    ana.addCut('lightStatus/laser',0.5,1.5,'onSel')
+    ana.addCut('ipm3/sum',0.25,10.,'onSel')
+    ana.addCut('tt/AMPL',0.025,10.,'onSel')
+    ana.addCut('tt/FLTPOSFWHM',80.,130.,'onSel')
+
+    #ana.addCube('cube','delay',np.linspace(-25.9,-25.8,2),'on')
+    ana.addCube('cube','scan/varStep',np.arange(-0.5,ana.xrData.scan__varStep.max()+0.5,1),'onSel')
+    cspadDict = {'source':'cspad','full':1}
+    ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels', cspadDict])
     #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels'])
 
-    #anaps.makeCubeData('cube',  nEvtsPerBin=3)
-    anaps.makeCubeData('cube')
+    anaps.makeCubeData('cube',  nEvtsPerBin=3)
+    #anaps.makeCubeData('cube')

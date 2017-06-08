@@ -1715,6 +1715,7 @@ class SmallDataAna(object):
         elif 'EvtID/fid' in self.Keys():
             fidVar='EvtID/fid'
             evttVar='EvtID/time'
+        print 'we will use fiducials from here: ',fidVar
 
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
