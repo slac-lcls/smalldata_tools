@@ -1475,10 +1475,12 @@ class SmallDataAna_psana(object):
         detMArrays=[] #for error calculation
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
-            if  thisdetDict.has_key('image'):
-                detShape = self.__dict__[thisdetName].imgShape
-            else:
-                detShape = self.__dict__[thisdetName].ped.shape
+            #we actually reshape later...
+            detShape = self.__dict__[thisdetName].ped.shape
+            #if  thisdetDict.has_key('image'):
+            #    detShape = self.__dict__[thisdetName].imgShape
+            #else:
+            #    detShape = self.__dict__[thisdetName].ped.shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
             det_arrayBin=np.zeros(csShape)
@@ -1535,9 +1537,9 @@ class SmallDataAna_psana(object):
             imgMArray=[]
             for binData,binSData,binMData in zip(dArray,dSArray,dMArray):
                 if  detDict.has_key('image'):
-                    thisImg = det.det.image(run, binData)
-                    thisImgS = det.det.image(run, binSData)
-                    thisImgM = det.det.image(run, binMData)
+                    thisImg = det.det.image(self.run, binData)
+                    thisImgS = det.det.image(self.run, binSData)
+                    thisImgM = det.det.image(self.run, binMData)
                 else:
                     thisImg = binData
                     thisImgS = binSData
@@ -1580,8 +1582,8 @@ class SmallDataAna_psana(object):
                         addToHdf5(fout, detName+'_x', det.x)
                         addToHdf5(fout, detName+'_y', det.y)
                 else:
-                    addToHdf5(fout, detName+'_ped', det.det.image(run,det.ped))
-                    addToHdf5(fout, detName+'_rms', det.det.image(run,det.rms))
+                    addToHdf5(fout, detName+'_ped', det.det.image(self.run,det.ped))
+                    addToHdf5(fout, detName+'_rms', det.det.image(self.run,det.rms))
 
         comm.Barrier()
         if rank==0:

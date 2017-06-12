@@ -7,21 +7,24 @@ import h5py
 from os import path
 from os import walk
 import numpy as np
-from pylab import ginput
-from matplotlib import pyplot as plt
-from matplotlib import gridspec
 from scipy import interpolate
-from utilities import getBins as util_getBins
-from utilities import dictToHdf5
-from utilities import hist2d
-from utilities import shapeFromKey_h5
 import time
 import json
 import subprocess
 import socket
 from scipy import sparse
 import tables
+from matplotlib import gridspec
+from pylab import ginput
+from matplotlib import pyplot as plt
+from utilities import getBins as util_getBins
+from utilities import dictToHdf5
+from utilities import shapeFromKey_h5
+from utilities import hist2d
+
+#including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
+
 #works from ana-1.2.9 on
 try:
     from pscache import client

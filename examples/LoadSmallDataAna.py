@@ -93,7 +93,6 @@ else:
 if ana is not None:
     ana.printRunInfo()
 
-    #somewhat non-obvious: if lower==upper; REJECT this point (e.g. FLTPOS==0)
     ana.addCut('lightStatus/xray',0.5,1.5,'xon')
     ana.addCut('lightStatus/xray',0.5,1.5,'on')
     ana.addCut('lightStatus/laser',0.5,1.5,'on')
@@ -104,11 +103,12 @@ if ana is not None:
     ana.addCut('ipm3/sum',0.03,10.,'off')
     ana.addCut('tt/AMPL',0.025,10.,'on')
 
-    binRange = np.arange(13.,15.5,0.03)
-    if run==65:
-        binRange = np.arange(8.5,13,0.03)
-    if run==153 or run == 304:
-        binRange = np.arange(12,15,0.05)
+    #this is an example of how to set up a cube.
+    #binRange = np.arange(13.,15.5,0.03)
+    #if run==65:
+    #    binRange = np.arange(8.5,13,0.03)
+    #if run==153 or run == 304:
+    #    binRange = np.arange(12,15,0.05)
     #ana.addCube('cube','delay',binRange,'on')
     #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
     #cubeData = ana.makeCubeData('cube')
