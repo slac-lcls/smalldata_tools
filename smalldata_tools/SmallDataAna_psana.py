@@ -1,7 +1,15 @@
 from os import path
 import numpy as np
-from pylab import ginput
-from matplotlib import pyplot as plt
+try:
+    from pylab import ginput
+except:
+    print 'could not import ginput'
+    pass
+try:
+    from matplotlib import pyplot as plt
+except:
+    print 'could not import pyplot'
+    pass
 from matplotlib import gridspec
 from matplotlib import path
 import itertools
@@ -1578,13 +1586,18 @@ class SmallDataAna_psana(object):
                 if not detDict.has_key('image'):
                     addToHdf5(fout, detName+'_ped', det.ped)
                     addToHdf5(fout, detName+'_rms', det.rms)
+                    addToHdf5(fout, detName+'_gain', det.gain)
+                    addToHdf5(fout, detName+'_mask', det.mask)
+                    addToHdf5(fout, detName+'_calib_mask', det.cmask)
                     if det.x is not None:
                         addToHdf5(fout, detName+'_x', det.x)
                         addToHdf5(fout, detName+'_y', det.y)
                 else:
                     addToHdf5(fout, detName+'_ped', det.det.image(self.run,det.ped))
                     addToHdf5(fout, detName+'_rms', det.det.image(self.run,det.rms))
-
+                    addToHdf5(fout, detName+'_gain', det.det.image(self.run,det.gain))
+                    addToHdf5(fout, detName+'_mask', det.det.image(self.run,det.mask))
+                    addToHdf5(fout, detName+'_calib_mask', det.det.image(self.run,det.cmask))
         comm.Barrier()
         if rank==0:
             print 'first,last img mean: ',np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])
