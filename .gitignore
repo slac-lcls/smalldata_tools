@@ -1,3 +1,5 @@
 #editing remnants
 *.py~
 *.pyc
+#copy for the current producer file
+examples/SmallDataProducer.py

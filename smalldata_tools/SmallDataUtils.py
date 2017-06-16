@@ -112,13 +112,16 @@ def getUserData(det):
     det_dict= {}
     try:
         userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('write_')>=0 ]
-        #print 'getting keys: ',userData_keys
+        #print 'DEBUG SmallDataUtils: getting keys: ',userData_keys
         for key in userData_keys:
-            #print 'getting data for key: ',key
+            #print 'DEBUG SmallDataUtils: getting data for key: ',key
             if isinstance(det.evt[key], np.ndarray):
                 if isinstance(det.evt[key], np.ma.masked_array):
                     data = det.evt[key].data
-                    data[det.evt[key].mask]=np.nan
+                    if data.dtype == 'uint16':
+                        data[det.evt[key].mask]=0
+                    else:
+                        data[det.evt[key].mask]=np.nan
                     #print eventNr,' is ndarray ',key
                     det_dict[key.replace('write_','')] = data
                 else:

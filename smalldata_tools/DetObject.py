@@ -124,7 +124,7 @@ class DetObject(dropObject):
       self.storeEnv = False
       #det.dettype
       #1->CsPad, 2->Cs2x2, 13->epix100a
-      #6->opal
+      #6->opal, 27->zyla
       #16 -> aqiris, ?->oceanOptics
       self.applyMask = applyMask
       #default to CsPad
@@ -161,6 +161,10 @@ class DetObject(dropObject):
             fexCfg = env.configStore().get(psana.Camera.FrameFexConfigV1, psana.Source(srcName))
             self.ped = np.zeros([fexCfg.roiEnd().column()-fexCfg.roiBegin().column(), fexCfg.roiEnd().row()-fexCfg.roiBegin().row()])
           self.imgShape = self.ped.shape
+        elif self.det.dettype == 27:
+          zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
+          self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
+          self.imgShape = self.ped.shape
         try:
           pedImg = self.det.image(run, self.ped)
           if pedImg is not None:
@@ -177,7 +181,7 @@ class DetObject(dropObject):
         except:
           self.mask = None
           self.cmask = None
-        if self.det.dettype == 6:
+        if self.det.dettype == 6 or self.det.dettype == 27:
           self.common_mode = -1
         #geometry
         try:
@@ -188,7 +192,7 @@ class DetObject(dropObject):
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-          if self.det.dettype == 6:
+          if self.det.dettype == 6  or self.det.dettype == 27:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
