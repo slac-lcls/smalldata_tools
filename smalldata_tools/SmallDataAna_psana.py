@@ -1483,12 +1483,7 @@ class SmallDataAna_psana(object):
         detMArrays=[] #for error calculation
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
-            #we actually reshape later...
             detShape = self.__dict__[thisdetName].ped.shape
-            #if  thisdetDict.has_key('image'):
-            #    detShape = self.__dict__[thisdetName].imgShape
-            #else:
-            #    detShape = self.__dict__[thisdetName].ped.shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
             det_arrayBin=np.zeros(csShape)
@@ -1531,7 +1526,7 @@ class SmallDataAna_psana(object):
                             dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
                         else:
                             dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-            
+
                         x = thisDetDataDict[key]
                         oldM = dMArray
                         dMArray = dMArray + (x-dMArray)/(ievt+1)
@@ -1543,7 +1538,10 @@ class SmallDataAna_psana(object):
             imgArray=[]
             imgSArray=[]
             imgMArray=[]
-            for binData,binSData,binMData in zip(dArray,dSArray,dMArray):
+            for binData,binSData,binMData,nent in zip(dArray,dSArray,dMArray,cubeData['nEntries'].values):
+                #now divide mean & std sums to be correct.
+                binSData = np.sqrt(binSData/(nent-1))
+                binMData = binMData/nent
                 if  detDict.has_key('image'):
                     thisImg = det.det.image(self.run, binData)
                     thisImgS = det.det.image(self.run, binSData)

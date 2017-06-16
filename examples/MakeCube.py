@@ -96,16 +96,16 @@ if ana is not None:
     ana.addCut('tt/FLTPOSFWHM',80.,130.,'onSel')
 
     #save raw data
-    cspadDict = {'source':'cspad','full':1}
+    #cspadDict = {'source':'cspad','full':1}
     #save image data
     cspadDict = {'source':'cspad','full':1,'image':1}
-    #ana.addCube('cubeDelay','delay',np.linspace(-12.8,-10.8,24),'on')
-    ana.addCube('cubeDelay','delay',np.linspace(-12.8,-10.8,4),'on')
-    ana.addToCube('cube',['ipm2/sum','ipm3/sum', cspadDict])
-
-    ana.addCube('cube','scan/varStep',np.arange(-0.5,ana.xrData.scan__varStep.max()+0.5,1),'onSel')
+    ana.addCube('cubeDelay','delay',np.linspace(-12.8,-10.8,24),'on')
+    #ana.addCube('cubeDelay','delay',np.linspace(-12.8,-10.8,4),'on')
     ana.addToCube('cubeDelay',['ipm2/sum','ipm3/sum','diodeU/channels', cspadDict])
 
-    #anaps.makeCubeData('cube',  nEvtsPerBin=3)
+    #ana.addCube('cube','scan/varStep',np.arange(-0.5,ana.xrData.scan__varStep.max()+0.5,1),'onSel')
+    #ana.addToCube('cube',['ipm2/sum','ipm3/sum', cspadDict])
+
+    #anaps.makeCubeData('cube',  nEvtsPerBin=3, dirname='./output')
     #anaps.makeCubeData('cubeDelay',  nEvtsPerBin=3)
     anaps.makeCubeData('cubeDelay')
