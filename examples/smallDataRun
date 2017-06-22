@@ -38,8 +38,9 @@ QUEUEREQ='xxx'
 XTCAV=0
 FFB=0
 LIVE=0
+AUTO=0
 
-while getopts "e:d:r:n:q:j:g:hxsfl" OPTION
+while getopts "e:d:r:n:q:j:g:hxsfla" OPTION
 do
     case $OPTION in
 	h)
@@ -79,6 +80,9 @@ do
 	g)
 	    GATHER=$OPTARG
 	    ;;
+	a)
+	    AUTO=1
+	    ;;
 	?)
 	    usage
 	    exit
@@ -117,10 +121,12 @@ RUNJOBS=`bjobs -u all -q $QUEUE | grep $QUEUE | grep run | grep $RUN | wc | awk 
 if [ $RUNJOBS -ne 0 ]; then
     echo 'job for run ' $RUN ' is already submitted: ' $RUNJOBS
     bjobs -l $RUNJOBS
-    echo ' still submit? [y/n]'
-    read answer
-    if [ $answer != 'y' ]; then
-	exit
+    if [ $AUTO -eq 0 ]; then 
+	echo 'still submit? [y/n]'
+	read answer
+	if [ $answer != 'y' ]; then
+	    exit
+	fi
     fi
 fi
 

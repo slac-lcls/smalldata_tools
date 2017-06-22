@@ -2,11 +2,7 @@
 
 export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
 CURREXP=`get_curr_exp`
-if [[ $CURREXP =~ 'xpp' ]]; then
-    HUTCH='xpp'
-else
-    HUTCH='xcs'
-fi
+HUTCH=`get_hutch_name`
 cd /reg/d/psdm/$HUTCH/$CURREXP/results/smalldata_tools
 #LASTRUN=4
 LASTRUN=`get_lastRun`
@@ -23,7 +19,7 @@ while true; do
 		let "LASTRUN+=1" 
 	    else
 		echo 'send ffb job for run ' $LASTRUN 
-		./examples/smallDataRun -r $LASTRUN
+		./examples/smallDataRun -a -r $LASTRUN
 		let "LASTRUN+=1" 
 		sleep 30
 	    fi
