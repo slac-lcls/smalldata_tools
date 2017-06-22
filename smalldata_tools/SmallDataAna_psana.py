@@ -41,6 +41,16 @@ class SmallDataAna_psana(object):
             if self.run > lastRun:
                 print 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run)
                 return None
+        else:
+            xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
+            haveXtc=False
+            for (dirpath, dirnames, filenames) in os.walk(self.dirname):
+                for fname in filenames:
+                    if fname.find('r%04d'%run)>=0:
+                        haveXtc=True
+            if not haveXtc:
+                print 'Could not find SmallDataAna_psana, return None'
+                return None
         self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
         self.dsname='exp=%s:run=%i:smd'%(expname,run)
         print 'make LittleDataAna_psana from dsname: ',self.dsname

@@ -481,8 +481,8 @@ class xtcavDetector(defaultDetector):
         self.nb=1
         self.size=5000
         self.ShotToShotCharacterization = Xtcav.ShotToShotCharacterization()
-        #this will NOT work. Have to ask Chris how to get access like psana does.
-        self.ShotToShotCharacterization.SetEnv(psana.Env)
+    def setEnv(self, env):
+        self.ShotToShotCharacterization.SetEnv(env)
     def setPars(self, xtcavPars):
         self.nb=xtcavPars[0]
         self.size=xtcavPars[1]
@@ -490,25 +490,36 @@ class xtcavDetector(defaultDetector):
         #check if detectors are in event
         dl={}
         xtcav_success=False
-        self.ShotToShotCharacterization.SetCurrentEvent(evt)
+        arSize=0
+        agreement=-2
+        timeAr=np.array([np.nan] * self.size)
+        power=np.array([np.nan] * self.size)
+        ragged_time=np.array([], dtype='float32')
+        ragged_power=np.array([], dtype='float32')
+        #self.ShotToShotCharacterization.SetCurrentEvent(evt)
         if self.ShotToShotCharacterization.SetCurrentEvent(evt):
-            timeOrg,power,ok=self.ShotToShotCharacterization.XRayPower()
+            agreement=-1
+            timeArOrg,power,ok=self.ShotToShotCharacterization.XRayPower()
             if ok:
-              arSize=timeOrg[0].shape[0]
+              arSize=timeArOrg[0].shape[0]
               agreement,ok=self.ShotToShotCharacterization.ReconstructionAgreement()
               xtcav_success=True
+              ragged_time = timeArOrg
+              ragged_power = power
               if arSize>=1 and arSize<=self.size:
-                  time = np.append(timeOrg[0],np.array([np.nan] * (self.size-arSize)))
+                  timeAr = np.append(timeArOrg[0],np.array([np.nan] * (self.size-arSize)))
                   power = np.append(power[0],np.array([np.nan] * (self.size-arSize)))
               else:
                 print 'Xtcav array is too small in run, please check littleData configuration',env.run()
-                time = timeOrg[:self.size]
+                time = timeArOrg[:self.size]
                 power = power[:self.size]
-              dl['agreement']=agreement
-              dl['arSize']=arSize
-              dl['time']=time
-              dl['power']=power
-                    
+
+        dl['agreement']=agreement
+        dl['arSize']=arSize
+        dl['time']=timeAr
+        dl['power']=power
+        #dl['ragged_time']=ragged_time
+        #dl['ragged_power']=ragged_power
         return dl
 
 

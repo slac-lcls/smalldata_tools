@@ -101,7 +101,7 @@ if ana is not None:
     
     ana.addCut('ipm3/sum',0.03,10.,'on')
     ana.addCut('ipm3/sum',0.03,10.,'off')
-    ana.addCut('tt/AMPL',0.025,10.,'on')
+    #ana.addCut('tt/AMPL',0.025,10.,'on')
 
     #this is an example of how to set up a cube.
     #binRange = np.arange(13.,15.5,0.03)

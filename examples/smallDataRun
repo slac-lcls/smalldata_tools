@@ -23,9 +23,10 @@ RUN=-1
 #16 works ok for default smalleData
 #also when using MPI, use only one node.....
 #for bigger ROI on short run, 32 jobs is better, 64 did not have gain
-#NJOBS=16
-GATHER=100
-NJOBS=80
+#GATHER=100
+#NJOBS=80
+GATHER=10
+NJOBS=16
 #
 EXP='xxx'
 QUEUE=psanaq
@@ -211,7 +212,7 @@ else
         --run $RUN`
 fi
 
-#source /reg/g/psdm/bin/conda_setup ""
+source /reg/g/psdm/bin/conda_setup ''
 
 echo $CMD
 $CMD

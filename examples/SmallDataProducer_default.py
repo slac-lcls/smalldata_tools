@@ -6,7 +6,7 @@ import time
 import argparse
 import socket
 import os
-
+import RegDB.experiment_info
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
 ########################################################## 
 ##

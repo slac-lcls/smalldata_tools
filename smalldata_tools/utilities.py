@@ -247,7 +247,7 @@ def getDelay(fh5, use_ttCorr=True, addEnc=False):
 
   isDaqDelayScan=False
   for node in fh5.get_node('/scan')._f_list_nodes():
-    if node.name.find('var')<0 and node.name.find('none')<0 and node.name.find('lxt')>=0:
+    if node.name.find('var')<0 and node.name.find('none')<0 and node.name.find('lxt')>=0 and node.name.find('damage')<0:
       isDaqDelayScan=True
       #print 'DEBUG: found that we have a delay scan'
       nomDelay=node.read()*1e12
@@ -293,89 +293,6 @@ def addToHdf5(fh5, key, npAr):
     dset[...] = npAr.astype(float)
 
 
-def getBins(bindef=[], fh5=None, debug=False):
-  #have full list of bin boundaries, just return it
-  if len(bindef)>3:
-    return bindef
-  
-  if len(bindef)==2:
-    if debug:
-      print 'only two bin boundaries, so this is effectively a cut...cube will have a single image'
-    Bins = np.array([min(bindef[0],bindef[1]),max(bindef[0],bindef[1])])
-    return Bins
-
-  if len(bindef)==3:
-    if type(bindef[2]) is int:
-        Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
-    else:
-        Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
-    if Bins[-1]<bindef[1]:
-      Bins = np.append(Bins,max(bindef[0],bindef[1]))
-    return Bins
-
-  #have no input at all, assume we have unique values in scan. If not, return empty list 
-  scanVarName = ''
-  if len(bindef)<=1:
-    for key in fh5['scan'].keys():
-      if key.find('var')<0 and key.find('none')<0:
-        scanVarName = key
-
-  if len(bindef)==0:
-    if scanVarName=='':
-      print 'this run is no scan, will need bins as input, quit now'
-      return []
-    print 'no bins as input, we will use the scan variable %s '%scanVarName
-
-    Bins = np.unique(fh5['scan/var0'])
-    if scanVarName.find('lxt')>=0:
-      Bins*=1e12
-    if debug:
-      print 'Bins: ',Bins
-    return Bins
-
-  #give a single number (binwidth or numBin)
-  if len(bindef)==1:
-    #this is a "normal" scan, use scanVar
-    if scanVarName!='':
-      Bins = np.unique(fh5['scan/var0'])
-      if scanVarName.find('lxt')>=0:
-        Bins*=1e12
-      valBound = [ min(Bins), max(Bins)]
-      if type(bindef[0]) is int:
-        Bins=np.linspace(valBound[0],valBound[1],bindef[0],endpoint=True)
-      else:
-        Bins=np.arange(valBound[0],valBound[1],bindef[0])
-        Bins=np.append(Bins,valBound[1])
-      return Bins
-      
-    else:
-      if hasKey('enc/ch0', fh5) or hasKey('enc/lasDelay',fh5):
-        if hasKey('enc/ch0', fh5):
-          vals = fh5['enc/ch0'].value.squeeze()*1e12
-        else:
-          vals = fh5['enc/lasDelay'].value.squeeze()
-        minEnc = (int(min(vals)*10.))
-        if minEnc<0:
-            minEnc+=-1
-        minEnc /= 10.
-        maxEnc = (int(max(vals)*10.)+1)/10.
-        print minEnc,maxEnc,bindef[0]
-        if minEnc!=maxEnc and abs(minEnc)<101 and abs(maxEnc<1001):
-          if type(bindef[0]) is int:
-            Bins=np.linspace(minEnc, maxEnc, bindef[0],endpoint=True)
-          else:
-            Bins=np.arange(minEnc, maxEnc, bindef[0])
-            if Bins[-1]< maxEnc:
-              Bins=np.append(Bins,maxEnc)
-          if debug:
-            print 'Bins....',Bins
-          return Bins
-        else:
-          print 'you passed only one number and the this does not look like a new delay scan or a normal scan'
-          return []
-
-    print 'why am I here? I should have hit one of the if/else staments....'
-    print 'you passed: ',bindef
 ###
 # utility functions for droplet stuff
 ###
