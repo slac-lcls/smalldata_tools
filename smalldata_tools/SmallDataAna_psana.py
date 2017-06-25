@@ -44,7 +44,7 @@ class SmallDataAna_psana(object):
         else:
             xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
             haveXtc=False
-            for (dirpath, dirnames, filenames) in os.walk(self.dirname):
+            for (dirpath, dirnames, filenames) in os.walk(xtcdirname):
                 for fname in filenames:
                     if fname.find('r%04d'%run)>=0:
                         haveXtc=True
@@ -497,12 +497,19 @@ class SmallDataAna_psana(object):
 
     def FitCircleAuto(self, detname=None, plotRes=True, inParams={}):
         detname, img, avImage = self.getAvImage(detname=None)
-        mask = self.__dict__[detname].det.mask_calib(self.run)
+        mask = self.__dict__[detname].det.mask_calib(self.run).astype(bool)
+        nPixRaw=1.
+        for idim in mask.shape:
+            nPixRaw=nPixRaw*idim
+        print 'check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw)
+        if (mask.sum()/nPixRaw)<0.5:
+            mask=~mask
         try:
-            maskgeo = self.__dict__[detname].det.mask_geo(self.run)
+            maskgeo = self.__dict__[detname].det.mask_geo(self.run).astype(bool)
             mask = mask*maskgeo
         except:
             pass
+        #apply mask to image.
         img = (img*mask)
 
         needsGeo=False
@@ -518,6 +525,7 @@ class SmallDataAna_psana(object):
             image = img
         limits=[[0,image.shape[0]],[0,image.shape[1]]]
 
+        #plot image in grayscale
         combRes, ringInfo, arSparse = FindFitCenter(image, mask, inParams=inParams)
 
         if not plotRes:
@@ -527,6 +535,8 @@ class SmallDataAna_psana(object):
         plt.imshow(image, interpolation='none', cmap='gray',clim=[0,np.percentile(img.flatten(),99.5)])
         #plot sparse images in blue.
         plt.plot(arSparse.col, arSparse.row,markersize=5,color='#ff9900',marker='.',linestyle='None')
+        if combRes==-1:
+            return -1
         greens=['#666600','#669900','#66cc00','#66cc99','#6699cc','#6633ff']
         for ir,thisRingInfo,rFit in itertools.izip(itertools.count(),ringInfo,combRes['R']):
             #plot ransac selected data in green <-- consider different greens for first circles.

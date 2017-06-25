@@ -16,9 +16,9 @@ from scipy.spatial import cKDTree
 
 def applyCanny(ar, mask, sigma=1, thres=95):
     if thres==-999:
-        arThres = feature.canny(ar, sigma=1,mask=mask)
+        arThres = feature.canny(ar, sigma=sigma,mask=mask)
     else:
-        arThres = feature.canny(ar, sigma=1,mask=mask, low_threshold=thres)
+        arThres = feature.canny(ar, sigma=sigma,mask=mask, low_threshold=thres)
     return arThres,sparse.coo_matrix(arThres)
 
 def fitCircles(x,y,r,yerr=None, guess=None):
@@ -258,7 +258,9 @@ def FindFitCenter(image, mask, inParams={}):
         allR.append(ir)
         allX.append(arSparse.col[thisRingInfo['pointsInCircle']])
         allY.append(arSparse.row[thisRingInfo['pointsInCircle']])
-    combRes = fitCircles(allX,allY,allR,yerr=True)
-    return combRes, ringInfo, arSparse
-
-
+    try:
+        combRes = fitCircles(allX,allY,allR,yerr=True)
+        return combRes, ringInfo, arSparse
+    except:
+        print 'combined fit failed'
+        return -1, ringInfo, arSparse

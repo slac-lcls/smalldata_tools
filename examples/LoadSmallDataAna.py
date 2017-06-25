@@ -32,25 +32,43 @@ if not args.run:
 else:
     run=args.run
 
+hutches=['amo','sxr','xpp','xcs','mfx','cxi','mec']
 if not args.exp:
     hostname=socket.gethostname()
-    if hostname.find('xpp')>=0:
-        hutch='XPP'
-    elif hostname.find('xcs')>=0:
-        hutch='XCS'
-    elif hostname.find('mfx')>=0:
-        hutch='MFX'
+    for ihutch in hutches:
+        if hostname.find(ihutch)>=0:
+            hutch=ihutch.upper()
+            foundHutch=True
+            break
+    if not foundHutch and hostname.find('psusr')>=0:
+        if hostname.find('psusr11')>=0:
+            hutch='AMO'
+        elif hostname.find('psusr12')>=0:
+            hutch='SXR'
+        elif hostname.find('psusr13')>=0:
+            hutch='XPP'
+        elif hostname.find('psusr21')>=0:
+            hutch='XCS'
+        elif hostname.find('psusr22')>=0:
+            hutch='CXI'
+        elif hostname.find('psusr23')>=0:
+            hutch='MEC'
+        elif hostname.find('psusr24')>=0:
+            hutch='MFX'
+        if hutch!='':
+            foundHutch=True
     else:
         #then check current path
         path=os.getcwd()
-        if path.find('xcs')>=0:
-            hutch='XCS'
-        elif path.find('xpp')>=0:
-            hutch='XPP'
-        elif path.find('mfx')>=0:
-            hutch='MFX'
-        else:
+        for ihutch in hutches:
+            if path.find(ihutch)>=0:
+                hutch=ihutch.upper()
+                foundHutch=True
+                break
+        if not foundHutch:
+            print 'I cannot figure out which hutch we are in, so cannot determine the current experiment'
             sys.exit()
+
     try:
         import RegDB.experiment_info
         expname=RegDB.experiment_info.active_experiment(hutch)[1]
@@ -112,4 +130,3 @@ if ana is not None:
     #ana.addCube('cube','delay',binRange,'on')
     #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
     #cubeData = ana.makeCubeData('cube')
-
