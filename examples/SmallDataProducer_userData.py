@@ -191,28 +191,11 @@ for det in dets:
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
-reqDet=[]
-if expname=='xcsl2516':
-    reqDet = ['acq01','epix_1','epix_2','epix_3','epix_4']
-elif expname=='xcsm9816' or expname=='xcs06016':
-    reqDet = ['epix_1','epix_2','epix_3','epix_4']
-elif expname=='xcs12316':
-    reqDet = ['epix_1','epix_2','epix_ladm']
-elif expname=='xppn4516':
-    reqDet = ['epix','epix_alcove']
 for eventNr,evt in enumerate(ds.events()):
     printMsg(eventNr, evt.run(), ds.rank)
 
     if eventNr >= maxNevt/ds.size:
         break
-
-    allDets = True
-    aliases = [ k.alias() for k in evt.keys() ]
-    for detn in reqDet:
-        if not detn in aliases:
-            allDets = False
-    if not allDets:
-        continue
 
     #add default data
     defData = detData(defaultDets, evt)
