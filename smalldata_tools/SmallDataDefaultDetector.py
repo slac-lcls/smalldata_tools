@@ -89,13 +89,15 @@ class epicsDetector(defaultDetector):
     def __init__(self, name='epics', PVlist=[]):
         self.name = name
         self.detname='epics'
-        self.PVlist = PVlist
-        self.pvs=[]
+        self.PVlist = []
+        self.pvs = []
         for pv in PVlist:
             try:
                 self.pvs.append(psana.Detector(pv))
+                self.PVlist.append(pv)
             except:
                 print 'could not find EPICS PV %s in data'%pv
+            
     def inRun(self):
         if len(self.pvs)>0:
             return True

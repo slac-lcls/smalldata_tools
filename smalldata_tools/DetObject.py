@@ -168,6 +168,10 @@ class DetObject(dropObject):
           zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
           self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
           self.imgShape = self.ped.shape
+        elif self.det.dettype == 5:
+          yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,psana.Source(srcName))
+          self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
+          self.imgShape = self.ped.shape
         try:
           pedImg = self.det.image(run, self.ped)
           if pedImg is not None:
