@@ -646,6 +646,32 @@ class SmallDataAna(object):
             print 'have more events, only attach ones matching time stamps'
             data=data[self._tStamp.shape[0]]
 
+        #if not self._isRedis and name[0]!='/': name='/'+name
+        name = name.replace('__','/')
+        if name not in self._fields.keys():
+            #print 'add a new variable to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'mem']
+        elif self._fields[name][2]=='main':
+            #print 'add a variable from the main data to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'main']
+        elif  self._fields[name][2]=='xrfile':
+            #print 'add a variable from an netcdf to Xarray: ',name
+            self._fields[name]=[data.shape, 'inXr', 'xrfile']
+            try:
+                testShape = self.xrData[name].data.shape
+                if (self.xrData[name].data==data).sum()!=data.shape[0]:
+                    self.xrData[name].data = data
+                    #reset this to memory so that file will get overwritten
+                    self._fields[name]=[data.shape, 'inXr', 'mem']
+                return
+            except:
+                pass
+        else:
+            #print 'try to add a variable already present in xrData, only replace values!'
+            self.xrData[name].data = data
+            return
+
+        #create new xrData to be merged
         if len(data.shape)==1:
             self.xrData = xr.merge([self.xrData, xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name) ])
         else:
@@ -661,17 +687,6 @@ class SmallDataAna(object):
             newArray = xr.DataArray(data, coords=coords, dims=dims,name=name)
             self.xrData = xr.merge([self.xrData, newArray])
 
-        #if not self._isRedis and name[0]!='/': name='/'+name
-        name = name.replace('__','/')
-        if name not in self._fields.keys():
-            #print 'add a new variable to Xarray: ',name
-            self._fields[name]=[data.shape, 'inXr', 'mem']
-        elif self._fields[name][2]=='main':
-            #print 'add a variable from the main data to Xarray: ',name
-            self._fields[name]=[data.shape, 'inXr', 'main']
-        else:
-            #print 'add a variable from an netcdf to Xarray: ',name
-            self._fields[name]=[data.shape, 'inXr', 'xrfile']
 
     def _updateFromXarray(self):
         """
@@ -737,6 +752,7 @@ class SmallDataAna(object):
                     self.addVar(key, values)
                     #need to print this dataset, otherwise this does not work. Why #DEBUG ME
                     print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
+                    add_xrDataSet.close()
 
     #FIX ME: need to fix this! this will NOT work anymore....
     def setRun(self, run):
@@ -874,7 +890,7 @@ class SmallDataAna(object):
         self.nEvts(printThis=True)
         isScan=False
         scanVar = self.getScanName()
-        if scanVar is not None:
+        if scanVar is not None and scanVar!='':
             isScan=True
         if isScan:
             nPoints=np.unique(self.getVar('scan/%s'%scanVar)).shape[0]
@@ -1281,10 +1297,10 @@ class SmallDataAna(object):
         for key in self.Keys('scan'):
             if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0:
                 return key.replace('/scan/','').replace('scan/','')
+        return ''
 
     def getScanValues(self,ttCorr=False,addEnc=False):
         #get the scan variable & time correct if desired
-        scanOrg = self.getVar('scan/var0')
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
             delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
@@ -1295,7 +1311,11 @@ class SmallDataAna(object):
                 else:
                     scanVarName='delay [fs]'
         else:
-            scan = scanOrg
+            try:
+                scanOrg = self.getVar('scan/var0')
+                scan = scanOrg
+            except:
+                scan=[]
         return scanVarName,scan
 
 
@@ -1456,6 +1476,7 @@ class SmallDataAna(object):
         #get the scan variable & time correct if desired
         scanVarName,scan =  self.getScanValues(ttCorr, addEnc)
             
+        print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
         # create energy bins for plot: here no need to bin!
         if (not ttCorr) and (not addEnc):
             scanPoints, scanOnIdx = np.unique(scan[FilterOn], return_inverse=True)
@@ -1510,8 +1531,8 @@ class SmallDataAna(object):
             iNorm = np.bincount(indOn2d, weights=i0Val[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
             iSig = np.bincount(indOn2d, weights=sigVal[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
         else:
-            iNorm = np.bincount(scanOnIdx, i0Val[FilterOn])
-            iSig = np.bincount(scanOnIdx, sigVal[FilterOn])
+            iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints))
+            iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints))
 
         #print 'evts ',np.bincount(scanOnIdx)
         #print 'i0',iNorm
@@ -1521,18 +1542,20 @@ class SmallDataAna(object):
 
         if OffData:
             #same for off shots
-            iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff])
-            iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff])
+            iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints))
+            iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff], minlength=len(scanOffPoints))
             scanoff = iSigoff/iNormoff
-            if scanOffIdx.shape > scanOffPoints.shape:
-                shapeDiff = abs(scanOnIdx.max()+1-scanPoints.shape[0])
-                shapeDiff = abs(scanOffIdx.max()+1-scanOffPoints.shape[0])
-                if scanOffIdx.min()>0:
-                    scanoff=scanoff[shapeDiff:]
-                else:
-                    scanoff=scanoff[:-shapeDiff]
+            #not sure what this was for, maybe for whatever is now solved with minlength
+            #if scanOffIdx.shape > scanOffPoints.shape:
+            #    shapeDiff = abs(scanOnIdx.max()+1-scanPoints.shape[0])
+            #    shapeDiff = abs(scanOffIdx.max()+1-scanOffPoints.shape[0])
+            #    if scanOffIdx.min()>0:
+            #        scanoff=scanoff[abs(shapeDiff):]
+            #    else:
+            #        scanoff=scanoff[:-shapeDiff]
         if (not OffData):
             plotDiff = False
+        print '--- off points now: ',len(scanOffPoints), len(scanoff)
         #now save data if desired
         if OffData:
             if saveData:
@@ -1566,7 +1589,7 @@ class SmallDataAna(object):
             plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
             plt.xlabel(scanVarName)
         #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
-        elif plotDiff and returnDict.has_key('scanOffPoints'):
+        elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
             if fig is None:
                 fig=plt.figure(figsize=(10,10))
             gs=gridspec.GridSpec(2,1,width_ratios=[1])

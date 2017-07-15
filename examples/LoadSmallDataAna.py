@@ -35,6 +35,7 @@ else:
 hutches=['amo','sxr','xpp','xcs','mfx','cxi','mec']
 if not args.exp:
     hostname=socket.gethostname()
+    foundHutch=False
     for ihutch in hutches:
         if hostname.find(ihutch)>=0:
             hutch=ihutch.upper()
