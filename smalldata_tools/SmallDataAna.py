@@ -1822,18 +1822,26 @@ class SmallDataAna(object):
         #else:
         #    print 'could not find event idx in data'
         #    return cubeData,None
-        cubeIdxData = evtIDXr.groupby_bins('binVar',Bins)   
+        cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5)
         keys = cubeIdxData.groups.keys()
         keys.sort()
+        print 'keys ',len(keys)
 
         fidArray=[]
         timeArray=[]
         addArray=[]
-        for key in keys:
-            fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
-            timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
-            if addIdxVar!='':
-                addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
+        for key in (Bins[1:]+Bins[:-1])*0.5:
+            if key in cubeIdxData.groups.keys():
+                fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
+                timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
+                if addIdxVar!='':
+                    addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
+            else:
+                fidArray.append([])
+                timeArray.append([])
+                if addIdxVar!='':
+                    addArray.append([])
+                
         retDict={'keys': keys}
         retDict['fiducial']=fidArray
         retDict['evttime']=timeArray
