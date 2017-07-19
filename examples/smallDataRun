@@ -189,6 +189,7 @@ if [ ! -d  $LOGDIR ]; then
     mkdir $LOGDIR
 fi
 
+source /reg/g/psdm/bin/conda_setup ''
 source /reg/g/pcds/setup/pathmunge.sh
 LDAP='./'
 pythonpathmunge $LDAP
@@ -217,8 +218,6 @@ else
 	$ARGSTR \
         --run $RUN`
 fi
-
-source /reg/g/psdm/bin/conda_setup ''
 
 echo $CMD
 $CMD
