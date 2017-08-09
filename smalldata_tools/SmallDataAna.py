@@ -616,8 +616,11 @@ class SmallDataAna(object):
                 fieldkey = key[1:]
                 #if key != '/event_time':
                 if self._fields[fieldkey][1]=='onDisk':
-                    self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:]) ])
-                    self._fields[fieldkey][1]='inXr'
+                    try:
+                        self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:]) ])
+                        self._fields[fieldkey][1]='inXr'
+                    except:
+                        print 'failed to create dataset for: ',fieldkey, self._fields[fieldkey]
                 continue
             for tleaf in node._f_list_nodes():
                 if not isinstance(tleaf, tables.group.Group):         

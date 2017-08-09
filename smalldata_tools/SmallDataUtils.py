@@ -74,6 +74,12 @@ def xcsDetectors(beamCodes=[[162],[81]]):
     dets.append(bmmonDetector('HX2-BEAMMON-01','ipm_hx2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
     dets.append(epicsDetector(PVlist=['att_transmission', 'att_transmission_3rd_h', 'ccm_E', 'lom_E', 'DIFF_phis', 'DIFF_th', 'DIFF_tth', 'DIFF_xs', 'DIFF_ys', 'DIFF_zs', 'DIFF_x', 'DIFF_y', 'DIFF_chis','DIFF_dety','ladm_theta','LAM_Z','LAM_X1','LAM_X2','LAM_Y1','LAM_Y2','LAM_DET_Y','LAM_DET_X']))
+    dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
+    try:
+        dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
+    except:
+        print 'did not add encoder detector'
+        pass
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage')
     return dets
