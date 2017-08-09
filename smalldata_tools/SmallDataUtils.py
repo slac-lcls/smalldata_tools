@@ -124,7 +124,7 @@ def getUserData(det):
             if isinstance(det.evt[key], np.ndarray):
                 if isinstance(det.evt[key], np.ma.masked_array):
                     data = det.evt[key].data
-                    if data.dtype == 'uint16':
+                    if np.issubdtype(data.dtype, np.integer):
                         data[det.evt[key].mask]=0
                     else:
                         data[det.evt[key].mask]=np.nan
