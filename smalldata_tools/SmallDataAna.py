@@ -4,6 +4,7 @@ Created on Tue Dec  8 21:31:56 2015
 @author: snelson
 """
 import h5py
+from os import makedirs
 from os import path
 from os import walk
 import numpy as np
@@ -20,6 +21,7 @@ from matplotlib import pyplot as plt
 from utilities import dictToHdf5
 from utilities import shapeFromKey_h5
 from utilities import hist2d
+import bokeh.plotting as bp
 
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
@@ -381,22 +383,30 @@ class Selection(object):
         self._filter=None
 
 class SmallDataAna(object):
-    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None):
+    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None, plotWith='matplotlib'):
         self._fields={}
         self._live_fields=[]
         if isinstance(liveList, list) and intable=='redis':
             self._live_fields=liveList
         self.expname=expname
         self.run=run
+        self.runLabel='Run%03d'%run
+        self.plotWith=plotWith
         if len(expname)>3:
             self.hutch=self.expname[:3]
             if dirname=='':
                 self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
+                self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
+                    self.plot_dirname='/reg/d/psdm/%s/%s/res/smalldata_plots/'%(self.hutch,self.expname)
             else:
                 self.dirname=dirname
+                self.plot_dirname = dirname+'/smalldata_plots'
+            if not path.isdir(self.plot_dirname):
+                makedirs(self.plot_dirname)
+
         if filename == '':
             self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
@@ -412,10 +422,30 @@ class SmallDataAna(object):
         if run == -1 or (intable is not None and intable == 'redis'):
             self.fh5=client.ExptClient(expname, host='psdb3')
             self._isRedis=True
+            plot_dirname='/reg/neh/operator/%sopr/experiments/%s/smalldata_plots/'%(self.hutch,self.expname)
+            if not path.isdir(plot_dirname):
+                try:
+                    makedirs(plot_dirname)
+                    self.plot_dirname = plot_dirname
+                except:
+                    pass
+            try:
+                import RegDB.experiment_info
+                currRun=RegDB.experiment_info.experiment_runs(self.expname[:3].upper)[-1]['num']
+                self.runLabel='Run%03d'%currRun
+            except:
+                self.runLabel='RunFromRedis'
         elif intable is not None:
             if intable == 'redis':
                 self.fh5=client.ExptClient(expname, host='psdb3')
                 self._isRedis=True
+                plot_dirname='/reg/neh/operator/%sopr/experiments/%s/smalldata_plots/'%(self.hutch,self.expname)
+                if not path.isdir(plot_dirname):
+                    try:
+                        makedirs(plot_dirname)
+                        self.plot_dirname = plot_dirname
+                    except:
+                        pass
             elif isinstance(intable, basestring) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
@@ -468,6 +498,12 @@ class SmallDataAna(object):
         #there won't be any xarray files of correct size when running "live"
         if not self._isRedis:
             self._readXarrayData()
+
+        #define bokeh palette based on matplotlib job for consistency of matplotlib & bokeh image plots
+        import matplotlib.cm as cm
+        import matplotlib as pltm
+        colormap =cm.get_cmap("jet")
+        self.bokehpalette = [pltm.colors.rgb2hex(m) for m in colormap(np.arange(colormap.N))]
 
     def __del__(self):
         try:
@@ -1178,7 +1214,10 @@ class SmallDataAna(object):
                 print 'bin# needs to be of same dimentions as plotvariables (2d)'
         return self.plotVar2d(plotvar, numBins=numBins,setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,asHist=asHist)
 
-    def plotVar1d(self, plotvar, numBins=100,setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None):
+    def plotVar1d(self, plotvar, numBins=100,setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None, plotWith=None):
+        if plotWith is None:
+            plotWith = self.plotWith
+
         if isinstance(plotvar,list):
             if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay'): 
                 print 'request variable %s not in littleData file'%plotvar
@@ -1187,6 +1226,7 @@ class SmallDataAna(object):
             if not (self.hasKey(plotvar) or plotvar=='delay'): 
                 print 'request variable %s not in littleData file'%plotvar
                 return
+
         if plotvar=='delay':
             vals = self.getDelay(use_ttCorr=True)
         elif len(plotvar)==1 and plotvar.find('droplets')>=0:
@@ -1212,19 +1252,40 @@ class SmallDataAna(object):
             pmax=max(limits[0],limits[1])
         hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
         print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
-        if fig is None:
-            fig=plt.figure(figsize=(8,5))
 
-        plt.plot(hst[1][:-1],hst[0],'o')
-        plt.xlabel(plotvar)
-        plt.ylabel('entries')
-        if setCuts is not None and self.Sels.has_key(setCuts):
-            p = np.array(ginput(2))
-            p=[p[0][0],p[1][0]]
-            self.Sels[setCuts].addCut(plotvar,min(p),max(p))
+        if plotWith=='matplotlib':
+            if fig is None:
+                fig=plt.figure(figsize=(8,5))
+
+            plt.plot(hst[1][:-1],hst[0],'o')
+            plt.xlabel(plotvar)
+            plt.ylabel('entries')
+            if setCuts is not None and self.Sels.has_key(setCuts):
+                p = np.array(ginput(2))
+                p=[p[0][0],p[1][0]]
+                self.Sels[setCuts].addCut(plotvar,min(p),max(p))
+                
+        elif plotWith.find('bokeh')>=0:
+            if setCuts is not None and self.Sels.has_key(setCuts):
+                print 'setting filter conditions does not work when using bokeh plotting'
+            p = bp.figure(title="%s histogram for %s"%(plotvar, self.runLabel), x_axis_label=plotvar, y_axis_label='entries')
+            p.circle(hst[1][:-1], hst[0], legend=self.runLabel, size=5)
+            if plotWith=='bokeh_notebook':
+                bp.output_notebook()
+                bp.show(p)
+            else:
+                bp.output_file('%s/%s_%s_histogram.html'%(self.plot_dirname,self.runLabel, plotvar.replace('/','_')))
+                bp.save(p)
+                
+        elif plotWith != 'no_plot':
+            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
+            
         return hst
 
-    def plotVar2d(self, plotvars, setCuts=None, applyCuts=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None):
+    def plotVar2d(self, plotvars, setCuts=None, applyCuts=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
+        if plotWith is None:
+            plotWith = self.plotWith
+
         for plotvar in plotvars:
             if isinstance(plotvar,list):
                 plotvar = plotvar[0]
@@ -1264,15 +1325,7 @@ class SmallDataAna(object):
             total_filter&=ft                
 
         print 'select ',total_filter.sum(),' of ',np.ones_like(total_filter).sum(),' events'
-        
-        if fig is None:
-            fig=plt.figure(figsize=(8,5))
-
-        if not asHist:
-            plt.plot(vals[1][total_filter],vals[0][total_filter],'o',markersize=3)
-            plt.xlabel(plotvars[1])
-            plt.ylabel(plotvars[0])
-        else:
+        if asHist:
             v0 = vals[0][total_filter]
             v1 = vals[1][total_filter]
             binEdges0 = np.linspace(np.nanmin(v0),np.nanmax(v0),numBins[0])
@@ -1282,15 +1335,54 @@ class SmallDataAna(object):
             ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
             iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
             extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
-            plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
-            plt.xlabel(plotvars[1])
-            plt.ylabel(plotvars[0])
-        if setCuts is not None and self.Sels.has_key(setCuts):
-            p =np.array(ginput(2))
-            p0=[p[0][1],p[1][1]]
-            p1=[p[0][0],p[1][0]]
-            self.Sels[setCuts].addCut(plotvars[0],min(p0),max(p0))
-            self.Sels[setCuts].addCut(plotvars[1],min(p1),max(p1))
+        
+        if plotWith == 'matplotlib':
+            if fig is None:
+                fig=plt.figure(figsize=(8,5))
+
+            if not asHist:
+                plt.plot(vals[1][total_filter],vals[0][total_filter],'o',markersize=3)
+                plt.xlabel(plotvars[1])
+                plt.ylabel(plotvars[0])
+            else:
+                plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
+                plt.xlabel(plotvars[1])
+                plt.ylabel(plotvars[0])
+            if setCuts is not None and self.Sels.has_key(setCuts):
+                p =np.array(ginput(2))
+                p0=[p[0][1],p[1][1]]
+                p1=[p[0][0],p[1][0]]
+                self.Sels[setCuts].addCut(plotvars[0],min(p0),max(p0))
+                self.Sels[setCuts].addCut(plotvars[1],min(p1),max(p1))
+
+        elif plotWith.find('bokeh')>=0:
+            if setCuts is not None and self.Sels.has_key(setCuts):
+                print 'setting filter conditions does not work when using bokeh plotting'
+            if not asHist:
+                p = bp.figure(title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1])
+                msize=2
+                if len(vals[1][total_filter])<100:
+                    msize=5
+                elif len(vals[1][total_filter])<1000:
+                    msize=3
+                p.circle(vals[1][total_filter],vals[0][total_filter], legend=self.runLabel, size=msize)
+            else:
+                p = bp.figure(x_range=(extent[0], extent[1]), y_range=(extent[2], extent[3]),title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1])
+                max995 = np.percentile(iSig,99.5)
+                iSig995 = iSig.copy()
+                iSig995[iSig>max995]=max995
+                p.image(image=[iSig995], x=extent[0], y=extent[2], dw=extent[1]-extent[0], dh=extent[3]-extent[2], palette=self.bokehpalette)
+            if plotWith=='bokeh_notebook':
+                bp.output_notebook()
+                bp.show(p)
+            else:
+                bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
+                bp.save(p)
+                
+
+        elif plotWith != 'no_plot':
+            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
+
         if asHist:
             return iSig, extent
         else:
