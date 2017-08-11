@@ -959,10 +959,24 @@ class SmallDataAna(object):
                 ttBaseStr = 'tt/TTSPEC_'
         return ttCorr, ttBaseStr
 
-    def addCut(self, varName, cmin, cmax, SelName):
+    def addCut(self, varName, cmin=0, cmax=0, SelName=None):
+        if SelName is None:
+            print 'you need to pass the name for the filter/selection you want to use'
+            return
         if not self.Sels.has_key(SelName):
             self.Sels[SelName] = Selection()
-        self.Sels[SelName].addCut(varName, cmin,cmax)
+        if cmin!=cmax:
+            self.Sels[SelName].addCut(varName, cmin,cmax)
+        else:
+            if isinstance(varName, basestring):
+                if self.Sels.has_key(varName):
+                    self.Sels[SelName].add(self.Sels[varName])
+                else:
+                    print 'Cannot add cuts for filter %s as its not defined yet'%varName
+            elif isinstance(varName, Selection):
+                self.Sels[SelName].add(varName)
+            else:
+                print 'need to pass selection to add as Selection or its name'
         Filter = self.getFilter(SelName=SelName)
         self.Sels[SelName]._setFilter(Filter)
     def removeCut(self, varName, SelName):

@@ -118,9 +118,15 @@ if ana is not None:
     ana.addCut('lightStatus/xray',0.5,1.5,'off')
     ana.addCut('lightStatus/laser',-0.5,0.5,'off')
     
-    ana.addCut('ipm3/sum',0.03,10.,'on')
-    ana.addCut('ipm3/sum',0.03,10.,'off')
-    #ana.addCut('tt/AMPL',0.025,10.,'on')
+    ana.addCut('ipm5/sum',0.1,10.,'on')
+    ana.addCut('ipm5/sum',0.1,10.,'off')
+    ana.addCut('tt/AMPL',0.0025,10.,'on')
+
+    ana.addCut('tt/FLTPOSFWHM',80.,130.,'onTT')
+    ana.addCut('on',SelName='onTT')
+
+    ana.addCut('evr/code_41',0.5,1.5,'onTT41')
+    ana.addCut('onTT',SelName='onTT41')
 
     #this is an example of how to set up a cube.
     #binRange = np.arange(13.,15.5,0.03)
