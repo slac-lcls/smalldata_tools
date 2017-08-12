@@ -653,7 +653,8 @@ class SmallDataAna(object):
                 #if key != '/event_time':
                 if self._fields[fieldkey][1]=='onDisk':
                     try:
-                        self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:]) ])
+                        print 'DEBUG:_addXarray::: try adding data for ',fieldkey,key[1:].replace('/','__')
+                        self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:].replace('/','__')) ])
                         self._fields[fieldkey][1]='inXr'
                     except:
                         print 'failed to create dataset for: ',fieldkey, self._fields[fieldkey]
@@ -711,6 +712,7 @@ class SmallDataAna(object):
             return
 
         #create new xrData to be merged
+        name = name.replace('/','__')
         if len(data.shape)==1:
             self.xrData = xr.merge([self.xrData, xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name) ])
         else:
@@ -1830,7 +1832,7 @@ class SmallDataAna(object):
             for txVar in targetVarsLocal:
                 if txVar[0]=='/':txVar=txVar[1:] 
                 if 'damage/%s'%txVar  in self._fields.keys(): 
-                    newSel.addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
+                    self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
             for txVar in cube.targetVarsXtc:
                 if isinstance(txVar, dict):
                     try:
@@ -1838,7 +1840,7 @@ class SmallDataAna(object):
                     except:
                         continue
                 if 'damage/%s'%txVar  in self._fields.keys(): 
-                        newSel.addCut('damage/%s'%txVar,0.5,1.5)
+                        self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut('damage/%s'%txVar,0.5,1.5)
             cube.SelName='%s_%s'%(cube.cubeName,cube.SelName)
 
         return cube
