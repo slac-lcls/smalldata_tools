@@ -81,6 +81,15 @@ if not args.exp:
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
+    #data gets removed from ffb faster now, please check if data is still available
+    isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
+    if not isLive:
+        dirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
+        xtcname=dirname+'/e*-r%04d-*'%int(run)
+        import glob
+        presentXtc=glob.glob('%s'%xtcname)
+        if len(presentXtc)==0:
+            dsname='exp='+expname+':run='+run+':smd'
 else:
     expname=args.exp
     hutch=expname[0:3]
