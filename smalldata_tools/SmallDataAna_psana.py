@@ -1478,7 +1478,7 @@ class SmallDataAna_psana(object):
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
                 fout = h5py.File(outFileName, "w")
                 print 'no big data, bin the data now....be patient'
-                cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)  
+                cubeData = self.sda.makeCubeData(cubeName)  
                 print 'now write outputfile (only little data) to : ',outFileName
                 for key in cubeData.keys():
                     addToHdf5(fout, key, cubeData[key].values)
