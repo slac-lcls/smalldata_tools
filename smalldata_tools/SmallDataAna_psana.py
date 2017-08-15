@@ -416,6 +416,8 @@ class SmallDataAna_psana(object):
         if returnIt:
             return image
                      
+#bokeh, use BoxSelectTool to get selected region
+#https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
     def SelectRegion(self,detname=None, limits=[5,99.5]):
         avImages=[]
         for key in self.__dict__.keys():
@@ -778,6 +780,8 @@ class SmallDataAna_psana(object):
         mask_r_nda=None
         select=True
         while select:
+            fig=plt.figure(figsize=(12,10))
+            gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
             shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d) or noise(n)?:\n")
