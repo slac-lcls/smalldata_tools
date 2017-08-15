@@ -22,14 +22,20 @@ from utilities import dictToHdf5
 from utilities import shapeFromKey_h5
 from utilities import hist2d
 import bokeh.plotting as bp
+from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
+from bokeh.models import WheelZoomTool, BoxZoomTool
+import sys
+
+from pscache import client #works from ana-1.2.9 on
 
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
 
-#works from ana-1.2.9 on
 try:
-    from pscache import client
+    sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
+    import bokeh_utils
 except:
+    print 'could not import bokeh_utils'
     pass
 
 class photons(object):
@@ -653,7 +659,6 @@ class SmallDataAna(object):
                 #if key != '/event_time':
                 if self._fields[fieldkey][1]=='onDisk':
                     try:
-                        print 'DEBUG:_addXarray::: try adding data for ',fieldkey,key[1:].replace('/','__')
                         self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:].replace('/','__')) ])
                         self._fields[fieldkey][1]='inXr'
                     except:
@@ -1282,9 +1287,23 @@ class SmallDataAna(object):
                 self.Sels[setCuts].addCut(plotvar,min(p),max(p))
                 
         elif plotWith.find('bokeh')>=0:
+            #IMPLEMENT ME
+            #bokeh, use BoxSelectTool to get selected region
+            #https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
+            #set cuts does not need to be specified explicly, can simple be gotten from callback of tool.....
             if setCuts is not None and self.Sels.has_key(setCuts):
                 print 'setting filter conditions does not work when using bokeh plotting'
-            p = bp.figure(title="%s histogram for %s"%(plotvar, self.runLabel), x_axis_label=plotvar, y_axis_label='entries')
+            pan=PanTool()
+            wheel_zoom=WheelZoomTool()
+            box_zoom=BoxZoomTool()
+            resize=ResizeTool()
+            save=SaveTool()
+            reset=ResetTool()
+            hover=HoverTool(tooltips=[
+                ("(x,y)","($x, $y)")
+            ])
+            tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
+            p = bp.figure(title="%s histogram for %s"%(plotvar, self.runLabel), x_axis_label=plotvar, y_axis_label='entries',tools=tools)
             p.circle(hst[1][:-1], hst[0], legend=self.runLabel, size=5)
             if plotWith=='bokeh_notebook':
                 bp.output_notebook()
@@ -1374,8 +1393,19 @@ class SmallDataAna(object):
         elif plotWith.find('bokeh')>=0:
             if setCuts is not None and self.Sels.has_key(setCuts):
                 print 'setting filter conditions does not work when using bokeh plotting'
+            pan=PanTool()
+            wheel_zoom=WheelZoomTool()
+            box_zoom=BoxZoomTool()
+            resize=ResizeTool()
+            save=SaveTool()
+            reset=ResetTool()
+            tools = [pan, wheel_zoom,box_zoom,resize,save,reset]
+            hover=HoverTool(tooltips=[
+                ("(x,y)","($x, $y)")
+            ])
             if not asHist:
-                p = bp.figure(title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1])
+                tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
+                p = bp.figure(title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1],tools=tools)
                 msize=2
                 if len(vals[1][total_filter])<100:
                     msize=5
@@ -1383,7 +1413,11 @@ class SmallDataAna(object):
                     msize=3
                 p.circle(vals[1][total_filter],vals[0][total_filter], legend=self.runLabel, size=msize)
             else:
-                p = bp.figure(x_range=(extent[0], extent[1]), y_range=(extent[2], extent[3]),title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1])
+                ##hover does not really work in a figure glyph.
+                ##figure out how to solve that later.
+                #tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
+                tools = [pan, wheel_zoom,box_zoom,resize,save,reset]
+                p = bp.figure(x_range=(extent[0], extent[1]), y_range=(extent[2], extent[3]),title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1],tools=tools)
                 max995 = np.percentile(iSig,99.5)
                 iSig995 = iSig.copy()
                 iSig995[iSig>max995]=max995
