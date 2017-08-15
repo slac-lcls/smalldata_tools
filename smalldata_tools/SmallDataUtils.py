@@ -58,7 +58,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def xcsDetectors(beamCodes=[[162],[81]]):
+def xcsDetectors(beamCodes=[[162],[89]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
