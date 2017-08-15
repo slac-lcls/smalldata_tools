@@ -64,6 +64,7 @@ def xcsDetectors(beamCodes=[[162],[81]]):
     dets.append(controlDetector())
     dets.append(ipmDetector('XCS-IPM-02','ipm2'))
     dets.append(ipmDetector('XCS-IPM-03','ipm3'))
+    dets.append(ipmDetector('XCS-IPM-04','ipm4'))
     dets.append(ipmDetector('XCS-IPM-05','ipm5'))
     dets.append(ipmDetector('XCS-DIO-03','dio3'))
     dets.append(ipmDetector('XCS-DIO-05','dio5'))
