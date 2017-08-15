@@ -146,9 +146,7 @@ class DetObject(dropObject):
         self.ped = self.det.pedestals(run)
         self.gain = self.det.gain(run)
         self.imgShape = None
-        if self.ped is not None:
-          self.imgShape = self.ped.shape
-        elif self.det.dettype == 19:
+        if self.det.dettype == 19:
           if self.common_mode > 0:
             self.common_mode = -1
           npix = int(170e-3/self.pixelsize[0])
@@ -164,17 +162,24 @@ class DetObject(dropObject):
               if srcName=='xtcav':
                 self.ped = np.zeros([1024,1024])
           self.imgShape = self.ped.shape
+          self.common_mode = -1
         elif self.det.dettype == 27:
           zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
-          self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
-          self.imgShape = self.ped.shape
+          self.imgShape = (zylaCfg.numPixelsX(), zylaCfg.numPixelsY())
+          self.common_mode = 0
+          if self.ped is None:
+            self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
+          if self.imgShape != self.ped.shape:            
+            self.common_mode = -1
         elif self.det.dettype == 5:
           yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,psana.Source(srcName))
           self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
           self.imgShape = self.ped.shape
+        elif self.ped is not None:
+          self.imgShape = self.ped.shape
         try:
           pedImg = self.det.image(run, self.ped)
-          if pedImg is not None:
+          if pedImg is not None and self.imgShape is None:
             self.imgShape = pedImg.shape
         except:
           pass
@@ -185,11 +190,13 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True).squeeze()
           if self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
+          if self.mask.shape!=self.imgShape:
+            print 'mask is not of same shape as image, will set mask to all ones.'
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
         except:
           self.mask = None
           self.cmask = None
-        if self.det.dettype == 6 or self.det.dettype == 27:
-          self.common_mode = -1
         #geometry
         try:
           self.x = self.det.coords_x(run).squeeze()
@@ -500,6 +507,7 @@ class DetObject(dropObject):
           self.evt.dat = self.det.raw_data(evt)
       elif self.common_mode==0:
         self.evt.dat = self.det.raw_data(evt)-self.ped
+        #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
         #apply mask if requested
         if self.applyMask==1:
           self.evt.dat[self.mask==0]=0
