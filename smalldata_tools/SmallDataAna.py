@@ -419,7 +419,8 @@ class SmallDataAna(object):
                 self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
-        print 'and now open in dir: ',self.dirname,' to open file ',self.fname
+        if intable != 'redis':
+            print 'and now open in dir: ',self.dirname,' to open file ',self.fname
 
         self.Sels = {}
         self.cubes = {}
@@ -479,6 +480,10 @@ class SmallDataAna(object):
             #cannot use getVar as getVar is using the presence of self._tStamp
             if self._isRedis:
                 evttime = self.fh5.fetch_data(self.run,['event_time'])['event_time']
+                if len(evttime)<1:
+                    print 'read from REDIS, found no entries for run ',self.run,', cannot make SmallData object'
+                    return None
+                print 'read data for run %d from REDIS, have %d events'%(self.run,len(evttime))
             else:
                 evttime = self.fh5.get_node('/event_time').read()
             self._fields['event_time'][1]='inXr'
@@ -603,6 +608,7 @@ class SmallDataAna(object):
                 #1-dim date
                 if len(redisInfo[key][0])<=2:
                     keys_for_xarray.append(key)
+        #print 'DEBUG ',keys_for_xarray
         nEvts = self.fh5.fetch_data(run=self.run, keys=['event_time'])['event_time'].shape[0]
         nEvts_in_Xarray = -1
         try:
