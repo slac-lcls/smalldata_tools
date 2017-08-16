@@ -24,7 +24,7 @@ RUN=-1
 #also when using MPI, use only one node.....
 #for bigger ROI on short run, 32 jobs is better, 64 did not have gain
 #NJOBS=16
-NJOBS=12
+NJOBS=36
 #
 EXP='xxx'
 QUEUE=psanaq
@@ -161,18 +161,22 @@ LDAP='./'
 pythonpathmunge $LDAP
 pythonpathmunge $LDAP'/smalldata_tools'
 
+PYTHON_EXE='./examples/MakeCube.py'
+#PYTHON_EXE='./examples/PickedEventsCube.py'
+
 # necessary because xarray check if it can use the set DISPLAY variable and
 # that is not possible when in batch mode but it is also absolutely not needed
 unset DISPLAY
 
+
 if [ $SINGLEJOB -eq 1 ]; then
     echo 'so I will run a new job for run ' $RUN
     if [ $NJOBS -le 8 ]; then
-	CMD=`echo mpirun -n $NJOBS python ./examples/MakeCube.py \
+	CMD=`echo mpirun -n $NJOBS python $PYTHON_EXE \
 	$ARGSTR \
         --run $RUN`
     else
-	CMD=`echo python ./examples/MakeCube.py \
+	CMD=`echo python $PYTHON_EXE \
 	$ARGSTR \
         --run $RUN`
     fi
@@ -180,7 +184,7 @@ else
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME
     CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
-        mpirun python ./examples/MakeCube.py \
+        mpirun python $PYTHON_EXE \
 	$ARGSTR \
         --run $RUN`
 fi
