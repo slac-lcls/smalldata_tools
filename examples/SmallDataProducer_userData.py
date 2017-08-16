@@ -34,9 +34,15 @@ def getNmaxDrop(run):
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
-epicsPV = [] 
 acqROI = [0,8000]
+#epicsPV = ['slit_s1_hw'] 
+epicsPV = [] a
+#fix timetool calibration if necessary
+#ttCalib=[0.,2.,0.]
+ttCalib=[]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -186,10 +192,10 @@ dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
