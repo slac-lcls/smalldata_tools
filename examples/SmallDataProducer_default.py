@@ -17,7 +17,14 @@ from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-epicsPV = [''] 
+#epicsPV = ['slit_s1_hw'] 
+epicsPV = [] 
+#fix timetool calibration if necessary
+#ttCalib=[0.,2.,0.]
+ttCalib=[]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -107,26 +114,12 @@ except:
 
 
 defaultDets = defaultDetectors(hutch)
-########################################################## 
-##
-## User Input start --> 
-##
-########################################################## 
-##########################################################
-# run independent parameters 
-##########################################################
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib, 'tt')
-##this gives the analog input channels friendlier names
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
-########################################################## 
-##
-## <-- User Input end
-##
-########################################################## 
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
 
 lasttime=time.time()
 for eventNr,evt in enumerate(ds.events()):
