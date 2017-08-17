@@ -24,6 +24,7 @@ from utilities import dropObject
 from utilities import plotImageBokeh
 import bokeh.plotting as bp
 import azimuthalBinning as ab
+from matplotlib import gridspec
 import RegDB.experiment_info
 from utilities_FitCenter import FindFitCenter
 from mpi4py import MPI
@@ -587,7 +588,7 @@ class SmallDataAna_psana(object):
         print 'center Final ',combRes['xCen'],combRes['yCen']
         return combRes
 
-    def FitCircle(self, detname=None, use_mask=False, use_mask_local=False, limits=[5,99.5]):
+    def FitCircle(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5]):
         detname, img, avImage = self.getAvImage(detname=None)
 
         if use_mask:
@@ -601,14 +602,14 @@ class SmallDataAna_psana(object):
             else:
                 maskName = raw_input('no local mask defined for %s, please enter file name '%avImage)
                 
-                if os.path.isfile(maskName):
+                if maskName!='' and os.path.isfile(maskName):
                     locmask=np.loadtxt(maskName)
                     if self.__dict__[detname].x is not None and locmask.shape != self.__dict__[detname].x.shape:
                         if locmask.shape[1] == 2:
                             locmask = locmask.transpose(1,0)
                         locmask = locmask.reshape(self.__dict__[detname].x.shape)
                     self.__dict__['_mask_'+avImage] = locmask
-                img = (img*locmask)
+                    img = (img*locmask)
 
         plotMax = np.percentile(img[img!=0], 99.5)
         plotMin = np.percentile(img[img!=0], 5)
@@ -658,11 +659,11 @@ class SmallDataAna_psana(object):
                 if raw_input("Happy with this selection:\n") in ["y","Y"]:
                     happy = True
 
-        elif raw_input("Select Circle Points with threshold (y/n):\n") in ["y","Y"]:
-            fig=plt.figure(figsize=(10,10))
-            plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
+        else:
             happy = False
             while not happy:
+                fig=plt.figure(figsize=(10,10))
+                plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 thres = float(raw_input("min percentile % of selected points:\n"))
                 thresP = np.percentile(img[img!=0], thres)
                 print 'thresP',thresP
@@ -788,10 +789,6 @@ class SmallDataAna_psana(object):
         iX = self.__dict__[detname+'_iX']
         iY = self.__dict__[detname+'_iY']
         extent=[x.min(), x.max(), y.min(), y.max()]
-
-        fig=plt.figure(figsize=(12,10))
-        from matplotlib import gridspec
-        gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
         
         mask=[]
         mask_r_nda=None
@@ -829,6 +826,8 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(mask_r_nda)
                 print 'mask from rectangle (shape):',mask_r_nda.shape
             elif shape=='c':
+                fig=plt.figure(figsize=(12,10))
+                gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
                 plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 if raw_input("Select center by mouse?\n") in ["y","Y"]:
                     c=ginput(1)
@@ -860,6 +859,8 @@ class SmallDataAna_psana(object):
                 else:
                     plt.subplot(gs[1]).imshow(mask_r_nda)
             elif shape=='p':
+                fig=plt.figure(figsize=(12,10))
+                gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
                 if needsGeo:
                     plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 elif det.dettype==13:
