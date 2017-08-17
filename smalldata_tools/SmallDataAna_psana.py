@@ -436,7 +436,7 @@ class SmallDataAna_psana(object):
             avImage=avImages[0]
         detname = self._getDetname_from_AvImage(avImage)
         img = self.__dict__[avImage]
-        #print img.shape
+        print 'DEBUG: ',img.shape
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
@@ -454,6 +454,7 @@ class SmallDataAna_psana(object):
         else:
             image = img
 
+        print 'DEBUG: ',needsGeo, image.shape
         plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
         plt.pause(0.0001)
 
@@ -572,8 +573,7 @@ class SmallDataAna_psana(object):
         print 'center Final ',combRes['xCen'],combRes['yCen']
         return combRes
 
-#171143, -23394.8115013]
-    def FitCircle(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5]):
+    def FitCircle(self, detname=None, use_mask=False, use_mask_local=False, limits=[5,99.5]):
         detname, img, avImage = self.getAvImage(detname=None)
 
         if use_mask:
@@ -619,26 +619,30 @@ class SmallDataAna_psana(object):
         extent=[x.min(), x.max(), y.min(), y.max()]
 
         if raw_input("Select Circle Points by Mouse?:\n") in ["y","Y"]:
-            fig=plt.figure(figsize=(10,10))
-            if needsGeo:
-                plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
-            else:
-                plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
             happy = False
             while not happy:
+                fig=plt.figure(figsize=(10,10))
+                if needsGeo:
+                    plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                else:
+                    plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 points=ginput(n=0)
                 parr=np.array(points)
                 #res: xc, yc, R, residu
                 res = fitCircle(parr[:,0],parr[:,1])
-                #draw the circle.
+                #draw the circle. now need to redraw the whole image thanks to the conda matplotlib
+                fig=plt.figure(figsize=(10,10))
+                if needsGeo:
+                    plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                else:
+                    plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 circle = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
                 plt.gca().add_artist(circle)
                 plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
                 plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
-
+                print 'x,y: ',res[0],res[1],' R ',res[2]
                 if raw_input("Happy with this selection:\n") in ["y","Y"]:
                     happy = True
-                print 'x,y: ',res[0],res[1],' R ',res[2]
 
         elif raw_input("Select Circle Points with threshold (y/n):\n") in ["y","Y"]:
             fig=plt.figure(figsize=(10,10))
@@ -656,7 +660,6 @@ class SmallDataAna_psana(object):
                 if raw_input("Happy with this threshold (y/n):\n") in ["y","Y"]:
                     happy=True
 
-            #print 'DEBUG: ',x.shape,y.shape,img.shape
             res = fitCircle(x.flatten()[img.flatten()>thresP],y.flatten()[img.flatten()>thresP])
             circleM = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
             fig=plt.figure(figsize=(10,10))
