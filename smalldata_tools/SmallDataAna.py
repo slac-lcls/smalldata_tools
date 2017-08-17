@@ -20,7 +20,7 @@ from pylab import ginput
 from matplotlib import pyplot as plt
 from utilities import dictToHdf5
 from utilities import shapeFromKey_h5
-from utilities import hist2d
+from utilities import hist2d, plotImageBokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
 from bokeh.models import WheelZoomTool, BoxZoomTool
@@ -30,13 +30,6 @@ from pscache import client #works from ana-1.2.9 on
 
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
-
-try:
-    sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
-    import bokeh_utils
-except:
-    print 'could not import bokeh_utils'
-    pass
 
 class photons(object):
     def __init__(self,h5file,detName='epix',photName='photon'):
@@ -1223,14 +1216,14 @@ class SmallDataAna(object):
         else:
             print 'getPeak is not yet implemented for this type of data (need 1d histo)'
 
-    def plotVar(self, plotvar, numBins=[100],setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None,asHist=False):
+    def plotVar(self, plotvar, numBins=[100],setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None):
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
         if isinstance(plotvar, basestring) or (len(plotvar)==2 and (isinstance(plotvar[0], basestring) and not isinstance(plotvar[1], basestring))):
             if len(numBins)!=1:
                 print 'bin# needs to be of same dimensions as plotvariables (1d)'
                 return
-            return self.plotVar1d(plotvar, numBins=numBins[0],setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig)
+            return self.plotVar1d(plotvar, numBins=numBins[0],setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,plotWith=plotWith)
         elif len(plotvar)>2:
             print 'plotting of 3 variables is not defined yet'
             return
@@ -1239,7 +1232,7 @@ class SmallDataAna(object):
                 numBins=[numBins[0],numBins[0]]
             else:
                 print 'bin# needs to be of same dimentions as plotvariables (2d)'
-        return self.plotVar2d(plotvar, numBins=numBins,setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,asHist=asHist)
+        return self.plotVar2d(plotvar, numBins=numBins,setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
 
     def plotVar1d(self, plotvar, numBins=100,setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None, plotWith=None):
         if plotWith is None:
@@ -1419,21 +1412,18 @@ class SmallDataAna(object):
                     msize=3
                 p.circle(vals[1][total_filter],vals[0][total_filter], legend=self.runLabel, size=msize)
             else:
-                ##hover does not really work in a figure glyph.
-                ##figure out how to solve that later.
-                #tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
-                tools = [pan, wheel_zoom,box_zoom,resize,save,reset]
-                p = bp.figure(x_range=(extent[0], extent[1]), y_range=(extent[2], extent[3]),title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1],tools=tools)
-                max995 = np.percentile(iSig,99.5)
-                iSig995 = iSig.copy()
-                iSig995[iSig>max995]=max995
-                p.image(image=[iSig995], x=extent[0], y=extent[2], dw=extent[1]-extent[0], dh=extent[3]-extent[2], palette=self.bokehpalette)
+                #hover does not really work in a figure glyph.
+                #figure out how to solve that later.
+                plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
+                layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
             if plotWith=='bokeh_notebook':
                 bp.output_notebook()
-                bp.show(p)
+                #bp.show(p)
+                bp.show(layout)
             else:
                 bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
-                bp.save(p)
+                #bp.save(p)
+                bp.save(layout)
                 
 
         elif plotWith != 'no_plot':
@@ -1885,7 +1875,7 @@ class SmallDataAna(object):
 
         return cube
 
-    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=''):
+    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
         cube = self.prepCubeData(cubeName)
         if cube is None:
             return 
@@ -1968,36 +1958,59 @@ class SmallDataAna(object):
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
-        if addIdxVar!='':
-            evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
+        if addIdxVar is not None:
+            if isinstance(addIdxVar,basestring):
+                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
+            elif  isinstance(addIdxVar,list):
+                for thisIdxVar in addIdxVar:
+                    addArray = xr.DataArray(self.getVar(thisIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=thisIdxVar)
+                    evtIDXr = xr.merge([evtIDXr, addArray])
+            else:
+                print 'addIdxVar need to be a string of list of strings, got: ',addIdxVar
         #else:
         #    print 'could not find event idx in data'
         #    return cubeData,None
         cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5)
         keys = cubeIdxData.groups.keys()
         keys.sort()
-        print 'keys ',len(keys)
 
         fidArray=[]
         timeArray=[]
-        addArray=[]
+        if isinstance(addIdxVar,list):
+            addArray=[]
+            for addVar in addIdxVar:
+                addArray.append([])
+        else:
+            addArray=[]
         for key in (Bins[1:]+Bins[:-1])*0.5:
             if key in cubeIdxData.groups.keys():
                 fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
                 timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
-                if addIdxVar!='':
-                    addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
+                if addIdxVar is not None:
+                    if isinstance(addIdxVar,basestring):
+                        addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
+                    elif isinstance(addIdxVar,list):
+                        for iv,thisIdxVar in enumerate(addIdxVar):
+                            addArray[iv].append(evtIDXr[thisIdxVar][cubeIdxData.groups[key]])
             else:
                 fidArray.append([])
                 timeArray.append([])
-                if addIdxVar!='':
-                    addArray.append([])
+                if addIdxVar is not None:
+                    if isinstance(addIdxVar,basestring):
+                        addArray.append([])
+                    elif isinstance(addIdxVar,list):
+                        for iv,thisIdxVar in enumerate(addIdxVar):
+                            addArray[iv].append([])
                 
         retDict={'keys': keys}
         retDict['fiducial']=fidArray
         retDict['evttime']=timeArray
-        if addIdxVar!='':
-            retDict[addIdxVar]=addArray
+        if addIdxVar is not None:
+            if isinstance(addIdxVar,basestring):
+                retDict[addIdxVar]=addArray
+            elif isinstance(addIdxVar,list):
+                for iv,thisIdxVar in enumerate(addIdxVar):
+                    retDict[thisIdxVar]=addArray[iv]
         return cubeData,retDict
 
     #CHECK ME: REWRITE ACCESS TO NON-SMALL data....
