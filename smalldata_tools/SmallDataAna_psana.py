@@ -21,6 +21,8 @@ from utilities import fitCircle
 from SmallDataUtils import getUserData
 from utilities import addToHdf5
 from utilities import dropObject
+from utilities import plotImageBokeh
+import bokeh.plotting as bp
 import azimuthalBinning as ab
 import RegDB.experiment_info
 from utilities_FitCenter import FindFitCenter
@@ -388,7 +390,7 @@ class SmallDataAna_psana(object):
             detname = detname[:-1]
         return detname
 
-    def plotAvImage(self,detname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False):
+    def plotAvImage(self,detname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith='',debugPlot=-1):
         detname, img, avImage = self.getAvImage(detname=None)
 
         if use_mask:
@@ -404,15 +406,27 @@ class SmallDataAna_psana(object):
         else:
             image = img
 
-        fig=plt.figure(figsize=(10,6))
-        if ROI!=[]:
-            gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
-            plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],clim=[plotMin,plotMax],interpolation='None')
+        #have issues with Jupyter notebook io size.
+        if plotWith=='bokeh_notebook':
+            plot_title="%s in Run %d"%(avImage, self.run)
+            if debugPlot>0:
+                img = image[:debugPlot, :debugPlot]
+            else:
+                img = image
+            layout, p, im = plotImageBokeh(img, plot_title=plot_title, plotMaxP=np.percentile(img,99),plotMinP=np.percentile(img,1), plotWidth=700, plotHeight=700)
+            bp.output_notebook()
+            bp.show(layout)
         else:
-            gs=gridspec.GridSpec(1,2,width_ratios=[99,1])        
-        plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
-        plt.title(avImage)
-        plt.show()
+            fig=plt.figure(figsize=(10,6))
+            if ROI!=[]:
+                gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
+                plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],clim=[plotMin,plotMax],interpolation='None')
+            else:
+                gs=gridspec.GridSpec(1,2,width_ratios=[99,1])        
+            plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
+            plt.title(avImage)
+            plt.show()
+
         if returnIt:
             return image
                      
