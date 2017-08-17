@@ -179,7 +179,7 @@ class DetObject(dropObject):
           self.imgShape = self.ped.shape
         try:
           pedImg = self.det.image(run, self.ped)
-          if pedImg is not None and self.imgShape is None:
+          if pedImg is not None:# and self.imgShape is None:
             self.imgShape = pedImg.shape
         except:
           pass
@@ -190,7 +190,7 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True).squeeze()
           if self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          if self.mask.shape!=self.imgShape:
+          if len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
             print 'mask is not of same shape as image, will set mask to all ones.'
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
