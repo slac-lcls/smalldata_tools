@@ -13,6 +13,56 @@ import resource
 import psana
 import RegDB.experiment_info
 
+import bokeh.plotting as bp
+from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
+from bokeh.models import WheelZoomTool, BoxZoomTool
+
+import sys
+
+try:
+    sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
+    import bokeh_utils
+    cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
+except:
+  print 'no bokeh utils'
+  pass
+
+def plotImageBokeh(data, plotMin=None, plotMax=None, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP=None, plotMaxP=None, initial_cmap='jet'):
+  if plotMin is None:
+    plotMin=data.min()
+  if plotMax is None:
+    plotMax=data.max()
+  if plotMinP is None: 
+    plotMinP = plotMin+0.1*(plotMax-plotMin)
+  if plotMaxP is None: 
+    plotMaxP = plotMax-0.1*(plotMax-plotMin)
+  if xRange is None:
+    xRange=(0,data.shape[0])
+  if yRange is None:
+    yRange=(0,data.shape[1])
+
+  if dateTime:
+    p,im = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+                                  fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
+                                  y_range=yRange,title=plot_title,x_axis_type="datetime",
+                                  cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP)
+  else:
+    p,im = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+                                  fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
+                                  y_range=yRange,title=plot_title,
+                                  cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP)
+        
+    # Controls
+    vabsmin,vabsmax = plotMin, plotMax
+    low_slider,high_slider = bokeh_utils.create_low_high_sliders(plotMin,plotMax,plotMinP,plotMaxP,im=im)
+    input_vmin,input_vmax,button_update = bokeh_utils.create_low_high_input_button(plotMinP,plotMaxP,im=im,width=plotWidth)
+    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=initial_cmap)
+
+    # Layout
+    layout = bp.gridplot([[p],[input_vmin,input_vmax,button_update],
+                          [low_slider,high_slider],[select_cm]])
+
+    return layout,p,im
 
 def MAD(a, c=0.6745, axis=None):
   """
