@@ -789,6 +789,7 @@ class SmallDataAna_psana(object):
         iX = self.__dict__[detname+'_iX']
         iY = self.__dict__[detname+'_iY']
         extent=[x.min(), x.max(), y.min(), y.max()]
+        print 'DEBUG: extent(x,y min,max)',extent
         
         mask=[]
         mask_r_nda=None
@@ -832,7 +833,7 @@ class SmallDataAna_psana(object):
                 if raw_input("Select center by mouse?\n") in ["y","Y"]:
                     c=ginput(1)
                     cx=c[0][0];cy=c[0][1]
-                    print 'center: ',cx,' ',cy
+                    print 'Corrdinates of selected center: ',cx,' ',cy
                 else:
                     ctot = raw_input("center (x y)?\n")
                     c = ctot.split(' ');cx=float(c[0]);cy=float(c[1]);
@@ -1014,7 +1015,7 @@ class SmallDataAna_psana(object):
             np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.sda.expname,int(self.run)),mask)
         return mask
          
-    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav'):
+    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
         if dis_to_sam==None:
             dis_to_sam=float(raw_input('please enter the detector distance'))
@@ -1022,7 +1023,7 @@ class SmallDataAna_psana(object):
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
             center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
                     int(centerString.replace('[','').replace(']','').split(',')[1])]
-        self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name)
+        self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name, Pplane=Pplane, userMask=userMask)
 
     def getAzAvs(self,detname=None):
       if detname is None:
