@@ -33,7 +33,7 @@ def sxrDetectors():
 def xppDetectors(beamCodes=[[162],[91]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
-    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp']))
+    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp', 'las_drift_correction']))
     dets.append(controlDetector())
     dets.append(ipmDetector('NH2-SB1-IPM-01','ipm1'))
     dets.append(ipmDetector('NH2-SB1-IPM-02','ipm1c'))
@@ -74,7 +74,7 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     #dets.append(ipmDetector('XcsUsrIpm01','diodeU'))
     dets.append(bmmonDetector('HX2-BEAMMON-01','ipm_hx2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
-    dets.append(epicsDetector(PVlist=['att_transmission', 'att_transmission_3rd_h', 'ccm_E', 'lom_E', 'DIFF_phis', 'DIFF_th', 'DIFF_tth', 'DIFF_xs', 'DIFF_ys', 'DIFF_zs', 'DIFF_x', 'DIFF_y', 'DIFF_chis','DIFF_dety','ladm_theta','LAM_Z','LAM_X1','LAM_X2','LAM_Y1','LAM_Y2','LAM_DET_Y','LAM_DET_X']))
+    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'DIFF_phis', 'DIFF_th', 'DIFF_tth', 'DIFF_xs', 'DIFF_ys', 'DIFF_zs', 'DIFF_x', 'DIFF_y', 'DIFF_chis','DIFF_dety','ladm_theta','LAM_Z','LAM_X1','LAM_X2','LAM_Y1','LAM_Y2','LAM_DET_Y','LAM_DET_X','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
     dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
     try:
         dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
@@ -182,3 +182,48 @@ def getCfgOutput(det):
         
     return cfgDict
 
+def defaultRedisVars(hutch):
+    defList = ['lightStatus/xray', 'lightStatus/laser','event_time','fiducials']
+    #FIX ME: APPEND PLEASE!
+    if hutch.lower()=='amo':
+        redisVars = amoRedisVars()
+    elif hutch.lower()=='sxr':
+        redisVars = sxrRedisVars()
+    elif hutch.lower()=='xpp':
+        redisVars = xppRedisVars()
+    elif hutch.lower()=='xcs':
+        redisVars = xcsRedisVars()
+    elif hutch.lower()=='mfx':
+        redisVars = mfxRedisVars()
+    elif hutch.lower()=='cxi':
+        redisVars = cxiRedisVars()
+    elif hutch.lower()=='mec':
+        redisVars = mecRedisVars()
+    else:
+        dets = []
+    #detsInRun= [ det for det in dets if det.inRun() ]
+    #print 'found %d detectors '%len(detsInRun)
+    return redisVars
+
+def amoRedisVars():
+    return []
+
+def sxrRedisVars():
+    return []
+
+def xppRedisVars():
+    xppList = ['ebeam/L3_energy','ipm2/channels','ipm3/channels','diodeU/channels','enc/lasDelay','tt/ttCorr','tt/AMPL','tt/FLTPOS','tt/FLTPOS_FWHM','scan','cspad','cs140','epix']
+    return xppList
+
+def xcsRedisVars():
+    xcsList = ['ebeam/L3_energy','ipm4/channels','ipm5/channels','diodeGON/channels','enc/lasDelay','tt/ttCorr','tt/AMPL','tt/FLTPOS','tt/FLTPOS_FWHM','scan','cspad','cs140','epix']
+    return xcsList
+
+def mfxRedisVars():
+    return []
+
+def cxiRedisVars():
+    return []
+
+def mecRedisVars():
+    return []
