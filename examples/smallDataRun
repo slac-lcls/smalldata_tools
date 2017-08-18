@@ -13,6 +13,8 @@ OPTIONS:
 -j #: run on # number of cores
 -n number of events (for testing)
 -s run locally
+-L add data to REDIS (selected variables)
+-l add data to REDIS (all)
 EOF
 }
 
@@ -38,9 +40,10 @@ QUEUEREQ='xxx'
 XTCAV=0
 FFB=0
 LIVE=0
+LIVEFAST=0
 AUTO=0
 
-while getopts "e:d:r:n:q:j:g:hxsfla" OPTION
+while getopts "e:d:r:n:q:j:g:hxsflLa" OPTION
 do
     case $OPTION in
 	h)
@@ -73,6 +76,9 @@ do
 	    ;;
 	l)
 	    LIVE=1
+	    ;;
+	L)
+	    LIVEFAST=1
 	    ;;
 	x)
 	    XTCAV=1
@@ -139,6 +145,9 @@ fi
 if [ $LIVE -gt 0 ]; then
     ARGSTR=$ARGSTR' --live'
 fi
+if [ $LIVEFAST -gt 0 ]; then
+    ARGSTR=$ARGSTR' --liveFast'
+fi
 if [ $NUMBER_OF_EVENTS -ne 0 ]; then
     ARGSTR=$ARGSTR' --nev '$NUMBER_OF_EVENTS
 fi
@@ -190,6 +199,7 @@ if [ ! -d  $LOGDIR ]; then
 fi
 
 source /reg/g/psdm/bin/conda_setup ''
+source activate ana-1.3.11
 source /reg/g/pcds/setup/pathmunge.sh
 LDAP='./'
 pythonpathmunge $LDAP
