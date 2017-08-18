@@ -17,15 +17,24 @@ from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dro
 # functions for run dependant parameters
 ##########################################################
 def getAzIntParams(run):
+    if isinstance(run,basestring):
+        run=int(run)
+        
     ret_dict = {'eBeam': 8.015}
     ret_dict['cspad_center'] = [87697.946016760892, 94865.383526655729]
     ret_dict['cspad_dis_to_sam'] = 110.
     return ret_dict
 
 def getROIs(run):
+    if isinstance(run,basestring):
+        run=int(run)
+
     return [[10, 20], [10, 20]]
 
 def getNmaxDrop(run):
+    if isinstance(run,basestring):
+        run=int(run)
+
     if run >= 10:
         return 2000, 100
     else:
@@ -177,7 +186,7 @@ if haveCspad:
         cspad.azav_center=azIntParams['cspad_center']
         cspad.azav_dis_to_sam=azIntParams['cspad_dis_to_sam']
         try:
-            cspad.addAzAv(phiBins=7)
+            cspad.addAzAv(phiBins=1, Pplane=0)
         except:
             pass
     dets.append(cspad)
