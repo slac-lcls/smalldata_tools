@@ -437,8 +437,10 @@ class DetObject(dropObject):
       self.binnedImgShp = shape
       self.orgImgShp = None
 
-    def addAzAv(self,phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav'):
+    def addAzAv(self,phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None):
       azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
+      if userMask is not None and userMask.shape == self.mask.shape:
+        azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool)&userMask.astype(bool))
       if rank==0:
         print 'mask %d pixel for azimuthal integration'%azavMask.sum()
       if dis_to_sam is None:
@@ -447,12 +449,13 @@ class DetObject(dropObject):
         center = self.__dict__[azavName+'_center']
       if eBeam is None:
         eBeam = self.__dict__[azavName+'_eBeam']
-      self.__dict__[azavName] = ab.azimuthalBinning(x=self.x.flatten()/1e3,y=self.y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=1,phiBins=phiBins,qbin=qBin)
+      self.__dict__[azavName] = ab.azimuthalBinning(x=self.x.flatten()/1e3,y=self.y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin)
       self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
       self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
       self.__dict__[azavName+'_norm'] = self.__dict__[azavName].norm
       self.__dict__[azavName+'_normPhi'] = self.__dict__[azavName].Cake_norm
       self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
+      self.__dict__[azavName+'_Pplane'] = Pplane
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, boolMask=False):
       if len(ROI)>0:
