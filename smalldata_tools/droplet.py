@@ -40,14 +40,14 @@ class aduHist:
                         return np.histogram(dadu[dadu>0], self.bins)[0]
                         
 class dropletSave:
-        def __init__(self,thresAdu=[50,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, boolMask=False, ragged=False):
+        def __init__(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
                 self.name=name
                 self.maxDroplets = maxDroplets
                 self.dropPosInt = dropPosInt
                 self.retPixel = retPixel
                 self.ret2ndMom = ret2ndMom
                 self.thresAdu = thresAdu
-                self.boolMask = boolMask
+                self.flagMasked = flagMasked
                 self.ragged=ragged
 
         def shapeArray(self, returnDict):
@@ -99,7 +99,7 @@ class dropletSave:
                                         ret_dict['%s_mom%d%d'%(self.name,i,ii)] = np.zeros(self.maxDroplets)
                 if self.retPixel!=0:
                         ret_dict[self.name+'_Pix'] = np.zeros([self.maxDroplets*self.retPixel])
-                if self.boolMask:
+                if self.flagMasked:
                         ret_dict[self.name+'_masked'] = np.zeros(self.maxDroplets)
                 return ret_dict
                                 
@@ -147,8 +147,8 @@ class droplet:
         if isinstance(debug, bool):
                 self.debug = debug
 
-    def addDropletSave(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, boolMask=False, ragged=False):
-        dropSave = dropletSave(thresAdu,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, boolMask, ragged)
+    def addDropletSave(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
+        dropSave = dropletSave(thresAdu,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged)
         self.dropletSaves.append(dropSave)
 
     def addAduHist(self, ADUhist=[700], ROI=None, name=''):
@@ -253,17 +253,18 @@ class droplet:
         vThres = np.where(adu_drop<self.thresADU)[0]
         vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
         imgDrop[vetoed]=0
+        drop_ind_thres = np.delete(drop_ind,vThres)
 
         ###
         # add label_img_neighbor w/ mask as image -> sum ADU , field "masked" (binary)?
         ###
-        if 'boolMask' not in self.__dict__.keys():
-                boolMask=False
+        if '_flagMasked' not in self.__dict__.keys():
+                flagMasked=False
                 for saveD in self.dropletSaves:
-                        if saveD.boolMask:
-                                boolMask=True
-                self.__dict__['boolMask'] = boolMask
-        if self.__dict__['boolMask']:
+                        if saveD.flagMasked:
+                                flagMasked=True
+                self.__dict__['_flagMasked'] = flagMasked
+        if self.__dict__['_flagMasked']:
                 maxImg = filters.maximum_filter(imgDrop,footprint=self.footprint)
                 maskMax = measurements.sum(self.mask,maxImg, drop_ind)
                 imgDropMin = imgDrop.copy()
@@ -273,23 +274,60 @@ class droplet:
                 maskMin = measurements.sum(self.mask,maxImg, drop_ind)
                 maskDrop = maskMax+maskMin
 
+        ###
+        #figure out if we need to run region props....
+        ###
+        if '_needProps' not in self.__dict__.keys():
+                _needProps=False
+                for saveD in self.dropletSaves:
+                        if saveD.ret2ndMom>1 or saveD.retPixel:
+                                _needProps=True
+                self.__dict__['_needProps'] = _needProps
+
         #adu_drop = np.delete(adu_drop,vThres)
-        #use region props
-        self.regions = measure.regionprops(imgDrop, intensity_image=img, cache=True)
         pos_drop = []
         moments = []
         bbox = []
         adu_drop = []
         npix_drop = []
         images = []
-        dropSlices = measurements.find_objects(imgDrop)
-        for droplet,ds in zip(self.regions,dropSlices):
-                pos_drop.append(droplet['weighted_centroid'])
-                moments.append(droplet['weighted_moments_central'])
-                bbox.append(droplet['bbox'])
-                adu_drop.append(droplet['intensity_image'].sum())
-                npix_drop.append((droplet['intensity_image']>0).sum())
-                images.append(droplet['intensity_image'].flatten())
+        #use region props - this is not particularly performant on busy data.
+        #if no information other than adu, npix & is requested in _any_ dropletSave, then to back to old code.
+        #<checking like for flagmask>
+        #<old code> -- check result against new code.
+        #if not '_needProps' in self.__dict__keys():
+        if not self.__dict__['_needProps']:
+                #t1 = time.time()
+                imgNpix = img.copy(); imgNpix[img>0]=1
+                #drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
+                ##drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
+                #drop_adu = measurements.sum(img,imgDrop, drop_ind_thres)
+                #drop_pos = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
+                npix_drop = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
+                adu_drop = measurements.sum(img,imgDrop, drop_ind_thres)
+                pos_drop = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
+        else:
+                #t2 = time.time()
+                self.regions = measure.regionprops(imgDrop, intensity_image=img, cache=True)
+                dropSlices = measurements.find_objects(imgDrop)
+                for droplet,ds in zip(self.regions,dropSlices):
+                        pos_drop.append(droplet['weighted_centroid'])
+                        moments.append(droplet['weighted_moments_central'])
+                        bbox.append(droplet['bbox'])
+                        adu_drop.append(droplet['intensity_image'].sum())
+                        npix_drop.append((droplet['intensity_image']>0).sum())
+                        images.append(droplet['intensity_image'].flatten())
+        #t3 = time.time()
+        #print 'times: ',t2-t1, t3-t2, self.__dict__['_needProps']
+
+        #print 'types - list: ',isinstance(drop_npix, list),isinstance(npix_drop, list)
+        #print 'types - array: ',isinstance(drop_npix, np.array),isinstance(npix_drop, np.array)
+        #print 'npix A: ',len(drop_npix), ' -- ', drop_npix
+        #print 'npix B: ',len(npix_drop), ' -- ', npix_drop
+        #print 'ADU A: ',len(drop_adu), ' -- ', drop_adu
+        #print 'ADU B: ',len(adu_drop), ' -- ', adu_drop
+        #print 'pos A ',len(drop_pos), len(drop_pos[0])
+        #print 'pos B ',len(pos_drop), len(pos_drop[0])
 
         for saveD in self.dropletSaves:
                 aduArray = np.array(adu_drop).copy()
@@ -306,7 +344,7 @@ class droplet:
                 self.ret_dict[dropName+'_nDroplets'] = Filter.sum()
                 self.ret_dict[dropName+'_adu'] = aduArray[Filter]
                 self.ret_dict[dropName+'_npix'] = np.array(npix_drop)[Filter]
-                if saveD.boolMask:
+                if saveD.flagMasked:
                         self.ret_dict[dropName+'_masked'] = np.array(maskDrop)[Filter]
                 if Filter.sum()>0:
                         self.ret_dict[dropName+'_X'] = np.array(pos_drop)[Filter][:,0]

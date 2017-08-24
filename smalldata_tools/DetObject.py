@@ -190,7 +190,7 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True).squeeze()
           if self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          if len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
+          if len(self.mask.shape)==2 and self.mask.shape!=self.imgShape and self.mask.shape!=self.ped.shape:
             print 'mask is not of same shape as image, will set mask to all ones.'
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
@@ -457,7 +457,7 @@ class DetObject(dropObject):
       self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
       self.__dict__[azavName+'_Pplane'] = Pplane
 
-    def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, boolMask=False):
+    def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
       if len(ROI)>0:
         print 'ROI DEBUG: ',self.cmask.shape,self.getMask(ROI).shape
         mask = ( self.mask.astype(bool) & self.cmask.astype(bool) & self.getMask(ROI).astype(bool) )
