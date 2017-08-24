@@ -3,7 +3,6 @@ Created on Tue Dec  8 21:31:56 2015
 
 @author: snelson
 """
-import h5py
 from os import makedirs
 from os import path
 from os import walk
@@ -673,6 +672,9 @@ class SmallDataAna(object):
                     dataShape, coords,dims = self._getXarrayDims(key,tleaf.name)
                     #limit on dimensions here!
                     if len(dataShape)<=2 and coords is not None:
+                        if len(dataShape)==2 and dataShape[1]>25 and (dataShape[0]*dataShape[1])>1e7:
+                            print 'array for %s is too large (shape %d * %d), will load when asked'%(fieldName,dataShape[0], dataShape[1])
+                            continue
                         self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key,tleaf.name).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
                         self._fields[fieldName][1]='inXr'
 
