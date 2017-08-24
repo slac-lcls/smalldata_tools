@@ -430,7 +430,50 @@ class SmallDataAna_psana(object):
 
         if returnIt:
             return image
-                     
+
+    def saveAvImage(self,detname=None,dirname=''):
+        avImages=[]
+        for key in self.__dict__.keys():
+            if key.find('_mask_')>=0:
+                continue
+            if key.find('_azint_')>=0:
+                continue
+            if detname is not None and key.find(detname)<0:
+                continue
+            if key.find('AvImg')>=0:
+                if detname is not None and key.find(detname)>=0:
+                    avImages.append(key)
+                elif detname is None:
+                    avImages.append(key)
+
+        detname, img, avImage = self.getAvImage(detname=None)
+
+        needsGeo=False
+        if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
+            needsGeo=True
+        data_to_save={}
+        data_to_save['ped'] = self.__dict__[detname].ped
+        data_to_save['rms'] = self.__dict__[detname].rms
+        data_to_save['mask'] = self.__dict__[detname].mask
+        data_to_save['cmask'] = self.__dict__[detname].cmask
+        if self.__dict__[detname].x is not None:
+            data_to_save['x'] = self.__dict__[detname].x
+            data_to_save['y'] = self.__dict__[detname].y
+        for rawImg in avImages:
+            data_to_save[rawImg] = self.__dict__[rawImg]
+            if needsGeo:
+                data_to_save[rawImg+'_image'] = self.__dict__[detname].det.image(self.run,self.__dict__[rawImg])
+        if dirname=='':
+            dirname=self.sda.dirname
+        if len(avImages)<=0:
+            return
+        fname = '%s%s_Run%03d_%s.h5'%(dirname,self.expname,self.run,avImages[0])
+        print 'now save information to file: ',fname
+        imgFile = h5py.File(fname, "w")
+        for key in data_to_save:
+            addToHdf5(imgFile, key, data_to_save[key])
+        imgFile.close()
+            
 #bokeh, use BoxSelectTool to get selected region
 #https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
     def SelectRegion(self,detname=None, limits=[5,99.5]):
