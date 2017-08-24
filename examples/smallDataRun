@@ -19,7 +19,6 @@ EOF
 }
 
 export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
-CURREXP=`get_curr_exp`
 
 RUN=-1
 #16 works ok for default smalleData
@@ -154,6 +153,7 @@ fi
 if [ $EXP != 'xxx' ]; then
     ARGSTR=$ARGSTR' --exp '$EXP
 else
+    CURREXP=`get_curr_exp`
     EXP=$CURREXP
 fi
 ARGSTR=$ARGSTR' --gather '$GATHER
