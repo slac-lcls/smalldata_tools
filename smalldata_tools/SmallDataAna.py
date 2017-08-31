@@ -1605,6 +1605,7 @@ class SmallDataAna(object):
         FilterOn = FilterOn & ~np.isnan(i0Val) & ~np.isnan(sigVal)
         FilterOff = FilterOff & ~np.isnan(i0Val) & ~np.isnan(sigVal)
 
+        #get the binning variable here so that points where this is not good can be thrown out.
         if binVar is not None:
             if binVar[0] != 'delay':
                 binVal = self.get1dVar(binVar[0])
@@ -1639,6 +1640,11 @@ class SmallDataAna(object):
                 print 'Bins: ',isinstance(Bins,list),' -- ',Bins
             scanOnIdx = np.digitize(scan[FilterOn], scanPoints)
             scanPoints = np.concatenate([scanPoints, [scanPoints[-1]+(scanPoints[1]-scanPoints[0])]],0)
+
+        if returnIdx:
+            return scanOnIdx
+
+        #now do the same for laser off data
         OffData=False
         if scan[FilterOff].sum()!=0:
             scanOffPoints, scanOffIdx = np.unique(scan[FilterOff], return_inverse=True)
@@ -1648,9 +1654,7 @@ class SmallDataAna(object):
             scanOffIdx = np.digitize(scan[FilterOff], scanOffPoints)
             OffData = True
 
-        if returnIdx:
-            return scanOnIdx
-
+        #now get the binning information for second variable.
         if binVar is not None:
             if len(binVar)==1:
                 nbin=100
@@ -2381,4 +2385,3 @@ class SmallDataAna(object):
 
         if returnData:
             return returnDict
-
