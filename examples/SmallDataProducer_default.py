@@ -8,6 +8,7 @@ import socket
 import os
 import RegDB.experiment_info
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
+from smalldata_tools import ttRawDetector,wave8Detector
 ########################################################## 
 ##
 ## User Input start --> 
@@ -66,6 +67,7 @@ if not args.exp:
                 hutch=thisHutch.upper()
     if hutch is None:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        import sys
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
