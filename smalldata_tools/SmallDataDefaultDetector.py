@@ -85,6 +85,31 @@ class bmmonDetector(defaultDetector):
             dl['ypos']=data.Y_Position()
         return dl
 
+class wave8Detector(defaultDetector):
+    def __init__(self, detname, name=None, saveTime=False):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        self.saveTime = saveTime
+        defaultDetector.__init__(self, detname, self.name)
+        cfg = self.det.env.configStore().get(psana.Generic1D.ConfigV0, psana.Source(detname))
+        self.wave8_shape = None
+        if cfg is not None:
+            self.wave8_shape = cfg.Length()
+
+    def data(self, evt):
+        dl={}
+        raw = self.det.raw(evt)
+        if raw is not None:
+            for itrace in range(len(raw)):
+                dl['ch%02d'%itrace]=raw[itrace]
+            if self.saveTime:
+                wftime = self.det.wftime(evt)
+                for itrace,trace in enumerate(wftime):
+                    dl['wftime_ch%02d'%itrace]=trace
+        return dl
+
 class epicsDetector(defaultDetector):
     def __init__(self, name='epics', PVlist=[]):
         self.name = name
@@ -364,11 +389,11 @@ class ttRawDetector(defaultDetector):
         ttData['tt_signal']=np.zeros(abs(self.ttROI_signal[1][1]-self.ttROI_signal[1][0]))
         if self.ttROI_sideband is not None:
             ttData['tt_sideband']=np.zeros(abs(self.ttROI_sideband[1][1]-self.ttROI_sideband[1][0]))
-        #XXX
         if self.ttROI_reference is not None:
             ttData['tt_reference']=np.zeros(abs(self.ttROI_reference[1][1]-self.ttROI_reference[1][0]))
         for lOff in self.laserOff:
             if lOff in evtCodes:
+                print 'DEBUG ttRaw: laser off event!'
                 return ttData
             
         try:
@@ -394,7 +419,7 @@ class ttRawDetector(defaultDetector):
                 else:
                     self.runningRef=ttRef*self.ref_convergence + self.runningRef*(1.-self.ref_convergence)
                 #print 'update self.runningRef'
-            ttData['tt_reference']=self.runningRef        
+                ttData['tt_reference']=self.runningRef        
         return ttData
 
     def prepareTrace(self, evt, ttData=None):
