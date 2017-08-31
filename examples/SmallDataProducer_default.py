@@ -122,6 +122,10 @@ if len(ttCalib)>0:
     setParameter(defaultDets, ttCalib)
 if len(aioParams)>0:
     setParameter(defaultDets, aioParams, 'ai')
+##adding raw timetool traces:
+#defaultDets.append(ttRawDetector(env=ds.env()))
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 
 lasttime=time.time()
 for eventNr,evt in enumerate(ds.events()):

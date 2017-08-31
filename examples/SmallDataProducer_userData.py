@@ -209,6 +209,10 @@ if len(aioParams)>0:
     setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+##adding raw timetool traces:
+#defaultDets.append(ttRawDetector(env=ds.env()))
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 
 #add config data here
 userDataCfg={}
