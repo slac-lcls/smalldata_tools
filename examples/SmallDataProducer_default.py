@@ -74,8 +74,8 @@ if not args.exp:
     #data gets removed from ffb faster now, please check if data is still available
     isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
     if not isLive:
-        dirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
-        xtcname=dirname+'/e*-r%04d-*'%int(run)
+        xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
+        xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
         import glob
         presentXtc=glob.glob('%s'%xtcname)
         if len(presentXtc)==0:
