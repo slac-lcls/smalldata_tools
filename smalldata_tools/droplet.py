@@ -35,9 +35,13 @@ class aduHist:
                 else:
                         dx = pos[:,0].flatten()
                         dy = pos[:,1].flatten()
-                        Filter = [ dx > ROI[0] & dx < ROI[1] & dy > ROI[3] & dy < ROI[4] ]
-                        dadu = dadu.flatten()[Filter]
-                        return np.histogram(dadu[dadu>0], self.bins)[0]
+                        fxl = dx > self.ROI[0] 
+                        fxh = dx < self.ROI[1] 
+                        fyl = dy > self.ROI[2] 
+                        fyh = dy < self.ROI[3]
+                        fSum = ( fxl & fxh & fyl & fyh )
+                        daduF = dadu.flatten()[fSum]
+                        return np.histogram(daduF[daduF>0], self.bins)[0]
                         
 class dropletSave:
         def __init__(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
