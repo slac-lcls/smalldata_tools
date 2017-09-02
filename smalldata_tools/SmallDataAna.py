@@ -243,7 +243,7 @@ class droplets(object):
 
         plt.figure()
         ndrop_int = max(1,490000./allX.shape[0])
-        hist2d(allX,allY, numBins=[int(702/ndropc_int),int(766/ndrop_int)])
+        hist2d(allX,allY, numBins=[int(702/ndrop_int),int(766/ndrop_int)])
 
     def aduSlices(self,axis='y', ADUrange=[0,-1], npix=0):
         allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
