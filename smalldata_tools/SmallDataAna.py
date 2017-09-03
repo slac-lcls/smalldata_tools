@@ -119,7 +119,7 @@ class droplets(object):
                 keyList.append(data)
         return keyList
 
-    def fillDropArrays(self, only_XYADU=False):
+    def fillDropArrays(self, only_XYADU=False, Filter=None):
         for node in self._h5dir._f_list_nodes():
             if not (node.name.find(self._dropName)>=0):
                 continue
@@ -130,10 +130,16 @@ class droplets(object):
             keyName=node.name.replace(self._dropName,'')
             if not only_XYADU:
                 print 'fill drop ',h5Name
-                self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
+                if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
+                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
+                else:
+                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
             elif (keyName=='X' or keyName=='Y' or keyName=='adu' or keyName=='npix'):
                 print 'fill drop ',h5Name
-                self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
+                if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
+                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
+                else:
+                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
 
     def flattenDropArray(self, filterArray=None):
         if filterArray is None:

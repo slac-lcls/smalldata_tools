@@ -52,7 +52,7 @@ class SmallDataAna_psana(object):
                     if fname.find('r%04d'%run)>=0:
                         haveXtc=True
             if not haveXtc:
-                print 'Could not find SmallDataAna_psana, return None'
+                print 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run)
                 return None
         self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
         self.dsname='exp=%s:run=%i:smd'%(expname,run)
