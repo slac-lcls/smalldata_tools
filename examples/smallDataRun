@@ -15,6 +15,7 @@ OPTIONS:
 -s run locally
 -L add data to REDIS (selected variables)
 -l add data to REDIS (all)
+-f no recorder data (faster data access)
 EOF
 }
 
@@ -29,6 +30,7 @@ RUN=-1
 GATHER=10
 NJOBS=16
 #
+#EXP='xcsx22015'
 EXP='xxx'
 QUEUE=psanaq
 DIRNAME='xxx'
@@ -37,12 +39,12 @@ SINGLEJOB=0
 DAYSHIFT=1
 QUEUEREQ='xxx'
 XTCAV=0
-FFB=0
 LIVE=0
 LIVEFAST=0
 AUTO=0
+NORECORDER=0
 
-while getopts "e:d:r:n:q:j:g:hxsflLa" OPTION
+while getopts "e:d:r:n:q:j:g:hxsflLfa" OPTION
 do
     case $OPTION in
 	h)
@@ -71,7 +73,7 @@ do
 	    SINGLEJOB=1
 	    ;;
 	f)
-	    FFB=1
+	    NORECORDER=1
 	    ;;
 	l)
 	    LIVE=1
@@ -147,6 +149,9 @@ fi
 if [ $LIVEFAST -gt 0 ]; then
     ARGSTR=$ARGSTR' --liveFast'
 fi
+if [ $NORECORDER -gt 0 ]; then
+    ARGSTR=$ARGSTR' --norecorder'
+fi
 if [ $NUMBER_OF_EVENTS -ne 0 ]; then
     ARGSTR=$ARGSTR' --nev '$NUMBER_OF_EVENTS
 fi
@@ -199,7 +204,7 @@ if [ ! -d  $LOGDIR ]; then
 fi
 
 source /reg/g/psdm/bin/conda_setup ''
-source activate ana-1.3.11
+#source activate ana-1.3.15
 source /reg/g/pcds/setup/pathmunge.sh
 LDAP='./'
 pythonpathmunge $LDAP
