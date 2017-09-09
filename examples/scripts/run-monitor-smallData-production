@@ -10,4 +10,4 @@ if [[ $CURREXP =~ 'xpp' ]]; then
 else
     cd /reg/d/psdm/xcs/$CURREXP/results/smalldata_tools/examples/scripts
 fi
-$PROCSERV --logfile /tmp/$NAME --name monitor-smallData 40002 ./monitor-smallData
+$PROCSERV --logfile /tmp/$NAME --name monitor-smallData 40001 ./monitor-smallData-production
