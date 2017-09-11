@@ -176,12 +176,9 @@ else
 fi
 
 if [ $QUEUE == 'psanaq' ]; then
-    FFB=0
     if [ $NJOBS -eq 16 ]; then
 	NJOBS=12
     fi
-elif [ $FFB == 1 ]; then
-    ARGSTR=$ARGSTR' --ffb '     
 fi
 
 BASEDIR=/reg/d/psdm/$HUTCH/$EXP/results
