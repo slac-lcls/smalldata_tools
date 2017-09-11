@@ -8,7 +8,7 @@ import socket
 import os
 import RegDB.experiment_info
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
-from smalldata_tools import ttRawDetector,wave8Detector
+from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
 ########################################################## 
 ##
 ## User Input start --> 
