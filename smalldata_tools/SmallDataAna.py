@@ -1639,7 +1639,7 @@ class SmallDataAna(object):
         #get the scan variable & time correct if desired
         scanVarName,scan =  self.getScanValues(ttCorr, addEnc)
             
-        print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
+        #print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
         # create energy bins for plot: here no need to bin!
         if (not ttCorr) and (not addEnc):
             scanPoints, scanOnIdx = np.unique(scan[FilterOn], return_inverse=True)
@@ -1697,31 +1697,26 @@ class SmallDataAna(object):
             iNorm = np.bincount(indOn2d, weights=i0Val[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
             iSig = np.bincount(indOn2d, weights=sigVal[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
         else:
-            iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints))
-            iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints))
+            iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
+            iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
 
         #print 'evts ',np.bincount(scanOnIdx)
         #print 'i0',iNorm
         #print 'sig',iSig
         scan = iSig/iNorm
         #scan = scan/np.mean(scan[1]) # normalize to 1 for first energy point?
+        scan = scan[1:-1]
+        scanPoints = (scanPoints[:-1]+scanPoints[1:])*0.5
 
         if OffData:
             #same for off shots
-            iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints))
-            iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff], minlength=len(scanOffPoints))
+            iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints)+1)
+            iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff], minlength=len(scanOffPoints)+1)
             scanoff = iSigoff/iNormoff
-            #not sure what this was for, maybe for whatever is now solved with minlength
-            #if scanOffIdx.shape > scanOffPoints.shape:
-            #    shapeDiff = abs(scanOnIdx.max()+1-scanPoints.shape[0])
-            #    shapeDiff = abs(scanOffIdx.max()+1-scanOffPoints.shape[0])
-            #    if scanOffIdx.min()>0:
-            #        scanoff=scanoff[abs(shapeDiff):]
-            #    else:
-            #        scanoff=scanoff[:-shapeDiff]
+            scanoff = scanoff[1:-1]
+            scanOffPoints = (scanOffPoints[:-1]+scanOffPoints[1:])*0.5
         if (not OffData):
             plotDiff = False
-        print '--- off points now: ',len(scanOffPoints), len(scanoff)
         #now save data if desired
         if OffData:
             if saveData:
