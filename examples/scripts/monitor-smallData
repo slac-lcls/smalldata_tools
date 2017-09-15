@@ -1,16 +1,16 @@
 #!/bin/bash
 
 export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
-CURREXP=`get_curr_exp`
+THISEXP=`get_curr_exp`
 HUTCH=`get_hutch_name`
-cd /reg/d/psdm/$HUTCH/$CURREXP/results/smalldata_tools
-#LASTRUN=4
+cd /reg/d/psdm/$HUTCH/$THISEXP/results/smalldata_tools
 LASTRUN=`get_lastRun`
 while true; do
 	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
+	CURREXP=`get_curr_exp`
 	EXP_RUN=`get_lastRun`
-	if [ $EXP_RUN -ge $LASTRUN ]; then
-            HASH5=`ls -t /reg/d/psdm/$HUTCH/$CURREXP/hdf5/smalldata/$CURREXP*Run*$LASTRUN*h5 | wc | awk {'print $1'}`
+	if [[ $EXP_RUN -ge $LASTRUN ]] && [[ $CURREXP == $THISEXP ]]; then
+            HASH5=`ls -t /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*Run*$LASTRUN*h5 | wc | awk {'print $1'}`
 	    echo 'Last Run: '$EXP_RUN ', checked at ' $CREATE_TIME ', checking to process run ' $LASTRUN
 
 	    if [ $HASH5 -eq 1 ]; then
