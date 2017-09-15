@@ -45,7 +45,10 @@ def xppDetectors(beamCodes=[[162],[91]]):
     dets.append(ipmDetector('XppSb4_Pim','diode2'))
     dets.append(ipmDetector('XppEnds_Ipm0','diodeU'))
     dets.append(aiDetector('XPP-AIN-01','ai'))
-    dets.append(adcDetector('adc','adc'))
+    try:
+        dets.append(adcDetector('adc','adc'))
+    except:
+        print 'did not find slow Adc detector'
     dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
     #dets.append(ttDetector(baseName='TTSPEC:'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
