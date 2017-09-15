@@ -53,11 +53,11 @@ class ROIObject(dropObject):
     elif self.bound.ndim==1:
       self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])])
     #this needs to be more generic....of maybe just ugly spelled out for now.
-    if self.bound.ndim==1:
+    if self.bound.shape[0]==1:
       subarr = array[self.bound[0]:self.bound[1]]
-    elif self.bound.ndim==2:
+    elif self.bound.shape[0]==2:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1]]
-    elif self.bound.ndim==3:
+    elif self.bound.shape[0]==3:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1],self.bound[2,0]:self.bound[2,1]]
     return subarr.copy()
   #calculates center of mass of first 2 dim of array within ROI using the mask
