@@ -439,7 +439,15 @@ class SmallDataAna(object):
                 currRun=RegDB.experiment_info.experiment_runs(self.expname[:3].upper)[-1]['num']
                 self.runLabel='Run%03d'%currRun
             except:
-                self.runLabel='RunFromRedis'
+                try:
+                    runs = self.fh5.runs()
+                    lastRun=-1
+                    while len(runs)>0:
+                        thisRun = runs.pop()
+                        lastRun = max(thisRun, lastRun)
+                    self.runLabel='Run%03d'%int(lastRun)
+                except:
+                    self.runLabel='RunFromRedis'
         elif intable is not None:
             if intable == 'redis':
                 self.fh5=client.ExptClient(expname, host='psdb3')
@@ -1119,6 +1127,7 @@ class SmallDataAna(object):
             return
 
     def getRedVar(self, plotvar,threshold=-1e25):
+        sigROI=[]
         if isinstance(plotvar, list):
             sigROI=plotvar[1]
             plotvar=plotvar[0]
@@ -1152,7 +1161,7 @@ class SmallDataAna(object):
     def get1dVar(self, plotvar,threshold=-1e25):
         vals = self.getRedVar(plotvar,threshold)
         while len(vals.shape)>1:
-            vals = vals.sum(axis=1)
+            vals = np.nansum(vals,axis=1)
         return vals
 
     #make delay another Xarray variable.
@@ -1165,10 +1174,14 @@ class SmallDataAna(object):
         getDelay(addEnc=True): get the delay from lxt, add encoder stage and timetool correction
         """
         ttCorrStr, ttBaseStr = self._getTTstr()
+        ttCorr = np.zeros_like(self.xrData.fiducials)
         if self.ttCorr is not None:
             ttCorr=self.getVar(self.ttCorr)
         if (np.nanstd(ttCorr)==0):
-            ttCorr=self.getVar(self.ttBaseStr+'FLTPOS_PS')
+            try:
+                ttCorr=self.getVar(self.ttBaseStr+'FLTPOS_PS')
+            except:
+                pass
         nomDelay=np.zeros_like(ttCorr)
 
         isDaqDelayScan=False
