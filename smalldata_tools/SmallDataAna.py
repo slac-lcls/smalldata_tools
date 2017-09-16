@@ -292,10 +292,11 @@ class droplets(object):
  
  
 class Cube(object):
-    def __init__(self, binVar='', bins=[], cubeName=None, SelName=None):
+    def __init__(self, binVar='', bins=[], cubeName=None, SelName=None, addBinVar=None):
         self.binVar = binVar
         self.bins = bins
         self.SelName = SelName
+        self.addBinVar=None
 
         nbins = len(bins)
         if nbins==3:
@@ -303,6 +304,18 @@ class Cube(object):
                 nbins=len(np.linspace(min(bins[0],bins[1]),max(bins[0],bins[1]),bins[2]))
             else:
                 nbins=len(np.arange(min(bins[0],bins[1]),max(bins[0],bins[1]),bins[2]))
+
+        if isinstance(addBinVar,list):
+            self.addBinVar=addBinVar[0]
+            addbins=addBinVar[1:]
+            if len(addbins)==3:
+                if type(addbins[2]) is int:
+                    nbinsAdd=len(np.linspace(min(addbins[0],addbins[1]),max(addbins[0],addbins[1]),addbins[2]))
+                else:
+                    nbinsAdd=len(np.arange(min(addbins[0],addbins[1]),max(addbins[0],addbins[1]),addbins[2]))
+            else:
+                nbinAdd = addBinVar[1:]
+            self.addBins = nbinAdd
 
         if cubeName is not None:
             self.cubeName = cubeName
@@ -347,15 +360,26 @@ class Cube(object):
         self.bins = jsonCube[1]
         self.targetVars = jsonCube[2]
         self.SelName = jsonCube[4]
+        if len(jsonCube)>5:
+            self.addVarBin = jsonCube[5]
+            self.addBins = jsonCube[6]
+        else:
+            self.addVarBin = None
         f.close()
 
     def writeCube(self, cubeName):
         f = open('CubeSetup_'+cubeName+'.txt','w')
         print 'write CubeSetup file for ',cubeName, ' to ','CubeSetup_'+cubeName+'.txt'
-        if isinstance(self.bins,list):
-            json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
+        if self.addBinVar is None:
+            if isinstance(self.bins,list):
+                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
+            else:
+                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
         else:
-            json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
+            if isinstance(self.bins,list):
+                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.SelName].cuts,self.SelName, self.addVarBin, self.addBins], f, indent=3)
+            else:
+                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.SelName].cuts,self.SelName, self.addVarBin, self.addBins], f, indent=3)
         f.close()
 
 class Selection(object):
@@ -1593,18 +1617,18 @@ class SmallDataAna(object):
         return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, applyCuts=applyCuts, plotThis=False)
 
     def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None):
-        
+
         plotVar=''
         if sig!='':
             sigVal = self.get1dVar(sig)
             for sigp in sig:
                 if isinstance(sigp,basestring):
-                    plotVar+=sigp.replace('/','_')
+                    plotVar+=sigp.replace('/','__')
                 elif isinstance(sigp,list):
                     for bound in sigp:
                         plotVar+='-%g'%bound
         else:
-            print 'could not get signal variable, please specify'
+            print 'could not get signal variable %s, please specify'%plotVar.replace('__','/')
             return
 
         if i0!='':
@@ -1612,13 +1636,12 @@ class SmallDataAna(object):
             plotVar+='/'
             for i0p in i0:
                 if isinstance(i0p,basestring):
-                    plotVar+=i0p.replace('/','_')
+                    plotVar+=i0p.replace('/','__')
                 elif isinstance(i0p,list):
                     for bound in i0p:
                         plotVar+='-%g'%bound
         else:
-            print 'please specify normalizing variable '
-            return
+            i0Val = np.ones_like(sigVal)
         
         [FilterOn, FilterOff] = self.getFilterLaser(applyCuts)
         FilterOn = FilterOn & ~np.isnan(i0Val) & ~np.isnan(sigVal)
@@ -1640,6 +1663,7 @@ class SmallDataAna(object):
         scanVarName,scan =  self.getScanValues(ttCorr, addEnc)
             
         #print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
+        usedDigitize = 0
         # create energy bins for plot: here no need to bin!
         if (not ttCorr) and (not addEnc):
             scanPoints, scanOnIdx = np.unique(scan[FilterOn], return_inverse=True)
@@ -1659,6 +1683,7 @@ class SmallDataAna(object):
                 print 'Bins: ',isinstance(Bins,list),' -- ',Bins
             scanOnIdx = np.digitize(scan[FilterOn], scanPoints)
             scanPoints = np.concatenate([scanPoints, [scanPoints[-1]+(scanPoints[1]-scanPoints[0])]],0)
+            usedDigitize = 1
 
         if returnIdx:
             return scanOnIdx
@@ -1666,11 +1691,16 @@ class SmallDataAna(object):
         #now do the same for laser off data
         OffData=False
         if scan[FilterOff].sum()!=0:
+            scanPointsT, scanOnIdxT = np.unique(scan[FilterOn], return_inverse=True)
             scanOffPoints, scanOffIdx = np.unique(scan[FilterOff], return_inverse=True)
+
+            #unique & digitize do not behave the same !!!!!
             if len(scanOffPoints) > len(scanPoints):
                 scanOffPoints = scanPoints.copy()
+                usedDigitize = 1
+            if usedDigitize>0:
+                scanOffIdx = np.digitize(scan[FilterOff], scanOffPoints)
                 
-            scanOffIdx = np.digitize(scan[FilterOff], scanOffPoints)
             OffData = True
 
         #now get the binning information for second variable.
@@ -1700,6 +1730,7 @@ class SmallDataAna(object):
             iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
             iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
 
+        print '#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints)
         #print 'evts ',np.bincount(scanOnIdx)
         #print 'i0',iNorm
         #print 'sig',iSig
@@ -1717,6 +1748,14 @@ class SmallDataAna(object):
             scanOffPoints = (scanOffPoints[:-1]+scanOffPoints[1:])*0.5
         if (not OffData):
             plotDiff = False
+
+        #more DEBUG..
+        print 'DEBUG:m OFF',np.bincount(scanOffIdx)
+        print 'DEBUG:m ON ',np.bincount(scanOnIdx)
+        print 'DEBUG: OFF',np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints)+1)
+        print 'DEBUG: ON ',np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
+        print 'n points off on ',len(scanOffPoints)+1,len(scanPoints)+1
+
         #now save data if desired
         if OffData:
             if saveData:
@@ -1907,6 +1946,14 @@ class SmallDataAna(object):
         else:
             binVar = self.get1dVar(cube.binVar)
 
+        #if applicable, get second bin variable.
+        if cube.addBinVar is not None:
+            if cube.addBinVar == 'delay':
+                addBinVar = self.getDelay()
+            else:
+                addBinVar = self.get1dVar(cube.addBinVar)
+            addBins = cube.addBins
+                
         if debug:
             cube.printCube(self.Sels[cube.SelName])
         cubeFilter = self.getFilter(cube.SelName)
@@ -1922,9 +1969,18 @@ class SmallDataAna(object):
         if binVar.shape[0] == 0:
             print 'did not select any event, quit now!'
             return
-
         if debug:
             print 'bin boundaries: ',Bins
+
+        if cube.addBinVar is not None:
+            addBinVar = addBinVar[cubeFilter]
+            #now use both binning variables & bins to make ind2d object that will be used
+            binIdx = np.digitize(binVar, Bins)
+            addBinIdx = np.digitize(addBinVar, addBins)
+            indOn2d = np.ravel_multi_index((binIdx, addBinIdx),(Bins.shape[0]+1, addBins.shape[0]+1))
+            binVar = indOn2d
+            orgBins = Bins
+            Bins = np.arange(0,(Bins.shape[0]+1*addBins.shape[0]+1))
 
         timeFiltered = self._tStamp[cubeFilter]
         newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
@@ -1947,7 +2003,8 @@ class SmallDataAna(object):
                     coords[dimStr] = thisDim
                     dims.append(dimStr)
                 newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
-
+                
+        #now we actually bin.
         cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).sum(dim='time')                  
         #could add error using the std of the values.
         cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).std(dim='time')
@@ -2033,54 +2090,6 @@ class SmallDataAna(object):
                     retDict[thisIdxVar]=addArray[iv]
         return cubeData,retDict
 
-    #CHECK ME: REWRITE ACCESS TO NON-SMALL data....
-    def submitCube(self, cubeName, run=None, expname=None, image=False, rebin=-1):                                    
-        if socket.gethostname().find('psana')<0:
-            print 'we can only submit jobs from psana, you are on ',socket.gethostname()
-            return
-
-        if expname == None:
-            expname = self.expname
-        if run == None:
-            run = self.run
-            
-        #check if cube file exists
-        haveFile = True
-        if not path.isfile('CubeSetup_'+cubeName+'.txt'):
-            haveFile=False
-            for cube in self.cubes:
-                if cube.cubeName == cubeName:
-                    if raw_input('this cube has not been written yet, do it?(y/n)') == 'y':
-                        self.writeCubeSetup(cubeName)
-                        haveFile=True
-        if not haveFile:
-            print 'cube %s has not been defined yet'%cubeName
-            return
-
-        if path.isfile('./cubeRun'):
-            cmd = './cubeRun -r %i -e %s -c %s'%(run, expname, 'CubeSetup_'+cubeName+'.txt')
-        else:
-            cmd = '/reg/d/psdm/xpp/%s/res/littleData/xppmodules/scripts/cubeRun -r %i -e %s -c %s'%(expname, run, expname, 'CubeSetup_'+cubeName+'.txt')
-        if image:
-            cmd+=' -i'
-        if rebin>0:
-            cmd+=' -R %i'%rebin
-        print 'command is: %s'%cmd
-        sout = subprocess.check_output([cmd],shell=True)
-        print 'and submission returned %s'%sout
-        self.jobIds.append(sout.split('Job <')[1].split('> is')[0])
-
-    def checkJobs(self):
-        remainingIds=[]
-        cmd = "bjobs | awk {'print $1'} | grep -v JOBID | grep -v psana"
-        cout = subprocess.check_output([cmd],shell=True)
-        print cout
-        for jobid in self.jobIds:
-            if cout.find(jobid)>=0:
-                remainingIds.append(jobid)
-            else:
-                print 'Job %s is done'%jobid
-        self.jobIds = remainingIds
 
     ##########################################################################
     ###
