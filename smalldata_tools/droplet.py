@@ -28,6 +28,8 @@ class aduHist:
                                 self.bins=np.linspace(aduHist[0], aduHist[1], aduHist[2])
                         if isinstance(aduHist[2], float):
                                 self.bins=np.arange(aduHist[0], aduHist[1], aduHist[2])
+                elif len(aduHist)>3:
+                        self.bins = np.array(aduHist)
                 self.ROI = ROI
         def fillHist(self, dadu, pos=None):
                 if pos is None:
@@ -44,13 +46,13 @@ class aduHist:
                         return np.histogram(daduF[daduF>0], self.bins)[0]
                         
 class dropletSave:
-        def __init__(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
+        def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
                 self.name=name
                 self.maxDroplets = maxDroplets
                 self.dropPosInt = dropPosInt
                 self.retPixel = retPixel
                 self.ret2ndMom = ret2ndMom
-                self.thresAdu = thresAdu
+                self.thresADU = thresADU
                 self.flagMasked = flagMasked
                 self.ragged=ragged
 
@@ -151,20 +153,20 @@ class droplet:
         if isinstance(debug, bool):
                 self.debug = debug
 
-    def addDropletSave(self,thresAdu=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
-        dropSave = dropletSave(thresAdu,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged)
+    def addDropletSave(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
+        dropSave = dropletSave(thresADU,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged)
         self.dropletSaves.append(dropSave)
 
-    def addAduHist(self, ADUhist=[700], ROI=None, name=''):
+    def add_aduHist(self, ADUhist=[700], ROI=None, name=''):
         name = self.name+'_'+name
-        thisAduHist = aduHist(ADUhist, ROI, name)
-        self.aduHists.append(thisAduHist)
+        thisADUHist = aduHist(ADUhist, ROI, name)
+        self.aduHists.append(thisADUHist)
 
     def addPhotonizeDrops(self,ADU_per_photon=154, thresFrac = 0.48, maxPhotons=1500, maxMultPhotons=25, name=''):
         self.photonizeDrops = photonizeDrops(ADU_per_photon=ADU_per_photon, thresFrac = thresFrac, maxPhotons=maxPhotons, maxMultPhotons=maxMultPhotons, name=name)
         self.photonize=True
 
-    def checkAduHist(self):
+    def checkADUHist(self):
             for adu in self.aduHists:
                     if adu.ROI is not None:
                             self.aduROI = True
@@ -206,7 +208,7 @@ class droplet:
                 ret_dict['photons'] = np.zeros([self.maxPhotons,2])     
         return ret_dict
 
-    def procAduHist(self, dadu, pos_drop=None):
+    def procADUHist(self, dadu, pos_drop=None):
         for adu in self.aduHists: 
                 if adu.ROI is None:
                         self.ret_dict[adu.name] = adu.fillHist(dadu)
@@ -243,13 +245,13 @@ class droplet:
         tfilled=time.time()
         if len(self.aduHists)>0:
                 if not self.aduROI:
-                        self.procAduHist(adu_drop)
+                        self.procADUHist(adu_drop)
                         if len(self.dropletSaves)==0:
                                 return
 
         if self.aduROI:
                 pos_drop = np.array(measurements.center_of_mass(img,img_drop[0], drop_ind))
-                self.procAduHist(adu_drop, pos_drop)
+                self.procADUHist(adu_drop, pos_drop)
         if len(self.dropletSaves)==0:
                 return
 
@@ -336,12 +338,12 @@ class droplet:
         for saveD in self.dropletSaves:
                 aduArray = np.array(adu_drop).copy()
                 Filter = np.ones_like(aduArray).astype(bool)
-                if saveD.thresAdu[0] is not np.nan and saveD.thresAdu[1] is not np.nan:
-                        Filter = ((aduArray>saveD.thresAdu[0]) & (aduArray<saveD.thresAdu[1]))
-                elif saveD.thresAdu[0] is not np.nan:
-                        Filter = (aduArray>saveD.thresAdu[0]) 
-                elif saveD.thresAdu[1] is not np.nan:
-                        Filter = (aduArray<saveD.thresAdu[1])
+                if saveD.thresADU[0] is not np.nan and saveD.thresADU[1] is not np.nan:
+                        Filter = ((aduArray>saveD.thresADU[0]) & (aduArray<saveD.thresADU[1]))
+                elif saveD.thresADU[0] is not np.nan:
+                        Filter = (aduArray>saveD.thresADU[0]) 
+                elif saveD.thresADU[1] is not np.nan:
+                        Filter = (aduArray<saveD.thresADU[1])
                 dropName = self.name
                 if saveD.name!='':
                         dropName = dropName+'_'+saveD.name
