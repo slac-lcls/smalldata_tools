@@ -1730,10 +1730,10 @@ class SmallDataAna(object):
             iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
             iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
 
-        print '#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints)
-        #print 'evts ',np.bincount(scanOnIdx)
-        #print 'i0',iNorm
-        #print 'sig',iSig
+        if OffData:
+            print '#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints)
+        else:
+            print '#scan points: -- 3 ',len(scanPoints)
         scan = iSig/iNorm
         #scan = scan/np.mean(scan[1]) # normalize to 1 for first energy point?
         scan = scan[1:-1]
@@ -1748,13 +1748,6 @@ class SmallDataAna(object):
             scanOffPoints = (scanOffPoints[:-1]+scanOffPoints[1:])*0.5
         if (not OffData):
             plotDiff = False
-
-        #more DEBUG..
-        print 'DEBUG:m OFF',np.bincount(scanOffIdx)
-        print 'DEBUG:m ON ',np.bincount(scanOnIdx)
-        print 'DEBUG: OFF',np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints)+1)
-        print 'DEBUG: ON ',np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
-        print 'n points off on ',len(scanOffPoints)+1,len(scanPoints)+1
 
         #now save data if desired
         if OffData:
