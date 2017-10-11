@@ -56,7 +56,7 @@ class SmallDataAna_psana(object):
                 return None
         self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
         self.dsname='exp=%s:run=%i:smd'%(expname,run)
-        print 'make LittleDataAna_psana from dsname: ',self.dsname
+        print 'make SmallDataAna_psana from dsname: ',self.dsname
         try:
             self.ds = psana.DataSource(self.dsname)
         except:
@@ -1534,14 +1534,14 @@ class SmallDataAna_psana(object):
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)
 
-        #littleData only version: only run on single core
+        #smallData only version: only run on single core
         if len(self.sda.cubes[cubeName].targetVarsXtc)<=0:
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
                 fout = h5py.File(outFileName, "w")
                 print 'no big data, bin the data now....be patient'
                 cubeData = self.sda.makeCubeData(cubeName)  
-                print 'now write outputfile (only little data) to : ',outFileName
+                print 'now write outputfile (only small data) to : ',outFileName
                 for key in cubeData.keys():
                     addToHdf5(fout, key, cubeData[key].values)
                 fout.close()
