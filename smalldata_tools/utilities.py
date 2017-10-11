@@ -39,7 +39,10 @@ def create_range_slider(vabsmin,vabsmax,vmin,vmax,im,step=0.1):
     callback_slider = bokeh.models.CustomJS(args=dict( im=im),
                                         code=JS_code_slider)
 
-    rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[vmin,vmax],callback=callback_slider,orientation="horizontal")
+    try:
+        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[vmin,vmax],callback=callback_slider,orientation="horizontal")
+    except:
+        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, value=[vmin,vmax],callback=callback_slider,orientation="horizontal")
 
     callback_slider.args['rslider'] = rslider
 
@@ -55,8 +58,11 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
     if yRange is None:
         yRange=(0,data.shape[1])
     if tools is None:
-        tools = 'pan, wheel_zoom, box_zoom, resize, reset'
-
+        if bokeh.__version__=='0.12.6':
+            tools = 'pan, wheel_zoom, box_zoom, resize, reset'
+        else:
+            tools = 'pan, wheel_zoom, box_zoom, reset'
+    
     if dateTime:
         if output_quad:
             p,im,q = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
@@ -82,7 +88,8 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
         
     # Controls
     vabsmin,vabsmax = plotMin, plotMax
-    range_slider = create_range_slider(np.nanmin(data),np.nanmax(data),plotMinP,plotMaxP,im=im)
+    step=(plotMaxP-plotMinP)/50.
+    range_slider = create_range_slider(np.nanmin(data),np.nanmax(data),plotMinP,plotMaxP,im=im,step=step)
     select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=initial_cmap)
 
     # Layout
