@@ -98,6 +98,7 @@ try:
     #from smalldata_tools import SmallDataAna_psana
     anaps = SmallDataAna_psana(expname,run,dirname,fname)
 except:
+    print 'failed to import & create SmallDataAna_psana object'
     pass
 
 if anaps is not None and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
@@ -118,22 +119,29 @@ if ana is not None:
     ana.addCut('lightStatus/xray',0.5,1.5,'off')
     ana.addCut('lightStatus/laser',-0.5,0.5,'off')
     
-    ana.addCut('ipm5/sum',0.1,10.,'on')
-    ana.addCut('ipm5/sum',0.1,10.,'off')
-    ana.addCut('tt/AMPL',0.0025,10.,'on')
+    try:
+        ana.addCut('ipm2/sum',0.04,10.,'on')
+        ana.addCut('ipm2/sum',0.04,10.,'off')
+    except:
+        try:
+            ana.addCut('ipm5/sum',0.04,10.,'on')
+            ana.addCut('ipm5/sum',0.04,10.,'off')
+        except:
+            pass
+    try:
+        ana.addCut('tt/AMPL',0.0025,10.,'onTT')
+        ana.addCut('tt/FLTPOSFWHM',80.,130.,'onTT')
+        ana.addCut('on',SelName='onTT')
+    except:
+        pass
+    #ana.addCut('evr/code_41',0.5,1.5,'onTT41')
+    #ana.addCut('onTT',SelName='onTT41')
 
-    ana.addCut('tt/FLTPOSFWHM',80.,130.,'onTT')
-    ana.addCut('on',SelName='onTT')
+    #ipm5S = ana.getVar('ipm5/sum','onTT')
+    #csf = np.nansum(ana.getVar('cspad/azav','onTT').mean(axis=1),axis=1)/ipm5S
 
-    ana.addCut('evr/code_41',0.5,1.5,'onTT41')
-    ana.addCut('onTT',SelName='onTT41')
-
-    #this is an example of how to set up a cube.
-    #binRange = np.arange(13.,15.5,0.03)
-    #if run==65:
-    #    binRange = np.arange(8.5,13,0.03)
-    #if run==153 or run == 304:
-    #    binRange = np.arange(12,15,0.05)
+    ##this is an example of how to set up a cube.
+    #binRange = np.arange(-1.25,1.75,0.05)
     #ana.addCube('cube','delay',binRange,'on')
-    #ana.addToCube('cube',['ipm2/sum','ipm3/sum','diodeU/channels','cs140_rob/ROI_0_sum'])
+    #ana.addToCube('cube',['ipm4/sum','ipm5/sum','diodeGon/channels','cspad/azav'])
     #cubeData = ana.makeCubeData('cube')
