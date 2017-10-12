@@ -18,6 +18,10 @@ import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
 from bokeh.models import WheelZoomTool, BoxZoomTool
 
+from collections import deque
+from itertools import islice
+from bisect import insort, bisect_left
+ 
 import sys
 
 try:
@@ -29,12 +33,12 @@ except:
   pass
 
 def create_range_slider(vabsmin,vabsmax,vmin,vmax,im,step=0.1):
-    JS_code_slider = """                                                                                                                                
-        var vmin = rslider.range[0];                                                                                                                    
-        var vmax = rslider.range[1];                                                                                                                    
-        im.glyph.color_mapper.high = vmax;                                                                                                              
-        im.glyph.color_mapper.low = vmin;                                                                                                               
-        im.data_source.trigger('change');                                                                                                               
+    JS_code_slider = """                                                                            
+        var vmin = rslider.range[0];
+        var vmax = rslider.range[1];
+        im.glyph.color_mapper.high = vmax;
+        im.glyph.color_mapper.low = vmin; 
+        im.data_source.trigger('change');
     """
     callback_slider = bokeh.models.CustomJS(args=dict( im=im),
                                         code=JS_code_slider)
@@ -156,6 +160,41 @@ def nanmedian(arr, **kwargs):
       Returns median ignoring NAN
       """
       return np.ma.median( np.ma.masked_where(arr!=arr, arr), **kwargs )
+    
+def running_median_insort(seq, windowsize=10):
+    isArray= isinstance(seq, np.ndarray)
+    if isArray:
+        seq = seq.tolist()
+    seq = iter(seq)
+    d = deque()
+    s = []
+    result = []
+    for item in islice(seq, windowsize):
+        d.append(item)
+        insort(s, item)
+        result.append(s[len(d)//2])
+    m = windowsize // 2
+    for item in seq:
+        old = d.popleft()
+        d.append(item)
+        del s[bisect_left(s, old)]
+        insort(s, item)
+        result.append(s[m])
+    if isArray:
+        result = np.array(result)
+    return result
+
+def running_median(seq, windowsize=10):
+    isArray= isinstance(seq, np.ndarray)
+    if isArray:
+        seq = seq.tolist()
+    result=[]
+    for ipseq,pseq in enumerate(seq):
+        seqMin = max(0,ipseq-windowsize+1)
+        result.append(np.median(seq[seqMin:ipseq+1]))
+    if isArray:
+        result = np.array(result)
+    return result
     
 def rebinFactor(a, shape):
     sh = shape[0],a.shape[0]//shape[0],shape[1],a.shape[1]//shape[1]

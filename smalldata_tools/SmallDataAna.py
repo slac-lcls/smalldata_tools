@@ -17,9 +17,9 @@ import tables
 from matplotlib import gridspec
 from pylab import ginput
 from matplotlib import pyplot as plt
-from utilities import dictToHdf5
-from utilities import shapeFromKey_h5
+from utilities import dictToHdf5, shapeFromKey_h5
 from utilities import hist2d, plotImageBokeh
+from utilities import running_median_insort
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
@@ -774,6 +774,11 @@ class SmallDataAna(object):
             newArray = xr.DataArray(data, coords=coords, dims=dims,name=name)
             self.xrData = xr.merge([self.xrData, newArray])
 
+
+    def addMedianVar(self, name='newVar',data=[], windowsize=31):
+        dataOrg = self.getVar(name)
+        dataNew=running_median_insort(dataOrg, windowsize=windowsize)
+        self.addVar(('median_%s'%name).replace('/','__'), dataNew)
 
     def _updateFromXarray(self):
         """
