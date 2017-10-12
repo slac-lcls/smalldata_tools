@@ -23,7 +23,8 @@ from utilities import hist2d, plotImageBokeh
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
-from bokeh.models import WheelZoomTool, BoxZoomTool
+from bokeh.models import WheelZoomTool, BoxZoomTool, Div
+from bokeh.layouts import column
 import sys
 
 from pscache import client #works from ana-1.2.9 on
@@ -1624,7 +1625,9 @@ class SmallDataAna(object):
     def getScan(self, ttCorr=False, sig='', i0='', Bins=100, applyCuts=None):
         return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, applyCuts=applyCuts, plotThis=False)
 
-    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None):
+    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None, plotWith=None):
+        if plotWith is None:
+            plotWith = self.plotWith
 
         plotVar=''
         if sig!='':
@@ -1773,7 +1776,10 @@ class SmallDataAna(object):
             self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig)
         return returnDict
 
-    def plotScanDict(self, returnDict, plotDiff=True, fig=None, plotOff=True, interpolation='', saveFig=False):
+    def plotScanDict(self, returnDict, plotDiff=True, fig=None, plotOff=True, interpolation='', saveFig=False, plotWith=None):
+        if plotWith is None:
+            plotWith = self.plotWith
+
         plotVarName = returnDict['plotVarName']
         scanVarName = returnDict['scanVarName']
         scanPoints = returnDict['scanPoints']
@@ -1783,45 +1789,112 @@ class SmallDataAna(object):
         if interpolation!='' and returnDict.has_key('scanOffPoints'):
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
             scanoff_interp = finter_off(scanPoints[:-1])
-        if len(scan.shape)>1:
-            if fig is None:
-                fig=plt.figure(figsize=(10,5))
-            extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
-            plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
-            plt.xlabel(scanVarName)
-        #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
-        elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
-            if fig is None:
-                fig=plt.figure(figsize=(10,10))
-            gs=gridspec.GridSpec(2,1,width_ratios=[1])
-            plt.subplot(gs[0]).set_xlabel(scanVarName)
-            plt.subplot(gs[0]).set_ylabel(plotVarName)
-            plt.subplot(gs[0]).plot(scanPoints, scan, 'ro--', markersize=5)
-            if interpolation!='':
-                plt.subplot(gs[0]).plot(scanPoints[:-1], scanoff_interp, 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-            plt.subplot(gs[0]).plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
-            plt.subplot(gs[0]).set_ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
-            if interpolation!='':
-                plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-scanoff_interp), 'bo--', markersize=5)
-            else:
-                plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-returnDict['scanOff'][:-1]), 'bo--', markersize=5)
-            plt.subplot(gs[1]).set_xlabel(scanVarName)
-            plt.subplot(gs[1]).set_ylabel(plotVarName)
-        else:
-            if fig is None:
-                fig=plt.figure(figsize=(10,5))
-            plt.plot(scanPoints, scan, 'ro--', markersize=5)
-            plt.xlabel(scanVarName)
-            plt.ylabel(plotVarName)
-            if returnDict.has_key('scanOffPoints') and plotOff:
+        if plotWith=='matplotlib':
+            if len(scan.shape)>1:
+                if fig is None:
+                    fig=plt.figure(figsize=(10,5))
+                extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
+                plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
+                plt.xlabel(scanVarName)
+                #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
+            elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+                if fig is None:
+                    fig=plt.figure(figsize=(10,10))
+                gs=gridspec.GridSpec(2,1,width_ratios=[1])
+                plt.subplot(gs[0]).set_xlabel(scanVarName)
+                plt.subplot(gs[0]).set_ylabel(plotVarName)
+                plt.subplot(gs[0]).plot(scanPoints, scan, 'ro--', markersize=5)
                 if interpolation!='':
-                    plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-                plt.plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
-            plt.ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
-            plt.xlabel(scanVarName)
-            plt.ylabel(plotVarName)
-        if saveFig:
-            fig.savefig('Scan_Run%i.jpg'%self.run)
+                    plt.subplot(gs[0]).plot(scanPoints[:-1], scanoff_interp, 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
+                plt.subplot(gs[0]).plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
+                plt.subplot(gs[0]).set_ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
+                if interpolation!='':
+                    plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-scanoff_interp), 'bo--', markersize=5)
+                else:
+                    plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-returnDict['scanOff'][:-1]), 'bo--', markersize=5)
+                plt.subplot(gs[1]).set_xlabel(scanVarName)
+                plt.subplot(gs[1]).set_ylabel(plotVarName)
+            else:
+                if fig is None:
+                    fig=plt.figure(figsize=(10,5))
+                plt.plot(scanPoints, scan, 'ro--', markersize=5)
+                plt.xlabel(scanVarName)
+                plt.ylabel(plotVarName)
+                if returnDict.has_key('scanOffPoints') and plotOff:
+                    if interpolation!='':
+                        plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
+                    plt.plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
+                plt.ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
+                plt.xlabel(scanVarName)
+                plt.ylabel(plotVarName)
+            if saveFig:
+                fig.savefig('Scan_Run%i.jpg'%self.run)
+        elif plotWith.find('bokeh')>=0:
+            pan=PanTool()
+            wheel_zoom=WheelZoomTool()
+            box_zoom=BoxZoomTool()
+            save=SaveTool()
+            reset=ResetTool()
+            hover=HoverTool(tooltips=[
+                ("(x,y)","($x, $y)")
+            ])
+            tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
+            if plotWith=='bokeh_notebook':
+                bp.output_notebook()
+            else:
+                bp.output_file('%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_')))
+            if bokeh.__version__=='0.12.6':
+                resize=ResizeTool()
+                tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
+
+            if len(scan.shape)>1:
+                plot_title="%s as a function of %s in %s"%(plotVarName, scanVarName, self.runLabel)
+                extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
+                layout, p, im = plotImageBokeh(scan, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(scan,99),plotMinP=np.percentile(scan,1))
+                if plotWith=='bokeh_notebook':
+                    bp.show(layout)
+                else:
+                    bp.save(layout)
+            elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+                p = bp.figure(width=900, height=350, x_axis_label=scanVarName, y_axis_label=plotVarName,tools=tools)
+                p.circle(scanPoints, scan, size=5, legend='on', fill_color='red', line_color='red')
+                p.line(scanPoints, scan, line_color='red', line_dash='dashed')
+                if interpolation!='':
+                    p.circle((scanPoints[:-1]+scanPoints[1:])*0.5, scanoff_interp, size=5, legend='off (interpol)', fill_color='none', line_color='black')
+                p.circle(returnDict['scanOffPoints'], returnDict['scanOff'], size=5, legend='off', fill_color='black', line_color='black')
+
+                #pdiff = bp.figure(width=500, height=400, x_axis_label=scanVarName, y_axis_label='(on-off)/on',tools=tools)
+                pdiff = bp.figure(width=900, height=350, x_axis_label=scanVarName, y_axis_label='(on-off)/off')
+                scanOffPlot = returnDict['scanOff'][:-1]
+                if interpolation!='':
+                    scanOffPlot = scanoff_interp
+                pdiff.circle(scanPoints[:-1], (scan[:-1]-scanOffPlot)/scanOffPlot, size=5, fill_color='blue', line_color='blue')
+
+                grid = bokeh.plotting.gridplot([[p], [pdiff]])
+                layout = column(Div(text='<h1>%s as a function of %s for %s</h1>'%(plotVarName, scanVarName, self.runLabel)),grid)
+                if plotWith=='bokeh_notebook':
+                    bp.show(layout)
+                else:
+                    bp.save(layout)
+            else:
+                p = bp.figure(title="%s as a function of %s for %s"%(plotVarName, scanVarName, self.runLabel), x_axis_label=scanVarName, y_axis_label=plotVarName,tools=tools, width=900, height=450)
+                p.circle(scanPoints, scan, legend=self.runLabel+', on', size=5, fill_color='red', line_color='red')
+                p.line(scanPoints, scan, line_color='red', line_dash='dashed')
+                if returnDict.has_key('scanOffPoints') and plotOff:
+                    #should make this better, fix styles to match off & interpolated off
+                    if interpolation!='':
+                        p.circle(scanPoints[:-1], (scanoff_interp), legend=self.runLabel+', off (interpol)', size=5)
+                        #plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
+                    p.circle(returnDict['scanOffPoints'], returnDict['scanOff'], legend=self.runLabel+', off', size=5)
+                    p.line(returnDict['scanOffPoints'], returnDict['scanOff'], line_color='blue', line_dash='dashed')
+                if plotWith=='bokeh_notebook':
+                    bp.show(p)
+                else:
+                    bp.save(p)
+            
+        elif plotWith != 'no_plot':
+            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
+
             
     def defPlots(self, applyCuts=None):
         scanVarName,scan =  self.getScanValues(True)
@@ -2409,3 +2482,158 @@ class SmallDataAna(object):
 
         if returnData:
             return returnDict
+
+
+    def plotScanCube(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None):
+
+        #TO IMPLEMENT
+        #decide when to apply reduction: A) cube full data, then apply or B) add reduced variable to xarray for cube.
+        #leaning to B)
+        plotVar=''
+        if sig!='':
+            sigVal = self.get1dVar(sig)
+            for sigp in sig:
+                if isinstance(sigp,basestring):
+                    plotVar+=sigp.replace('/','__')
+                elif isinstance(sigp,list):
+                    for bound in sigp:
+                        plotVar+='-%g'%bound
+        else:
+            print 'could not get signal variable %s, please specify'%plotVar.replace('__','/')
+            return
+
+        if i0!='':
+            i0Val = self.get1dVar(i0)
+            plotVar+='/'
+            for i0p in i0:
+                if isinstance(i0p,basestring):
+                    plotVar+=i0p.replace('/','__')
+                elif isinstance(i0p,list):
+                    for bound in i0p:
+                        plotVar+='-%g'%bound
+        else:
+            i0Val = np.ones_like(sigVal)
+        
+        #TO IMPLEMENT
+        #create an "off" select based on the pass selection.
+        [FilterOn, FilterOff] = self.getFilterLaser(applyCuts)
+        FilterOn = FilterOn & ~np.isnan(i0Val) & ~np.isnan(sigVal)
+        FilterOff = FilterOff & ~np.isnan(i0Val) & ~np.isnan(sigVal)
+
+        #get the binning variable here so that points where this is not good can be thrown out.
+        if binVar is not None:
+            if binVar[0] != 'delay':
+                binVal = self.get1dVar(binVar[0])
+            else:
+                binVal=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
+                ttCorr = None; addEnc=None
+            FilterOn = FilterOn & ~np.isnan(binVal)
+            FilterOff = FilterOff & ~np.isnan(binVal)
+
+        print 'from %i events keep %i (%i off events)'%(np.ones_like(i0Val).sum(),np.ones_like(i0Val[FilterOn]).sum(), np.ones_like(i0Val[FilterOff]).sum() )
+
+        #get the scan variable & time correct if desired
+        scanVarName,scan =  self.getScanValues(ttCorr, addEnc)
+            
+        #print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
+        usedDigitize = 0
+        # create energy bins for plot: here no need to bin!
+        if (not ttCorr) and (not addEnc):
+            scanPoints, scanOnIdx = np.unique(scan[FilterOn], return_inverse=True)
+        else:
+            if isinstance(Bins, int) or isinstance(Bins, float):
+                scanUnique = np.unique(scan[FilterOn])                
+                if isinstance(Bins,int):
+                    scanPoints = np.linspace(scanUnique[0],scanUnique[-1],Bins)
+                elif isinstance(Bins,float):
+                    if (abs(scanUnique[0]-scanUnique[-1])/Bins) > 1e5:
+                        print 'this are more than 100k bins! will not try....'
+                        return
+                    scanPoints = np.arange(scanUnique[0],scanUnique[-1],Bins)
+            elif isinstance(Bins,list) or isinstance(Bins,np.ndarray):
+                scanPoints = Bins
+            else:
+                print 'Bins: ',isinstance(Bins,list),' -- ',Bins
+            scanOnIdx = np.digitize(scan[FilterOn], scanPoints)
+            scanPoints = np.concatenate([scanPoints, [scanPoints[-1]+(scanPoints[1]-scanPoints[0])]],0)
+            usedDigitize = 1
+
+        if returnIdx:
+            return scanOnIdx
+
+        #now do the same for laser off data
+        OffData=False
+        if scan[FilterOff].sum()!=0:
+            scanPointsT, scanOnIdxT = np.unique(scan[FilterOn], return_inverse=True)
+            scanOffPoints, scanOffIdx = np.unique(scan[FilterOff], return_inverse=True)
+
+            #unique & digitize do not behave the same !!!!!
+            if len(scanOffPoints) > len(scanPoints):
+                scanOffPoints = scanPoints.copy()
+                usedDigitize = 1
+            if usedDigitize>0:
+                scanOffIdx = np.digitize(scan[FilterOff], scanOffPoints)
+                
+            OffData = True
+
+        #now get the binning information for second variable.
+        if binVar is not None:
+            if len(binVar)==1:
+                nbin=100
+            else:
+                nbin=binVar[1]
+            if len(binVar)<3:
+                min = np.percentile(binVal,1)
+                max = np.percentile(binVal,99)
+            else:
+                min = binVar[2]
+                max = binVar[3]
+            if isinstance(nbin, int):
+                binPoints = np.linspace(min,max,nbin)
+            elif isinstance(nbin, float):
+                binPoints = np.arange(min,max,nbin)
+            binIdx = np.digitize(binVal[FilterOn], binPoints)
+
+            indOn2d = np.ravel_multi_index((scanOnIdx, binIdx),(scanPoints.shape[0]+1, binPoints.shape[0]+1)) 
+
+            # calculate the normalized intensity for each bin
+            iNorm = np.bincount(indOn2d, weights=i0Val[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
+            iSig = np.bincount(indOn2d, weights=sigVal[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
+        else:
+            iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
+            iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
+
+        if OffData:
+            print '#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints)
+        else:
+            print '#scan points: -- 3 ',len(scanPoints)
+        scan = iSig/iNorm
+        #scan = scan/np.mean(scan[1]) # normalize to 1 for first energy point?
+        scan = scan[1:-1]
+        scanPoints = (scanPoints[:-1]+scanPoints[1:])*0.5
+
+        if OffData:
+            #same for off shots
+            iNormoff = np.bincount(scanOffIdx, i0Val[FilterOff], minlength=len(scanOffPoints)+1)
+            iSigoff = np.bincount(scanOffIdx, sigVal[FilterOff], minlength=len(scanOffPoints)+1)
+            scanoff = iSigoff/iNormoff
+            scanoff = scanoff[1:-1]
+            scanOffPoints = (scanOffPoints[:-1]+scanOffPoints[1:])*0.5
+        if (not OffData):
+            plotDiff = False
+
+        #now save data if desired
+        if OffData:
+            if saveData:
+                np.savetxt('Scan_Run%i.txt'%self.run, (scanPoints, scan, scanOffPoints,scanoff))
+            returnDict= {'scanVarName':scanVarName,'scanPoints':scanPoints,'scan':scan, 'scanOffPoints':scanOffPoints,'scanOff':scanoff,'plotVarName':plotVar}
+        else:
+            if saveData:
+                np.savetxt('Scan_Run%i.txt'%self.run, (scanPoints, scan))
+            returnDict= {'scanVarName':scanVarName,'scanPoints':scanPoints,'scan':scan,'plotVarName':plotVar}
+        if binVar is not None:
+            returnDict['binPoints']=binPoints
+        if plotThis:
+            #print 'retData: ',returnDict
+            self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig)
+        return returnDict
