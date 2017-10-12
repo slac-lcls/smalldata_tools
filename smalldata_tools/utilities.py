@@ -9,7 +9,7 @@ from scipy import optimize
 from scipy import ndimage
 from matplotlib import pyplot as plt
 import resource
-
+from itertools import izip, count
 import psana
 import RegDB.experiment_info
 
@@ -47,6 +47,32 @@ def create_range_slider(vabsmin,vabsmax,vmin,vmax,im,step=0.1):
     callback_slider.args['rslider'] = rslider
 
     return rslider
+
+def plotArrayData(dataY, dataX=None, plotWidth=800, plotHeight=400, legend=None, plot_title='', x_axis_label='', y_axis_label='', tools=None, line_dash='dashed'):
+    bp.output_notebook()
+    if tools is None:
+        if bokeh.__version__=='0.12.6':
+            tools = 'pan, wheel_zoom, box_zoom, resize, reset'
+        else:
+            tools = 'pan, wheel_zoom, box_zoom, reset'
+    colors = ['black','red','blue','green','cyan','magenta']
+    #p = bp.figure(height=plotHeight, width=plotWidth, tools=tools)
+    p = bp.figure(title=plot_title, x_axis_label=x_axis_label, y_axis_label=y_axis_label,height=plotHeight, width=plotWidth,tools=tools)
+    if isinstance(dataY, list):
+        if len(np.array(dataY).shape)==1:
+            dataY = [dataY]
+            if dataX is not None:
+                dataX = [dataX]
+        if dataX is None:
+            dataX = np.array([np.arange(np.array(datay).shape[0]) for datay in dataY if len(datay)>0])
+    for ic,datax,datay,color in izip(count(),dataX,dataY,colors):
+        if legend is not None:
+            p.circle(datax, datay, size=5, fill_color=color, line_color=color, legend=legend[ic])
+        else:
+            p.circle(datax, datay, size=5, fill_color=color, line_color=color)
+        if line_dash!='':
+            p.line(datax, datay, line_dash=line_dash, line_color=color)
+    bp.show(p)
 
 def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP=None, plotMaxP=None, plotMin="auto", plotMax="auto", initial_cmap='jet', output_quad=False, tools=None):
     if plotMinP is None: 
