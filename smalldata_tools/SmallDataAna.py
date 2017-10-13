@@ -396,6 +396,7 @@ class Selection(object):
         else:
             print 'cannot set filter array with this ',newFilter
     def addCut(self, varName, varmin, varmax):
+        self.removeCut(varName)
         self.cuts.append([varName, varmin, varmax])
         self._filter=None
     def removeCut(self, varName):
