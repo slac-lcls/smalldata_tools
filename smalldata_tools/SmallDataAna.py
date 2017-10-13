@@ -720,6 +720,9 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
+        if newVar.find('__'):
+            print 'Names of newly defined variables may not contain __, will replace with single _'
+            newVar = newVar.replace('__','_')
         if not isinstance(data, np.ndarray):
             try:
                 data = np.array(data)
@@ -779,7 +782,7 @@ class SmallDataAna(object):
     def addMedianVar(self, name='newVar',data=[], windowsize=31):
         dataOrg = self.getVar(name)
         dataNew=running_median_insort(dataOrg, windowsize=windowsize)
-        self.addVar(('median_%s'%name).replace('/','__'), dataNew)
+        self.addVar(('median_%s'%name).replace('/','_'), dataNew)
 
     def _updateFromXarray(self):
         """
@@ -952,21 +955,6 @@ class SmallDataAna(object):
 
         return keysFiltered
         
-    def printSelection(self, selName=None, brief=True):
-        if selName is not None:
-            if selName not in self.Sels:
-                print 'could not find selection ',selName,', options are: ',
-                for sel in self.Sels:
-                    print sel
-                return
-            print self.Sels[selName].printCuts()
-            return
-        for sel in self.Sels:
-            print sel
-            if not brief:
-                print self.Sels[sel].printCuts()
-                print '--------------------------'
-
     def nEvts(self,printThis=False):
         if ('fiducials' in self._fields.keys()):
             nent = self._fields['fiducials'][0][0]
@@ -1040,36 +1028,62 @@ class SmallDataAna(object):
         self.Sels[SelName].removeCut(varName)
         Filter = self.getFilter(SelName=SelName)
         self.Sels[SelName]._setFilter(Filter)
-    def printCuts(self, SelName):
-        self.Sels[SelName].printCuts()
+    def printCuts(self, selName=None, brief=True):
+        self.printSelections(selName=selName, brief=brief)
+    def printSelections(self, selName=None, brief=True):
+        if selName is not None:
+            if selName not in self.Sels:
+                print 'could not find selection ',selName,', options are: ',
+                for sel in self.Sels:
+                    print sel
+                return
+            print self.Sels[selName].printCuts()
+            return
+        for sel in self.Sels:
+            print sel
+            if not brief:
+                print self.Sels[sel].printCuts()
+                print '--------------------------'
     def getFilterLaser(self, SelName, ignoreVar=[]):
-        ignoreVar.append('lightStatus/laser')
-        onFilter = self.getFilter(SelName=SelName, ignoreVar=ignoreVar)
-        if self.ttCorr is not None:
-            ignoreVar.append(self.ttCorr)
-        if self.hasKey(self.ttBaseStr+'AMPL'):
-            ignoreVar.append(self.ttBaseStr+'AMPL')
-            ignoreVar.append(self.ttBaseStr+'FLTPOS')
-            ignoreVar.append(self.ttBaseStr+'FLTPOS_PS')
-            ignoreVar.append(self.ttBaseStr+'FLTPOSFWHM')
-        offFilter = self.getFilter(SelName=SelName, ignoreVar=ignoreVar)
-        #return [onFilter, offFilter]
-
-        FilterOff = (offFilter&[self.getVar('lightStatus/laser')!=1])
-        FilterOn = (onFilter&[self.getVar('lightStatus/laser')==1])
-        return [FilterOn.squeeze() , FilterOff.squeeze()]
+        #moved functionality into getFilter.
+        SelNameBase = SelName.split('__')[0]
+        return [self.getFilter(SelName=SelNameBase+"__on", ignoreVar=ignoreVar).squeeze(),self.getFilter(SelName=SelNameBase+"__off", ignoreVar=ignoreVar).squeeze()]
         
     def getFilter(self, SelName=None, ignoreVar=[]):
         try:
             total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
         except:
             total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
-        if SelName==None or SelName not in self.Sels.keys():
+        SelNameBase = SelName.split('__')[0]
+        if SelName==None or SelNameBase not in self.Sels.keys():
             return total_filter
-        if self.Sels[SelName]._filter is not None and len(ignoreVar)==0:
-            return self.Sels[SelName]._filter
+
+        #if SelName ends in __off, drop on requirements
+        LaserReq = -1
+        if len(SelName.split('__'))>1:
+            if (SelName.split('__')[1] == 'on' or SelName.split('__')[1] == 'On'):
+                LaserReq = 1
+            if (SelName.split('__')[1] == 'off' or SelName.split('__')[1] == 'Off'):
+                LaserReq = 0
+
+        if self.Sels[SelNameBase]._filter is not None and len(ignoreVar)==0:
+            if LaserReq == -1:
+                return self.Sels[SelNameBase]._filter
+            if LaserReq == 1:
+                return (self.Sels[SelNameBase]._filter&[self.getVar('lightStatus/laser')==1])
+
+        if LaserReq == 0:
+            ignoreVar.append('lightStatus/laser')
+            if self.ttCorr is not None:
+                ignoreVar.append(self.ttCorr)
+            if self.hasKey(self.ttBaseStr+'AMPL'):
+                ignoreVar.append(self.ttBaseStr+'AMPL')
+                ignoreVar.append(self.ttBaseStr+'FLTPOS')
+                ignoreVar.append(self.ttBaseStr+'FLTPOS_PS')
+                ignoreVar.append(self.ttBaseStr+'FLTPOSFWHM')
+
         filters=[]
-        for thiscut in self.Sels[SelName].cuts:
+        for thiscut in self.Sels[SelNameBase].cuts:
             if not thiscut[0] in ignoreVar:
                 thisPlotvar=self.get1dVar(thiscut[0])
                 filters.append(~np.isnan(thisPlotvar))
@@ -1078,7 +1092,15 @@ class SmallDataAna(object):
                 else:
                     filters.append(thisPlotvar != thiscut[1])
         for ft in filters:
-            total_filter&=ft                
+            total_filter&=ft     
+           
+        if LaserReq == 2:
+            return total_filter
+        if LaserReq == 1:
+            return (total_filter&[self.getVar('lightStatus/laser')==1])
+        if LaserReq == 0:
+            return (total_filter&[self.getVar('lightStatus/laser')==0])
+
         return total_filter
         
     def saveFilter(self, baseName='boolArray',SelName=None, ignoreVar=[]):
