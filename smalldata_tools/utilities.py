@@ -22,6 +22,8 @@ from collections import deque
 from itertools import islice
 from bisect import insort, bisect_left
  
+from numba import jit
+
 import sys
 
 try:
@@ -443,6 +445,44 @@ def addToHdf5(fh5, key, npAr):
     dset = fh5.create_dataset(key, arShape)
     dset[...] = npAr.astype(float)
 
+
+###
+# utility functions for getting indices of matching off events
+###
+#tried numba version, no speedup observed.
+def get_startOffIdx(tStamp, filterOff, nNbr=3, nMax=-1):
+    all_startOffIdx=[]
+    startOffIdx=0
+    nOff = filterOff.sum()
+    tStampOff = tStamp[filterOff] #do this once to save time.
+    tLow = tStampOff[startOffIdx]
+    tHigh =  tStampOff[startOffIdx+nNbr]
+
+    for iMax,thistStamp in enumerate(tStamp):
+        if nMax>=0 and iMax>nMax:
+            break
+        #print nMax, iMax,' -- ', np.abs(thistStamp-tLow), np.abs(tHigh-thistStamp)
+        if (startOffIdx+nNbr) < nOff-1 and np.abs(thistStamp-tLow) > np.abs(tHigh-thistStamp):
+            #print 'move starting offIdx ',iMax, np.abs(thistStamp-tLow), np.abs(tHigh-thistStamp)
+            startOffIdx+=1
+            tLow = tStampOff[startOffIdx]
+            tHigh =  tStampOff[startOffIdx+nNbr]
+        all_startOffIdx.append(startOffIdx)
+    return np.array(all_startOffIdx)
+
+#speed gain factor 2-3 depending on data (better for single#)
+@jit
+def get_offVar(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
+    assert (varArray.shape[0] == filterOff.shape[0])
+    assert (varArray[filterOff].shape[0] > (startOffIdx[-1]+nNbr))
+    varOff=[]
+    for idx in startOffIdx:
+        if mean:
+            varOff.append((varArray[filterOff][idx:idx+nNbr]).mean())
+        else:
+            varOff.append(varArray[filterOff][idx:idx+nNbr])
+    return np.array(varOff)
+_ = get_offVar(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr=1)
 
 ###
 # utility functions for droplet stuff

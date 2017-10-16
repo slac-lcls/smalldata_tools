@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 from utilities import dictToHdf5, shapeFromKey_h5
 from utilities import hist2d, plotImageBokeh
 from utilities import running_median_insort
+from utilities import get_startOffIdx, get_offVar
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
@@ -685,6 +686,9 @@ class SmallDataAna(object):
 
         return
 
+###
+# functions to deal with extra variables added to smallData
+###
     def _addXarray(self):
         #filling info from redis.
         if self._isRedis:
@@ -720,7 +724,7 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
-        if name.find('__'):
+        if name.find('__')>=0:
             print 'Names of newly defined variables may not contain __, will replace with single _'
             name = name.replace('__','_')
         if not isinstance(data, np.ndarray):
@@ -739,7 +743,7 @@ class SmallDataAna(object):
         #if not self._isRedis and name[0]!='/': name='/'+name
         name = name.replace('__','/')
         if name not in self._fields.keys():
-            #print 'add a new variable to Xarray: ',name
+            #print 'DEBUG: add a new variable to Xarray: ',name
             self._fields[name]=[data.shape, 'inXr', 'mem']
         elif self._fields[name][2]=='main':
             #print 'add a variable from the main data to Xarray: ',name
@@ -777,12 +781,6 @@ class SmallDataAna(object):
             
             newArray = xr.DataArray(data, coords=coords, dims=dims,name=name)
             self.xrData = xr.merge([self.xrData, newArray])
-
-
-    def addMedianVar(self, name='newVar',data=[], windowsize=31):
-        dataOrg = self.getVar(name)
-        dataNew=running_median_insort(dataOrg, windowsize=windowsize)
-        self.addVar(('median_%s'%name).replace('/','_'), dataNew)
 
     def _updateFromXarray(self):
         """
@@ -849,6 +847,40 @@ class SmallDataAna(object):
                     #need to print this dataset, otherwise this does not work. Why #DEBUG ME
                     print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
                     add_xrDataSet.close()
+
+###
+# functions to add extra variables to smallData
+###
+    def addMedianVar(self, name='newVar',data=[], windowsize=31):
+        dataOrg = self.getVar(name)
+        dataNew=running_median_insort(dataOrg, windowsize=windowsize)
+        medVarName = ('median_%s'%name).replace('/','_')
+        print 'add variable named: ',medVarName
+        self.addVar(medVarName, dataNew)
+
+    def getStartOffIdx(self, selName, nNbr=3, overWrite=False):
+        if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys() and not overWrite:
+            startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
+        else:
+            tStamp = self.xrData.time
+            filterOff = self.getFilter(selName.split('__')[0]+'__off')
+            startOffIdx = get_startOffIdx(tStamp, filterOff, nNbr=nNbr)
+            print 'add offIdx to data: ',('%s_offIdx_nNbr%02d'%(selName, nNbr))
+            self.addVar('%s_offIdx_nNbr%02d'%(selName, nNbr), startOffIdx)
+        #return startOffIdx
+
+    def getOffVar(self, varName, selName, nNbr=3, mean=True):
+        if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys():
+            startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
+        else:
+            startOffIdx = self.getStartOffIdx(selName, nNbr=nNbr)
+        filterOff = self.getFilter(selName.split('__')[0]+'__off')
+        varArray = self.getVar(varName)
+        varArrayOff =  get_offVar(varArray, filterOff, startOffIdx, nNbr=nNbr, mean=mean)
+        if mean:
+            self.addVar('offNbrsAv_%s_%s_nNbr%02d'%(varName.replace('/','_'),selName, nNbr), varArrayOff)
+        else:
+            self.addVar('offNbrs_%s_%s_nNbr%02d'%(varName.replace('/','_'),selName, nNbr), varArrayOff)
 
     #FIX ME: need to fix this! this will NOT work anymore....
     def setRun(self, run):
@@ -1056,7 +1088,7 @@ class SmallDataAna(object):
             total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
         SelNameBase = SelName.split('__')[0]
         if SelName==None or SelNameBase not in self.Sels.keys():
-            return total_filter
+            return total_filter.squeeze()
 
         #if SelName ends in __off, drop on requirements
         LaserReq = -1
@@ -1068,9 +1100,9 @@ class SmallDataAna(object):
 
         if self.Sels[SelNameBase]._filter is not None and len(ignoreVar)==0:
             if LaserReq == -1:
-                return self.Sels[SelNameBase]._filter
+                return self.Sels[SelNameBase]._filter.squeeze()
             if LaserReq == 1:
-                return (self.Sels[SelNameBase]._filter&[self.getVar('lightStatus/laser')==1])
+                return (self.Sels[SelNameBase]._filter&[self.getVar('lightStatus/laser')==1]).squeeze()
 
         if LaserReq == 0:
             ignoreVar.append('lightStatus/laser')
@@ -1095,11 +1127,11 @@ class SmallDataAna(object):
             total_filter&=ft     
            
         if LaserReq == 2:
-            return total_filter
+            return total_filter.squeeze()
         if LaserReq == 1:
-            return (total_filter&[self.getVar('lightStatus/laser')==1])
+            return (total_filter&[self.getVar('lightStatus/laser')==1]).squeeze()
         if LaserReq == 0:
-            return (total_filter&[self.getVar('lightStatus/laser')==0])
+            return (total_filter&[self.getVar('lightStatus/laser')==0]).squeeze()
 
         return total_filter
         
