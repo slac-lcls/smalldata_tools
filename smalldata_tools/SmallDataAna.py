@@ -720,9 +720,9 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
-        if newVar.find('__'):
+        if name.find('__'):
             print 'Names of newly defined variables may not contain __, will replace with single _'
-            newVar = newVar.replace('__','_')
+            name = name.replace('__','_')
         if not isinstance(data, np.ndarray):
             try:
                 data = np.array(data)
