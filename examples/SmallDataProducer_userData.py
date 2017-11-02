@@ -21,35 +21,52 @@ def getAzIntParams(run):
     if isinstance(run,basestring):
         run=int(run)
         
-    ret_dict = {'eBeam': 8.015}
-    ret_dict['cspad_center'] = [87697.946016760892, 94865.383526655729]
-    ret_dict['cspad_dis_to_sam'] = 110.
+    ret_dict = {'eBeam': 9.5}
+    ret_dict['cspad_center'] = [87526.79161840, 92773.3296889500]
+    ret_dict['cspad_dis_to_sam'] = 80.
     return ret_dict
 
-def getROIs(run):
+def getROI_cspad(run):
+    if isinstance(run,basestring):
+        run=int(run)
+    if run <=6:
+        return [ [[0,1], [1,74], [312,381]],
+                 [[8,9], [8,89], [218,303]] ]
+    else:
+        return [ [[0,1], [1,74], [312,381]],
+                 [[8,9], [8,89], [218,303]] ]
+
+def getROI_rowland(run):
     if isinstance(run,basestring):
         run=int(run)
 
-    return [[10, 20], [10, 20]]
+    if run <= 6:
+        return [[[0,1], [25, 275], [516, 556]], 
+                [[0,1], [25, 275], [460, 500]]]
+    else:
+        return [[[0,1], [25, 275], [516, 556]], 
+                [[0,1], [25, 275], [460, 500]]]
 
 def getNmaxDrop(run):
     if isinstance(run,basestring):
         run=int(run)
 
     if run >= 10:
-        return 2000, 100
+        return 2000
     else:
-        return 400,400
+        return 400
+
 ##########################################################
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
 acqROI = [0,8000]
 #epicsPV = ['slit_s1_hw'] 
-epicsPV = [] a
+epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
-ttCalib=[]
+#ttCalib=[]#1.860828, -0.002950]
+ttCalib=[1.860828, -0.002950]
 #decide which analog input to save & give them nice names
 #aioParams=[[1],['laser']]
 aioParams=[]
@@ -74,6 +91,7 @@ parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/sm
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
+parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
 args = parser.parse_args()
 hostname=socket.gethostname()
 if not args.run:
@@ -137,8 +155,7 @@ try:
     smldataFile = '%s/%s_Run%03d.h5'%(dirname,expname,int(run))
 
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
-    if args.live:
-        smldata.connect_redis()
+
 except:
     print 'failed making the output file ',smldataFile
     import sys
@@ -149,38 +166,30 @@ except:
 ## User Input start --> 
 ##
 ########################################################## 
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib, 'tt')
-##this gives the analog input channels friendlier names
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
-
-nDrop = getNmaxDrop(int(run))
-azIntParams = getAzIntParams(run)
-epixnames = ['epix_vonHamos']
 dets=[]
-for iepix,epixname in enumerate(epixnames):
-    have_epix = checkDet(ds.env(), epixname)
-    if have_epix:
-        print 'creating epix detector object  for epix ',epixname
-        epix = DetObject(epixname ,ds.env(), int(run), name=epixname,common_mode=46)
 
-        epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-        epix['droplet'].addAduHist([0.,1500.])
-        epix['droplet'].addDropletSave(maxDroplets=nDrop[iepix])
+epixname='epix_diff'
+nDrop = getNmaxDrop(int(run))
+have_epix = checkDet(ds.env(), epixname)
+if have_epix:
+    epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
+    epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+    epix['droplet'].addDropletSave(maxDroplets=nDrop)
+    dets.append(epix)
 
-        dets.append(epix)
+ROI_rowland = getROI_rowland(int(run))
+if checkDet(ds.env(), 'cs140_diff'):
+    cs140 = DetObject('cs140_diff' ,ds.env(), int(run))#, name='Rowland')
+    for iROI,ROI in enumerate(ROI_rowland):
+        cs140.addROI('ROI_%d'%iROI, ROI)
+    dets.append(cs140)
 
-ROIs = getROIs(int(run))
-#if checkDet(env, 'epix_Rowland']:
-#    epix = DetObject(epixname ,env, int(run), name='epix_Rowland', common_mode=46)
-#    epix.addROI('ROI', ROIs, rm=30.0)
-#    dets.append(epix)
-
+azIntParams = getAzIntParams(run)
+ROI_cspad = getROI_cspad(int(run))
 haveCspad = checkDet(ds.env(), 'cspad')
 if haveCspad:
     cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
-    for iROI,ROI in enumerate(ROIs):
+    for iROI,ROI in enumerate(ROI_cspad):
         cspad.addROI('ROI_%d'%iROI, ROI)
 
     cspad.azav_eBeam=azIntParams['eBeam']
@@ -188,11 +197,10 @@ if haveCspad:
         cspad.azav_center=azIntParams['cspad_center']
         cspad.azav_dis_to_sam=azIntParams['cspad_dis_to_sam']
         try:
-            cspad.addAzAv(phiBins=1, Pplane=0)
+            cspad.addAzAv(phiBins=11, Pplane=0)
         except:
             pass
     dets.append(cspad)
-
 
 ########################################################## 
 ##
@@ -222,7 +230,7 @@ Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
 for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank)
+    printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
     if eventNr >= maxNevt/ds.size:
         break
@@ -254,13 +262,31 @@ for eventNr,evt in enumerate(ds.events()):
     smldata.event(userDict)
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.
-    try:
-        cspadMax = cspad.evt.dat.max()
-        epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-        combDict = {'userValue': cspadMax*epix_vonHamosMax}
-        smldata.event(combDict)
-    except:
-        pass
+    #try:
+    #    cspadMax = cspad.evt.dat.max()
+    #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
+    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
+    #    smldata.event(combDict)
+    #except:
+    #    pass
+
+    #first event.
+    if ds.rank==0 and eventNr==0 and (args.live or args.liveFast):
+        if not args.liveFast:
+            #this saves all fields
+            smldata.connect_redis()
+        else:
+            redisKeys = defaultRedisVars(hutch)
+            redisList=['fiducials','event_time']
+            for key in redisKeys:
+                if key.find('/')>=0 and key in smldata._dlist.keys():
+                    redisList.append(key)
+                else:
+                    for sdkey in smldata._dlist.keys():
+                        if sdkey.find(key)>=0:
+                            redisList.append(sdkey)
+            print 'Saving in REDIS: ',redisList
+            smldata.connect_redis(redisList)
 
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()
