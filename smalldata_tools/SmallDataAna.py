@@ -295,10 +295,10 @@ class droplets(object):
  
  
 class Cube(object):
-    def __init__(self, binVar='', bins=[], cubeName=None, SelName=None, addBinVar=None):
+    def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVar=None):
         self.binVar = binVar
         self.bins = bins
-        self.SelName = SelName
+        self.useFilter = useFilter
         self.addBinVar=None
 
         nbins = len(bins)
@@ -362,7 +362,7 @@ class Cube(object):
         self.binVar = jsonCube[0]
         self.bins = jsonCube[1]
         self.targetVars = jsonCube[2]
-        self.SelName = jsonCube[4]
+        self.useFilter = jsonCube[4]
         if len(jsonCube)>5:
             self.addVarBin = jsonCube[5]
             self.addBins = jsonCube[6]
@@ -375,14 +375,14 @@ class Cube(object):
         print 'write CubeSetup file for ',cubeName, ' to ','CubeSetup_'+cubeName+'.txt'
         if self.addBinVar is None:
             if isinstance(self.bins,list):
-                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
+                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
             else:
-                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.SelName].cuts,self.SelName], f, indent=3)
+                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
         else:
             if isinstance(self.bins,list):
-                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.SelName].cuts,self.SelName, self.addVarBin, self.addBins], f, indent=3)
+                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter, self.addVarBin, self.addBins], f, indent=3)
             else:
-                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.SelName].cuts,self.SelName, self.addVarBin, self.addBins], f, indent=3)
+                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter, self.addVarBin, self.addBins], f, indent=3)
         f.close()
 
 class Selection(object):
@@ -724,7 +724,7 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
-        if name.find('__')>=0:
+        if name.find('__')>=0 and name not in self._fields.keys():
             print 'Names of newly defined variables may not contain __, will replace with single _'
             name = name.replace('__','_')
         if not isinstance(data, np.ndarray):
@@ -1033,33 +1033,35 @@ class SmallDataAna(object):
                 ttBaseStr = 'tt/TTSPEC_'
         return ttCorr, ttBaseStr
 
-    def addCut(self, varName, cmin=0, cmax=0, SelName=None):
-        if SelName is None:
+    def addCut(self, varName, cmin=0, cmax=0, useFilter=None):
+        if useFilter is None:
             print 'you need to pass the name for the filter/selection you want to use'
             return
-        if not self.Sels.has_key(SelName):
-            self.Sels[SelName] = Selection()
+        if not self.Sels.has_key(useFilter):
+            self.Sels[useFilter] = Selection()
         if cmin!=cmax:
-            self.Sels[SelName].addCut(varName, cmin,cmax)
+            self.Sels[useFilter].addCut(varName, cmin,cmax)
         else:
             if isinstance(varName, basestring):
                 if self.Sels.has_key(varName):
-                    self.Sels[SelName].add(self.Sels[varName])
+                    self.Sels[useFilter].add(self.Sels[varName])
                 else:
                     print 'Cannot add cuts for filter %s as its not defined yet'%varName
             elif isinstance(varName, Selection):
-                self.Sels[SelName].add(varName)
+                self.Sels[useFilter].add(varName)
             else:
                 print 'need to pass selection to add as Selection or its name'
-        Filter = self.getFilter(SelName=SelName)
-        self.Sels[SelName]._setFilter(Filter)
-    def removeCut(self, varName, SelName):
-        if not self.Sels.has_key(SelName):
-            print 'Selection with name %s does not exist, cannot remove cut'%SelName
+        Filter = self.getFilter(useFilter=useFilter)
+        self.Sels[useFilter]._setFilter(Filter)
+        #if self.Sels[useFilter]._filter is not None:
+        #    print 'of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum())
+    def removeCut(self, varName, useFilter):
+        if not self.Sels.has_key(useFilter):
+            print 'Selection with name %s does not exist, cannot remove cut'%useFilter
             return
-        self.Sels[SelName].removeCut(varName)
-        Filter = self.getFilter(SelName=SelName)
-        self.Sels[SelName]._setFilter(Filter)
+        self.Sels[useFilter].removeCut(varName)
+        Filter = self.getFilter(useFilter=useFilter)
+        self.Sels[useFilter]._setFilter(Filter)
     def printCuts(self, selName=None, brief=True):
         self.printSelections(selName=selName, brief=brief)
     def printSelections(self, selName=None, brief=True):
@@ -1076,33 +1078,33 @@ class SmallDataAna(object):
             if not brief:
                 print self.Sels[sel].printCuts()
                 print '--------------------------'
-    def getFilterLaser(self, SelName, ignoreVar=[]):
+    def getFilterLaser(self, useFilter, ignoreVar=[]):
         #moved functionality into getFilter.
-        SelNameBase = SelName.split('__')[0]
-        return [self.getFilter(SelName=SelNameBase+"__on", ignoreVar=ignoreVar).squeeze(),self.getFilter(SelName=SelNameBase+"__off", ignoreVar=ignoreVar).squeeze()]
+        useFilterBase = useFilter.split('__')[0]
+        return [self.getFilter(useFilter=useFilterBase+"__on", ignoreVar=ignoreVar).squeeze(),self.getFilter(useFilter=useFilterBase+"__off", ignoreVar=ignoreVar).squeeze()]
         
-    def getFilter(self, SelName=None, ignoreVar=[]):
+    def getFilter(self, useFilter=None, ignoreVar=[]):
         try:
             total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
         except:
             total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
-        SelNameBase = SelName.split('__')[0]
-        if SelName==None or SelNameBase not in self.Sels.keys():
+        useFilterBase = useFilter.split('__')[0]
+        if useFilter==None or useFilterBase not in self.Sels.keys():
             return total_filter.squeeze()
 
-        #if SelName ends in __off, drop on requirements
+        #if useFilter ends in __off, drop on requirements
         LaserReq = -1
-        if len(SelName.split('__'))>1:
-            if (SelName.split('__')[1] == 'on' or SelName.split('__')[1] == 'On'):
+        if len(useFilter.split('__'))>1:
+            if (useFilter.split('__')[1] == 'on' or useFilter.split('__')[1] == 'On'):
                 LaserReq = 1
-            if (SelName.split('__')[1] == 'off' or SelName.split('__')[1] == 'Off'):
+            if (useFilter.split('__')[1] == 'off' or useFilter.split('__')[1] == 'Off'):
                 LaserReq = 0
 
-        if self.Sels[SelNameBase]._filter is not None and len(ignoreVar)==0:
+        if self.Sels[useFilterBase]._filter is not None and len(ignoreVar)==0:
             if LaserReq == -1:
-                return self.Sels[SelNameBase]._filter.squeeze()
+                return self.Sels[useFilterBase]._filter.squeeze()
             if LaserReq == 1:
-                return (self.Sels[SelNameBase]._filter&[self.getVar('lightStatus/laser')==1]).squeeze()
+                return (self.Sels[useFilterBase]._filter&[self.getVar('lightStatus/laser')==1]).squeeze()
 
         if LaserReq == 0:
             ignoreVar.append('lightStatus/laser')
@@ -1115,7 +1117,7 @@ class SmallDataAna(object):
                 ignoreVar.append(self.ttBaseStr+'FLTPOSFWHM')
 
         filters=[]
-        for thiscut in self.Sels[SelNameBase].cuts:
+        for thiscut in self.Sels[useFilterBase].cuts:
             if not thiscut[0] in ignoreVar:
                 thisPlotvar=self.get1dVar(thiscut[0])
                 filters.append(~np.isnan(thisPlotvar))
@@ -1135,11 +1137,11 @@ class SmallDataAna(object):
 
         return total_filter
         
-    def saveFilter(self, baseName='boolArray',SelName=None, ignoreVar=[]):
-        total_filter = self.getFilter(SelName=SelName, ignoreVar=ignoreVar)
+    def saveFilter(self, baseName='boolArray',useFilter=None, ignoreVar=[]):
+        total_filter = self.getFilter(useFilter=useFilter, ignoreVar=ignoreVar)
         np.savetxt('%s_Run%03d.txt'%(baseName, self.run),total_filter.astype(bool),fmt='%5i')
 
-    def getSelIdx(self, SelName):
+    def getSelIdx(self, useFilter):
         if self.hasKey('EvtID'):
             fids = self.getVar('/EvtID/fid')
             times = self.getVar('/EvtID/time')
@@ -1149,7 +1151,7 @@ class SmallDataAna(object):
         elif self.hasKey('fiducials'):
             fids = self.getVar('fiducials')
             times = self.getVar('event_time')
-        Filter =  self.getFilter(SelName)
+        Filter =  self.getFilter(useFilter)
         selfids = [ (ifid,itime) for ifid,itime in zip(fids[Filter],times[Filter])]
         return selfids
         
@@ -1316,21 +1318,21 @@ class SmallDataAna(object):
         self.addVar('delay', delay)
         return delay
 
-    def getPeak(self, plotvar, numBins=[100],setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None,asHist=False,sigROI=[]):
-        hst = plotVar(plotvar, numBins=[100],setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None,asHist=False,sigROI=[])
+    def getPeak(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,sigROI=[]):
+        hst = plotVar(plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,sigROI=[])
         if len(hst)==2:
             return [hst[0].max(), hst[1][hst[0].argmax()]]
         else:
             print 'getPeak is not yet implemented for this type of data (need 1d histo)'
 
-    def plotVar(self, plotvar, numBins=[100],setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None):
+    def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None):
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
         if isinstance(plotvar, basestring) or (len(plotvar)==2 and (isinstance(plotvar[0], basestring) and not isinstance(plotvar[1], basestring))):
             if len(numBins)!=1:
                 print 'bin# needs to be of same dimensions as plotvariables (1d)'
                 return
-            return self.plotVar1d(plotvar, numBins=numBins[0],setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,plotWith=plotWith)
+            return self.plotVar1d(plotvar, numBins=numBins[0], useFilter=useFilter, limits=limits,fig=fig,plotWith=plotWith)
         elif len(plotvar)>2:
             print 'plotting of 3 variables is not defined yet'
             return
@@ -1339,19 +1341,19 @@ class SmallDataAna(object):
                 numBins=[numBins[0],numBins[0]]
             else:
                 print 'bin# needs to be of same dimentions as plotvariables (2d)'
-        return self.plotVar2d(plotvar, numBins=numBins,setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
+        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
 
-    def plotVar1d(self, plotvar, numBins=100,setCuts=None, applyCuts=None, limits=[1,99,'p'],fig=None, plotWith=None):
+    def plotVar1d(self, plotvar, numBins=100, useFilter=None, limits=[1,99,'p'],fig=None, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
         if isinstance(plotvar,list):
             if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay'): 
-                print 'request variable %s not in littleData file'%plotvar
+                print 'request variable %s not in smallData file'%plotvar
                 return
         else:
             if not (self.hasKey(plotvar) or plotvar=='delay'): 
-                print 'request variable %s not in littleData file'%plotvar
+                print 'request variable %s not in smallData file'%plotvar
                 return
 
         if plotvar=='delay':
@@ -1362,8 +1364,8 @@ class SmallDataAna(object):
             vals = self.get1dVar(plotvar)
 
         total_filter = np.ones(vals.shape[0]).astype(bool)
-        if applyCuts is not None and self.Sels.has_key(applyCuts):
-            total_filter =  self.getFilter(applyCuts, [plotvar])
+        if useFilter is not None:
+            total_filter =  self.getFilter(useFilter, [plotvar])
         vals = vals[total_filter]
 
         if  len(plotvar)==1 and plotvar.find('droplets')>=0:
@@ -1387,18 +1389,12 @@ class SmallDataAna(object):
             plt.plot(hst[1][:-1],hst[0],'o')
             plt.xlabel(plotvar)
             plt.ylabel('entries')
-            if setCuts is not None and self.Sels.has_key(setCuts):
-                p = np.array(ginput(2))
-                p=[p[0][0],p[1][0]]
-                self.Sels[setCuts].addCut(plotvar,min(p),max(p))
                 
         elif plotWith.find('bokeh')>=0:
             #IMPLEMENT ME
             #bokeh, use BoxSelectTool to get selected region
             #https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
             #set cuts does not need to be specified explicly, can simple be gotten from callback of tool.....
-            if setCuts is not None and self.Sels.has_key(setCuts):
-                print 'setting filter conditions does not work when using bokeh plotting'
             pan=PanTool()
             wheel_zoom=WheelZoomTool()
             box_zoom=BoxZoomTool()
@@ -1425,7 +1421,7 @@ class SmallDataAna(object):
             
         return hst
 
-    def plotVar2d(self, plotvars, setCuts=None, applyCuts=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
+    def plotVar2d(self, plotvars, useFilter=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1433,7 +1429,7 @@ class SmallDataAna(object):
             if isinstance(plotvar,list):
                 plotvar = plotvar[0]
             if not self.hasKey(plotvar) or plotvar == 'delay': 
-                print 'request variable %s not in littleData file'%(plotvar)
+                print 'request variable %s not in smallData file'%(plotvar)
                 return
         vals=[]
         for plotvar in plotvars:
@@ -1462,8 +1458,8 @@ class SmallDataAna(object):
         filters=[]
         filters.append((vals[0] >= pmin0 ) & (vals[0] <= pmax0))
         filters.append((vals[1] >= pmin1 ) & (vals[1] <= pmax1))
-        if applyCuts is not None and self.Sels.has_key(applyCuts):
-            filters.append(self.getFilter(applyCuts,plotvars))
+        if useFilter is not None and self.Sels.has_key(useFilter):
+            filters.append(self.getFilter(useFilter,plotvars))
         for ft in filters:
             total_filter&=ft                
 
@@ -1491,16 +1487,8 @@ class SmallDataAna(object):
                 plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
                 plt.xlabel(plotvars[1])
                 plt.ylabel(plotvars[0])
-            if setCuts is not None and self.Sels.has_key(setCuts):
-                p =np.array(ginput(2))
-                p0=[p[0][1],p[1][1]]
-                p1=[p[0][0],p[1][0]]
-                self.Sels[setCuts].addCut(plotvars[0],min(p0),max(p0))
-                self.Sels[setCuts].addCut(plotvars[1],min(p1),max(p1))
 
         elif plotWith.find('bokeh')>=0:
-            if setCuts is not None and self.Sels.has_key(setCuts):
-                print 'setting filter conditions does not work when using bokeh plotting'
             pan=PanTool()
             wheel_zoom=WheelZoomTool()
             box_zoom=BoxZoomTool()
@@ -1645,12 +1633,12 @@ class SmallDataAna(object):
           print 'you passed only one number and the this does not look like a new delay scan or a normal scan'
           return []
 
-    def getScans(self, runs=[], ttCorr=False, sig='', i0='', numBins=100, applyCuts=None, offData=True):
+    def getScans(self, runs=[], ttCorr=False, sig='', i0='', numBins=100, useFilter=None, offData=True):
         plotData=[]
         currRun=self.run
         for run in runs:
             self.setRun(run)
-            plotData.append(self.getScan(ttCorr=ttCorr,sig=sig,i0=i0,numBins=numBins,applyCuts=applyCuts))
+            plotData.append(self.getScan(ttCorr=ttCorr,sig=sig,i0=i0,numBins=numBins,useFilter=useFilter))
         self.setRun(currRun)
         if not plotData[0].has_key('scanOffPoints'):
             offData=False
@@ -1682,10 +1670,10 @@ class SmallDataAna(object):
         
         return {'scanVarName':dataSet['scanVarName'],'scanPoints':scanPoints,'scan':scan}
 
-    def getScan(self, ttCorr=False, sig='', i0='', Bins=100, applyCuts=None):
-        return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, applyCuts=applyCuts, plotThis=False)
+    def getScan(self, ttCorr=False, sig='', i0='', Bins=100, useFilter=None):
+        return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
 
-    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None, plotWith=None):
+    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1714,7 +1702,7 @@ class SmallDataAna(object):
         else:
             i0Val = np.ones_like(sigVal)
         
-        [FilterOn, FilterOff] = self.getFilterLaser(applyCuts)
+        [FilterOn, FilterOff] = self.getFilterLaser(useFilter)
         FilterOn = FilterOn & ~np.isnan(i0Val) & ~np.isnan(sigVal)
         FilterOff = FilterOff & ~np.isnan(i0Val) & ~np.isnan(sigVal)
 
@@ -1956,18 +1944,18 @@ class SmallDataAna(object):
             print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
 
             
-    def defPlots(self, applyCuts=None):
+    def defPlots(self, useFilter=None):
         scanVarName,scan =  self.getScanValues(True)
         total_filter = np.ones_like(scan).astype(bool)
-        if applyCuts is not None and self.Sels.has_key(applyCuts):
-            total_filter =  self.getFilter(applyCuts, [plotvar])
+        if useFilter is not None and self.Sels.has_key(useFilter):
+            total_filter =  self.getFilter(useFilter, [plotvar])
 
         fig=plt.figure(figsize=(10,6))
         plt.title('Standard Plots for Run %i'%self.run)
         
         gs=gridspec.GridSpec(2,2,width_ratios=[2,2])
-        self.plotVar('ipm2/sum',fig=plt.subplot(gs[0]),applyCuts=applyCuts)
-        self.plotVar(['ipm2/sum','ebeam/L3Energy'],fig=plt.subplot(gs[1]),asHist=True,applyCuts=applyCuts)
+        self.plotVar('ipm2/sum',fig=plt.subplot(gs[0]),useFilter=useFilter)
+        self.plotVar(['ipm2/sum','ebeam/L3Energy'],fig=plt.subplot(gs[1]),asHist=True,useFilter=useFilter)
         if len(scan)<200:
             pmin=scan[0]
             pmax=scan[-1]
@@ -1996,8 +1984,8 @@ class SmallDataAna(object):
     #########################################################
 
     #cube might be better to be its own class
-    def addCube(self, cubeName, binVar='', bins=[], SelName=''):    
-        self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, SelName=SelName)
+    def addCube(self, cubeName, binVar='', bins=[], useFilter=''):    
+        self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter)
         
     def addToCube(self, cubeName, targetVariable):
         if cubeName in self.cubes.keys():
@@ -2014,7 +2002,7 @@ class SmallDataAna(object):
             for cubeName in self.cubes.keys():
                 cube = self.cubes[cubeName]
                 if printDetail:
-                    cube.printCube(self.Sels[cube.SelName])
+                    cube.printCube(self.Sels[cube.useFilter])
                 else:
                     print cubeName
                 cubeNames.append(cubeName)
@@ -2046,16 +2034,20 @@ class SmallDataAna(object):
         cube.targetVars = targetVarsLocal
 
         #now get the filter & create a new one taking bins & detector damage into account.
-        orgSel = cube.SelName
-        if orgSel.find(cube.cubeName)!=0:
-            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)] = Selection()
-            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].add(self.Sels[orgSel])
-            self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut(cube.binVar, min(Bins), max(Bins) )
+        onoff=2
+        useFilterBase = cube.useFilter.split('__')[0]
+        if len(cube.useFilter.split('__'))>1:
+            if cube.useFilter.split('__')[1]=='on': onoff=1
+            elif cube.useFilter.split('__')[1]=='off': onoff=0
+        if cube.useFilter.find(cube.cubeName)!=0 and '%s_%s'%(cube.cubeName,useFilterBase) not in self.Sels.keys():
+            self.Sels['%s_%s'%(cube.cubeName,useFilterBase)] = Selection()
+            self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].add(self.Sels[useFilterBase])
+            self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].addCut(cube.binVar, min(Bins), max(Bins) )
             #add cuts with detector damage - if we have damage detector info.
             for txVar in targetVarsLocal:
                 if txVar[0]=='/':txVar=txVar[1:] 
                 if 'damage/%s'%txVar  in self._fields.keys(): 
-                    self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
+                    self.Sels['%s_%s'%(cube.cubeName,cube.useFilter)].addCut('damage/%s'%txVar.split('/')[0],0.5,1.5)
             for txVar in cube.targetVarsXtc:
                 if isinstance(txVar, dict):
                     try:
@@ -2063,13 +2055,16 @@ class SmallDataAna(object):
                     except:
                         continue
                 if 'damage/%s'%txVar  in self._fields.keys(): 
-                        self.Sels['%s_%s'%(cube.cubeName,cube.SelName)].addCut('damage/%s'%txVar,0.5,1.5)
-            cube.SelName='%s_%s'%(cube.cubeName,cube.SelName)
+                        self.Sels['%s_%s'%(cube.cubeName,cube.useFilter)].addCut('damage/%s'%txVar,0.5,1.5)
+            cube.useFilter='%s_%s'%(cube.cubeName,cube.useFilter)
 
-        return cube
+        return cube, onoff
 
     def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
-        cube = self.prepCubeData(cubeName)
+        cube, cubeName_onoff = self.prepCubeData(cubeName)
+        if onoff == 2:
+            onoff = cubeName_onoff
+
         if cube is None:
             return 
         Bins = cube.binBounds
@@ -2089,9 +2084,11 @@ class SmallDataAna(object):
             addBins = cube.addBins
                 
         if debug:
-            cube.printCube(self.Sels[cube.SelName])
-        cubeFilter = self.getFilter(cube.SelName)
-        [cubeOn, cubeOff] = self.getFilterLaser(cube.SelName, ignoreVar=[])
+            cube.printCube(self.Sels[cube.useFilter])
+
+        cubeFilter = self.getFilter(cube.useFilter)
+        [cubeOn, cubeOff] = self.getFilterLaser(cube.useFilter, ignoreVar=[])
+
         if onoff==1:
             cubeFilter = cubeOn
             cubeName = cubeName+'_laserOn'
@@ -2231,7 +2228,7 @@ class SmallDataAna(object):
     ###
     ##########################################################################
 
-    def AvImage(self, detname='None', numEvts=100, nSkip=0, thresADU=0., thresRms=0.,applyCuts=None, mean=False, std=False):
+    def AvImage(self, detname='None', numEvts=100, nSkip=0, thresADU=0., thresRms=0.,useFilter=None, mean=False, std=False):
         #look for detector
         if detname=='None':
             aliases=self.Keys2d()
@@ -2260,8 +2257,8 @@ class SmallDataAna(object):
             mask = None
 
         #only events requested
-        if applyCuts is not None:
-            Filter = self.getFilter(SelName=applyCuts)
+        if useFilter is not None:
+            Filter = self.getFilter(useFilter=useFilter)
             dataAr = self.getVar(detname,Filter)
             dataAr = dataAr[nSkip:min(nSkip+numEvts, dataAr.shape[0])].squeeze()
         else:
@@ -2470,16 +2467,16 @@ class SmallDataAna(object):
     ###
     ##########################################################################
 
-    def DropletCube(self, applyCuts='', i0='ipm3/sum', rangeAdu=[], rangeX=[], rangeY=[], addName='', returnData=False, writeFile=False):
+    def DropletCube(self, useFilter='', i0='ipm3/sum', rangeAdu=[], rangeX=[], rangeY=[], addName='', returnData=False, writeFile=False):
         data='DropletCube_Run%d_%s'%(self.run,addName)
-        if applyCuts!='':
-            data+='_'+applyCuts
+        if useFilter!='':
+            data+='_'+useFilter
         self.__dict__[data]=None
 
         #get basename of droplets
         dkey = [ key for key in self.Keys() if key.find('dropletsAdu')>=0]
         if len(dkey)==0:
-            print 'did not find any droplets in this littleData file: ',self.fh5.filename
+            print 'did not find any droplets in this smallData file: ',self.fh5.filename
             return
         if len(dkey)>1:
             print 'we have the following options: ',dbkey
@@ -2489,8 +2486,8 @@ class SmallDataAna(object):
 
         #get filtered list of events
         i0_all = self.getVar(i0)
-        if applyCuts is not None:
-            Filter = self.getFilter(SelName=applyCuts)
+        if useFilter is not None:
+            Filter = self.getFilter(useFilter=useFilter)
         else:
             Filter = np.ones_like(i0_all)
 
@@ -2544,7 +2541,7 @@ class SmallDataAna(object):
             return returnDict
 
 
-    def plotScanCube(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, applyCuts=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None):
+    def plotScanCube(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None):
 
         #TO IMPLEMENT
         #decide when to apply reduction: A) cube full data, then apply or B) add reduced variable to xarray for cube.
@@ -2576,7 +2573,7 @@ class SmallDataAna(object):
         
         #TO IMPLEMENT
         #create an "off" select based on the pass selection.
-        [FilterOn, FilterOff] = self.getFilterLaser(applyCuts)
+        [FilterOn, FilterOff] = self.getFilterLaser(useFilter)
         FilterOn = FilterOn & ~np.isnan(i0Val) & ~np.isnan(sigVal)
         FilterOff = FilterOff & ~np.isnan(i0Val) & ~np.isnan(sigVal)
 

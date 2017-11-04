@@ -151,8 +151,8 @@ class SmallDataAna_psana(object):
         else:
             return keys
         
-    def plotVar(self, plotvar, numBins=[100],setCuts=False, applyCuts=False, limits=[1,99],fig=None,asHist=False):
-        self.sda.plotVar(plotvar=plotvar, numBins=numBins,setCuts=setCuts, applyCuts=applyCuts, limits=limits,fig=fig,asHist=asHist)
+    def plotVar(self, plotvar, numBins=[100], useFilter=False, limits=[1,99],fig=None,asHist=False):
+        self.sda.plotVar(plotvar=plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist)
 
     def plotScan(self, ttCorr=False, sig='diodeU/channels', sigROI=[], i0='ipm3/sum', numBins=100):
         self.sda.plotScan(ttCorr=ttCorr, sig=sig, sigROI=sigROI, i0=i0, numBins=numBins)
