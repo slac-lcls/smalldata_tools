@@ -576,6 +576,118 @@ def dictToHdf5(filename, indict):
     dset[...] = npAr
   f.close()
 
+#
+# code for peak finding.
+#
+def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
+    if data is None or len(data)<10:
+        return
+    nWeights = 100
+    if weights is not None and isinstance(weights, int):
+        nWeights = weights
+    if weights is None or isinstance(weights, int):
+        weights = np.ones(nWeights)
+        if kind == "stepUp":
+            weights[nWeights/2:]=0
+        elif kind == "stepDown":
+            weights[0:nWeights/2]=0
+        else:
+            print 'for fits not using stepUp or stepDown you need to provide weights!'
+            return
+    weights = np.array(weights).squeeze()
+    retDict = {}
+    retDict['pos']=0.
+    retDict['amp']=0.
+    retDict['fwhm']=0.
+    weights = weights/sum(weights)     #normalize
+    weights = weights-weights.mean()   #center around 0
+
+    nWeights = len(weights)
+    halfrange = round(nWeights/10)
+    if np.isnan(data).sum()==data.shape[0]:
+        return retDict
+        
+    f0 = np.convolve(np.array(weights).ravel(),data,'same')
+    f = f0[nWeights/2:len(f0)-nWeights/2-1]
+    retDict['fConv']=f
+    mpr = f.argmax()
+    # now do a parabolic fit around the max
+    xd = np.arange(max(0,mpr-halfrange),min(mpr+halfrange,len(f)-1))
+    yd = f[int(max(0,mpr-halfrange)):int(min(mpr+halfrange,len(f)-1))]
+
+    p2 = np.polyfit(xd,yd,2)
+    tpos = -p2[1]/2./p2[0]
+    tamp = np.polyval(p2,tpos)
+    try:
+        below = (f<((f[-25:].mean()+tamp)/2.)).nonzero()[0]-mpr
+        tfwhm = np.abs(np.min(below[below>0])-np.max(below[below<0]))
+        retDict['below']=below
+    except:
+        tfwhm = 0.
+    retDict['pos']=tpos + nWeights/2.
+    retDict['amp']=tamp
+
+    if np.isnan(tamp): 
+        retDict['fwhm']=np.nan
+    else:
+        retDict['fwhm']=tfwhm 
+
+    if iterFrac>0.:
+        allPos=[retDict['pos']]
+        allAmp=[retDict['amp']]
+        allFwhm=[retDict['fwhm']]
+        fP = f.copy()        
+
+        mprIter = mpr
+        currPeakMin = max(0,mprIter-allFwhm[-1])
+        currPeakMax = min(mprIter+allFwhm[-1],len(fP))
+        print 'zero array: ',currPeakMin, currPeakMax
+        fP[currPeakMin:currPeakMax]=[0]*(currPeakMax-currPeakMin)
+        while np.max(fP)>iterFrac*allAmp[0]:
+            retDict['fp_%d'%len(allPos)]=np.array(fP)#fP.deep_copy()
+            mprIter = fP.argmax()
+            # now do a parabolic fit around the max
+            xd = np.arange(max(0,mprIter-halfrange),min(mprIter+halfrange,len(fP)-1))
+            yd = fP[max(0,mprIter-halfrange):min(mprIter+halfrange,len(fP)-1)]
+            p2 = np.polyfit(xd,yd,2)
+            tpos = -p2[1]/2./p2[0]
+            tamp = np.polyval(p2,tpos)
+            try:
+                below = (fP<((fP[-25:].mean()+tamp)/2.)).nonzero()[0]-mprIter
+                try:
+                    hm_above = np.min(below[below>0])
+                except:
+                    hm_above = len(below)
+                try:
+                    hm_below = np.max(below[below<0])
+                except:
+                    hm_below=0
+                tfwhm = np.abs(hm_above - hm_below)
+
+                currPeakMin = max(0,mprIter-tfwhm)
+                currPeakMax = min(mprIter+tfwhm,len(fP))
+                #print len(allPos),' new peak vals: ',tpos, tamp, tfwhm, ' zero array: ',currPeakMin, currPeakMax
+                fP[currPeakMin:currPeakMax]=[0]*(currPeakMax-currPeakMin)
+
+                allPos.append(tpos + nWeights/2.)
+                allAmp.append(tamp)
+                if np.isnan(tamp): 
+                    allFwhm.append(np.nan)
+                    break
+                allFwhm.append(tfwhm)
+            except:
+                break
+            if len(allPos)>maxPeak:
+                break
+        retDict['allPos'] = allPos
+        retDict['allAmp'] = allAmp
+        retDict['allFwhm'] = allFwhm
+
+    #for k in retDict.keys():
+        #print 'fit Trace test: ',k,retDict[k]
+
+    return retDict
+
 
 #
 # should work on removing it
