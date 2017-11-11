@@ -862,14 +862,14 @@ class SmallDataAna(object):
         if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys() and not overWrite:
             startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
         else:
-            tStamp = self.xrData.time
+            tStamp = self.xrData.event_time.values
             filterOff = self.getFilter(selName.split('__')[0]+'__off')
             startOffIdx = get_startOffIdx(tStamp, filterOff, nNbr=nNbr)
             print 'add offIdx to data: ',('%s_offIdx_nNbr%02d'%(selName, nNbr))
             self.addVar('%s_offIdx_nNbr%02d'%(selName, nNbr), startOffIdx)
-        #return startOffIdx
+        return startOffIdx
 
-    def getOffVar(self, varName, selName, nNbr=3, mean=True):
+    def getOffVar(self, varName, selName, nNbr=3, mean=True, returnMe=False):
         if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys():
             startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
         else:
@@ -881,6 +881,8 @@ class SmallDataAna(object):
             self.addVar('offNbrsAv_%s_%s_nNbr%02d'%(varName.replace('/','_'),selName, nNbr), varArrayOff)
         else:
             self.addVar('offNbrs_%s_%s_nNbr%02d'%(varName.replace('/','_'),selName, nNbr), varArrayOff)
+        if returnMe:
+            return varArrayOff
 
     #FIX ME: need to fix this! this will NOT work anymore....
     def setRun(self, run):
@@ -903,18 +905,6 @@ class SmallDataAna(object):
                 elif self.hasKey('tt/TTSPEC_AMPL'):
                     self.ttBaseStr = 'tt/TTSPEC_'
             
-    def setExperiment(self,expname):
-        self.expname=expname
-        self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-        if path.isfile(self.fname):
-            self.fh5=tables.open_file(self.fname,'r')
-    def setSmallDataDir(self, dirname):
-        self.dirname=dirname
-        self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-        if not path.isfile(self.fname):
-            self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-        if path.isfile(self.fname):
-            self.fh5=tables.open_file(self.fname,'r')
     def Keys2d(self, inh5 = None, printKeys=False):
         return self.Keys(inh5 = inh5, printKeys=printKeys, areaDet=True)
 

@@ -449,32 +449,24 @@ def addToHdf5(fh5, key, npAr):
 ###
 # utility functions for getting indices of matching off events
 ###
-#tried numba version, no speedup observed.
-def get_startOffIdx(tStamp, filterOff, nNbr=3, nMax=-1):
-    all_startOffIdx=[]
-    startOffIdx=0
-    nOff = filterOff.sum()
-    tStampOff = tStamp[filterOff] #do this once to save time.
-    tLow = tStampOff[startOffIdx]
-    tHigh =  tStampOff[startOffIdx+nNbr]
-
-    for iMax,thistStamp in enumerate(tStamp):
-        if nMax>=0 and iMax>nMax:
-            break
-        #print nMax, iMax,' -- ', np.abs(thistStamp-tLow), np.abs(tHigh-thistStamp)
-        if (startOffIdx+nNbr) < nOff-1 and np.abs(thistStamp-tLow) > np.abs(tHigh-thistStamp):
-            #print 'move starting offIdx ',iMax, np.abs(thistStamp-tLow), np.abs(tHigh-thistStamp)
-            startOffIdx+=1
-            tLow = tStampOff[startOffIdx]
-            tHigh =  tStampOff[startOffIdx+nNbr]
-        all_startOffIdx.append(startOffIdx)
+def get_startOffIdx(evtTime, filterOff, nNbr=3, nMax=-1):
+    ##switch to next set of off events when:
+    #t_next - t_evt < t_evt - t_last ----> (t_next + t_last) * 0.5 < t_evt    
+    #calculate times where the offIdx_start will switch: (t[offIdx_start+nNbr]+t[offIdx_start])*0.5
+    evtTimeOff = evtTime[filterOff]
+    t_switch = (evtTimeOff[:-nNbr] - evtTimeOff[nNbr:])/2 + evtTimeOff[nNbr:]
+      
+    #now digitize times
+    all_startOffIdx = np.digitize(evtTime, t_switch)
+    #to use
+    #datOffNbr[i] = dat_array[filterOff][all_startOffIdx[i]:all_startOffIdx[i]+nNbr] 
     return np.array(all_startOffIdx)
 
 #speed gain factor 2-3 depending on data (better for single#)
 @jit
 def get_offVar(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
     assert (varArray.shape[0] == filterOff.shape[0])
-    assert (varArray[filterOff].shape[0] > (startOffIdx[-1]+nNbr))
+    assert (varArray[filterOff].shape[0] >= (startOffIdx[-1]+nNbr))
     varOff=[]
     for idx in startOffIdx:
         if mean:
