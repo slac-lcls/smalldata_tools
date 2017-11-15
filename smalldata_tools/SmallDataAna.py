@@ -338,6 +338,8 @@ class Cube(object):
         elif isinstance(tVar, list):
             for tv in tVar:
                 self.targetVars.append(tv)
+        elif isinstance(tVar, dict):
+            self.targetVars.append(tVar)
 
     def printCube(self, Sel):
         print 'cube: ',self.cubeName
@@ -1980,7 +1982,9 @@ class SmallDataAna(object):
     def addToCube(self, cubeName, targetVariable):
         if cubeName in self.cubes.keys():
             self.cubes[cubeName].addVar(targetVariable)
- 
+        else:
+            print 'could not add variable %s to cube %s as this cuve was not found'%(targetVariable, cubeName)
+
     def getCube(self, cubeName):
         if cubeName in self.cubes.keys():
             return self.cubes[cubeName]
@@ -2158,10 +2162,18 @@ class SmallDataAna(object):
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
         if addIdxVar is not None:
             if isinstance(addIdxVar,basestring):
-                evtIDXr = xr.merge([evtIDXr, xr.DataArray(self.getVar(addIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=addIdxVar) ])       
-            elif  isinstance(addIdxVar,list):
+                addIdxVar=[addIdxVar]
+            if  isinstance(addIdxVar,list):
                 for thisIdxVar in addIdxVar:
-                    addArray = xr.DataArray(self.getVar(thisIdxVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name=thisIdxVar)
+                    varData = self.getVar(thisIdxVar,cubeFilter)
+                    coords={'time': timeFiltered}
+                    dims = ['time']
+                    for dim in range(len(varData.shape)-1):
+                        thisDim = np.arange(0, varData.shape[dim+1])
+                        dimStr = 'dim%d'%dim
+                        coords[dimStr] = thisDim
+                        dims.append(dimStr)
+                    addArray = xr.DataArray(varData, coords=coords, dims=dims,name=thisIdxVar)
                     evtIDXr = xr.merge([evtIDXr, addArray])
             else:
                 print 'addIdxVar need to be a string of list of strings, got: ',addIdxVar
