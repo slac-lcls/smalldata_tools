@@ -35,6 +35,7 @@ class ROIObject(dropObject):
     self.writeArea = writeArea
     self.rebin = False
     if rms is not None:
+      print 'DEBUG: ',rms.shape, self.bound.shape, self.bound
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
     if array.ndim < self.bound.ndim:
@@ -53,9 +54,9 @@ class ROIObject(dropObject):
     elif self.bound.ndim==1:
       self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])])
     #this needs to be more generic....of maybe just ugly spelled out for now.
-    if self.bound.shape[0]==1:
+    if self.bound.shape[0]==2 and len(self.bound.shape)==1:
       subarr = array[self.bound[0]:self.bound[1]]
-    elif self.bound.shape[0]==2:
+    elif self.bound.shape[0]==2 and len(self.bound.shape)==2:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1]]
     elif self.bound.shape[0]==3:
       subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1],self.bound[2,0]:self.bound[2,1]]
