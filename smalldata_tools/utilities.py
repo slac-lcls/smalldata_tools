@@ -96,27 +96,20 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
             tools = 'pan, wheel_zoom, box_zoom, reset'
     
     if dateTime:
-        if output_quad:
-            p,im,q = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
                                             fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
                                             y_range=yRange,title=plot_title,x_axis_type="datetime", tools=tools,
                                             cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
-        else:
-            p,im = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
-                                          fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                          y_range=yRange,title=plot_title,x_axis_type="datetime", tools=tools,
-                                          cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
     else: 
-        if output_quad:
-            p,im,q = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
                                             fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
                                             y_range=yRange,title=plot_title, tools=tools,
                                             cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
-        else:
-            p,im = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
-                                          fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                          y_range=yRange,title=plot_title, tools=tools,
-                                          cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
+
+    if output_quad:
+        p, im, q = created_map
+    else:
+        p, im = created_map
         
     # Controls
     vabsmin,vabsmax = plotMin, plotMax
