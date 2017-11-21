@@ -35,7 +35,7 @@ class ROIObject(dropObject):
     self.writeArea = writeArea
     self.rebin = False
     if rms is not None:
-      print 'DEBUG: ',rms.shape, self.bound.shape, self.bound
+      #print 'DEBUG: ',rms.shape, self.bound.shape, self.bound
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
     if array.ndim < self.bound.ndim:
@@ -121,12 +121,26 @@ class DetObject(dropObject):
         self._name = srcName
       self.det=psana.Detector(srcName)
       self.run=run
-      self.common_mode = common_mode
       self.storeEnv = False
       #det.dettype
       #1->CsPad, 2->Cs2x2, 13->epix100a
-      #6->opal, 27->zyla
+      #6->opal, 27->zyla, 26->jungfrau
       #16 -> aqiris, ?->oceanOptics
+      if common_mode is not None:
+        self.common_mode = common_mode
+      elif self.det.dettype == 19:
+        if self.common_mode > 0:
+          self.common_mode = -1
+      elif self.det.dettype == 6:
+        self.common_mode = -1
+      elif self.det.dettype == 1:
+        self.common_mode = 0
+      elif self.det.dettype == 2:
+        self.common_mode = 1
+      elif self.det.dettype == 13:
+        self.common_mode = 46
+      elif self.det.dettype == 26:
+        self.common_mode = 0 #pedestal subtract
       self.applyMask = applyMask
       #default to CsPad
       self.pixelsize=[110e-6]
@@ -148,8 +162,6 @@ class DetObject(dropObject):
         self.gain = self.det.gain(run)
         self.imgShape = None
         if self.det.dettype == 19:
-          if self.common_mode > 0:
-            self.common_mode = -1
           npix = int(170e-3/self.pixelsize[0])
           self.ped = np.zeros([npix, npix])
           self.imgShape = [npix, npix]
@@ -163,7 +175,6 @@ class DetObject(dropObject):
               if srcName=='xtcav':
                 self.ped = np.zeros([1024,1024])
           self.imgShape = self.ped.shape
-          self.common_mode = -1
         elif self.det.dettype == 27:
           zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
           self.imgShape = (zylaCfg.numPixelsX(), zylaCfg.numPixelsY())
@@ -211,16 +222,16 @@ class DetObject(dropObject):
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-        if self.det.dettype == 1 or self.det.dettype == 2 or self.det.dettype == 13: 
+        if self.det.dettype == 1 or self.det.dettype == 2 or self.det.dettype == 13 or self.det.dettype == 26: 
             try:
-                iX,iY = self.det.indexes_xy(run)
-                self.iX=np.array(iX)
-                self.iY=np.array(iY)
+              iX, iY = self.det.indexes_xy(run)
+              self.iX=np.array(iX)
+              self.iY=np.array(iY)
             except:
-                if rank==0:
-                  print 'failed to get geometry info, likely because we do not have a geometry file'
-                self.iX=self.x
-                self.iY=self.y
+              if rank==0:
+                print 'failed to get geometry info, likely because we do not have a geometry file'
+              self.iX=self.x
+              self.iY=self.y
         else:          
           self.iX=self.x
           self.iY=self.y
@@ -420,18 +431,18 @@ class DetObject(dropObject):
 
     def getMask(self, ROI):
       ROI = np.array(ROI)
-      print 'DEBUG getMask: ',ROI.shape
+      #print 'DEBUG getMask: ',ROI.shape
       if ROI.shape != (2,2):
         return np.ones_like(self.ped) 
 
       mask_roi=np.zeros(self.imgShape)#<-- no, like image. Need image size.
-      print 'DEBUG getMask: img shape ',self.imgShape, self.ped.shape
+      #print 'DEBUG getMask: img shape ',self.imgShape, self.ped.shape
       mask_roi[ROI[0,0]:ROI[0,1],ROI[1,0]:ROI[1,1]]=1
       if self.needsGeo:
         mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(self.iX,self.iY)] )
       else:
         mask_r_nda = mask_roi
-      print 'mask from rectangle (shape):',mask_r_nda.shape
+      #print 'mask from rectangle (shape):',mask_r_nda.shape
       return mask_r_nda
 
     def addBinnedImg(self,shape):
@@ -460,7 +471,7 @@ class DetObject(dropObject):
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
       if len(ROI)>0:
-        print 'ROI DEBUG: ',self.cmask.shape,self.getMask(ROI).shape
+        #print 'ROI DEBUG: ',self.cmask.shape,self.getMask(ROI).shape
         mask = ( self.mask.astype(bool) & self.cmask.astype(bool) & self.getMask(ROI).astype(bool) )
       else:
         mask = ( self.cmask.astype(bool) & self.mask.astype(bool) )
@@ -506,11 +517,13 @@ class DetObject(dropObject):
         if self.wfx is None:
             self.wfx = self.det.wftime(evt)
         return
-      #print 'still trying to get data for ',self._name
       if self.common_mode<0:
           self.evt.dat = self.det.raw_data(evt)
       elif self.common_mode==0:
-        self.evt.dat = self.det.raw_data(evt)-self.ped
+        if self.det.dettype==26:
+          self.evt.dat = self.det.calib(evt, cmpars=None)
+        else:
+          self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
         #apply mask if requested
         if self.applyMask==1:
@@ -521,8 +534,12 @@ class DetObject(dropObject):
         self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100))
       elif self.common_mode%100==5:
         self.evt.dat = self.det.calib(evt, cmpars=(5,100))
+      elif self.common_mode%100==6:
+        self.evt.dat = self.det.calib(evt, cmpars=(6))
       elif self.common_mode%100==4:
         self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30))
+      elif self.common_mode%100==7:
+          self.evt.dat = self.det.calib(evt, cmpars=(7,3,100))
       elif self.common_mode%100==45:
         self.evt.dat = self.det.raw_data(evt)-self.ped
         self.evt.dat[self.mask==0]=0

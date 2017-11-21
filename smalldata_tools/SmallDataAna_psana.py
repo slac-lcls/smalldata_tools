@@ -205,25 +205,27 @@ class SmallDataAna_psana(object):
         
         return detname
 
-    def _getDetName(self, detname='None'):
-        if not isinstance(detname, basestring):
-            print 'please give parameter name unless specifying arguments in right order. detname is first'
-            return
+    def _getDetName(self, detname=None):
+        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau']
         #look for detector
-        if detname=='None':
-            aliases=[]
-            for key in self.Keys():
-                if key.alias().find('cs')>=0 or key.alias().find('epix')>=0 or key.alias().find('opal')>=0 or key.alias().find('Epix')>=0:
+        aliases=[]
+        for key in self.Keys():
+            for detName in detNameList:
+                if key.alias().find(detName)>=0:
                     aliases.append(key.alias())
-            if len(aliases)<1:
-                print 'no cs, epix or opal in aliases, look at source'
-                for key in self.Keys():
-                    if key.src().__repr__().find('cs')>=0 or key.src().__repr__().find('Cs')>=0 or key.src().__repr__().find('Ep')>=0 or key.src().__repr__().find('Opal')>=0:
+        if len(aliases)<1:
+            print 'no cs, epix or opal in aliases, look at source'
+            for key in self.Keys():
+                for detName in detNameList:
+                    if key.src().__repr__().find(detName)>=0:
                         aliases.append(key.src().__repr__())
-            if len(aliases)==1:
-                detname = aliases[0]
-            else:
-                return aliases
+        if len(aliases)==1:
+            detname = aliases[0]
+        elif detname is not None:
+            alias_match = [alias for alias in aliases if alias.find(detname)>=0]
+            return alias_match
+        else:
+            return aliases
 
     def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useLdatSelection='', nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False):
         if not isinstance(detname, basestring):
@@ -352,7 +354,7 @@ class SmallDataAna_psana(object):
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
-        detname = self._getDetname_from_AvImage(avImage)
+        detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
         return detname, img, avImage
 
@@ -375,13 +377,13 @@ class SmallDataAna_psana(object):
             avInt=raw_input('type the name of the AvImage to use:')
         else:
             avInt=azInts[0]
-        detname = self._getDetname_from_AvImage(avInt.replace('_azint_',''))
+        detname = self._getDetName_from_AvImage(avInt.replace('_azint_',''))
         values = self.__dict__[avInt]
         #azavName = 'azav'
         #bins = self.__dict__[detname].__dict__[azavName+'_q']
         return detname, values, avInt
 
-    def _getDetname_from_AvImage(self,avimage):
+    def _getDetName_from_AvImage(self,avimage):
         detname=''
         dns = avimage.replace('AvImg_','').replace('std_','').replace('median_','').replace('pedSub_','').replace('cm46_','').replace('raw_','').replace('unb_','').split('_')
         for ddns in dns:
@@ -492,7 +494,7 @@ class SmallDataAna_psana(object):
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
-        detname = self._getDetname_from_AvImage(avImage)
+        detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
         print 'DEBUG: ',img.shape
 
@@ -558,7 +560,10 @@ class SmallDataAna_psana(object):
 
     def FitCircleAuto(self, detname=None, plotRes=True, inParams={}):
         detname, img, avImage = self.getAvImage(detname=None)
-        mask = self.__dict__[detname].det.mask_calib(self.run).astype(bool)
+        try:
+            mask = self.__dict__[detname].det.cmask.astype(bool)
+        except:
+            mask = self.__dict__[detname].det.mask(self.run, calib=True, status=True).astype(bool)
         nPixRaw=1.
         for idim in mask.shape:
             nPixRaw=nPixRaw*idim
@@ -1242,7 +1247,7 @@ class SmallDataAna_psana(object):
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
-        detname = self._getDetname_from_AvImage(avImage)
+        detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
         print img.shape
 
