@@ -116,20 +116,23 @@ class SmallDataAna_psana(object):
 
     def Keys(self,printthis=False):
         try:
-            keys=self.ds.events().next().keys()
-            if printthis: 
-                print keys
-            else:
-                return keys
-        except:
-            print 'could not use the smd dataset'
             times = self.dsIdxRun.times()            
-            evt=self.dsIdxRun.event(times[0])
+            evt=self.dsIdxRun.event(times[-1])
             keys=evt.keys()
             if printthis: 
                 print keys
             else:
                 return keys
+        except:
+            print 'failed to use last event in idx mode, try smlData'
+            try:
+                keys=self.ds.events().next().keys()
+                if printthis: 
+                    print keys
+                else:
+                    return keys
+            except:
+                print 'WARNING: smd data also did not work, give up. No keys returned! '
 
     def CfgKeys(self,idx=True,printthis=False):
         if idx:
@@ -206,7 +209,7 @@ class SmallDataAna_psana(object):
         return detname
 
     def _getDetName(self, detname=None):
-        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau']
+        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera']
         #look for detector
         aliases=[]
         for key in self.Keys():
@@ -214,9 +217,9 @@ class SmallDataAna_psana(object):
                 if key.alias().find(detName)>=0:
                     aliases.append(key.alias())
         if len(aliases)<1:
-            print 'no cs, epix or opal in aliases, look at source'
             for key in self.Keys():
                 for detName in detNameList:
+                    print 'DEBUG: source: ',detName, key
                     if key.src().__repr__().find(detName)>=0:
                         aliases.append(key.src().__repr__())
         if len(aliases)==1:
