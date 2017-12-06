@@ -171,9 +171,10 @@ class DetObject(dropObject):
           else:
             fexCfg = env.configStore().get(psana.Camera.FrameFexConfigV1, psana.Source(srcName))
             self.ped = np.zeros([fexCfg.roiEnd().column()-fexCfg.roiBegin().column(), fexCfg.roiEnd().row()-fexCfg.roiBegin().row()])
-            if self.ped.shape==(0,0): #for recorder 
-              if srcName=='xtcav':
-                self.ped = np.zeros([1024,1024])
+            if self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
+              #if srcName=='xtcav':
+              #  self.ped = np.zeros([1024,1024])
+              self.ped = np.zeros([1024,1024])
           self.imgShape = self.ped.shape
         elif self.det.dettype == 27:
           zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
