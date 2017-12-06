@@ -126,6 +126,7 @@ class DetObject(dropObject):
       #1->CsPad, 2->Cs2x2, 13->epix100a
       #6->opal, 27->zyla, 26->jungfrau
       #16 -> aqiris, ?->oceanOptics
+      #28: controls camera
       if common_mode is not None:
         self.common_mode = common_mode
       elif self.det.dettype == 19:
@@ -184,6 +185,14 @@ class DetObject(dropObject):
             self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
           if self.imgShape != self.ped.shape:            
             self.common_mode = -1
+        elif self.det.dettype == 28:
+          camrecCfg = env.configStore().get(psana.Camera.ControlsCameraConfigV1, psana.Source(srcName))
+          self.imgShape = (camrecCfg.height(), camrecCfg.width())
+          self.common_mode = 0
+          if self.ped is None:
+            self.ped = np.zeros([camrecCfg.height(), camrecCfg.width()])
+          if self.imgShape != self.ped.shape:            
+            self.common_mode = -1
         elif self.det.dettype == 5:
           yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,psana.Source(srcName))
           self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
@@ -219,7 +228,11 @@ class DetObject(dropObject):
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-          if self.det.dettype == 6  or self.det.dettype == 27:
+          if self.det.dettype == 6 or self.det.dettype == 27:
+            self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.x, self.y = np.meshgrid(self.x, self.y)
+          if self.det.dettype == 28:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
