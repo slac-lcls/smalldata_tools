@@ -92,6 +92,7 @@ parser.add_argument("--offline", help="run offline (def for current exp from ffb
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
 parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
+parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
 hostname=socket.gethostname()
 if not args.run:
@@ -139,6 +140,9 @@ if args.dir:
     dirname=args.dir
     if dirname[-1]=='/':
         dirname=dirname[:-1]
+
+if args.norecorder:
+    dsname=dsname+':stream=0-79'
 
 debug = True
 time_ev_sum = 0.
