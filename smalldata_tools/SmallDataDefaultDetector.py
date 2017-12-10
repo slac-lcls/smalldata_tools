@@ -80,6 +80,15 @@ class bmmonDetector(defaultDetector):
         data = self.det.get(evt)
         dl['sum']=data.TotalIntensity()
         dl['channels']=data.peakA()
+        if self.name=='snd_dio':
+            dl['dcc']=dl['channels'][8]
+            dl['dco']=dl['channels'][9]
+            dl['do']=dl['channels'][10]
+            dl['t1d']=dl['channels'][11]
+            dl['dd']=dl['channels'][12]
+            dl['dci']=dl['channels'][13]
+            dl['di']=dl['channels'][14]
+            dl['t4d']=dl['channels'][15]
         if self.savePos:
             dl['xpos']=data.X_Position()
             dl['ypos']=data.Y_Position()
