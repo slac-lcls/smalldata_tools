@@ -189,7 +189,8 @@ else
         --run $RUN`
 fi
 
-source /reg/g/psdm/bin/conda_setup ""
+source /reg/g/psdm/etc/psconda.sh
+source activate ana-1.4.43 #special release made for MEC with mpi writing
 
 echo $CMD
 $CMD
