@@ -206,7 +206,10 @@ class aiDetector(defaultDetector):
     def data(self, evt):
         dl={}
         for ichn,chName,chnScale,chnOffset in zip(self.aioInfo[0], self.aioInfo[1], self.aioInfo[2], self.aioInfo[3]):
-            dl[chName]=self.det.get(evt).channelVoltages()[ichn]*chnScale+chnOffset
+            try: 
+                dl[chName]=self.det.get(evt).channelVoltages()[ichn]*chnScale+chnOffset
+            except:
+                break
         return dl
 
 class adcDetector(defaultDetector):

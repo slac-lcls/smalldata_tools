@@ -100,7 +100,19 @@ def cxiDetectors():
     return []
 
 def mecDetectors():
-    return []
+    dets=[]
+    dets.append(controlDetector())
+    dets.append(ipmDetector('MEC-XT2-IPM-02','ipm2'))
+    dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
+    dets.append(ipmDetector('MEC-XT2-PIM-02','pim2')) #needs a newer release
+    dets.append(ipmDetector('MEC-XT2-PIM-03','pim3')) #needs a newer release
+    dets.append(ipmDetector('MEC-TCTR-DI-01','dio_tctr'))
+    dets.append(ipmDetector('MEC-LAS-EM-01','dio_las'))  #needs a newer release
+    dets.append(aiDetector('MEC-AIN-01','ai')) 
+    dets.append(damageDetector())
+    setParameter(dets, dets, detName='damage') 
+    dets.append(epicsDetector(PVlist=['belens z']))
+    return dets
 
 
 def detData(detList, evt):
