@@ -726,7 +726,7 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
-        if name.find('__')>=0 and name not in self._fields.keys():
+        if name.find('__')>=0 and name.replace('__','/') not in self._fields.keys():
             print 'Names of newly defined variables may not contain __, will replace with single _'
             name = name.replace('__','_')
         if not isinstance(data, np.ndarray):
@@ -1081,10 +1081,14 @@ class SmallDataAna(object):
         return [self.getFilter(useFilter=useFilterBase+"__on", ignoreVar=ignoreVar).squeeze(),self.getFilter(useFilter=useFilterBase+"__off", ignoreVar=ignoreVar).squeeze()]
         
     def getFilter(self, useFilter=None, ignoreVar=[]):
-        try:
-            total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
-        except:
+        if 'fiducials' in self._fields.keys():
             total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
+        elif 'EvtID/fid' in self._fields.keys():
+            total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
+        else:
+            print 'cannot find fiducials, cannot define a filter'
+            return None
+
         useFilterBase = useFilter.split('__')[0]
         if useFilter==None or useFilterBase not in self.Sels.keys():
             return total_filter.squeeze()
@@ -1163,12 +1167,13 @@ class SmallDataAna(object):
         if isinstance(Filter,basestring):
             Filter = self.getFilter(Filter)
 
-        if self._fields[plotvar][1]=='inXr':
-            fullData = self.xrData[plotvar.replace('/','__')]
-            if Filter is None:
-                return fullData.values
-            else:
-                return fullData[Filter].values
+        if plotvar in self._fields.keys():
+            if self._fields[plotvar][1]=='inXr':
+                fullData = self.xrData[plotvar.replace('/','__')]
+                if Filter is None:
+                    return fullData.values
+                else:
+                    return fullData[Filter].values
 
         #check if this variable has been added to xarray and needs to be added to fields
         if plotvar not in self._fields.keys():
@@ -1193,6 +1198,7 @@ class SmallDataAna(object):
                 if vals.shape[0]==self._tStamp.shape[0]:
                     tArrName = plotvar.replace('/','__')
                     if addToXarray:
+                        print 'add me to xarray...',plotvar
                         self.addVar(tArrName, vals)
             else:
                 if not self._isRedis:
