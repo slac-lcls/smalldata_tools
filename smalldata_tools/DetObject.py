@@ -173,7 +173,7 @@ class DetObject(dropObject):
             fexCfg = env.configStore().get(psana.Camera.FrameFexConfigV1, psana.Source(srcName))
             if fexCfg.forwarding() == fexCfg.Forwarding.values[2]: #make sure we are only doing ROI
               self.ped = np.zeros([fexCfg.roiEnd().column()-fexCfg.roiBegin().column(), fexCfg.roiEnd().row()-fexCfg.roiBegin().row()])
-            if self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
+            if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
               #if srcName=='xtcav':
               #  self.ped = np.zeros([1024,1024])
               self.ped = np.zeros([1024,1024])
