@@ -929,7 +929,10 @@ class SmallDataAna(object):
         if len(self._fields.keys())>0 and not returnShape:
             keys=self._fields.keys()
             for key in keys:
-                keyShapes.append((0,))
+                try:
+                    keyShapes.append(self._fields[key][0])
+                except:
+                    keyShapes.append((0,))
         elif self._isRedis:
             #redisInfo = self.fh5.keyinfo(run=-1)
             redisInfo = self.fh5.keyinfo(run=self.run)
@@ -964,6 +967,8 @@ class SmallDataAna(object):
 
         for thiskey,thiskeyshape in zip(keys,keyShapes):
             if isinstance(name, basestring) and thiskey.find(name)<0:
+                continue
+            if areaDet and thiskey.find('Cfg')>=0:
                 continue
             if areaDet and len(thiskeyshape)<=2:
                 continue
