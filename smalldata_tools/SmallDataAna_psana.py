@@ -622,11 +622,11 @@ class SmallDataAna_psana(object):
         print 'center ',combRes['xCen'],combRes['yCen']
         if needsGeo:
             geo = self.__dict__[detname].det.geometry(self.run)
-            d=1e6
+            d=160000.
             ix0,iy0 = geo.point_coord_indexes(p_um=(0,0))
             ixd,iyd = geo.point_coord_indexes(p_um=(d,d))
-            combRes['xCen'] = d*(combRes['xCen']-ix0)/(ixd-ix0)
-            combRes['yCen'] = d*(combRes['yCen']-iy0)/(iyd-iy0)
+            combRes['yCen'] = d*(combRes['yCen']-ix0)/(ixd-ix0)
+            combRes['xCen'] = d*(combRes['xCen']-iy0)/(iyd-iy0)
             print 'center Final mid',combRes['xCen'],combRes['yCen']
             helpVar =  combRes['xCen']
             combRes['xCen'] = combRes['yCen']
@@ -638,7 +638,7 @@ class SmallDataAna_psana(object):
                 print 'aradii: ',r
         print 'center Final ',combRes['xCen'],combRes['yCen']
         return combRes
-
+ 
     def FitCircle(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5]):
         detname, img, avImage = self.getAvImage(detname=None)
 
