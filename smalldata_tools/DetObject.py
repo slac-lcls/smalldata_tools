@@ -536,7 +536,7 @@ class DetObject(dropObject):
           self.evt.dat = self.det.raw_data(evt)
       elif self.common_mode==0:
         if self.det.dettype==26:
-          self.evt.dat = self.det.calib(evt, cmpars=None)
+          self.evt.dat = self.det.calib(evt, cmpars=(7,0,100))
         else:
           self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
@@ -554,7 +554,7 @@ class DetObject(dropObject):
       elif self.common_mode%100==4:
         self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30))
       elif self.common_mode%100==7:
-          self.evt.dat = self.det.calib(evt, cmpars=(7,3,100))
+          self.evt.dat = self.det.calib(evt, cmpars=(7,1,100)) #correction in rows
       elif self.common_mode%100==45:
         self.evt.dat = self.det.raw_data(evt)-self.ped
         self.evt.dat[self.mask==0]=0
