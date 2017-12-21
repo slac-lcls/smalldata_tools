@@ -2022,6 +2022,12 @@ class SmallDataAna(object):
         # create the bins for the cube
         if len(cube.bins)>3:
             Bins = cube.bins
+        elif len(cube.bins)==0:
+            scanValues = self.getScanValues()
+            if scanValues[0]!='' and len(scanValues[1])>0:
+                Bins = np.unique(scanValues[1])
+                Bins = np.insert(Bins,0,Bins[0]-1e-5)
+                Bins = np.append(Bins,Bins[-1]+1e-5)
         else:
             Bins = self.getBins(cube.bins)
         cube.binBounds = Bins
