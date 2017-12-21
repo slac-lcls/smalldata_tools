@@ -1329,14 +1329,14 @@ class SmallDataAna(object):
         else:
             print 'getPeak is not yet implemented for this type of data (need 1d histo)'
 
-    def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None):
+    def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None, plotMultidimMean=False):
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
         if isinstance(plotvar, basestring) or (len(plotvar)==2 and (isinstance(plotvar[0], basestring) and not isinstance(plotvar[1], basestring))):
             if len(numBins)!=1:
                 print 'bin# needs to be of same dimensions as plotvariables (1d)'
                 return
-            return self.plotVar1d(plotvar, numBins=numBins[0], useFilter=useFilter, limits=limits,fig=fig,plotWith=plotWith)
+            return self.plotVar1d(plotvar, numBins=numBins[0], useFilter=useFilter, limits=limits,fig=fig,plotWith=plotWith, plotMultidimMean=plotMultidimMean)
         elif len(plotvar)>2:
             print 'plotting of 3 variables is not defined yet'
             return
@@ -1345,9 +1345,12 @@ class SmallDataAna(object):
                 numBins=[numBins[0],numBins[0]]
             else:
                 print 'bin# needs to be of same dimentions as plotvariables (2d)'
-        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
+            if plotMultidimMean:
+                print 'plotting multidim means of two variables is not implemented yet'
+                return
+        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith, plotMultidimMean=plotMultidimMean)
 
-    def plotVar1d(self, plotvar, numBins=100, useFilter=None, limits=[1,99,'p'],fig=None, plotWith=None):
+    def plotVar1d(self, plotvar, numBins=100, useFilter=None, limits=[1,99,'p'],fig=None, plotWith=None, plotMultidimMean=False):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1362,6 +1365,8 @@ class SmallDataAna(object):
 
         if plotvar=='delay':
             vals = self.getDelay(use_ttCorr=True)
+        elif plotMultidimMean:
+            vals = self.getRedVar(plotvar)
         elif len(plotvar)==1 and plotvar.find('droplets')>=0:
             vals = self.getRedVar(plotvar)
         else:
@@ -1375,16 +1380,58 @@ class SmallDataAna(object):
         if  len(plotvar)==1 and plotvar.find('droplets')>=0:
             vals = vals.flatten()[vals.flatten()>0]
 
-        if limits[2]=='p':
-            pmin = np.percentile(vals,limits[0])
-            pmax = np.percentile(vals,limits[1])
-            if np.isnan(pmin): pmin=np.nanmin(vals)
-            if np.isnan(pmax): pmax=np.nanmax(vals)
+        if not plotMultidimMean:
+            if limits[2]=='p':
+                pmin = np.percentile(vals,limits[0])
+                pmax = np.percentile(vals,limits[1])
+                if np.isnan(pmin): pmin=np.nanmin(vals)
+                if np.isnan(pmax): pmax=np.nanmax(vals)
+            else:
+                pmin=min(limits[0],limits[1])
+                pmax=max(limits[0],limits[1])
+            hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
+            print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
         else:
-            pmin=min(limits[0],limits[1])
-            pmax=max(limits[0],limits[1])
-        hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
-        print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
+            vals = vals.mean(axis=0)
+            if len(vals.shape)==1:
+                hst = [vals, np.arange(0,vals.shape[0]+1)]
+            elif len(vals.shape)==2:
+                if plotWith=='matplotlib':
+                    if fig is None:
+                        fig=plt.figure(figsize=(8,5))
+                    plt.imshow(vals, clim=[np.percentile(vals,limits[0]), np.percentile(vals,limits[1])])
+                    return
+            elif plotWith.find('bokeh')>=0:
+                pan=PanTool()
+                wheel_zoom=WheelZoomTool()
+                box_zoom=BoxZoomTool()
+                save=SaveTool()
+                reset=ResetTool()
+                hover=HoverTool(tooltips=[
+                    ("(x,y)","($x, $y)")
+                ])
+                tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
+                if bokeh.__version__=='0.12.6':
+                    resize=ResizeTool()
+                    tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
+                #hover does not really work in a figure glyph.
+                #figure out how to solve that later.
+                plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
+                layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
+                if plotWith=='bokeh_notebook':
+                    bp.output_notebook()
+                    #bp.show(p)
+                    bp.show(layout)
+                    return
+                else:
+                    bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
+                    #bp.save(p)
+                    bp.save(layout)
+                    return
+                
+            elif len(vals.shape)==3:
+                print 'cannot plot 3-dim data'
+                return
 
         if plotWith=='matplotlib':
             if fig is None:
