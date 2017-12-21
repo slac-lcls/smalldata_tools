@@ -418,6 +418,7 @@ class Selection(object):
 
 class SmallDataAna(object):
     def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None, plotWith='matplotlib'):
+        print 'INIT; ',expname, run
         self._fields={}
         self._live_fields=[]
         if isinstance(liveList, list) and intable=='redis':
@@ -1269,11 +1270,11 @@ class SmallDataAna(object):
         if self.ttCorr is not None:
             ttCorr=self.getVar(self.ttCorr)
         if (np.nanstd(ttCorr)==0):
-            try:
+            if (self.ttBaseStr+'FLTPOS_PS') in self._fields.keys():
                 ttCorr=self.getVar(self.ttBaseStr+'FLTPOS_PS')
-            except:
-                pass
         nomDelay=np.zeros_like(ttCorr)
+        if len(nomDelay.shape) == 0:
+            return None
 
         isDaqDelayScan=False
         scanVar = self.getScanName()
@@ -1550,8 +1551,10 @@ class SmallDataAna(object):
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
             delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
+            if delays is None or (delays.mean()+delays.std()==0):
+                return '',[]
             scan = delays
-            if scanVarName == '':
+            if scanVarName == '': 
                 if ttCorr:
                     scanVarName='delay (tt corrected) [fs]'
                 else:
