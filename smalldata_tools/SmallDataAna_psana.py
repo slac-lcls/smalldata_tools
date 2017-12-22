@@ -230,7 +230,7 @@ class SmallDataAna_psana(object):
         else:
             return aliases
 
-    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useLdatSelection='', nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False):
+    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter='', nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
         if not isinstance(detname, basestring):
             print 'please give parameter name unless specifying arguments in right order. detname is first'
             return
@@ -264,19 +264,25 @@ class SmallDataAna_psana(object):
         run = self.dsIdxRun
         times=[]
         if self.sda is None or 'fh5' not in self.sda.__dict__.keys():
-        #if 'fh5' not in self.sda.__dict__.keys():
-            useLdat=False
-        if useLdatSelection!='':
-            evttsSel = self.sda.getSelIdx(useLdatSelection)
-            print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useLdatSelection)
+            useFilter=''
+        if useFilter!='':
+            evttsSel = self.sda.getSelIdx(useFilter)
+            print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter)
+            if numEvts==-1:
+                numEvts = len(evttsSel)-nSkip
+                if numEvts<0:
+                    print 'hve no events, quit'
+                    return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
-                times.append(psana.EventTime(int(evtts[1][0]<<32|evtts[1][1]),int(evtts[0])))
+                times.append(psana.EventTime(evtts[1],evtts[0]))
         else:
             times = run.times()[nSkip:]
         print 'requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events'
         if (min(len(times),numEvts) < numEvts*0.5):
-            print 'to few events'
-            return
+            if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
+                return
+            else:
+                numEvts = len(times)
 
         for tm in times:
             #print 'numEvts ',numEvts
@@ -294,8 +300,6 @@ class SmallDataAna_psana(object):
             det.evt = dropObject()
             det.getData(evt)
             data = det.evt.dat.copy()
-            if det.mask is not None:
-                data[det.mask==0]=0
             if thresADU != 0:
                 data[data<abs(thresADU)]=0
                 if thresADU < 0:
@@ -309,13 +313,12 @@ class SmallDataAna_psana(object):
 
         #make array
         data='AvImg_';
-        if useLdatSelection:
-            data+='Sel'+useLdatSelection+'_'
+        if useFilter:
+            data+='Filter'+useFilter+'_'
         if thresADU!=0:
             data+='thresADU%d_'%int(thresADU)
         if thresRms!=0:
             data+='thresRms%d_'%int(thresRms*10.)
-            
 
         print 'use common mode: ',common_mode
         data+=self.commonModeStr(common_mode)
@@ -326,6 +329,8 @@ class SmallDataAna_psana(object):
             imgA = img.mean(axis=0)
         else:
             imgA = img.sum(axis=0)
+        if det.mask is not None and useMask:
+            imgA[det.mask==0]=0
 
         self.__dict__[data]=imgA
         if std:
@@ -390,7 +395,7 @@ class SmallDataAna_psana(object):
         detname=''
         dns = avimage.replace('AvImg_','').replace('std_','').replace('median_','').replace('pedSub_','').replace('cm46_','').replace('raw_','').replace('unb_','').split('_')
         for ddns in dns:
-            if ddns.find('thres')<0 and ddns.find('Sel')<0:
+            if ddns.find('thres')<0 and ddns.find('Filter')<0:
                 detname+=ddns;detname+='_'
         if detname[-1]=='_':
             detname = detname[:-1]
@@ -1066,6 +1071,81 @@ class SmallDataAna_psana(object):
             np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.sda.expname,int(self.run)),mask)
         return mask
          
+    def makePedestal(self, detname, filterName='', numEvts=-1, pedRange=[10,10000], rmsRange=[2.,7.], i0Check='ipm', dirname='./'):
+        if i0Check=='':
+            i0List=[]
+        elif i0Check=='ipm':
+            if self.sda.expname[:3]=='xpp':
+                i0List = ['ipm3/sum']
+            elif self.sda.expname[:3]=='xcs':
+                i0List = ['ipm5/sum']
+            else:
+                i0List=[]
+        else:
+            i0List = ['gas_detector/f_22_ENRC']
+    
+        minFrac = 1e6
+        for i0 in i0List:
+            try:
+                i0Median = np.nanmedian(self.sda.getVar(i0))
+                i0Off = np.nanmedian(self.sda.getVar(i0, filterName))
+            except:
+                print 'if not smallData file is available, try pass i0Check=\'\''
+            if minFrac > i0Off/i0Median:
+                minFrac=i0Off/i0Median
+            print 'median value for ',i0,' is ',i0Median,' and for the off events ',i0Off,' offRatio: ',i0Off/i0Median
+        if minFrac > 0.05 and i0List!=[]:
+            print 'This selection seems to lets too many events with beam through, will quit'
+            return
+
+        self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, median=True)
+        self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, std=True)
+        fname='%s-end.data'%self.sda.run
+        pedImg = self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName]
+        pedStat = np.logical_and(pedImg > min(pedRange), pedImg < max(pedRange))
+        rmsImg = self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName]
+        rmsStat = np.logical_and(rmsImg > min(rmsRange), rmsImg < max(rmsRange))
+        status = np.logical_and(rmsStat, pedStat).astype(int)
+
+        #if raw_input("Save to calibdir?\n") in ["y","Y"]:
+        if dirname =='calib':
+            detname, img, avImage = self.getAvImage(detname=None)
+            det = self.__dict__[detname].det     
+            srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
+            if det.dettype==2:
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(expname[:3],expname,srcStr)
+            elif det.dettype==1:
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/'%(expname[:3],expname,srcStr)        
+            elif det.dettype==13:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(expname[:3],expname,srcStr)
+            elif det.dettype==19:
+                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(expname[:3],expname,srcStr)        
+            if not os.path.exists(dirname+'pedestals'):
+                os.makedirs(dirname+'pedestals')
+            if not os.path.exists(dirname+'pixel_rms'):
+                os.makedirs(dirname+'pixel_rms')
+            if not os.path.exists(dirname+'pixel_status'):
+                os.makedirs(dirname+'pixel_status')
+            print 'save noise file in %s as %s '%(dirname+'pedestals/',fname)
+            np.savetxt(dirname+'pedestals/'+fname,self.AvImg_Filterxoff_raw_epix)
+            print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
+            np.savetxt(dirname+'pixel_rms/'+fname,self.AvImg_std_Filterxoff_raw_epix)
+            print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
+            np.savetxt(dirname+'pixel_status/'+fname,status)
+        else:
+            if not os.path.exists(dirname+'pedestals'):
+                os.makedirs(dirname+'pedestals')
+            if not os.path.exists(dirname+'pixel_rms'):
+                os.makedirs(dirname+'pixel_rms')
+            if not os.path.exists(dirname+'pixel_status'):
+                os.makedirs(dirname+'pixel_status')
+            print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
+            np.savetxt(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName])
+            print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
+            np.savetxt(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName])
+            print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
+            np.savetxt(dirname+'pixel_status/'+fname,status)
+
     def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
         if dis_to_sam==None:
