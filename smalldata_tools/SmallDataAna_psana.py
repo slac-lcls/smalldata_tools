@@ -288,7 +288,14 @@ class SmallDataAna_psana(object):
             #print 'numEvts ',numEvts
             if numEvts<=0:
                 break
-            evt=run.event(tm)
+            try:
+                evt=run.event(tm)
+            except:
+                print 'Could not get this event, skip '
+                continue
+            if evt is None:
+                print 'Returned event is None, skip'
+                continue
             if minIpm!=-1 and ( (self.hutch=='xpp' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XppSb2_Ipm)')).sum() < minIpm) or (self.hutch=='xcs' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XCS-IPM-05)')).sum() < minIpm)):
                 continue
             if printFid:
