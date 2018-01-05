@@ -94,6 +94,7 @@ parser.add_argument("--live", help="add data to redis database (quasi-live feedb
 parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
+
 hostname=socket.gethostname()
 if not args.run:
     run=raw_input("Run Number:\n")
@@ -165,6 +166,12 @@ except:
     import sys
     sys.exit()
 
+if ds.rank==0:
+    version='unable to detect psana version'
+    for dirn in psana.__file__:
+        if dirn.find('ana-')>=0):
+            version=dirn
+    print 'Using psana version ',version
 ########################################################## 
 ##
 ## User Input start --> 
