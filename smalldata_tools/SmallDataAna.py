@@ -21,7 +21,7 @@ from utilities import dictToHdf5, shapeFromKey_h5
 from utilities import hist2d
 from utilities import running_median_insort
 from utilities import get_startOffIdx, get_offVar
-from utilities_plotting import plotImageBokeh
+from utilities_plotting import plotImageBokeh, plot1d
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
@@ -1121,13 +1121,6 @@ class SmallDataAna(object):
         if  len(plotvar)==1 and plotvar.find('droplets')>=0:
             vals = vals.flatten()[vals.flatten()>0]
 
-        ###
-        #
-        # this looks like it is generic 1-d plotting stuff.
-        # make it so.
-        #
-        ###
-
         if not plotMultidimMean:
             if limits[2]=='p':
                 pmin = np.percentile(vals,limits[0])
@@ -1181,43 +1174,14 @@ class SmallDataAna(object):
                 print 'cannot plot 3-dim data'
                 return
 
-        if plotWith=='matplotlib':
-            if fig is None:
-                fig=plt.figure(figsize=(8,5))
+        ###
+        #
+        # this looks like it is generic 1-d plotting stuff.
+        # make it so.
+        #
+        ###
 
-            plt.plot(hst[1][:-1],hst[0],'o')
-            plt.xlabel(plotvar)
-            plt.ylabel('entries')
-                
-        elif plotWith.find('bokeh')>=0:
-            #IMPLEMENT ME
-            #bokeh, use BoxSelectTool to get selected region
-            #https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
-            #set cuts does not need to be specified explicly, can simple be gotten from callback of tool.....
-            pan=PanTool()
-            wheel_zoom=WheelZoomTool()
-            box_zoom=BoxZoomTool()
-            save=SaveTool()
-            reset=ResetTool()
-            hover=HoverTool(tooltips=[
-                ("(x,y)","($x, $y)")
-            ])
-            tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-            if bokeh.__version__=='0.12.6':
-                resize=ResizeTool()
-                tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
-            p = bp.figure(title="%s histogram for %s"%(plotvar, self.runLabel), x_axis_label=plotvar, y_axis_label='entries',tools=tools)
-            p.circle(hst[1][:-1], hst[0], legend=self.runLabel, size=5)
-            if plotWith=='bokeh_notebook':
-                bp.output_notebook()
-                bp.show(p)
-            else:
-                bp.output_file('%s/%s_%s_histogram.html'%(self.plot_dirname,self.runLabel, plotvar.replace('/','_')))
-                bp.save(p)
-                
-        elif plotWith != 'no_plot':
-            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
-            
+        plot1d(hst[0], xData=hst[1][:-1], xLabel=plotvar, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
         return hst
 
     def plotVar2d(self, plotvars, useFilter=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
@@ -1263,29 +1227,32 @@ class SmallDataAna(object):
             total_filter&=ft                
 
         print 'select ',total_filter.sum(),' of ',np.ones_like(total_filter).sum(),' events'
-        if asHist:
-            v0 = vals[0][total_filter]
-            v1 = vals[1][total_filter]
-            binEdges0 = np.linspace(np.nanmin(v0),np.nanmax(v0),numBins[0])
-            binEdges1 = np.linspace(np.nanmin(v1),np.nanmax(v1),numBins[1])
-            ind0 = np.digitize(v0, binEdges0)
-            ind1 = np.digitize(v1, binEdges1)
-            ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
-            iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
-            extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
+        if not asHist:
+            msize=2
+            if len(vals[1][total_filter])<100:
+                msize=5
+            elif len(vals[1][total_filter])<1000:
+                msize=3
+            plot1d(vals[0][total_filter], xData=vals[1][total_filter], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotvars[0], plotvars[1], self.runLabel), plotDirname=self.plot_dirname, markersize=msize)
+            return vals[0][total_filter], vals[1][total_filter]
+        
+        #asHist only
+        v0 = vals[0][total_filter]
+        v1 = vals[1][total_filter]
+        binEdges0 = np.linspace(np.nanmin(v0),np.nanmax(v0),numBins[0])
+        binEdges1 = np.linspace(np.nanmin(v1),np.nanmax(v1),numBins[1])
+        ind0 = np.digitize(v0, binEdges0)
+        ind1 = np.digitize(v1, binEdges1)
+        ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
+        iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
+        extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
         
         if plotWith == 'matplotlib':
             if fig is None:
                 fig=plt.figure(figsize=(8,5))
-
-            if not asHist:
-                plt.plot(vals[1][total_filter],vals[0][total_filter],'o',markersize=3)
-                plt.xlabel(plotvars[1])
-                plt.ylabel(plotvars[0])
-            else:
-                plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
-                plt.xlabel(plotvars[1])
-                plt.ylabel(plotvars[0])
+            plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
+            plt.xlabel(plotvars[1])
+            plt.ylabel(plotvars[0])
 
         elif plotWith.find('bokeh')>=0:
             pan=PanTool()
@@ -1300,23 +1267,10 @@ class SmallDataAna(object):
             if bokeh.__version__=='0.12.6':
                 resize=ResizeTool()
                 tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
-            if not asHist:
-                tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-                if bokeh.__version__=='0.12.6':
-                    resize=ResizeTool()
-                    tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
-                p = bp.figure(title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel), x_axis_label=plotvars[0], y_axis_label=plotvars[1],tools=tools)
-                msize=2
-                if len(vals[1][total_filter])<100:
-                    msize=5
-                elif len(vals[1][total_filter])<1000:
-                    msize=3
-                p.circle(vals[1][total_filter],vals[0][total_filter], legend=self.runLabel, size=msize)
-            else:
-                #hover does not really work in a figure glyph.
-                #figure out how to solve that later.
-                plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
-                layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
+            #hover does not really work in a figure glyph.
+            #figure out how to solve that later.
+            plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
+            layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
             if plotWith=='bokeh_notebook':
                 bp.output_notebook()
                 #bp.show(p)
@@ -1326,14 +1280,10 @@ class SmallDataAna(object):
                 #bp.save(p)
                 bp.save(layout)
                 
-
         elif plotWith != 'no_plot':
             print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
 
-        if asHist:
             return iSig, extent
-        else:
-            return vals[0][total_filter], vals[1][total_filter]
 
     def getScanName(self):
         for key in self.Keys('scan'):

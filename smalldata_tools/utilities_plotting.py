@@ -135,18 +135,21 @@ def plot1d(data, **kwargs):
     plotTitle: title to show on plot
     plotDirname: directory to which bokeh html files will be written (def ./)
     marker: pass marker style (def o, options: *,^,+,x,s,D)
-    line_dash: connect markers with line
+    markersize: marker size, default is 5
+    line_dash: connect markers with line style as defined (default: none)
     tools: for bokeh plotting, tools can be passed. Default tools will be used
            otherwise
     """
     if isinstance(data, np.ndarray):
         data = data.tolist()
-    if isinstance(data[0], int):
+    if isinstance(data[0], int) or isinstance(data[0], float):
         data = [data]
     xData = kwargs.pop("xData", [])
     if xData == []:
         for yData in data:
             xData.append(np.arange(np.array(yData).shape[0]).tolist())
+    if isinstance(xData[0], int) or isinstance(xData[0], float):
+        xData = [xData]
 
     xLabel = kwargs.pop("xLabel", "")
     yLabel = kwargs.pop("yLabel", "")
@@ -159,13 +162,13 @@ def plot1d(data, **kwargs):
     plotTitle = kwargs.pop("plotTitle","%s histogram for %s"%(xLabel, runLabel))
     marker = kwargs.pop("marker", "o")
     line_dash = kwargs.pop("line_dash", None)
+    markersize = kwargs.pop("markersize", 5)
     tools = kwargs.pop("tools", None)
-    
-    #if isinstance(xData, list):
-    #    xData = np.array(xData)
+    plotDirname = kwargs.pop("plotDirname", "./") 
+    plotFilename =  kwargs.pop("plotFilename", '%s/%s_%s_histogram'%(plotDirname,runLabel, xLabel.replace('/','_')))    
     if len(data)>1:
         sorted_colors = getColors(nColors=len(data))
-    if plotWith=='matplotlib':
+    if plotWith.find('matplotlib')>=0:
         if 'fig' in kwargs.keys():
             fig = kwargs.pop("fig")
         else:
@@ -178,10 +181,12 @@ def plot1d(data, **kwargs):
             if ic > 0:
                 plt.plot(ixdata,idata,marker=marker, color=sorted_colors[ic],linestyle=line_dash)
             else:
-                plt.plot(ixdata,idata,marker=marker,linestyle=line_dash)
+                plt.plot(ixdata,idata,marker=marker,linestyle=line_dash,markersize=markersize)
         plt.xlabel(xLabel)
         plt.ylabel(yLabel)
         plt.title(plotTitle)                  
+        if plotWith.find('file')>=0:
+            plt.savefig('%s.jpeg'%(plotFilename))
 
     elif plotWith.find('bokeh')>=0:
         #IMPLEMENT ME
@@ -212,19 +217,19 @@ def plot1d(data, **kwargs):
             else:
                 iRunLabel=runLabel
             if marker=='o':
-                p.circle(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='*':
-                p.asterisk(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='+':
-                p.cross(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='x':
-                p.x(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='s':
-                p.square(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='^':
-                p.triangle(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             elif marker=='D':
-                p.diamond(ixdata, idata, legend=iRunLabel, size=5, color=color)
+                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
             else:
                 print 'unsupported marker option'
             if line_dash is not None:
@@ -237,8 +242,7 @@ def plot1d(data, **kwargs):
         else:
             if len(kwargs)>0:
                 print 'found unexpected parameters to plot1d, will ignore', kwargs
-            plotDirname =  kwargs.pop("plotDirname", "./")
-            bp.output_file('%s/%s_%s_histogram.html'%(plotDirname,runLabel, xLabel.replace('/','_')))
+            bp.output_file('%s.html'%(plotFilename))
             bp.save(p)
                 
     elif plotWith != 'no_plot':
