@@ -13,11 +13,6 @@ from itertools import izip, count
 import psana
 import RegDB.experiment_info
 
-import bokeh
-import bokeh.plotting as bp
-from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
-from bokeh.models import WheelZoomTool, BoxZoomTool
-
 from collections import deque
 from itertools import islice
 from bisect import insort, bisect_left
@@ -25,105 +20,6 @@ from bisect import insort, bisect_left
 from numba import jit
 
 import sys
-
-try:
-    sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
-    import bokeh_utils
-    cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
-except:
-  print 'no bokeh utils'
-  pass
-
-def create_range_slider(vabsmin,vabsmax,vmin,vmax,im,step=0.1):
-    JS_code_slider = """                                                                            
-        var vmin = rslider.range[0];
-        var vmax = rslider.range[1];
-        im.glyph.color_mapper.high = vmax;
-        im.glyph.color_mapper.low = vmin; 
-        im.data_source.trigger('change');
-    """
-    callback_slider = bokeh.models.CustomJS(args=dict( im=im),
-                                        code=JS_code_slider)
-
-    try:
-        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[vmin,vmax],callback=callback_slider,orientation="horizontal")
-    except:
-        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, value=[vmin,vmax],callback=callback_slider,orientation="horizontal")
-
-    callback_slider.args['rslider'] = rslider
-
-    return rslider
-
-def plotArrayData(dataY, dataX=None, plotWidth=800, plotHeight=400, legend=None, plot_title='', x_axis_label='', y_axis_label='', tools=None, line_dash='dashed'):
-    bp.output_notebook()
-    if tools is None:
-        if bokeh.__version__=='0.12.6':
-            tools = 'pan, wheel_zoom, box_zoom, resize, reset'
-        else:
-            tools = 'pan, wheel_zoom, box_zoom, reset'
-    colors = ['black','red','blue','green','cyan','magenta']
-    #p = bp.figure(height=plotHeight, width=plotWidth, tools=tools)
-    p = bp.figure(title=plot_title, x_axis_label=x_axis_label, y_axis_label=y_axis_label,height=plotHeight, width=plotWidth,tools=tools)
-    if isinstance(dataY, list):
-        if len(np.array(dataY).shape)==1:
-            dataY = [dataY]
-            if dataX is not None:
-                dataX = [dataX]
-        if dataX is None:
-            dataX = np.array([np.arange(np.array(datay).shape[0]) for datay in dataY if len(datay)>0])
-    for ic,datax,datay,color in izip(count(),dataX,dataY,colors):
-        if legend is not None:
-            p.circle(datax, datay, size=5, fill_color=color, line_color=color, legend=legend[ic])
-        else:
-            p.circle(datax, datay, size=5, fill_color=color, line_color=color)
-        if line_dash!='':
-            p.line(datax, datay, line_dash=line_dash, line_color=color)
-    bp.show(p)
-
-def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP=None, plotMaxP=None, plotMin="auto", plotMax="auto", initial_cmap='jet', output_quad=False, tools=None):
-    if plotMinP is None: 
-        plotMinP = np.nanpercentile(data, 5)
-    if plotMaxP is None: 
-        plotMaxP = np.nanpercentile(data, 95)
-    if xRange is None:
-        xRange=(0,data.shape[0])
-    if yRange is None:
-        yRange=(0,data.shape[1])
-    if tools is None:
-        if bokeh.__version__=='0.12.6':
-            tools = 'pan, wheel_zoom, box_zoom, resize, reset'
-        else:
-            tools = 'pan, wheel_zoom, box_zoom, reset'
-    
-    if dateTime:
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
-                                            fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                            y_range=yRange,title=plot_title,x_axis_type="datetime", tools=tools,
-                                            cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
-    else: 
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
-                                            fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                            y_range=yRange,title=plot_title, tools=tools,
-                                            cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
-
-    if output_quad:
-        p, im, q = created_map
-    else:
-        p, im = created_map
-        
-    # Controls
-    vabsmin,vabsmax = plotMin, plotMax
-    step=(plotMaxP-plotMinP)/50.
-    range_slider = create_range_slider(np.nanmin(data),np.nanmax(data),plotMinP,plotMaxP,im=im,step=step)
-    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=initial_cmap)
-
-    # Layout
-    layout = bp.gridplot([[p],[range_slider,select_cm]])
-
-    if output_quad:
-        return layout,p,im,q
-    else:
-        return layout,p,im
 
 def MAD(a, c=0.6745, axis=None):
   """
