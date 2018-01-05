@@ -18,9 +18,10 @@ from matplotlib import gridspec
 from pylab import ginput
 from matplotlib import pyplot as plt
 from utilities import dictToHdf5, shapeFromKey_h5
-from utilities import hist2d, plotImageBokeh
+from utilities import hist2d
 from utilities import running_median_insort
 from utilities import get_startOffIdx, get_offVar
+from utilities_plotting import plotImageBokeh
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
@@ -33,266 +34,7 @@ from pscache import client #works from ana-1.2.9 on
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
 
-class photons(object):
-    def __init__(self,h5file,detName='epix',photName='photon'):
-        self._detName=detName
-        self._photName=photName
-        if self._photName[-1]!='_':
-            self._photName+='_'
-        self._h5 = h5file
-        self.shape = h5file['UserDataCfg/'+detName+'_cmask'].value.shape
 
-    def getKeys(self):
-        keyList=[]
-        for data in self.__dict__.keys():
-            if not data[0]=='_':
-                keyList.append(data)
-        return keyList
-
-    def fillPhotArrays(self):
-        eh5_dir = self._h5[self._detName]
-        for key in eh5_dir.keys():
-            if not (key.find(self._photName)>=0):
-                continue
-            #likely a different photName set of variables. Need own fillPhotArray
-            if key.replace(self._photName,'').find('_')>=0:
-                continue
-            h5Name = self._photName+key.replace(self._photName,'')
-            #print 'h5name ',h5Name
-            keyName=key.replace(self._photName,'')
-            self.__dict__[keyName] = eh5_dir[h5Name].value
-        
-    def flattenPhotArray(self, filterArray=None):
-        for key in self.getKeys():
-            if filterArray is None:
-                filterArray=np.ones(self.__dict__[key].shape[0])
-            if filterArray.shape == self.__dict__[key].shape[0]:
-                self[key] = self.__dict__[key][filterArray].flatten()
-
-    def photImgEvt(self, iEvt):
-        eh5_dir = self._h5[self._detName]
-        data = eh5_dir[self._photName+'data'][iEvt]
-        row = eh5_dir[self._photName+'row'][iEvt]
-        col = eh5_dir[self._photName+'col'][iEvt]
-        if max(row)>=self.shape[0] or max(col)>=self.shape[1]:
-            print 'inconsistent shape ',self.shape, max(row), max(col)
-        #print eh5_dir[self._photName+'data'][iEvt].shape
-        #print eh5_dir[self._photName+'row'].shape
-        #print eh5_dir[self._photName+'row'][iEvt].shape
-        #print max(eh5_dir[self._photName+'row'][iEvt])
-        #print 'inconsistent shape ',self.shape, max(row), max(col)
-        return sparse.coo_matrix( (data, (row, col)),shape=self.shape ).todense()
-
-    def photImg(self, filterArray=None):
-        if 'pHist' not in self.__dict__.keys():
-            self.fillPhotArrays()
-        if filterArray is None:
-            filterArray=np.ones(self.pHist.shape[0]).astype(bool)
-        data = self.data[filterArray].flatten()
-        data = data[data>0]
-        row = self.row[filterArray].flatten()[data>0]
-        col = self.col[filterArray].flatten()[data>0]
-        img = sparse.coo_matrix( (data, (row, col)) ).todense()
-        return img
-
-    def photonHist(self, filterArray=None):
-        if 'pHist' not in self.__dict__.keys():
-            self.fillPhotArrays()
-        if filterArray is None:
-            filterArray=np.ones(self.pHist.shape[0]).astype(bool)
-        if filterArray.shape[0] == self.pHist.shape[0]:
-            pHist = self.pHist[filterArray].sum(axis=0)
-        else:
-            return
-        return pHist
-
-class droplets(object):
-    def __init__(self,h5file,detName='epix',dropName='droplet'):
-        self._detName=detName
-        self._dropName=dropName
-        if self._dropName[-1]!='_':
-            self._dropName+='_'
-        self._h5 = h5file
-        self._h5dir = self._h5.get_node('/'+self._detName)
-
-    def getKeys(self):
-        keyList=[]
-        for data in self.__dict__.keys():
-            if not data[0]=='_':
-                keyList.append(data)
-        return keyList
-
-    def fillDropArrays(self, only_XYADU=False, Filter=None):
-        for node in self._h5dir._f_list_nodes():
-            if not (node.name.find(self._dropName)>=0):
-                continue
-            #likely a different dropName set of variables. Need own fillDropArray
-            if node.name.replace(self._dropName,'').find('_')>=0:
-                continue
-            h5Name = self._dropName+node.name.replace(self._dropName,'')
-            keyName=node.name.replace(self._dropName,'')
-            if not only_XYADU:
-                print 'fill drop ',h5Name
-                if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
-                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
-                else:
-                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
-            elif (keyName=='X' or keyName=='Y' or keyName=='adu' or keyName=='npix'):
-                print 'fill drop ',h5Name
-                if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
-                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
-                else:
-                    self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
-
-    def flattenDropArray(self, filterArray=None):
-        if filterArray is None:
-            if 'adau' in self.getKeys():
-                filterArray = (self.__dict__['adu']>0)
-            else:
-                print 'did not find adu, will not flatten'
-                return
-
-        for key in self.getKeys():
-            if filterArray.shape == self.__dict__[key].shape:
-                self.__dict__[key] = self.__dict__[key][filterArray].flatten()
-
-    def getDropPixels(self, ievt, debug=False):
-        print 'will need to be reimplemented'
-        return
-        if not 'Pix' in self.__dict__.keys():
-            nDroplets = self._h5[self._detName][self._dropName+'nDroplets'][ievt]
-            Pix = self._h5[self._detName][self._dropName+'Pix'][ievt]
-            sizeX = self._h5[self._detName][self._dropName+'bbox_x1'][ievt] - self._h5[self._detName][self._dropName+'bbox_x0'][ievt]
-            sizeY = self._h5[self._detName][self._dropName+'bbox_y1'][ievt] - self._h5[self._detName][self._dropName+'bbox_y0'][ievt]
-            adu = self._h5[self._detName][self._dropName+'adu'][ievt]
-            dX =  self._h5[self._detName][self._dropName+'X'][ievt]
-            dY =  self._h5[self._detName][self._dropName+'Y'][ievt]
-        else:
-            nDroplets = self.nDroplets[ievt]
-            Pix = self.Pix[ievt]
-            sizeX = self.bbox_x1[ievt] - self.bbox_x0[ievt]
-            sizeY = self.bbox_y1[ievt] - self.bbox_y0[ievt]
-            adu = self.adu[ievt]
-            dX =  self.X[ievt]
-            dY =  self.Y[ievt]
-        sizes = (sizeX*sizeY)
-        imgs=[]
-        idxPix=0
-        for iDrop in range(0,nDroplets):
-            img= np.array(Pix[idxPix:(idxPix+sizes[iDrop])]).reshape(sizeX[iDrop],sizeY[iDrop])
-            if debug:
-                print 'adu ',adu[iDrop],img.sum()
-            imgs.append(img)
-            idxPix+=sizes[iDrop]
-        ret_dict = {'images' : imgs}
-        ret_dict['adu']=adu[:len(imgs)]
-        ret_dict['X']=dX[:len(imgs)]
-        ret_dict['Y']=dY[:len(imgs)]
-        return ret_dict
-
-    def getDropPixelsRoi(self, ievt, mask, debug=False):
-        dropInfo = self.getDropPixelsRoi(ievt, debug=debug)
-        imgsROI = []
-        for img,x,y in zip(dropInfo['images'],dropInfo['X'],dropInfo['Y']):
-            if mask(int(x), int(y))==1:
-                imgsROI.append(img)
-        return imgsROI
-
-    def plotSpectrum(self, plotLog=True, aduRange=[]):
-        if len(aduRange)==0:
-            aduRange=[0,700]
-        elif len(aduRange)==1:
-            aduRange=[0,aduRange[0]]
-        elif len(aduRange)==2:
-            aduRange=[aduRange[0], aduRange[1]]
-            
-        hst = np.histogram(self.__dict__['adu'], np.arange(aduRange[0],aduRange[1]))
-        if plotLog:
-            plt.semilogy(hst[1][1:],hst[0],'o')
-        else:
-            plt.plot(hst[1][1:],hst[0],'o')
-            
-    def plotAduX(self, ADUrange=[120,180],maxLim=99.5):
-        if len(self.__dict__['X'].shape)>1:
-            self.flattenDropArray()
-        plt.figure()
-        hist2d(self.__dict__['X'],self.__dict__['adu'], numBins=[702,180], histLims=[0,702,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
-
-    def plotAduY(self, ADUrange=[120,180],maxLim=99.5):    
-        if len(self.__dict__['Y'].shape)>1:
-            self.flattenDropArray()
-        plt.figure()
-        plt.subplot(211)
-        hist2d(self.__dict__['Y'][self.__dict__['X']<351],self.__dict__['adu'][self.__dict__['X']<351], numBins=[766,180], histLims=[0,766,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
-        plt.subplot(212)
-        hist2d(self.__dict__['Y'][self.__dict__['X']>353],self.__dict__['adu'][self.__dict__['X']>353], numBins=[766,180], histLims=[0,766,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
-
-    def plotXY(self, ADUrange=[120,180], npix=0):            
-        allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
-        allY = self.__dict__['Y'][self.__dict__['adu']>ADUrange[0]]
-        alladu = self.__dict__['adu'][self.__dict__['adu']>ADUrange[0]]
-        if npix!=0:
-            allNpix=self.__dict__['npix'][self.__dict__['adu']>ADUrange[0]]
-            
-        if ADUrange[1]>ADUrange[0]:
-            allX = allX[alladu<ADUrange[1]]
-            allY = allY[alladu<ADUrange[1]]
-            if npix!=0:
-                allNpix = allNpix[alladu<ADUrange[1]]
-            alladu = alladu[alladu<ADUrange[1]]
-        if npix!=0:
-            if npix>0:
-                allX = allX[allNpix==npix] 
-                allY = allY[allNpix==npix] 
-                alladu = alladu[allNpix==npix] 
-            else:
-                allX = allX[allNpix>=abs(npix)] 
-                allY = allY[allNpix>=abs(npix)] 
-                alladu = alladu[allNpix>=abs(npix)] 
-
-        plt.figure()
-        ndrop_int = max(1,490000./allX.shape[0])
-        hist2d(allX,allY, numBins=[int(702/ndrop_int),int(766/ndrop_int)])
-
-    def aduSlices(self,axis='y', ADUrange=[0,-1], npix=0):
-        allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
-        allY = self.__dict__['Y'][self.__dict__['adu']>ADUrange[0]]
-        alladu = self.__dict__['adu'][self.__dict__['adu']>ADUrange[0]]
-        if npix!=0:
-            allNpix=self.__dict__['npix'][self.__dict__['adu']>ADUrange[0]]
-        if ADUrange[1]>ADUrange[0]:
-            allX = allX[alladu<ADUrange[1]]
-            allY = allY[alladu<ADUrange[1]]
-            if npix!=0:
-                allNpix = allNpix[alladu<ADUrange[1]]
-            alladu = alladu[alladu<ADUrange[1]]
-        if npix!=0:
-            if npix>0:
-                allX = allX[allNpix==npix] 
-                allY = allY[allNpix==npix] 
-                alladu = alladu[allNpix==npix] 
-            else:
-                allX = allX[allNpix>=abs(npix)] 
-                allY = allY[allNpix>=abs(npix)] 
-                alladu = alladu[allNpix>=abs(npix)] 
-                
-        if axis=='y':
-            nSlice=16
-            allY+=(allX>351).astype(int)*768
-            sliceSize=768*2./nSlice
-            binVar=allY
-        elif axis=='x':
-            nSlice=14
-            sliceSize=704./nSlice
-            binVar=allX
-            
-        aduS=[]
-        for i in range(0,nSlice):
-            aduS.append([])
-        for adu,bv in zip(alladu,binVar):
-            aduS[int(bv/sliceSize)].append(adu)
-        return aduS
- 
  
 class Cube(object):
     def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVar=None):
@@ -418,7 +160,6 @@ class Selection(object):
 
 class SmallDataAna(object):
     def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None, plotWith='matplotlib'):
-        print 'INIT; ',expname, run
         self._fields={}
         self._live_fields=[]
         if isinstance(liveList, list) and intable=='redis':
@@ -1348,7 +1089,7 @@ class SmallDataAna(object):
             if plotMultidimMean:
                 print 'plotting multidim means of two variables is not implemented yet'
                 return
-        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith, plotMultidimMean=plotMultidimMean)
+        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
 
     def plotVar1d(self, plotvar, numBins=100, useFilter=None, limits=[1,99,'p'],fig=None, plotWith=None, plotMultidimMean=False):
         if plotWith is None:
@@ -1380,6 +1121,13 @@ class SmallDataAna(object):
         if  len(plotvar)==1 and plotvar.find('droplets')>=0:
             vals = vals.flatten()[vals.flatten()>0]
 
+        ###
+        #
+        # this looks like it is generic 1-d plotting stuff.
+        # make it so.
+        #
+        ###
+
         if not plotMultidimMean:
             if limits[2]=='p':
                 pmin = np.percentile(vals,limits[0])
@@ -1392,7 +1140,7 @@ class SmallDataAna(object):
             hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
             print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
         else:
-            vals = vals.mean(axis=0)
+            vals = np.nanmean(vals,axis=0)
             if len(vals.shape)==1:
                 hst = [vals, np.arange(0,vals.shape[0]+1)]
             elif len(vals.shape)==2:
@@ -1919,8 +1667,6 @@ class SmallDataAna(object):
                 if fig is None:
                     fig=plt.figure(figsize=(10,5))
                 plt.plot(scanPoints, scan, 'ro--', markersize=5)
-                plt.xlabel(scanVarName)
-                plt.ylabel(plotVarName)
                 if returnDict.has_key('scanOffPoints') and plotOff:
                     if interpolation!='':
                         plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
