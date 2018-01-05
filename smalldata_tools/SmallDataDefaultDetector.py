@@ -45,6 +45,8 @@ class lightStatus(defaultDetector):
             for lOff in self.laserCodes:
                 if lOff in evtCodes:
                     laser_status = 0
+        else:
+            xfel_status, laser_status = (-1,-1) # default if no EVR code matches
         dl['xray']=xfel_status
         dl['laser']=laser_status
         return dl
