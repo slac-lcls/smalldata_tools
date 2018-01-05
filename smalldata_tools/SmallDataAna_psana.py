@@ -21,7 +21,7 @@ from utilities import fitCircle
 from SmallDataUtils import getUserData
 from utilities import addToHdf5
 from utilities import dropObject
-from utilities import plotImageBokeh
+from utilities_plotting import plotImageBokeh
 import bokeh.plotting as bp
 import azimuthalBinning as ab
 from matplotlib import gridspec
@@ -219,11 +219,10 @@ class SmallDataAna_psana(object):
         if len(aliases)<1:
             for key in self.Keys():
                 for detName in detNameList:
-                    print 'DEBUG: source: ',detName, key
                     if key.src().__repr__().find(detName)>=0:
                         aliases.append(key.src().__repr__())
         if len(aliases)==1:
-            detname = aliases[0]
+            return aliases[0]
         elif detname is not None:
             alias_match = [alias for alias in aliases if alias.find(detname)>=0]
             return alias_match
@@ -1112,46 +1111,34 @@ class SmallDataAna_psana(object):
         pedStat = np.logical_and(pedImg > min(pedRange), pedImg < max(pedRange))
         rmsImg = self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName]
         rmsStat = np.logical_and(rmsImg > min(rmsRange), rmsImg < max(rmsRange))
-        status = np.logical_and(rmsStat, pedStat).astype(int)
+        status = (~(np.logical_and(rmsStat, pedStat))).astype(int)
 
         #if raw_input("Save to calibdir?\n") in ["y","Y"]:
-        if dirname =='calib':
-            detname, img, avImage = self.getAvImage(detname=None)
+        if dirname == 'calib':
+            #detname, img, avImage = self.getAvImage(detname=None)
             det = self.__dict__[detname].det     
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
             if det.dettype==2:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(expname[:3],expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
             elif det.dettype==1:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/'%(expname[:3],expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==13:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(expname[:3],expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
             elif det.dettype==19:
-                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(expname[:3],expname,srcStr)        
-            if not os.path.exists(dirname+'pedestals'):
-                os.makedirs(dirname+'pedestals')
-            if not os.path.exists(dirname+'pixel_rms'):
-                os.makedirs(dirname+'pixel_rms')
-            if not os.path.exists(dirname+'pixel_status'):
-                os.makedirs(dirname+'pixel_status')
-            print 'save noise file in %s as %s '%(dirname+'pedestals/',fname)
-            np.savetxt(dirname+'pedestals/'+fname,self.AvImg_Filterxoff_raw_epix)
-            print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-            np.savetxt(dirname+'pixel_rms/'+fname,self.AvImg_std_Filterxoff_raw_epix)
-            print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
-            np.savetxt(dirname+'pixel_status/'+fname,status)
-        else:
-            if not os.path.exists(dirname+'pedestals'):
-                os.makedirs(dirname+'pedestals')
-            if not os.path.exists(dirname+'pixel_rms'):
-                os.makedirs(dirname+'pixel_rms')
-            if not os.path.exists(dirname+'pixel_status'):
-                os.makedirs(dirname+'pixel_status')
-            print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
-            np.savetxt(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName])
-            print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-            np.savetxt(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName])
-            print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
-            np.savetxt(dirname+'pixel_status/'+fname,status)
+                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
+
+        if not os.path.exists(dirname+'pedestals'):
+            os.makedirs(dirname+'pedestals')
+        if not os.path.exists(dirname+'pixel_rms'):
+            os.makedirs(dirname+'pixel_rms')
+        if not os.path.exists(dirname+'pixel_status'):
+            os.makedirs(dirname+'pixel_status')
+        print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
+        np.savetxt(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName])
+        print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
+        np.savetxt(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName])
+        print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
+        np.savetxt(dirname+'pixel_status/'+fname,status)
 
     def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
