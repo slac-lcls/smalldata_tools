@@ -21,7 +21,7 @@ from utilities import dictToHdf5, shapeFromKey_h5
 from utilities import hist2d
 from utilities import running_median_insort
 from utilities import get_startOffIdx, get_offVar
-from utilities_plotting import plotImageBokeh, plot1d
+from utilities_plotting import plotImageBokeh, plotMarker, plotImage
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
@@ -1181,7 +1181,7 @@ class SmallDataAna(object):
         #
         ###
 
-        plot1d(hst[0], xData=hst[1][:-1], xLabel=plotvar, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
+        plotMarker(hst[0], xData=hst[1][:-1], xLabel=plotvar, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
         return hst
 
     def plotVar2d(self, plotvars, useFilter=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
@@ -1233,7 +1233,7 @@ class SmallDataAna(object):
                 msize=5
             elif len(vals[1][total_filter])<1000:
                 msize=3
-            plot1d(vals[0][total_filter], xData=vals[1][total_filter], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotvars[0], plotvars[1], self.runLabel), plotDirname=self.plot_dirname, markersize=msize)
+            plotMarker(vals[0][total_filter], xData=vals[1][total_filter], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotvars[0], plotvars[1], self.runLabel), plotDirname=self.plot_dirname, markersize=msize)
             return vals[0][total_filter], vals[1][total_filter]
         
         #asHist only
@@ -1246,44 +1246,10 @@ class SmallDataAna(object):
         ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
         iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
         extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
-        
-        if plotWith == 'matplotlib':
-            if fig is None:
-                fig=plt.figure(figsize=(8,5))
-            plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=extent,clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
-            plt.xlabel(plotvars[1])
-            plt.ylabel(plotvars[0])
 
-        elif plotWith.find('bokeh')>=0:
-            pan=PanTool()
-            wheel_zoom=WheelZoomTool()
-            box_zoom=BoxZoomTool()
-            save=SaveTool()
-            reset=ResetTool()
-            hover=HoverTool(tooltips=[
-                ("(x,y)","($x, $y)")
-            ])
-            tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-            if bokeh.__version__=='0.12.6':
-                resize=ResizeTool()
-                tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
-            #hover does not really work in a figure glyph.
-            #figure out how to solve that later.
-            plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
-            layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
-            if plotWith=='bokeh_notebook':
-                bp.output_notebook()
-                #bp.show(p)
-                bp.show(layout)
-            else:
-                bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
-                #bp.save(p)
-                bp.save(layout)
-                
-        elif plotWith != 'no_plot':
-            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
+        plotImage(iSig, extent=extent, ylim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith)
 
-            return iSig, extent
+        return iSig, extent
 
     def getScanName(self):
         for key in self.Keys('scan'):
@@ -1621,12 +1587,12 @@ class SmallDataAna(object):
                         ydata = (scan[:-1]-scanoff_interp)
                     else:
                         ydata = (scan[:-1]-returnDict['scanOff'][:-1])
-                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], fig=gs[0])
-                    plot1d( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig=gs[1])
+                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], fig=gs[0])
+                    plotMarker( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig=gs[1])
                 else:
                     if saveFig:
                         plotWith='matplotlib_file'
-                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
 
         elif plotWith.find('bokeh')>=0:
             if len(scan.shape)>1:
@@ -1672,13 +1638,13 @@ class SmallDataAna(object):
 
                 if plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
 
-                    p = plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], width_height=(750,350), fig='return')
+                    p = plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], width_height=(750,350), fig='return')
 
                     if interpolation!='':
                         ydata = (scan[:-1]-scanoff_interp)
                     else:
                         ydata = (scan[:-1]-returnDict['scanOff'][:-1])
-                    pdiff = plot1d( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig='return', width_height=(750,400))
+                    pdiff = plotMarker( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig='return', width_height=(750,400))
 
                     grid = bokeh.plotting.gridplot([[p], [pdiff]])
                     layout = column(Div(text='<h1>%s as a function of %s for %s</h1>'%(plotVarName, scanVarName, self.runLabel)),grid)
@@ -1689,9 +1655,8 @@ class SmallDataAna(object):
                         bp.save(layout)
 
                 else:
-                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
 
-            
         elif plotWith != 'no_plot':
             print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
 

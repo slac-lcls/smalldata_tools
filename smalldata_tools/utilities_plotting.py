@@ -59,10 +59,18 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
     if yRange is None:
         yRange=(0,data.shape[1])
     if tools is None:
+        pan=PanTool()
+        wheel_zoom=WheelZoomTool()
+        box_zoom=BoxZoomTool()
+        save=SaveTool()
+        reset=ResetTool()
+        hover=HoverTool(tooltips=[
+            ("(x,y)","($x, $y)")
+        ])
+        tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
         if bokeh.__version__=='0.12.6':
-            tools = 'pan, wheel_zoom, box_zoom, resize, reset'
-        else:
-            tools = 'pan, wheel_zoom, box_zoom, reset'
+            resize=ResizeTool()
+            tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
     
     if dateTime:
         created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
@@ -117,7 +125,7 @@ def getColors(nColors=None, maxCol=2.6, minCol=0.25):
             color_names.append(sorted_names[i*dcol])
         return color_names
 
-def plot1d(data, **kwargs):
+def plotMarker(data, **kwargs):
     """
     class to plot 1-d data (histograms, scans).
     Input are xData (1-d array, optionally list of arrays)
@@ -180,7 +188,7 @@ def plot1d(data, **kwargs):
     ylim = kwargs.pop("ylim", None)
     width_height = kwargs.pop("width_height", None)
     if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
-        print 'found unexpected parameters to plot1d, will ignore', kwargs
+        print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if plotWith.find('matplotlib')>=0:
         if 'fig' in kwargs.keys():
@@ -286,3 +294,98 @@ def plot1d(data, **kwargs):
             
     return
 
+
+
+def plotImage(image, **kwargs):
+    """
+    class to plot 1-d data (histograms, scans).
+    Input are xData (1-d array, optionally list of arrays)
+
+    Parameters
+    ----------
+    xLabel: string to be used for labelling a X-axis
+    yLabel: string to be used for labelling the Y-axis
+    extend: x,y ranges for plot, form: x0, y0, x1, y1. Use bin counter as default
+    plotWith: method for plotting, options are matplotlib, 
+              bokeh_notebook or bokeh w/ output as a html file
+    fig: if using matplotlib, you can pass a gridspec for the figure
+         in which the data will be plotted
+         if passing anything when using bokeh, the figure will be returned
+    runLabel: label to indicate the run ('Run001'), def 'Run', can be list
+              is passing array
+    plotTitle: title to show on plot
+    plotDirname: directory to which bokeh html files will be written (def ./)
+    tools: for bokeh plotting, tools can be passed. Default tools will be used
+           otherwise
+    ylim: limits for z-axis, automatically chosen by matplotlib/bokeh otherwise
+    width_height: measurements for to be created figures
+    dateTime: default False, True will make the plot use time coords on x-axis, bokeh only (?)
+    output_quad: default False, bokeh only, determines what of layout is return
+    """
+    
+    if not isinstance(image, np.ndarray):
+        image = np.array(image)
+    if len(image.shape)!=2:
+        print 'plotImage need to be given a 2-d array, got this shape',image.shape,' instead, will quit'
+        return
+
+    xLabel = kwargs.pop("xLabel", "")
+    yLabel = kwargs.pop("yLabel", "")
+    extent = kwargs.pop("extent", [0,image.shape[0],0,image.shape[1]])
+    plotWith = kwargs.pop("plotWith", "matplotlib")
+    RunLabel = kwargs.pop("runLabel", "Run")
+    if isinstance(RunLabel, list):
+        runLabel = RunLabel[0]
+    else:
+        runLabel = RunLabel
+    plotTitle = kwargs.pop("plotTitle","%s vs %s for %s"%(xLabel, yLabel, runLabel))
+    tools = kwargs.pop("tools", None)
+    plotDirname = kwargs.pop("plotDirname", "./") 
+    plotFilename =  kwargs.pop("plotFilename", '%s/%s_%s_vs_%s'%(plotDirname,runLabel, xLabel.replace('/','_'), yLabel.replace('/','_')))
+    ylim = kwargs.pop("ylim", None)
+    width_height = kwargs.pop("width_height", None)
+    dateTime = kwargs.pop("dateTime", False)
+    output_quad = kwargs.pop("output_quad", False)
+    if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
+        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+
+    if plotWith.find('matplotlib')>=0:
+        if 'fig' in kwargs.keys():
+            fig = kwargs.pop("fig")
+        else:
+            if width_height is None: width_height = (8,5)
+            plt.figure(figsize=width_height)
+            fig = (gridspec.GridSpec(1,1)[0])
+        if ylim is None:
+            ylim = [np.percentile(image,1), np.percentile(image,99.5)]
+        plt.subplot(fig).imshow(image, clim=ylim, extent=extent, aspect='auto', interpolation='none')
+        plt.subplot(fig).set_xlabel(xLabel)
+        plt.subplot(fig).set_ylabel(yLabel)
+        plt.subplot(fig).set_title(plotTitle)
+
+    elif plotWith.find('bokeh')>=0:
+        if width_height is None: width_height = (600,400)
+        if ylim is None:
+            ylime=['auto', 'auto']
+        fig = kwargs.pop("fig", None)
+        #retValues are layout,p,im[,q] - latter is output_quad is True, return if fig is not None
+        retValues = plotImageBokeh(image, plotWidth=width_height[0], plotHeight=width_height[1], xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plotTitle, dateTime=dateTime, plotMinP=None, plotMaxP=None, plotMin=ylim[0], plotMax=ylim[1], initial_cmap='jet', output_quad=output_quad, tools=tools)
+        if fig is not None:
+            return retValues
+        if output_quad:
+            layout,p,im,q = retValues
+        else:
+            layout,p,im = retValues
+        if plotWith=='bokeh_notebook':
+            bp.output_notebook()
+            #bp.show(p)
+            bp.show(layout)
+        else:
+            bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
+            #bp.save(p)
+            bp.save(layout)
+
+    elif plotWith != 'no_plot':
+        print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
+            
+    return
