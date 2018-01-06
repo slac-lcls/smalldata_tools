@@ -1572,7 +1572,7 @@ class SmallDataAna(object):
             returnDict['binPoints']=binPoints
         if plotThis:
             #print 'retData: ',returnDict
-            self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig)
+            self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig, plotWith=plotWith)
         return returnDict
 
     def plotScanDict(self, returnDict, plotDiff=True, fig=None, plotOff=True, interpolation='', saveFig=False, plotWith=None):
@@ -1588,6 +1588,7 @@ class SmallDataAna(object):
         if interpolation!='' and returnDict.has_key('scanOffPoints'):
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
             scanoff_interp = finter_off(scanPoints[:-1])
+        print 'DEBUG: ',plotWith
         if plotWith=='matplotlib':
             if len(scan.shape)>1:
                 if fig is None:
@@ -1626,25 +1627,26 @@ class SmallDataAna(object):
                     if saveFig:
                         plotWith='matplotlib_file'
                     plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
-        elif plotWith.find('bokeh')>=0:
-            pan=PanTool()
-            wheel_zoom=WheelZoomTool()
-            box_zoom=BoxZoomTool()
-            save=SaveTool()
-            reset=ResetTool()
-            hover=HoverTool(tooltips=[
-                ("(x,y)","($x, $y)")
-            ])
-            tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-            if plotWith=='bokeh_notebook':
-                bp.output_notebook()
-            else:
-                bp.output_file('%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_')))
-            if bokeh.__version__=='0.12.6':
-                resize=ResizeTool()
-                tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
 
+        elif plotWith.find('bokeh')>=0:
             if len(scan.shape)>1:
+                if plotWith=='bokeh_notebook':
+                    bp.output_notebook()
+                else:
+                    bp.output_file('%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_')))
+                pan=PanTool()
+                wheel_zoom=WheelZoomTool()
+                box_zoom=BoxZoomTool()
+                save=SaveTool()
+                reset=ResetTool()
+                hover=HoverTool(tooltips=[
+                    ("(x,y)","($x, $y)")
+                ])
+                tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
+                if bokeh.__version__=='0.12.6':
+                    resize=ResizeTool()
+                    tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
+
                 plot_title="%s as a function of %s in %s"%(plotVarName, scanVarName, self.runLabel)
                 extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
                 layout, p, im = plotImageBokeh(scan, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(scan,99),plotMinP=np.percentile(scan,1))
@@ -1652,29 +1654,7 @@ class SmallDataAna(object):
                     bp.show(layout)
                 else:
                     bp.save(layout)
-            elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
-                p = bp.figure(width=900, height=350, x_axis_label=scanVarName, y_axis_label=plotVarName,tools=tools)
-                p.circle(scanPoints, scan, size=5, legend='on', fill_color='red', line_color='red')
-                p.line(scanPoints, scan, line_color='red', line_dash='dashed')
-                if interpolation!='':
-                    p.circle((scanPoints[:-1]+scanPoints[1:])*0.5, scanoff_interp, size=5, legend='off (interpol)', fill_color='none', line_color='black')
-                p.circle(returnDict['scanOffPoints'], returnDict['scanOff'], size=5, legend='off', fill_color='black', line_color='black')
-
-                #pdiff = bp.figure(width=500, height=400, x_axis_label=scanVarName, y_axis_label='(on-off)/on',tools=tools)
-                pdiff = bp.figure(width=900, height=350, x_axis_label=scanVarName, y_axis_label='(on-off)/off')
-                scanOffPlot = returnDict['scanOff'][:-1]
-                if interpolation!='':
-                    scanOffPlot = scanoff_interp
-                pdiff.circle(scanPoints[:-1], (scan[:-1]-scanOffPlot)/scanOffPlot, size=5, fill_color='blue', line_color='blue')
-
-                grid = bokeh.plotting.gridplot([[p], [pdiff]])
-                layout = column(Div(text='<h1>%s as a function of %s for %s</h1>'%(plotVarName, scanVarName, self.runLabel)),grid)
-                if plotWith=='bokeh_notebook':
-                    bp.show(layout)
-                else:
-                    bp.save(layout)
             else:
-                ###BEGIN NEW
                 scanYvals=[scan]
                 scanXvals=[scanPoints]
                 markers = ['o']
@@ -1689,25 +1669,28 @@ class SmallDataAna(object):
                         colors.append('black')
                         scanYvals.append(scanoff_interp)
                         scanXvals.append(scanPoints)
-                if saveFig:
-                    plotWith='matplotlib_file'
-                plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
-                return
-                ###END NEW
-                p = bp.figure(title="%s as a function of %s for %s"%(plotVarName, scanVarName, self.runLabel), x_axis_label=scanVarName, y_axis_label=plotVarName,tools=tools, width=900, height=450)
-                p.circle(scanPoints, scan, legend=self.runLabel+', on', size=5, fill_color='red', line_color='red')
-                p.line(scanPoints, scan, line_color='red', line_dash='dashed')
-                if returnDict.has_key('scanOffPoints') and plotOff:
-                    #should make this better, fix styles to match off & interpolated off
+
+                if plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+
+                    p = plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], width_height=(750,350), fig='return')
+
                     if interpolation!='':
-                        p.circle(scanPoints[:-1], (scanoff_interp), legend=self.runLabel+', off (interpol)', size=5)
-                        #plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-                    p.circle(returnDict['scanOffPoints'], returnDict['scanOff'], legend=self.runLabel+', off', size=5)
-                    p.line(returnDict['scanOffPoints'], returnDict['scanOff'], line_color='blue', line_dash='dashed')
-                if plotWith=='bokeh_notebook':
-                    bp.show(p)
+                        ydata = (scan[:-1]-scanoff_interp)
+                    else:
+                        ydata = (scan[:-1]-returnDict['scanOff'][:-1])
+                    pdiff = plot1d( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig='return', width_height=(750,400))
+
+                    grid = bokeh.plotting.gridplot([[p], [pdiff]])
+                    layout = column(Div(text='<h1>%s as a function of %s for %s</h1>'%(plotVarName, scanVarName, self.runLabel)),grid)
+
+                    if plotWith=='bokeh_notebook':
+                        bp.show(layout)
+                    else:
+                        bp.save(layout)
+
                 else:
-                    bp.save(p)
+                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+
             
         elif plotWith != 'no_plot':
             print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'

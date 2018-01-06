@@ -131,6 +131,7 @@ def plot1d(data, **kwargs):
               bokeh_notebook or bokeh w/ output as a html file
     fig: if using matplotlib, you can pass a gridspec for the figure
          in which the data will be plotted
+         if passing anything when using bokeh, the figure will be returned
     runLabel: label to indicate the run ('Run001'), def 'Run', can be list
               is passing array
     plotTitle: title to show on plot
@@ -142,6 +143,7 @@ def plot1d(data, **kwargs):
     tools: for bokeh plotting, tools can be passed. Default tools will be used
            otherwise
     ylim: limits for y-axis, automatically chosen by matplotlib/bokeh otherwise
+    width_height: measurements for to be created figures
     """
     if isinstance(data, np.ndarray):
         data = data.tolist()
@@ -176,14 +178,16 @@ def plot1d(data, **kwargs):
         print 'ndataset ',len(data)
         sorted_colors = getColors(nColors=len(data))
     ylim = kwargs.pop("ylim", None)
-    if len(kwargs)>0:
+    width_height = kwargs.pop("width_height", None)
+    if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
         print 'found unexpected parameters to plot1d, will ignore', kwargs
 
     if plotWith.find('matplotlib')>=0:
         if 'fig' in kwargs.keys():
             fig = kwargs.pop("fig")
         else:
-            plt.figure(figsize=(8,5))
+            if width_height is None: width_height = (8,5)
+            plt.figure(figsize=width_height)
             fig = (gridspec.GridSpec(1,1)[0])
         if line_dash is None:
             line_dash = 'none'
@@ -213,6 +217,10 @@ def plot1d(data, **kwargs):
         #bokeh, use BoxSelectTool to get selected region
         #https://stackoverflow.com/questions/34164587/get-selected-data-contained-within-box-select-tool-in-bokeh
         #set cuts does not need to be specified explicly, can simple be gotten from callback of tool.....
+        if 'fig' in kwargs.keys():
+            fig = kwargs.pop("fig")
+        else:
+            fig = None
         if tools is None:
             pan=PanTool()
             wheel_zoom=WheelZoomTool()
@@ -226,7 +234,10 @@ def plot1d(data, **kwargs):
             if bokeh.__version__=='0.12.6':
                 resize=ResizeTool()
                 tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
-        p = bp.figure(title=plotTitle, x_axis_label=xLabel, y_axis_label=yLabel,tools=tools)
+        if width_height is None:
+            p = bp.figure(title=plotTitle, x_axis_label=xLabel, y_axis_label=yLabel,tools=tools)
+        else:
+            p = bp.figure(title=plotTitle, x_axis_label=xLabel, y_axis_label=yLabel,tools=tools, width=width_height[0], height=width_height[1])
         for ic,(idata,ixdata) in enumerate(zip(data, xData)):
             if color is not None:
                 thiscolor=color[ic]
@@ -262,10 +273,13 @@ def plot1d(data, **kwargs):
                 p.line(ixdata, idata, line_dash=line_dash, line_color=thiscolor)
         if plotWith=='bokeh_notebook':
             bp.output_notebook()
-            bp.show(p)
+            if fig is None:
+                bp.show(p)
         else:
             bp.output_file('%s.html'%(plotFilename))
             bp.save(p)
+        if fig is not None:
+            return p
                 
     elif plotWith != 'no_plot':
         print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
