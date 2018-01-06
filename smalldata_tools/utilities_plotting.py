@@ -7,6 +7,7 @@ import h5py
 import tables
 from matplotlib import pyplot as plt
 from matplotlib import colors as mcolors
+from matplotlib import gridspec
 import resource
 
 import bokeh
@@ -128,8 +129,8 @@ def plot1d(data, **kwargs):
     yLabel: string to be used for labelling the Y-axis
     plotWith: method for plotting, options are matplotlib, 
               bokeh_notebook or bokeh w/ output as a html file
-    fig: if using matplotlib, a figure can be passed in which the new data 
-         will be plotted
+    fig: if using matplotlib, you can pass a gridspec for the figure
+         in which the data will be plotted
     runLabel: label to indicate the run ('Run001'), def 'Run', can be list
               is passing array
     plotTitle: title to show on plot
@@ -137,8 +138,10 @@ def plot1d(data, **kwargs):
     marker: pass marker style (def o, options: *,^,+,x,s,D)
     markersize: marker size, default is 5
     line_dash: connect markers with line style as defined (default: none)
+    color: pass (list of) colors, otherwise a set of colors will be automatically picked
     tools: for bokeh plotting, tools can be passed. Default tools will be used
            otherwise
+    ylim: limits for y-axis, automatically chosen by matplotlib/bokeh otherwise
     """
     if isinstance(data, np.ndarray):
         data = data.tolist()
@@ -166,25 +169,42 @@ def plot1d(data, **kwargs):
     tools = kwargs.pop("tools", None)
     plotDirname = kwargs.pop("plotDirname", "./") 
     plotFilename =  kwargs.pop("plotFilename", '%s/%s_%s_histogram'%(plotDirname,runLabel, xLabel.replace('/','_')))    
-    if len(data)>1:
+    color = kwargs.pop("color", None)
+    if color is not None and len(color) != len(data):
+        color = None
+    if color is None and len(data)>1:
+        print 'ndataset ',len(data)
         sorted_colors = getColors(nColors=len(data))
+    ylim = kwargs.pop("ylim", None)
+    if len(kwargs)>0:
+        print 'found unexpected parameters to plot1d, will ignore', kwargs
+
     if plotWith.find('matplotlib')>=0:
         if 'fig' in kwargs.keys():
             fig = kwargs.pop("fig")
         else:
             plt.figure(figsize=(8,5))
-        if len(kwargs)>0:
-            print 'found unexpected parameters to plot1d, will ignore', kwargs
+            fig = (gridspec.GridSpec(1,1)[0])
         if line_dash is None:
             line_dash = 'none'
+
         for ic,(idata,ixdata) in enumerate(zip(data, xData)):
-            if ic > 0:
-                plt.plot(ixdata,idata,marker=marker, color=sorted_colors[ic],linestyle=line_dash)
+            if isinstance(marker, list) and len(marker)==len(data):
+                plotMarker = marker[ic]
             else:
-                plt.plot(ixdata,idata,marker=marker,linestyle=line_dash,markersize=markersize)
-        plt.xlabel(xLabel)
-        plt.ylabel(yLabel)
-        plt.title(plotTitle)                  
+                plotMarker = marker
+            if color is None and ic == 0:
+                plt.subplot(fig).plot(ixdata,idata,marker=plotMarker,linestyle=line_dash,markersize=markersize)
+            elif color is None:
+                plt.subplot(fig).plot(ixdata,idata,marker=plotMarker, color=sorted_colors[ic],linestyle=line_dash)
+            else:
+                plt.subplot(fig).plot(ixdata,idata,marker=plotMarker, color=color[ic],linestyle=line_dash)
+
+        plt.subplot(fig).set_xlabel(xLabel)
+        plt.subplot(fig).set_ylabel(yLabel)
+        plt.subplot(fig).set_title(plotTitle)
+        if ylim is not None:
+            plt.subplot(fig).set_ylim(np.nanmin(np.array(ylim)),np.nanmax(np.array(ylim)))
         if plotWith.find('file')>=0:
             plt.savefig('%s.jpeg'%(plotFilename))
 
@@ -208,40 +228,42 @@ def plot1d(data, **kwargs):
                 tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
         p = bp.figure(title=plotTitle, x_axis_label=xLabel, y_axis_label=yLabel,tools=tools)
         for ic,(idata,ixdata) in enumerate(zip(data, xData)):
-            if len(data)==1:
-                color='black'
+            if color is not None:
+                thiscolor=color[ic]
+            elif len(data)==1:
+                thiscolor='black'
             else:
-                color=sorted_colors[ic]
+                thiscolor=sorted_colors[ic]
             if isinstance(RunLabel, list):
                 iRunLabel=RunLabel[ic]
             else:
                 iRunLabel=runLabel
-            if marker=='o':
-                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='*':
-                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='+':
-                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='x':
-                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='s':
-                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='^':
-                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
-            elif marker=='D':
-                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=color)
+            if isinstance(marker, list) and len(marker)==len(data):
+                plotMarker = marker[ic]
+            else:
+                plotMarker = marker
+            if plotMarker=='o':
+                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='*':
+                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='+':
+                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='x':
+                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='s':
+                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='^':
+                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+            elif plotMarker=='D':
+                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
             else:
                 print 'unsupported marker option'
             if line_dash is not None:
-                p.line(ixdata, idata, line_dash=line_dash, line_color=color)
+                p.line(ixdata, idata, line_dash=line_dash, line_color=thiscolor)
         if plotWith=='bokeh_notebook':
-            if len(kwargs)>0:
-                print 'found unexpected parameters to plot1d, will ignore', kwargs
             bp.output_notebook()
             bp.show(p)
         else:
-            if len(kwargs)>0:
-                print 'found unexpected parameters to plot1d, will ignore', kwargs
             bp.output_file('%s.html'%(plotFilename))
             bp.save(p)
                 
@@ -249,5 +271,4 @@ def plot1d(data, **kwargs):
         print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
             
     return
-
 

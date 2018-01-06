@@ -1596,36 +1596,36 @@ class SmallDataAna(object):
                 plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
                 plt.xlabel(scanVarName)
                 #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
-            elif plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
-                if fig is None:
-                    fig=plt.figure(figsize=(10,10))
-                gs=gridspec.GridSpec(2,1,width_ratios=[1])
-                plt.subplot(gs[0]).set_xlabel(scanVarName)
-                plt.subplot(gs[0]).set_ylabel(plotVarName)
-                plt.subplot(gs[0]).plot(scanPoints, scan, 'ro--', markersize=5)
-                if interpolation!='':
-                    plt.subplot(gs[0]).plot(scanPoints[:-1], scanoff_interp, 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-                plt.subplot(gs[0]).plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
-                plt.subplot(gs[0]).set_ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
-                if interpolation!='':
-                    plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-scanoff_interp), 'bo--', markersize=5)
-                else:
-                    plt.subplot(gs[1]).plot(scanPoints[:-1], (scan[:-1]-returnDict['scanOff'][:-1]), 'bo--', markersize=5)
-                plt.subplot(gs[1]).set_xlabel(scanVarName)
-                plt.subplot(gs[1]).set_ylabel(plotVarName)
             else:
-                if fig is None:
-                    fig=plt.figure(figsize=(10,5))
-                plt.plot(scanPoints, scan, 'ro--', markersize=5)
+                scanYvals=[scan]
+                scanXvals=[scanPoints]
+                markers = ['o']
+                colors = ['red']
                 if returnDict.has_key('scanOffPoints') and plotOff:
+                    markers.append('o')
+                    colors.append('black')
+                    scanYvals.append(returnDict['scanOff'])
+                    scanXvals.append(returnDict['scanOffPoints'])
                     if interpolation!='':
-                        plt.plot(scanPoints[:-1], (scanoff_interp), 'o--', markersize=5,markerfacecolor='none',markeredgecolor='b')
-                    plt.plot(returnDict['scanOffPoints'], returnDict['scanOff'], 'ko--', markersize=5)
-                plt.ylim(np.nanmin(scan)*0.95,np.nanmax(scan)*1.05)
-                plt.xlabel(scanVarName)
-                plt.ylabel(plotVarName)
-            if saveFig:
-                fig.savefig('Scan_Run%i.jpg'%self.run)
+                        markers.append('D')
+                        colors.append('black')
+                        scanYvals.append(scanoff_interp)
+                        scanXvals.append(scanPoints)
+
+                if plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+                    if fig is None:
+                        fig=plt.figure(figsize=(10,10))
+                    gs=gridspec.GridSpec(2,1,width_ratios=[1])
+                    if interpolation!='':
+                        ydata = (scan[:-1]-scanoff_interp)
+                    else:
+                        ydata = (scan[:-1]-returnDict['scanOff'][:-1])
+                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], fig=gs[0])
+                    plot1d( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig=gs[1])
+                else:
+                    if saveFig:
+                        plotWith='matplotlib_file'
+                    plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
         elif plotWith.find('bokeh')>=0:
             pan=PanTool()
             wheel_zoom=WheelZoomTool()
@@ -1674,6 +1674,26 @@ class SmallDataAna(object):
                 else:
                     bp.save(layout)
             else:
+                ###BEGIN NEW
+                scanYvals=[scan]
+                scanXvals=[scanPoints]
+                markers = ['o']
+                colors = ['red']
+                if returnDict.has_key('scanOffPoints') and plotOff:
+                    markers.append('o')
+                    colors.append('black')
+                    scanYvals.append(returnDict['scanOff'])
+                    scanXvals.append(returnDict['scanOffPoints'])
+                    if interpolation!='':
+                        markers.append('D')
+                        colors.append('black')
+                        scanYvals.append(scanoff_interp)
+                        scanXvals.append(scanPoints)
+                if saveFig:
+                    plotWith='matplotlib_file'
+                plot1d(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+                return
+                ###END NEW
                 p = bp.figure(title="%s as a function of %s for %s"%(plotVarName, scanVarName, self.runLabel), x_axis_label=scanVarName, y_axis_label=plotVarName,tools=tools, width=900, height=450)
                 p.circle(scanPoints, scan, legend=self.runLabel+', on', size=5, fill_color='red', line_color='red')
                 p.line(scanPoints, scan, line_color='red', line_dash='dashed')
