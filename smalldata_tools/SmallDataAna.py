@@ -1134,52 +1134,22 @@ class SmallDataAna(object):
             print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
         else:
             vals = np.nanmean(vals,axis=0)
+            if len(vals.shape)==0:
+                print 'mean of plotvar is ',vals
+                return 
             if len(vals.shape)==1:
                 hst = [vals, np.arange(0,vals.shape[0]+1)]
             elif len(vals.shape)==2:
-                if plotWith=='matplotlib':
-                    if fig is None:
-                        fig=plt.figure(figsize=(8,5))
-                    plt.imshow(vals, clim=[np.percentile(vals,limits[0]), np.percentile(vals,limits[1])])
+                if plotWith.find('matplotlib')>=0:
+                    plotImage(vals, ylim=[np.percentile(vals,1),np.percentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
                     return
-            elif plotWith.find('bokeh')>=0:
-                pan=PanTool()
-                wheel_zoom=WheelZoomTool()
-                box_zoom=BoxZoomTool()
-                save=SaveTool()
-                reset=ResetTool()
-                hover=HoverTool(tooltips=[
-                    ("(x,y)","($x, $y)")
-                ])
-                tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-                if bokeh.__version__=='0.12.6':
-                    resize=ResizeTool()
-                    tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
-                #hover does not really work in a figure glyph.
-                #figure out how to solve that later.
-                plot_title="%s vs %s in %s"%(plotvars[0], plotvars[1], self.runLabel)
-                layout, p, im = plotImageBokeh(iSig, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(iSig,99),plotMinP=np.percentile(iSig,1))
-                if plotWith=='bokeh_notebook':
-                    bp.output_notebook()
-                    #bp.show(p)
-                    bp.show(layout)
-                    return
-                else:
-                    bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
-                    #bp.save(p)
-                    bp.save(layout)
+                elif plotWith.find('bokeh')>=0:
+                    plotImage(vals, xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
                     return
                 
             elif len(vals.shape)==3:
                 print 'cannot plot 3-dim data'
                 return
-
-        ###
-        #
-        # this looks like it is generic 1-d plotting stuff.
-        # make it so.
-        #
-        ###
 
         plotMarker(hst[0], xData=hst[1][:-1], xLabel=plotvar, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
         return hst
@@ -1426,6 +1396,7 @@ class SmallDataAna(object):
         #get the binning variable here so that points where this is not good can be thrown out.
         if binVar is not None:
             if binVar[0] != 'delay':
+                if isinstance(binVar, basestring): binVar=[binVar]
                 binVal = self.get1dVar(binVar[0])
             else:
                 binVal=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
@@ -1500,8 +1471,8 @@ class SmallDataAna(object):
             indOn2d = np.ravel_multi_index((scanOnIdx, binIdx),(scanPoints.shape[0]+1, binPoints.shape[0]+1)) 
 
             # calculate the normalized intensity for each bin
-            iNorm = np.bincount(indOn2d, weights=i0Val[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
-            iSig = np.bincount(indOn2d, weights=sigVal[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1)    
+            iNorm = np.bincount(indOn2d, weights=i0Val[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1).T    
+            iSig = np.bincount(indOn2d, weights=sigVal[FilterOn], minlength=(scanPoints.shape[0]+1)*(binPoints.shape[0]+1)).reshape(scanPoints.shape[0]+1, binPoints.shape[0]+1).T    
         else:
             iNorm = np.bincount(scanOnIdx, i0Val[FilterOn], minlength=len(scanPoints)+1)
             iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
@@ -1536,6 +1507,7 @@ class SmallDataAna(object):
             returnDict= {'scanVarName':scanVarName,'scanPoints':scanPoints,'scan':scan,'plotVarName':plotVar}
         if binVar is not None:
             returnDict['binPoints']=binPoints
+            returnDict['binVar']=binVar[0]
         if plotThis:
             #print 'retData: ',returnDict
             self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig, plotWith=plotWith)
@@ -1554,15 +1526,11 @@ class SmallDataAna(object):
         if interpolation!='' and returnDict.has_key('scanOffPoints'):
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
             scanoff_interp = finter_off(scanPoints[:-1])
-        print 'DEBUG: ',plotWith
         if plotWith=='matplotlib':
             if len(scan.shape)>1:
-                if fig is None:
-                    fig=plt.figure(figsize=(10,5))
                 extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
-                plt.imshow(scan, interpolation='none', aspect='auto', clim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)],extent=extent, origin='lower')
-                plt.xlabel(scanVarName)
-                #elif plotDiff and interpolation!='' and returnDict.has_key('scanOffPoints'):
+                plotImage(scan, ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], xLabel=scanVarName, yLabel=returnDict['binVar'], plotWith=plotWith, plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), extent=extent)
+                return
             else:
                 scanYvals=[scan]
                 scanXvals=[scanPoints]
@@ -1596,30 +1564,10 @@ class SmallDataAna(object):
 
         elif plotWith.find('bokeh')>=0:
             if len(scan.shape)>1:
-                if plotWith=='bokeh_notebook':
-                    bp.output_notebook()
-                else:
-                    bp.output_file('%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_')))
-                pan=PanTool()
-                wheel_zoom=WheelZoomTool()
-                box_zoom=BoxZoomTool()
-                save=SaveTool()
-                reset=ResetTool()
-                hover=HoverTool(tooltips=[
-                    ("(x,y)","($x, $y)")
-                ])
-                tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
-                if bokeh.__version__=='0.12.6':
-                    resize=ResizeTool()
-                    tools = [pan, wheel_zoom,box_zoom,resize,save,hover,reset]
-
-                plot_title="%s as a function of %s in %s"%(plotVarName, scanVarName, self.runLabel)
                 extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
-                layout, p, im = plotImageBokeh(scan, xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plot_title, plotMaxP=np.percentile(scan,99),plotMinP=np.percentile(scan,1))
-                if plotWith=='bokeh_notebook':
-                    bp.show(layout)
-                else:
-                    bp.save(layout)
+                output_file='%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_'))
+                plotImage(scan, ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], xLabel=scanVarName, yLabel=returnDict['binVar'], plotWith=plotWith, plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), extent=extent,plotFilename=output_file)
+                return
             else:
                 scanYvals=[scan]
                 scanXvals=[scanPoints]

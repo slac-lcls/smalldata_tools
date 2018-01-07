@@ -366,10 +366,11 @@ def plotImage(image, **kwargs):
     elif plotWith.find('bokeh')>=0:
         if width_height is None: width_height = (600,400)
         if ylim is None:
-            ylime=['auto', 'auto']
+            ylim=['auto', 'auto']
         fig = kwargs.pop("fig", None)
-        #retValues are layout,p,im[,q] - latter is output_quad is True, return if fig is not None
-        retValues = plotImageBokeh(image, plotWidth=width_height[0], plotHeight=width_height[1], xRange=(extent[0], extent[2]), yRange=(extent[1], extent[3]), plot_title=plotTitle, dateTime=dateTime, plotMinP=None, plotMaxP=None, plotMin=ylim[0], plotMax=ylim[1], initial_cmap='jet', output_quad=output_quad, tools=tools)
+        #retValues are layout,p,im[,q] (latter if output_quad is True)
+        retValues = plotImageBokeh(image, plotWidth=width_height[0], plotHeight=width_height[1], initial_cmap='jet', output_quad=output_quad, tools=tools,  plot_title=plotTitle, dateTime=dateTime, xRange=(extent[0], extent[1]), yRange=(extent[2], extent[3]), plotMinP=None, plotMaxP=None, plotMin=ylim[0], plotMax=ylim[1])
+
         if fig is not None:
             return retValues
         if output_quad:
