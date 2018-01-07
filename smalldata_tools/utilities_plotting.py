@@ -357,7 +357,7 @@ def plotImage(image, **kwargs):
             plt.figure(figsize=width_height)
             fig = (gridspec.GridSpec(1,1)[0])
         if ylim is None:
-            ylim = [np.percentile(image,1), np.percentile(image,99.5)]
+            ylim = [np.nanpercentile(image,1), np.nanpercentile(image,99.5)]
         plt.subplot(fig).imshow(image, clim=ylim, extent=extent, aspect='auto', interpolation='none')
         plt.subplot(fig).set_xlabel(xLabel)
         plt.subplot(fig).set_ylabel(yLabel)

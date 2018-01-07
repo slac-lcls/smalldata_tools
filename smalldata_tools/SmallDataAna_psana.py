@@ -1845,20 +1845,20 @@ class SmallDataAna_psana(object):
 
             if det.rms is not None:
                 if not detDict.has_key('image'):
-                    addToHdf5(fout, detName+'_ped', det.ped)
-                    addToHdf5(fout, detName+'_rms', det.rms)
-                    addToHdf5(fout, detName+'_gain', det.gain)
-                    addToHdf5(fout, detName+'_mask', det.mask)
-                    addToHdf5(fout, detName+'_calib_mask', det.cmask)
+                    addToHdf5(fout, 'Cfg_'+detName+'_ped', det.ped)
+                    addToHdf5(fout, 'Cfg_'+detName+'_rms', det.rms)
+                    addToHdf5(fout, 'Cfg_'+detName+'_gain', det.gain)
+                    addToHdf5(fout, 'Cfg_'+detName+'_mask', det.mask)
+                    addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.cmask)
                     if det.x is not None:
-                        addToHdf5(fout, detName+'_x', det.x)
-                        addToHdf5(fout, detName+'_y', det.y)
+                        addToHdf5(fout, 'Cfg_'+detName+'_x', det.x)
+                        addToHdf5(fout, 'Cfg_'+detName+'_y', det.y)
                 else:
-                    addToHdf5(fout, detName+'_ped', det.det.image(self.run,det.ped))
-                    addToHdf5(fout, detName+'_rms', det.det.image(self.run,det.rms))
-                    addToHdf5(fout, detName+'_gain', det.det.image(self.run,det.gain))
-                    addToHdf5(fout, detName+'_mask', det.det.image(self.run,det.mask))
-                    addToHdf5(fout, detName+'_calib_mask', det.det.image(self.run,det.cmask))
+                    addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped))
+                    addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms))
+                    addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain))
+                    addToHdf5(fout, 'Cfg_'+detName+'_mask', det.det.image(self.run,det.mask))
+                    addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.det.image(self.run,det.cmask))
         comm.Barrier()
         if rank==0:
             print 'first,last img mean: ',np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])

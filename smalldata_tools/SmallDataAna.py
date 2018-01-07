@@ -1733,7 +1733,7 @@ class SmallDataAna(object):
 
         return cube, onoff
 
-    def makeCubeData(self, cubeName, debug=False, toHdf5=False, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
+    def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
         if onoff == 2:
             onoff = cubeName_onoff
@@ -1819,10 +1819,16 @@ class SmallDataAna(object):
             if key not in cubeData.keys():
                 cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
-        if toHdf5:
+        if toHdf5 is 'h5netcdf':
             fname = 'Cube_%s_Run%03d.nc'%(cubeName, self.run)
             cubeData.to_netcdf(fname,engine='h5netcdf')
-        
+        elif toHdf5 is 'h5':
+            fname = 'Cube_%s_Run%03d.h5'%(cubeName, self.run)
+            h5Dict={}
+            for key in cubeData.keys():
+                h5Dict[key] = cubeData[key].values
+                dictToHdf5(fname, h5Dict)
+            
         if not returnIdx:
             return cubeData
 
