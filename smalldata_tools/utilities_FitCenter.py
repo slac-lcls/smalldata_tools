@@ -163,7 +163,11 @@ def getMaxR(fitRes, norm=False, minDr=-1):
         maxR = argrelextrema(np.array(rRes)/radii, np.greater)
     else:
         maxR = argrelextrema(np.array(rRes), np.greater)
+    print 'maxR: ',maxR
     maxRadii = radii[maxR[0]]
+    if maxRadii.shape[0]==0:
+        print 'no maxima could be found!'
+        return []
     resAtRadii = np.array(rRes)[maxR[0]]
     resAtRadii,maxRadii = (list(x) for x in zip(*sorted(zip( resAtRadii, maxRadii))))
 
@@ -220,11 +224,14 @@ def FindFitCenter(image, mask, inParams={}):
     maxR1 =  getMaxR(res, norm=params['norm'], minDr=params['deltaR'])
     print 'maxR1: ',maxR1
 
+    ringInfo=[]
     pointsInCircles=[]
     pointsInCirclesFitted=[]
     fitResultsRansac=[]
     residuals=[]
-    ringInfo=[]
+    if len(maxR1) == 0:
+        return -1, ringInfo, arSparse
+
     plotDetail=False
     #use cKDTree to select points in ring of width 2*deltaR around circle
     print 'select points in circles using cKDTree and select good candidates for final fit using RANSAC'
