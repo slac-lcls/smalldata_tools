@@ -122,7 +122,7 @@ def getColors(nColors=None, maxCol=2.6, minCol=0.25):
         dcol = int(len(sorted_names)/nColors)
         color_names=[]
         for i in range(nColors+1):
-            color_names.append(sorted_names[i*dcol])
+            color_names.append(sorted_names[min(i*dcol, len(sorted_names)-1)])
         return color_names
 
 def plotMarker(data, **kwargs):
