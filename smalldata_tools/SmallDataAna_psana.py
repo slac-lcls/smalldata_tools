@@ -1113,10 +1113,10 @@ class SmallDataAna_psana(object):
         rmsStat = np.logical_and(rmsImg > min(rmsRange), rmsImg < max(rmsRange))
         status = (~(np.logical_and(rmsStat, pedStat))).astype(int)
 
+        det = self.__dict__[detname].det     
         #if raw_input("Save to calibdir?\n") in ["y","Y"]:
         if dirname == 'calib':
             #detname, img, avImage = self.getAvImage(detname=None)
-            det = self.__dict__[detname].det     
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
             if det.dettype==2:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
@@ -1134,11 +1134,11 @@ class SmallDataAna_psana(object):
         if not os.path.exists(dirname+'pixel_status'):
             os.makedirs(dirname+'pixel_status')
         print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
-        np.savetxt(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName])
+        det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName], fmt='%.1f',addmetad=True)
         print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-        np.savetxt(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName])
+        det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName], fmt='%.1f',addmetad=True)
         print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
-        np.savetxt(dirname+'pixel_status/'+fname,status)
+        det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
     def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
@@ -1401,7 +1401,7 @@ class SmallDataAna_psana(object):
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
-            np.savetxt(dirname+fname,mask)
+            det.save_txtnda(dirname+fname,mask, fmt='%d',addmetad=True)
         elif raw_input("Save to local?\n") in ["y","Y"]:
             mask = (~(mask.astype(bool))).astype(int)
             np.savetxt('%s_mask_run%s.data'%(self.sda.expname,self.run),mask)
