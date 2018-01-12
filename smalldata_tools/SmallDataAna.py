@@ -1151,7 +1151,11 @@ class SmallDataAna(object):
                 print 'cannot plot 3-dim data'
                 return
 
-        plotMarker(hst[0], xData=hst[1][:-1], xLabel=plotvar, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
+        if isinstance(plotvar, list):
+            plotXlabel = plotvar[0]
+        else:
+            plotXlabel = plotvar
+        plotMarker(hst[0], xData=hst[1][:-1], xLabel=plotXlabel, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
         return hst
 
     def plotVar2d(self, plotvars, useFilter=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
@@ -1647,8 +1651,6 @@ class SmallDataAna(object):
     ### functions for easy cube creation
     ###
     #########################################################
-
-    #cube might be better to be its own class
     def addCube(self, cubeName, binVar='', bins=[], useFilter=''):    
         self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter)
         
@@ -1733,6 +1735,11 @@ class SmallDataAna(object):
 
         return cube, onoff
 
+    #XXX
+    #add code to cube droplets/photons: one image/cube point (image later)
+    #add correct variables to addIdxVar w/ keyword (droplet/photon name)
+    #flatten returned droplet arrays: list/bin
+    #think about adding to cubefile (make array-able)
     def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
         if onoff == 2:
@@ -1819,11 +1826,13 @@ class SmallDataAna(object):
             if key not in cubeData.keys():
                 cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
-        if toHdf5 is 'h5netcdf':
-            fname = 'Cube_%s_Run%03d.nc'%(cubeName, self.run)
+        #TO DO: move this later. UseSmallDataAna method to make Xr to make 
+        #extra Xr for cubed droplets/photons. Merge Datasets.
+        if toHdf5 == 'h5netcdf':
+            fname = '%s/Cube_%s_Run%03d_%s.nc'%(self.dirname,self.expname,self.run,cubeName)
             cubeData.to_netcdf(fname,engine='h5netcdf')
-        elif toHdf5 is 'h5':
-            fname = 'Cube_%s_Run%03d.h5'%(cubeName, self.run)
+        elif toHdf5 == 'h5':
+            fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
             h5Dict={}
             for key in cubeData.keys():
                 h5Dict[key] = cubeData[key].values
