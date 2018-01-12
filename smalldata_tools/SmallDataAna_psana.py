@@ -572,7 +572,7 @@ class SmallDataAna_psana(object):
                 print 'ROI: [[%i,%i], [%i,%i]]'%(ax1.min(),ax1.max(),ax0.min(),ax0.max())
             
 
-    def FitCircleAuto(self, detname=None, plotRes=True, inParams={}):
+    def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inParams={}):
         detname, img, avImage = self.getAvImage(detname=None)
         try:
             mask = self.__dict__[detname].det.cmask.astype(bool)
@@ -582,7 +582,7 @@ class SmallDataAna_psana(object):
         for idim in mask.shape:
             nPixRaw=nPixRaw*idim
         print 'check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw)
-        if (mask.sum()/nPixRaw)<0.5:
+        if (mask.sum()/nPixRaw)<0.5 and not forceMask:
             mask=~mask
         try:
             maskgeo = self.__dict__[detname].det.mask_geo(self.run).astype(bool)
@@ -861,7 +861,7 @@ class SmallDataAna_psana(object):
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
-            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d) or noise(n)?:\n")
+            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
             #this definitely works for the rayonix...
             if shape=='r':
                 print 'select two corners: '
@@ -976,6 +976,28 @@ class SmallDataAna_psana(object):
                 if needsGeo:
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
                 else:
+                    plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
+            if shape=='e':
+                ctot=raw_input("Enter number of edge rows that should be masked:")
+                try:
+                    nEdge = int(ctot)
+                except:
+                    print 'please enter an integer'
+                    continue
+                mask_r_nda = np.zeros_like(det.rms(self.run))
+                if needsGeo:
+                    for tile in mask_r_nda:
+                        tile[0:nEdge,:]=1
+                        tile[tile.shape[0]-nEdge:,:]=1
+                        tile[:,0:nEdge]=1
+                        tile[:,tile.shape[1]-nEdge:]=1
+                    plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
+                else:
+                    tile=mask_r_nda
+                    tile[0:nEdge,:]=1
+                    tile[nEdge:-1,:]=1
+                    tile[:,0:nEdge]=1
+                    tile[:,nEdge:-1]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
 
             if mask_r_nda is not None:
