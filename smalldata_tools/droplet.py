@@ -37,13 +37,12 @@ class aduHist:
                 else:
                         dx = pos[:,0].flatten()
                         dy = pos[:,1].flatten()
-                        fxl = dx > self.ROI[0] 
-                        fxh = dx < self.ROI[1] 
-                        fyl = dy > self.ROI[2] 
-                        fyh = dy < self.ROI[3]
-                        fSum = ( fxl & fxh & fyl & fyh )
-                        daduF = dadu.flatten()[fSum]
-                        return np.histogram(daduF[daduF>0], self.bins)[0]
+                        inROIx = np.logical_and(dx>np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
+                        inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[0],dy < np.array(self.ROI).flatten()[1]) 
+                        inROI = np.logical_and(inROIx, inROIy)
+                        daduF = dadu.flatten()[inROI]
+                        hist = np.histogram(daduF[daduF>0], self.bins)
+                        return hist[0]
                         
 class dropletSave:
         def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
@@ -161,6 +160,7 @@ class droplet:
         name = self.name+'_'+name
         thisADUHist = aduHist(ADUhist, ROI, name)
         self.aduHists.append(thisADUHist)
+        self.checkADUHist()
 
     def addPhotonizeDrops(self,ADU_per_photon=154, thresFrac = 0.48, maxPhotons=1500, maxMultPhotons=25, name=''):
         self.photonizeDrops = photonizeDrops(ADU_per_photon=ADU_per_photon, thresFrac = thresFrac, maxPhotons=maxPhotons, maxMultPhotons=maxMultPhotons, name=name)
