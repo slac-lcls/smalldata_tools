@@ -276,6 +276,7 @@ class DetObject(dropObject):
           bmask[(i%2)*352:(i%2+1)*352,768/8*(i/2):768/8*(i/2+1)]=1
           self.bankMasks.append(bmask.astype(bool))
           #print i,'|', (i%2)*352,(i%2+1)*352,768/8*(i/2),768/8*(i/2+1),'|',bmask.sum(), self.bankMasks[i].sum(),'---',np.ones_like(self.rms)[352:704,0:96].sum()
+
       self.needsGeo=False
       if 'ped' in self.__dict__.keys() and self.ped.shape != self.imgShape:
         self.needsGeo=True
