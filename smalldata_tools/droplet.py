@@ -37,15 +37,15 @@ class aduHist:
                 else:
                         dx = pos[:,0].flatten()
                         dy = pos[:,1].flatten()
-                        inROIx = np.logical_and(dx>np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
-                        inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[0],dy < np.array(self.ROI).flatten()[1]) 
+                        inROIx = np.logical_and(dx > np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
+                        inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[2],dy < np.array(self.ROI).flatten()[3]) 
                         inROI = np.logical_and(inROIx, inROIy)
                         daduF = dadu.flatten()[inROI]
                         hist = np.histogram(daduF[daduF>0], self.bins)
                         return hist[0]
                         
 class dropletSave:
-        def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
+        def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False, ROI=None):
                 self.name=name
                 self.maxDroplets = maxDroplets
                 self.dropPosInt = dropPosInt
@@ -54,6 +54,7 @@ class dropletSave:
                 self.thresADU = thresADU
                 self.flagMasked = flagMasked
                 self.ragged=ragged
+                self.ROI=ROI
 
         def shapeArray(self, returnDict):
                 for key in returnDict.keys():
@@ -152,8 +153,8 @@ class droplet:
         if isinstance(debug, bool):
                 self.debug = debug
 
-    def addDropletSave(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False):
-        dropSave = dropletSave(thresADU,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged)
+    def addDropletSave(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False, ROI=None):
+        dropSave = dropletSave(thresADU,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged, ROI)
         self.dropletSaves.append(dropSave)
 
     def add_aduHist(self, ADUhist=[700], ROI=None, name=''):
@@ -336,6 +337,9 @@ class droplet:
         #print 'pos B ',len(pos_drop), len(pos_drop[0])
 
         for saveD in self.dropletSaves:
+                dropName = self.name
+                if saveD.name!='':
+                        dropName = dropName+'_'+saveD.name
                 aduArray = np.array(adu_drop).copy()
                 Filter = np.ones_like(aduArray).astype(bool)
                 if saveD.thresADU[0] is not np.nan and saveD.thresADU[1] is not np.nan:
@@ -343,10 +347,15 @@ class droplet:
                 elif saveD.thresADU[0] is not np.nan:
                         Filter = (aduArray>saveD.thresADU[0]) 
                 elif saveD.thresADU[1] is not np.nan:
-                        Filter = (aduArray<saveD.thresADU[1])
-                dropName = self.name
-                if saveD.name!='':
-                        dropName = dropName+'_'+saveD.name
+                        Filter = (aduArray<saveD.thresADU[1])                        
+                if saveD.ROI is not None:
+                        dx = np.array(pos_drop)[:,0].flatten()
+                        dy = np.array(pos_drop)[:,1].flatten()
+                        Filter = np.logical_and(Filter, dx > np.array(saveD.ROI).flatten()[0])
+                        Filter = np.logical_and(Filter, dx < np.array(saveD.ROI).flatten()[1]) 
+                        Filter = np.logical_and(Filter, dy > np.array(saveD.ROI).flatten()[2])
+                        Filter = np.logical_and(Filter, dy < np.array(saveD.ROI).flatten()[3]) 
+
                 self.ret_dict[dropName+'_nDroplets'] = Filter.sum()
                 self.ret_dict[dropName+'_adu'] = aduArray[Filter]
                 self.ret_dict[dropName+'_npix'] = np.array(npix_drop)[Filter]
