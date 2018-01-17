@@ -73,6 +73,8 @@ class Cube(object):
         #convenience variables
         self.binBounds = None   #bin boundary array (could be same as bins, but does not need to)
         self.targetVarsXtc = [] #split out the detectors that are not in the smallData
+        self.addIdxVars = []
+        self.dropletProc = {} #for droplet treatment in cube
 
     def addVar(self, tVar):
         if isinstance(tVar, basestring):
@@ -82,6 +84,15 @@ class Cube(object):
                 self.targetVars.append(tv)
         elif isinstance(tVar, dict):
             self.targetVars.append(tVar)
+
+    def addIdxVar(self, tVar):
+        if isinstance(tVar, basestring):
+            self.addIdxVars.append(tVar)
+        elif isinstance(tVar, list):
+            for tv in tVar:
+                self.addIdxVars.append(tv)
+        else:
+            print 'addIdxVar need to be a string or list of strings, got: ',tVar
 
     def printCube(self, Sel):
         print 'cube: ',self.cubeName
@@ -1654,9 +1665,12 @@ class SmallDataAna(object):
     def addCube(self, cubeName, binVar='', bins=[], useFilter=''):    
         self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter)
         
-    def addToCube(self, cubeName, targetVariable):
+    def addToCube(self, cubeName, targetVariable, isIdxVar=False):
         if cubeName in self.cubes.keys():
-            self.cubes[cubeName].addVar(targetVariable)
+            if not isIdxVar:
+                self.cubes[cubeName].addVar(targetVariable)
+            else:
+                self.cubes[cubeName].addIdxVar(targetVariable)
         else:
             print 'could not add variable %s to cube %s as this cuve was not found'%(targetVariable, cubeName)
 
@@ -1700,7 +1714,26 @@ class SmallDataAna(object):
         targetVarsLocal = []
         for tVar in cube.targetVars:
             if isinstance(tVar, basestring):
-                if tVar not in self._fields.keys():
+                if tVar.split(':')[0]=='droplet': #ex: droplet:epix_2/droplet:image
+                    dropBaseName = tVar.split(':')[1]
+                    dropDet = dropBaseName.split('/')[0]
+                    dropFct = tVar.split(':')[2]
+                    #add droplet source.
+                    if dropBaseName not in cube.dropletProc.keys():
+                        if (dropBaseName+'_X') in self._fields.keys():
+                            cube.dropletProc[dropBaseName] = {}
+                            cube.dropletProc[dropBaseName]['source'] = dropDet
+                            cube.dropletProc[dropBaseName]['fct'] = [dropFct]
+                            cube.dropletProc[dropBaseName]['vars'] = [dropBaseName+'_X', dropBaseName+'_Y', dropBaseName+'_adu', dropBaseName+'_npix']
+                            #get shape for image.
+                            cube.dropletProc[dropBaseName]['shape'] = ( np.nanmax(self.getVar('UserDataCfg/%s/iX'%dropDet)), 
+                                                                        np.nanmax(self.getVar('UserDataCfg/%s/iY'%dropDet)))
+                        else:
+                            print 'could not find droplets with base name: ',dropBaseName
+                    else:
+                        cube.dropletProc[dropBaseName]['fct'].append(dropFct)                        
+
+                elif tVar not in self._fields.keys():
                     cube.targetVarsXtc.append(tVar)
                 else:
                     targetVarsLocal.append(tVar)
@@ -1731,16 +1764,15 @@ class SmallDataAna(object):
                         continue
                 if 'damage/%s'%txVar  in self._fields.keys(): 
                         self.Sels['%s_%s'%(cube.cubeName,cube.useFilter)].addCut('damage/%s'%txVar,0.5,1.5)
+            for dropletBase in cube.dropletProc.keys():
+                dropDet = cube.dropletProc[dropletBase]['source']
+                if 'damage/%s'%dropDet in self._fields.keys(): 
+                    self.Sels['%s_%s'%(cube.cubeName,cube.useFilter)].addCut('damage/%s'%dropDet,0.5,1.5)
             cube.useFilter='%s_%s'%(cube.cubeName,cube.useFilter)
 
         return cube, onoff
 
-    #XXX
-    #add code to cube droplets/photons: one image/cube point (image later)
-    #add correct variables to addIdxVar w/ keyword (droplet/photon name)
-    #flatten returned droplet arrays: list/bin
-    #think about adding to cubefile (make array-able)
-    def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False, addIdxVar=None):
+    def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
         if onoff == 2:
             onoff = cubeName_onoff
@@ -1826,19 +1858,16 @@ class SmallDataAna(object):
             if key not in cubeData.keys():
                 cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
-        #TO DO: move this later. UseSmallDataAna method to make Xr to make 
-        #extra Xr for cubed droplets/photons. Merge Datasets.
-        if toHdf5 == 'h5netcdf':
-            fname = '%s/Cube_%s_Run%03d_%s.nc'%(self.dirname,self.expname,self.run,cubeName)
-            cubeData.to_netcdf(fname,engine='h5netcdf')
-        elif toHdf5 == 'h5':
-            fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
-            h5Dict={}
-            for key in cubeData.keys():
-                h5Dict[key] = cubeData[key].values
-                dictToHdf5(fname, h5Dict)
-            
-        if not returnIdx:
+        if not returnIdx and len(cube.addIdxVars)==0 and len(cube.dropletProc.keys())==0:
+            if toHdf5 == 'h5netcdf':
+                fname = '%s/Cube_%s_Run%03d_%s.nc'%(self.dirname,self.expname,self.run,cubeName)
+                cubeData.to_netcdf(fname,engine='h5netcdf')
+            elif toHdf5 == 'h5':
+                fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
+                h5Dict={}
+                for key in cubeData.keys():
+                    h5Dict[key] = cubeData[key].values
+                    dictToHdf5(fname, h5Dict)
             return cubeData
 
         fidVar='fiducials'
@@ -1854,67 +1883,120 @@ class SmallDataAna(object):
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
-        if addIdxVar is not None:
-            if isinstance(addIdxVar,basestring):
-                addIdxVar=[addIdxVar]
-            if  isinstance(addIdxVar,list):
-                for thisIdxVar in addIdxVar:
-                    varData = self.getVar(thisIdxVar,cubeFilter)
-                    coords={'time': timeFiltered}
-                    dims = ['time']
-                    for dim in range(len(varData.shape)-1):
-                        thisDim = np.arange(0, varData.shape[dim+1])
-                        dimStr = 'dim%d'%dim
-                        coords[dimStr] = thisDim
-                        dims.append(dimStr)
-                    addArray = xr.DataArray(varData, coords=coords, dims=dims,name=thisIdxVar)
-                    evtIDXr = xr.merge([evtIDXr, addArray])
-            else:
-                print 'addIdxVar need to be a string of list of strings, got: ',addIdxVar
-        #else:
-        #    print 'could not find event idx in data'
-        #    return cubeData,None
+        for thisIdxVar in cube.addIdxVars:
+            varData = self.getVar(thisIdxVar,cubeFilter)
+            coords={'time': timeFiltered}
+            dims = ['time']
+            for dim in range(len(varData.shape)-1):
+                thisDim = np.arange(0, varData.shape[dim+1])
+                dimStr = 'dim%d'%dim
+                coords[dimStr] = thisDim
+                dims.append(dimStr)
+            addArray = xr.DataArray(varData, coords=coords, dims=dims,name=thisIdxVar)
+            evtIDXr = xr.merge([evtIDXr, addArray])
+        for thisDropDictKey in cube.dropletProc.keys():
+            for thisVar in cube.dropletProc[thisDropDictKey]['vars']:
+                varData = self.getVar(thisVar,cubeFilter)
+                coords={'time': timeFiltered}
+                dims = ['time']
+                for dim in range(len(varData.shape)-1):
+                    thisDim = np.arange(0, varData.shape[dim+1])
+                    dimStr = 'dim%d'%dim
+                    coords[dimStr] = thisDim
+                    dims.append(dimStr)
+                addArray = xr.DataArray(varData, coords=coords, dims=dims,name=thisVar)
+                evtIDXr = xr.merge([evtIDXr, addArray])
+                
         cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5)
         keys = cubeIdxData.groups.keys()
         keys.sort()
 
         fidArray=[]
         timeArray=[]
-        if isinstance(addIdxVar,list):
-            addArray=[]
-            for addVar in addIdxVar:
-                addArray.append([])
-        else:
-            addArray=[]
+        addArray=[]
+        for addIdxVar in cube.addIdxVars:
+            addArray.append([])
         for key in (Bins[1:]+Bins[:-1])*0.5:
             if key in cubeIdxData.groups.keys():
                 fidArray.append(evtIDXr.fiducial[cubeIdxData.groups[key]])
                 timeArray.append(evtIDXr.evttime[cubeIdxData.groups[key]])
-                if addIdxVar is not None:
-                    if isinstance(addIdxVar,basestring):
-                        addArray.append(evtIDXr[addIdxVar][cubeIdxData.groups[key]])
-                    elif isinstance(addIdxVar,list):
-                        for iv,thisIdxVar in enumerate(addIdxVar):
-                            addArray[iv].append(evtIDXr[thisIdxVar][cubeIdxData.groups[key]])
+                for iv,thisIdxVar in enumerate(cube.addIdxVars):
+                    addArray[iv].append(evtIDXr[thisIdxVar][cubeIdxData.groups[key]])
             else:
                 fidArray.append([])
                 timeArray.append([])
-                if addIdxVar is not None:
-                    if isinstance(addIdxVar,basestring):
-                        addArray.append([])
-                    elif isinstance(addIdxVar,list):
-                        for iv,thisIdxVar in enumerate(addIdxVar):
-                            addArray[iv].append([])
+                for iv,thisIdxVar in enumerate(cube.addIdxVars):
+                    addArray[iv].append([])
                 
         retDict={'keys': keys}
         retDict['fiducial']=fidArray
         retDict['evttime']=timeArray
-        if addIdxVar is not None:
-            if isinstance(addIdxVar,basestring):
-                retDict[addIdxVar]=addArray
-            elif isinstance(addIdxVar,list):
-                for iv,thisIdxVar in enumerate(addIdxVar):
-                    retDict[thisIdxVar]=addArray[iv]
+        for iv,thisIdxVar in enumerate(cube.addIdxVars):
+            retDict[thisIdxVar]=addArray[iv]
+
+        h5Dict={}
+        for key in cubeData.keys():
+            h5Dict[key] = cubeData[key].values
+
+        for droplet in cube.dropletProc.keys():
+            if 'image' in cube.dropletProc[droplet]['fct']:
+                imageList=[]
+                for key in (Bins[1:]+Bins[:-1])*0.5:
+                    if key in cubeIdxData.groups.keys():
+                        dropVar = cube.dropletProc[droplet]['vars']
+                        npix = evtIDXr[dropVar[3]][cubeIdxData.groups[key]].data.flatten()
+                        tx = evtIDXr[dropVar[0]][cubeIdxData.groups[key]].data.flatten()[npix>0]
+                        ty = evtIDXr[dropVar[1]][cubeIdxData.groups[key]].data.flatten()[npix>0]
+                        tadu = evtIDXr[dropVar[2]][cubeIdxData.groups[key]].data.flatten()[npix>0]
+                        #make image
+                        data = tadu
+                        row = tx
+                        col = ty
+                        if max(row)>=cube.dropletProc[droplet]['shape'][0] or max(col)>=cube.dropletProc[droplet]['shape'][1]:
+                            print 'inconsistent shape ',self.shape, max(row), max(col)
+                        imageList.append(sparse.coo_matrix( (data, (row, col)),shape=cube.dropletProc[droplet]['shape']).todense())
+                #append to retDict & h5
+                retDict[droplet+'_image']=imageList
+                h5Dict[(droplet+'_image').replace('/','_')]=imageList
+
+            if 'array' in cube.dropletProc[droplet]['fct']:
+                xArrayList=[]
+                yArrayList=[]
+                aduArrayList=[]
+                nDrops=[]
+                for key in (Bins[1:]+Bins[:-1])*0.5:
+                    if key in cubeIdxData.groups.keys():
+                        dropVar = cube.dropletProc[droplet]['vars']
+                        npix = evtIDXr[dropVar[3]][cubeIdxData.groups[key]].data.flatten()
+                        xArrayList.append(evtIDXr[dropVar[0]][cubeIdxData.groups[key]].data.flatten()[npix>0])
+                        yArrayList.append(evtIDXr[dropVar[1]][cubeIdxData.groups[key]].data.flatten()[npix>0])
+                        aduArrayList.append(evtIDXr[dropVar[2]][cubeIdxData.groups[key]].data.flatten()[npix>0])
+                        nDrops.append((npix>0).sum())
+                #now filter zeros out and make or max size.
+                xArray=np.zeros((len(xArrayList), np.nanmax(np.array(nDrops))))
+                yArray=np.zeros((len(xArrayList), np.nanmax(np.array(nDrops))))
+                aduArray=np.zeros((len(xArrayList), np.nanmax(np.array(nDrops))))
+                for ia, (thisx, thisy, thisadu) in enumerate(zip(xArrayList, yArrayList, aduArrayList)):
+                    xArray[ia,:len(thisx)] = thisx
+                    yArray[ia,:len(thisx)] = thisy
+                    aduArray[ia,:len(thisx)] = thisadu
+                retDict[droplet+'_array_X']=xArray
+                retDict[droplet+'_array_Y']=yArray
+                retDict[droplet+'_array_adu']=aduArray
+                h5Dict[(droplet+'_array_X').replace('/','_')]=xArray
+                h5Dict[(droplet+'_array_Y').replace('/','_')]=yArray
+                h5Dict[(droplet+'_array_adu').replace('/','_')]=aduArray
+
+        #write final file.
+        if toHdf5 == 'h5netcdf':
+            fname = '%s/Cube_%s_Run%03d_%s.nc'%(self.dirname,self.expname,self.run,cubeName)
+            cubeData.to_netcdf(fname,engine='h5netcdf')
+        elif toHdf5 == 'h5':
+            fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
+            for key in cubeData.keys():
+                h5Dict[key] = cubeData[key].values
+                dictToHdf5(fname, h5Dict)
+            
         return cubeData,retDict
 
 

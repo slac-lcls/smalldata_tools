@@ -1640,7 +1640,7 @@ class SmallDataAna_psana(object):
             self.addDetInfo(det)
 
         #smallData only version: only run on single core
-        if len(self.sda.cubes[cubeName].targetVarsXtc)<=0:
+        if len(myCube.targetVarsXtc)<=0:
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
                 fout = h5py.File(outFileName, "w")
@@ -1660,7 +1660,7 @@ class SmallDataAna_psana(object):
         try:
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
         except:
-            print 'you will need an analysis release < ana.1.3.21 for the cube to work. Solution in progress...'
+            print 'you will need an analysis release < ana.1.3.21 or ana-1.3.42 for the cube to work. Solution in progress...'
             print 'we will save the small cubed data only and return'
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
@@ -1677,9 +1677,8 @@ class SmallDataAna_psana(object):
             self.sda.getOffVar('fiducials','xon',nNbr=offEventsCube, mean=False)
             self.sda.getOffVar('event_time','xon',nNbr=offEventsCube, mean=False)
             addVars = [ 'offNbrs_event_time_xon_nNbr%02d'%offEventsCube,'offNbrs_fiducials_xon_nNbr%02d'%offEventsCube]
-            cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True, addIdxVar=addVars)
-        else:
-            cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)
+            self.sda.cubes[cubeName].addIdxVar(addVars)
+        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)
         #add small data to hdf5
         for key in cubeData.keys():
             addToHdf5(fout, key, cubeData[key].values)
