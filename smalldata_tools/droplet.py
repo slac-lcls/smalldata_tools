@@ -34,6 +34,8 @@ class aduHist:
         def fillHist(self, dadu, pos=None):
                 if pos is None:
                         return np.histogram(dadu.flatten()[dadu.flatten()>0], self.bins)[0]
+                elif pos.shape==(0,):
+                        return (np.histogram(pos, self.bins))[0]
                 else:
                         dx = pos[:,0].flatten()
                         dy = pos[:,1].flatten()
@@ -168,9 +170,9 @@ class droplet:
         self.photonize=True
 
     def checkADUHist(self):
-            for adu in self.aduHists:
-                    if adu.ROI is not None:
-                            self.aduROI = True
+        for adu in self.aduHists:
+                if adu.ROI is not None:
+                        self.aduROI = True
 
     def applyThreshold(self,img, donut=False, invert=False, low=False):
         if not donut:
