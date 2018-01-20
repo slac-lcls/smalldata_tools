@@ -21,6 +21,7 @@ from utilities import dictToHdf5, shapeFromKey_h5
 from utilities import hist2d
 from utilities import running_median_insort
 from utilities import get_startOffIdx, get_offVar
+from utilities import getBins as util_getBins
 from utilities_plotting import plotImageBokeh, plotMarker, plotImage
 import bokeh
 import bokeh.plotting as bp
@@ -37,11 +38,10 @@ import xarray as xr
 
  
 class Cube(object):
-    def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVar=None):
+    def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVars=None):
         self.binVar = binVar
         self.bins = bins
         self.useFilter = useFilter
-        self.addBinVar=None
 
         nbins = len(bins)
         if nbins==3:
@@ -50,17 +50,7 @@ class Cube(object):
             else:
                 nbins=len(np.arange(min(bins[0],bins[1]),max(bins[0],bins[1]),bins[2]))
 
-        if isinstance(addBinVar,list):
-            self.addBinVar=addBinVar[0]
-            addbins=addBinVar[1:]
-            if len(addbins)==3:
-                if type(addbins[2]) is int:
-                    nbinsAdd=len(np.linspace(min(addbins[0],addbins[1]),max(addbins[0],addbins[1]),addbins[2]))
-                else:
-                    nbinsAdd=len(np.arange(min(addbins[0],addbins[1]),max(addbins[0],addbins[1]),addbins[2]))
-            else:
-                nbinAdd = addBinVar[1:]
-            self.addBins = nbinAdd
+        self.add_BinVar(addBinVars)
 
         if cubeName is not None:
             self.cubeName = cubeName
@@ -75,6 +65,33 @@ class Cube(object):
         self.targetVarsXtc = [] #split out the detectors that are not in the smallData
         self.addIdxVars = []
         self.dropletProc = {} #for droplet treatment in cube
+
+    #should be extended to a dict to > 2 binning variables.
+    def add_BinVar(self, addBinVars):
+        if addBinVars is None:
+            addBinVars={}
+        if isinstance(addBinVars,list):
+            if isinstance(addBinVars[1], list):
+                inputBins = addBinVars[1]
+            else:
+                inputBins = addBinVars[1:]
+            addbins = util_getBins(inputBins)
+            if addbins is None:
+                print 'Could not define bin boundaries for addBinVars:',inputBins
+                print 'automatic detection only works for primary binning axis'
+            addBinVars = { addBinVars[0]: addbins}
+        elif isinstance(addBinVars,dict):
+            for addVar in addBinVars.keys():
+                addbins = util_getBins(addBinVars[addVar])
+                if addbins is None:
+                    print 'Could not define bin boundaries for addBinVars:',addBinVars[addVar]
+                    print 'automatic detection only works for primary binning axis'
+                addBinVars[addVar] = addbins
+        else:
+            print 'please pass addBinVar as list: [ varName, bins ]'
+
+        self.addBinVars = addBinVars
+        return
 
     def addVar(self, tVar):
         if isinstance(tVar, basestring):
@@ -128,16 +145,11 @@ class Cube(object):
     def writeCube(self, cubeName):
         f = open('CubeSetup_'+cubeName+'.txt','w')
         print 'write CubeSetup file for ',cubeName, ' to ','CubeSetup_'+cubeName+'.txt'
-        if self.addBinVar is None:
-            if isinstance(self.bins,list):
-                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
-            else:
-                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
+        print 'this will NOT work for additional variables'
+        if isinstance(self.bins,list):
+            json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
         else:
-            if isinstance(self.bins,list):
-                json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter, self.addVarBin, self.addBins], f, indent=3)
-            else:
-                json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter, self.addVarBin, self.addBins], f, indent=3)
+            json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
         f.close()
 
 class Selection(object):
@@ -1265,23 +1277,8 @@ class SmallDataAna(object):
 
 
     def getBins(self,bindef=[], debug=False):
-        #have full list of bin boundaries, just return it
-        if len(bindef)>3:
-            return bindef
-  
-        if len(bindef)==3:
-            if type(bindef[2]) is int:
-                Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
-            else:
-                Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
-            if Bins[-1]<bindef[1]:
-                Bins = np.append(Bins,max(bindef[0],bindef[1]))
-            return Bins
-
-        if len(bindef)==2:
-            if debug:
-                print 'only two bin boundaries, so this is effectively a cut...cube will have a single image'
-            Bins = np.array([min(bindef[0],bindef[1]),max(bindef[0],bindef[1])])
+        Bins = util_getBins(bindef, debug)
+        if Bins is not None:
             return Bins
 
         #have no input at all, assume we have unique values in scan. If not, return empty list 
@@ -1662,8 +1659,8 @@ class SmallDataAna(object):
     ### functions for easy cube creation
     ###
     #########################################################
-    def addCube(self, cubeName, binVar='', bins=[], useFilter=''):    
-        self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter)
+    def addCube(self, cubeName, binVar='', bins=[], useFilter='', addBinVars=None):    
+        self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter, addBinVars=addBinVars)
         
     def addToCube(self, cubeName, targetVariable, isIdxVar=False):
         if cubeName in self.cubes.keys():
@@ -1751,6 +1748,8 @@ class SmallDataAna(object):
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)] = Selection()
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].add(self.Sels[useFilterBase])
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].addCut(cube.binVar, min(Bins), max(Bins) )
+            for addVar in cube.addBinVars.keys():
+                self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].addCut(addVar, min(cube.addBinVars[addVar]), max(cube.addBinVars[addVar]) )
             #add cuts with detector damage - if we have damage detector info.
             for txVar in targetVarsLocal:
                 if txVar[0]=='/':txVar=txVar[1:] 
@@ -1786,17 +1785,10 @@ class SmallDataAna(object):
             binVar = self.getDelay()
         else:
             binVar = self.get1dVar(cube.binVar)
-
-        #if applicable, get second bin variable.
-        if cube.addBinVar is not None:
-            if cube.addBinVar == 'delay':
-                addBinVar = self.getDelay()
-            else:
-                addBinVar = self.get1dVar(cube.addBinVar)
-            addBins = cube.addBins
                 
         if debug:
-            cube.printCube(self.Sels[cube.useFilter])
+            cube.printCube(cubeName)
+            cube.printSelection(self.Sels[cube.useFilter])
 
         cubeFilter = self.getFilter(cube.useFilter)
         [cubeOn, cubeOff] = self.getFilterLaser(cube.useFilter, ignoreVar=[])
@@ -1815,15 +1807,34 @@ class SmallDataAna(object):
         if debug:
             print 'bin boundaries: ',Bins
 
-        if cube.addBinVar is not None:
-            addBinVar = addBinVar[cubeFilter]
-            #now use both binning variables & bins to make ind2d object that will be used
-            binIdx = np.digitize(binVar, Bins)
-            addBinIdx = np.digitize(addBinVar, addBins)
-            indOn2d = np.ravel_multi_index((binIdx, addBinIdx),(Bins.shape[0]+1, addBins.shape[0]+1))
-            binVar = indOn2d
+        nTotBins=Bins.shape[0]-1
+        binShp=[Bins.shape[0]-1]
+        if len(cube.addBinVars.keys())>0:
+            binIdx=[np.digitize(binVar, Bins)]
+            if np.array(binIdx).min()<1:
+                print 'something went wrong in the setting of the cube selection, please fix me....'
+                return
+            binIdx = (np.array(binIdx)-1).tolist()
+            for addVar in cube.addBinVars.keys():
+                if addVar == 'delay':
+                    addBinVar = self.getDelay()
+                else:
+                    addBinVar = self.get1dVar(addVar)
+                addBinVar = addBinVar[cubeFilter]
+                addBinIdx = np.digitize(addBinVar, cube.addBinVars[addVar])
+                if np.array(addBinIdx).min()<1:
+                    print 'something went wrong in the setting of the cube selection for variable %s, please fix me....'%addVar
+                    return
+                addBinIdx = (np.array(addBinIdx)-1).tolist()
+                binShp.append(cube.addBinVars[addVar].shape[0]-1)
+                nTotBins=nTotBins*(cube.addBinVars[addVar].shape[0]-1)
+                binIdx.append(addBinIdx)
+
+            #binShp & binIdx as tuple for use in ravel_multi_index. Append them to cube
+            indMultiD = np.ravel_multi_index(tuple(binIdx),tuple(binShp))
+            binVar = indMultiD
             orgBins = Bins
-            Bins = np.arange(0,(Bins.shape[0]+1*addBins.shape[0]+1))
+            Bins = np.arange(0,nTotBins+1)
 
         timeFiltered = self._tStamp[cubeFilter]
         newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
@@ -1851,12 +1862,67 @@ class SmallDataAna(object):
         cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).sum(dim='time')                  
         #could add error using the std of the values.
         cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).std(dim='time')
-        for key in cubeDataErr:
-            if key.replace('std_','').replace('__','/') in cube.targetVars:
-                cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
-        for key in cubeDataErr:
-            if key not in cubeData.keys():
-                cubeData = xr.merge([cubeData, cubeDataErr[key]])
+            
+        if len(cube.addBinVars.keys())>0:
+            newXr = None
+            for key in cubeData.keys():
+                #treat only actual data
+                if key in cubeData.dims:
+                    continue
+                #get dimensions & coords for reshaped data
+                dims = [cube.binVar]
+                coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                for addVar in cube.addBinVars.keys():
+                    dims.append(addVar)
+                    coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
+                for thisdim in cubeData[key].dims:
+                    if thisdim=='binVar_bins':
+                        continue
+                    dims.append(thisdim)
+                    coords[thisdim]=cubeData[key].coords[thisdim].data
+                #now get data & create new data and new shape:
+                dataShp = cubeData[key].shape
+                newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
+                data = cubeData[key].data.reshape(newShp)
+                dataArray = xr.DataArray(data, coords=coords, dims=dims,name=key)
+                if newXr is None:
+                    newXr = dataArray
+                else:
+                    newXr = xr.merge([newXr, dataArray])
+
+            for key in cubeDataErr.keys():
+                #treat only actual data
+                if key in cubeDataErr.dims:
+                    continue
+                if key == 'nEntries' or key == 'binVar':
+                    continue
+                #get dimensions & coords for reshaped data
+                dims = [cube.binVar]
+                coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                for addVar in cube.addBinVars.keys():
+                    dims.append(addVar)
+                    coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
+                for thisdim in cubeDataErr[key].dims:
+                    if thisdim=='binVar_bins':
+                        continue
+                    dims.append(thisdim)
+                    coords[thisdim]=cubeDataErr[key].coords[thisdim].data
+                #now get data & create new data and new shape:
+                dataShp = cubeDataErr[key].shape
+                newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
+                data = cubeDataErr[key].data.reshape(newShp)
+                newKey = ('std_%s'%key)
+                print 'key ',key, newKey
+                dataArray = xr.DataArray(data, coords=coords, dims=dims,name=newKey)
+                newXr = xr.merge([newXr, dataArray])
+            cubeData = newXr
+        else:
+            for key in cubeDataErr:
+                if key.replace('std_','').replace('__','/') in cube.targetVars:
+                    cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
+            for key in cubeDataErr:
+                if key not in cubeData.keys():
+                    cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
         if not returnIdx and len(cube.addIdxVars)==0 and len(cube.dropletProc.keys())==0:
             if toHdf5 == 'h5netcdf':
@@ -1928,16 +1994,6 @@ class SmallDataAna(object):
                 for iv,thisIdxVar in enumerate(cube.addIdxVars):
                     addArray[iv].append([])
                 
-        retDict={'keys': keys}
-        retDict['fiducial']=fidArray
-        retDict['evttime']=timeArray
-        for iv,thisIdxVar in enumerate(cube.addIdxVars):
-            retDict[thisIdxVar]=addArray[iv]
-
-        h5Dict={}
-        for key in cubeData.keys():
-            h5Dict[key] = cubeData[key].values
-
         for droplet in cube.dropletProc.keys():
             if 'image' in cube.dropletProc[droplet]['fct']:
                 imageList=[]
@@ -1954,10 +2010,33 @@ class SmallDataAna(object):
                         col = ty
                         if max(row)>=cube.dropletProc[droplet]['shape'][0] or max(col)>=cube.dropletProc[droplet]['shape'][1]:
                             print 'inconsistent shape ',self.shape, max(row), max(col)
-                        imageList.append(sparse.coo_matrix( (data, (row, col)),shape=cube.dropletProc[droplet]['shape']).todense())
-                #append to retDict & h5
-                retDict[droplet+'_image']=imageList
-                h5Dict[(droplet+'_image').replace('/','_')]=imageList
+                        imageAsMatrix = sparse.coo_matrix( (data, (row, col)),shape=cube.dropletProc[droplet]['shape']).todense()
+                        imageList.append(np.asarray(imageAsMatrix))
+                    else:
+                        nanImage = np.zeros(cube.dropletProc[droplet]['shape'])
+                        nanImage.fill(np.nan)
+                        imageList.append(nanImage)
+                        
+                if len(cube.addBinVars.keys())>0:
+                    dims = [cube.binVar]
+                    coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                    for addVar in cube.addBinVars.keys():
+                        dims.append(addVar)
+                        coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
+                    dataShape = np.array(imageList[0]).shape
+                    for dim in range(len(dataShape)):
+                        thisDim = np.arange(0, dataShape[dim])
+                        dimStr = 'imgDim%d'%dim
+                        coords[dimStr] = thisDim
+                        dims.append(dimStr)
+
+                    #now get data & create new data and new shape:
+                    dataShp = np.array(imageList).shape
+                    newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
+                    data = np.array(imageList).reshape(newShp)
+                    newKey = (droplet+'_image').replace('/','_')
+                    dataArray = xr.DataArray(data, coords=coords, dims=dims,name=newKey)
+                    cubeData = xr.merge([cubeData, dataArray])
 
             if 'array' in cube.dropletProc[droplet]['fct']:
                 xArrayList=[]
@@ -1972,6 +2051,10 @@ class SmallDataAna(object):
                         yArrayList.append(evtIDXr[dropVar[1]][cubeIdxData.groups[key]].data.flatten()[npix>0])
                         aduArrayList.append(evtIDXr[dropVar[2]][cubeIdxData.groups[key]].data.flatten()[npix>0])
                         nDrops.append((npix>0).sum())
+                    else:
+                        xArrayList.append([0])
+                        yArrayList.append([0])
+                        aduArrayList.append([0])
                 #now filter zeros out and make or max size.
                 xArray=np.zeros((len(xArrayList), np.nanmax(np.array(nDrops))))
                 yArray=np.zeros((len(xArrayList), np.nanmax(np.array(nDrops))))
@@ -1980,12 +2063,31 @@ class SmallDataAna(object):
                     xArray[ia,:len(thisx)] = thisx
                     yArray[ia,:len(thisx)] = thisy
                     aduArray[ia,:len(thisx)] = thisadu
-                retDict[droplet+'_array_X']=xArray
-                retDict[droplet+'_array_Y']=yArray
-                retDict[droplet+'_array_adu']=aduArray
-                h5Dict[(droplet+'_array_X').replace('/','_')]=xArray
-                h5Dict[(droplet+'_array_Y').replace('/','_')]=yArray
-                h5Dict[(droplet+'_array_adu').replace('/','_')]=aduArray
+
+                if len(cube.addBinVars.keys())>0:
+                    dims = [cube.binVar]
+                    coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                    for addVar in cube.addBinVars.keys():
+                        dims.append(addVar)
+                        coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])                        
+                    dimStr = 'dropDim%d'%dim
+                    coords[dimStr] = np.arange(0, xArray[0].shape[0])
+                    dims.append(dimStr)
+                    #now get data & create new data and new shape:
+                    newShp = tuple(np.append(np.array(binShp), xArray.shape[1:]))
+                    xdata = np.array(xArray).reshape(newShp)
+                    ydata = np.array(yArray).reshape(newShp)
+                    adudata = np.array(aduArray).reshape(newShp)
+                    dataArray = xr.DataArray(xdata, coords=coords, dims=dims,name=((droplet+'_array_X').replace('/','_')))
+                    cubeData = xr.merge([cubeData, dataArray])
+                    dataArray = xr.DataArray(ydata, coords=coords, dims=dims,name=((droplet+'_array_Y').replace('/','_')))
+                    cubeData = xr.merge([cubeData, dataArray])
+                    dataArray = xr.DataArray(adudata, coords=coords, dims=dims,name=((droplet+'_array_adu').replace('/','_')))
+                    cubeData = xr.merge([cubeData, dataArray])
+
+        h5Dict={}
+        for key in cubeData.keys():
+            h5Dict[key] = cubeData[key].values
 
         #write final file.
         if toHdf5 == 'h5netcdf':
@@ -1997,6 +2099,15 @@ class SmallDataAna(object):
                 h5Dict[key] = cubeData[key].values
                 dictToHdf5(fname, h5Dict)
             
+        if not returnIdx and len(cube.addIdxVars)==0:
+            return cubeData
+
+        retDict={'keys': keys}
+        retDict['fiducial']=fidArray
+        retDict['evttime']=timeArray
+        for iv,thisIdxVar in enumerate(cube.addIdxVars):
+            retDict[thisIdxVar]=addArray[iv]
+
         return cubeData,retDict
 
 
