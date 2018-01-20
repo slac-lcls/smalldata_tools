@@ -137,6 +137,29 @@ def reduceVar(vals, sigROI,threshold=-1e25):
 
     print 'this dimension is not yet implemented:',vals.shape,' ROI: ',sigROI
     return vals
+
+def getBins(bindef=[], debug=False):
+  #have full list of bin boundaries, just return it
+  if len(bindef)>3:
+    return bindef
+  
+  if len(bindef)==3:
+    if type(bindef[2]) is int:
+      Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
+    else:
+      Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
+    if Bins[-1]<bindef[1]:
+      Bins = np.append(Bins,max(bindef[0],bindef[1]))
+    return Bins
+
+  if len(bindef)==2:
+    if debug:
+      print 'only two bin boundaries, so this is effectively a cut...cube will have a single image'
+    Bins = np.array([min(bindef[0],bindef[1]),max(bindef[0],bindef[1])])
+    return Bins
+
+  #fallback.
+  return None
     
 #from ixppy
 def E2lam(E,o=0):
@@ -191,7 +214,6 @@ def getExpName(env):
 ##########################################################################################
 ###  helper classes & functions
 ##########################################################################################
-
 
 def fitCircle(x,y):
   def calc_R(x,y, xc, yc):
