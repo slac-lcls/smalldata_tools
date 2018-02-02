@@ -11,7 +11,7 @@ def fcn(buffer):
         return 0.
 
 class photon:
-    def __init__(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=False, nphotRet=100):
+    def __init__(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0):
         self.ADU_per_photon = ADU_per_photon
         self.name = name
         self.mask = mask
@@ -19,6 +19,7 @@ class photon:
         self.nphotMax = nphotMax
         self.nphotRet = nphotRet
         self.retImg = retImg
+        self.thresADU = thresADU
 
     def prepImage(self,image):
         return image/self.ADU_per_photon
@@ -30,7 +31,7 @@ class photon:
         """
         tstart=time.time()
         fimage = self.prepImage(image)
-        photons_nda_nomask = photons(fimage, np.ones_like(self.mask))
+        photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
         photons_nda = photons(fimage, self.mask)
 
         ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
@@ -38,21 +39,24 @@ class photon:
         ret_dict['nPhot_mask']=photons_nda[self.mask>0].sum()
         ret_dict['nPhot_nomask']=photons_nda_nomask.sum()
 
-        if self.retImg:
+        if self.retImg>0:
             #next line: work around fact that mask sometimes gets ignored.
             photonsImg = photons_nda.copy()
             photonsImg[self.mask==0]=0
-            sImage = sparse.coo_matrix(photonsImg)
-            #back to normal code
-            data = sImage.data
-            if data.shape[0] >= self.nphotRet:
-                ret_dict['data']=data[:self.nphotRet]
-                ret_dict['row']=sImage.row[:self.nphotRet]
-                ret_dict['col']=sImage.col[:self.nphotRet]
-            else:
-                ret_dict['data']=(np.append(data[:self.nphotRet], np.zeros(self.nphotRet-len(data)))).astype(int)
-                ret_dict['row']=(np.append(sImage.row[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
-                ret_dict['col']=(np.append(sImage.col[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
+            if self.retImg>1:
+                ret_dict['img']=photonsImg
+            else:    
+                sImage = sparse.coo_matrix(photonsImg)
+                #back to normal code
+                data = sImage.data
+                if data.shape[0] >= self.nphotRet:
+                    ret_dict['data']=data[:self.nphotRet]
+                    ret_dict['row']=sImage.row[:self.nphotRet]
+                    ret_dict['col']=sImage.col[:self.nphotRet]
+                else:
+                    ret_dict['data']=(np.append(data[:self.nphotRet], np.zeros(self.nphotRet-len(data)))).astype(int)
+                    ret_dict['row']=(np.append(sImage.row[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
+                    ret_dict['col']=(np.append(sImage.col[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
         ret_dict['evtTime']=time.time() - tstart
         #print 'shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape
         #print ret_dict['data'][:10]
@@ -65,7 +69,7 @@ class photon:
 #
 import scipy.ndimage.measurements as measurements
 class photon2:
-    def __init__(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon2', nphotMax=25, retImg=False, nphotRet=100):
+    def __init__(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon2', nphotMax=25, retImg=0, nphotRet=100):
         self.ADU_per_photon = ADU_per_photon
         self.thresRms=thresRms
         self.thresADU=thresADU
@@ -107,17 +111,21 @@ class photon2:
         ret_dict = {'pHist': np.histogram(photImg.flatten(), np.arange(0,self.nphotMax))[0]}
         ret_dict['nPhot']=photImg.sum()
 
-        if self.retImg:
+        if self.retImg>0:
             #now sparsify the image (data, xIdx, yIdx)
-            sImage = sparse.coo_matrix(photImg)
-            if sImage.data.shape[0] >= self.nphotRet:
-                ret_dict['data']=sImage.data[:self.nphotRet]
-                ret_dict['row']=sImage.row[:self.nphotRet]
-                ret_dict['col']=sImage.col[:self.nphotRet]
+            if self.retImg>1:
+                #print 'DEBUG: shape ',photImg.shape, fphotons.shape
+                ret_dict['img']=photImg.copy()
             else:
-                ret_dict['data']=(np.append(sImage.data[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.data)))).astype(int)
-                ret_dict['row']=(np.append(sImage.row[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
-                ret_dict['col']=(np.append(sImage.col[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
+                sImage = sparse.coo_matrix(photImg)
+                if sImage.data.shape[0] >= self.nphotRet:
+                    ret_dict['data']=sImage.data[:self.nphotRet]
+                    ret_dict['row']=sImage.row[:self.nphotRet]
+                    ret_dict['col']=sImage.col[:self.nphotRet]
+                else:
+                    ret_dict['data']=(np.append(sImage.data[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.data)))).astype(int)
+                    ret_dict['row']=(np.append(sImage.row[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
+                    ret_dict['col']=(np.append(sImage.col[:self.nphotRet], np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
         ret_dict['evtTime']=time.time() - tstart
 
         # re-label this img, and make hist of relabelled ADU histo as well.
@@ -129,7 +137,7 @@ class photon2:
 
 
 class photon3:
-    def __init__(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon3', nphotMax=25, retImg=False, nphotRet=100, maxMethod=0):
+    def __init__(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon3', nphotMax=25, retImg=0, nphotRet=100, maxMethod=0):
         self.ADU_per_photon = ADU_per_photon
         self.thresRms=thresRms
         self.thresADU=thresADU
@@ -155,6 +163,11 @@ class photon3:
         tstart=time.time()    
         fphotons = self.prepImage(image)
         fpi=fphotons//1
+        #ignore partial photons.
+        if self.retImg<0:
+            ret_dict={'img':fpi}
+            return ret_dict
+
         fpf=fphotons%1
         #
         fpf_seed=fpf.copy()
@@ -179,17 +192,20 @@ class photon3:
         ret_dict = {'pHist': np.histogram(photImg.flatten(), np.arange(0,self.nphotMax))[0]}
         ret_dict['nPhot']=photImg.sum()
 
-        if self.retImg:
+        if self.retImg>0:
             #now sparsify the image (data, xIdx, yIdx)
-            sImage = sparse.coo_matrix(photImg)
-            if sImage.data.shape[0] >= self.nphotRet:
-                ret_dict['data']=sImage.data[:self.nphotRet]
-                ret_dict['row']=sImage.row[:self.nphotRet]
-                ret_dict['col']=sImage.col[:self.nphotRet]
+            if self.retImg>1:
+                ret_dict['img']=photImg
             else:
-                ret_dict['data']=(np.append(sImage.data, np.zeros(self.nphotRet-len(sImage.data)))).astype(int)
-                ret_dict['row']=(np.append(sImage.row, np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
-                ret_dict['col']=(np.append(sImage.col, np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
+                sImage = sparse.coo_matrix(photImg)
+                if sImage.data.shape[0] >= self.nphotRet:
+                    ret_dict['data']=sImage.data[:self.nphotRet]
+                    ret_dict['row']=sImage.row[:self.nphotRet]
+                    ret_dict['col']=sImage.col[:self.nphotRet]
+                else:
+                    ret_dict['data']=(np.append(sImage.data, np.zeros(self.nphotRet-len(sImage.data)))).astype(int)
+                    ret_dict['row']=(np.append(sImage.row, np.zeros(self.nphotRet-len(sImage.row)))).astype(int)
+                    ret_dict['col']=(np.append(sImage.col, np.zeros(self.nphotRet-len(sImage.col)))).astype(int)
         ret_dict['evtTime']=time.time() - tstart
 
         # re-label this img, and make hist of relabelled ADU histo as well.
