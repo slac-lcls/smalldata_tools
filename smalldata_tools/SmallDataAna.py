@@ -38,6 +38,7 @@ import xarray as xr
 
  
 class Cube(object):
+    """ class to define binning operation for small/big data in a given run"""
     def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVars=None):
         self.binVar = binVar
         self.bins = bins
@@ -68,6 +69,12 @@ class Cube(object):
 
     #should be extended to a dict to > 2 binning variables.
     def add_BinVar(self, addBinVars):
+        """
+        add extra dimensions to bin the data in
+        parameters: addBinVars: dict or list
+                    list: only 1 extra variable [varname, bin1, bin2, ....]
+                    dict: {varname: bins}
+        """
         if addBinVars is None:
             addBinVars={}
         if isinstance(addBinVars,list):
@@ -94,6 +101,18 @@ class Cube(object):
         return
 
     def addVar(self, tVar):
+        """
+        add variables that should be binned
+        parameters: tVar (either string of list of strings)
+
+        variables are either variables present in the smallData hdf5 file
+                  for droplet binning, specify if you want an image/bin or the X/Y/adu array
+                  e.g. 'droplet:epix_2/droplet:image' 
+                  or detector aliases for data present only in the xtc file
+                  for the latter, the cube needs to be created using the 
+                           SmallDataAna_psana class
+                  example: epixDict = {'source':'epix_2','full':1,'image':1}
+        """
         if isinstance(tVar, basestring):
             self.targetVars.append(tVar)
         elif isinstance(tVar, list):
@@ -103,6 +122,12 @@ class Cube(object):
             self.targetVars.append(tVar)
 
     def addIdxVar(self, tVar):
+        """
+        parameter: tVar as string or list of strings
+        add variables that you would like to have returned as lists for each bin 
+            rather than the sum. Will be returned as extra dictionary in addition 
+            to the binned xArray
+        """
         if isinstance(tVar, basestring):
             self.addIdxVars.append(tVar)
         elif isinstance(tVar, list):
@@ -112,6 +137,10 @@ class Cube(object):
             print 'addIdxVar need to be a string or list of strings, got: ',tVar
 
     def printCube(self, Sel):
+        """
+        parameter: name of filter/selection
+        prints the setting of this cube.
+        """
         print 'cube: ',self.cubeName
         if len(self.bins)==3 and type(self.bins[2]) is int:
             print '%s binned from %g to %g in %i bins'%(self.binVar,self.bins[0],self.bins[1],self.bins[2])
@@ -129,30 +158,9 @@ class Cube(object):
             print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
         print 'we will bin: ',self.targetVars
 
-    def readCube(self, cubeName):
-        jsonCube = json.load(open('CubeSetup_'+cubeName+'.txt','r'))
-        self.binVar = jsonCube[0]
-        self.bins = jsonCube[1]
-        self.targetVars = jsonCube[2]
-        self.useFilter = jsonCube[4]
-        if len(jsonCube)>5:
-            self.addVarBin = jsonCube[5]
-            self.addBins = jsonCube[6]
-        else:
-            self.addVarBin = None
-        f.close()
-
-    def writeCube(self, cubeName):
-        f = open('CubeSetup_'+cubeName+'.txt','w')
-        print 'write CubeSetup file for ',cubeName, ' to ','CubeSetup_'+cubeName+'.txt'
-        print 'this will NOT work for additional variables'
-        if isinstance(self.bins,list):
-            json.dump([self.binVar,self.bins,self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
-        else:
-            json.dump([self.binVar,self.bins.tolist(),self.targetVars,self.Sels[self.useFilter].cuts,self.useFilter], f, indent=3)
-        f.close()
 
 class Selection(object):
+    """ class to define a subset of events using simple square cuts"""
     def __init__(self):
         self.cuts=[]
         self._filter=None
@@ -164,24 +172,41 @@ class Selection(object):
         else:
             print 'cannot set filter array with this ',newFilter
     def addCut(self, varName, varmin, varmax):
+        """
+        add a variable to the selection
+        parameters: varName, varmin, varmax
+        varName: variable name as in smallData hdf5 file (string)
+        varmin: minimum of variable varName that passes
+        varmax: maximum of variable varName that passes
+        """
         self.removeCut(varName)
         self.cuts.append([varName, varmin, varmax])
         self._filter=None
     def removeCut(self, varName):
+        """
+        remove a variable from the selection
+        parameters: varName
+        """
         for cut in self.cuts:
             if cut[0]==varName: self.cuts.remove(cut)
         self._filter=None
     def printCuts(self):
+        """ print the currently defined list of square cuts for selection/filter"""
         for icut,cut in enumerate(self.cuts):
             print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
         if isinstance(self._filter, np.ndarray):
             print 'of %d events %d pass filter'%(self._filter.shape[0], self._filter.sum())
     def add(self, additionalSel):
+        """ add all cuts defined in a different filter to this one"""
         for cut in additionalSel.cuts:
             self.cuts.append(cut)
         self._filter=None
 
 class SmallDataAna(object):
+    """ 
+    class to deal with data in smallData hdf5 file. 
+    Most functions assume standard variables to be present
+    """
     def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None, plotWith='matplotlib'):
         self._fields={}
         self._live_fields=[]
@@ -339,6 +364,7 @@ class SmallDataAna(object):
                     self._live_fields.append(key)
 
     def _getXarrayDims(self,key,tleaf_name=None, setNevt=-1):
+        """ helper function to get the shape of data from hdf5 file"""
         coords=None
         dims=None
         try:
@@ -454,9 +480,10 @@ class SmallDataAna(object):
         return
 
 ###
-# functions to deal with extra variables added to smallData
+# function to deal with extra variables added to smallData
 ###
     def _addXarray(self):
+        """  add xarray object to main class instance as xrData """
         #filling info from redis.
         if self._isRedis:
             self._updateXarray_fromREDIS()
@@ -491,6 +518,8 @@ class SmallDataAna(object):
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
+        """  add new variables to xrData. Keep track so that it will be saved on 
+        destuction of main object"""
         if name.find('__')>=0 and name.replace('__','/') not in self._fields.keys():
             print 'Names of newly defined variables may not contain __, will replace with single _'
             name = name.replace('__','_')
@@ -561,7 +590,7 @@ class SmallDataAna(object):
 
     def _writeNewData(self):
         """
-        write newly created fields to netcdf fiels that can be loaded in future sessions
+        write newly created fields to netcdf files that can be loaded in future sessions
         """
         #do not write files for REDIS (as you are likely auto-updating...)
         if self._isRedis:
@@ -597,6 +626,7 @@ class SmallDataAna(object):
                 new_xrData.to_netcdf(xrname,engine='h5netcdf')
 
     def _readXarrayData(self):
+        """ read data previously saved as netcdf files for this run"""
         for (dirpath, dirnames, filenames) in walk(self.dirname):        
             for fname in filenames:
                 if fname.find('xr')==0 and fname.find('Run%03d'%self.run)>=0:
@@ -618,14 +648,21 @@ class SmallDataAna(object):
 ###
 # functions to add extra variables to smallData
 ###
-    def addMedianVar(self, name='newVar',data=[], windowsize=31):
+    def addMedianVar(self, name='newVar', windowsize=31):
+        """
+        add a variable containing the median of the input variable to the data.
+        parameters: name='newVar', windowsize=31
+                    name: variable name as already present in data
+                    windowsize: number of events prior to current used to calc median
+        """
         dataOrg = self.getVar(name)
         dataNew=running_median_insort(dataOrg, windowsize=windowsize)
         medVarName = ('median_%s'%name).replace('/','_')
         print 'add variable named: ',medVarName
         self.addVar(medVarName, dataNew)
 
-    def getStartOffIdx(self, selName, nNbr=3, overWrite=False):
+    def _getStartOffIdx(self, selName, nNbr=3, overWrite=False):
+        """ function to get start of the indices for neighboring off events"""
         if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys() and not overWrite:
             startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
         else:
@@ -637,10 +674,20 @@ class SmallDataAna(object):
         return startOffIdx
 
     def getOffVar(self, varName, selName, nNbr=3, mean=True, returnMe=False):
+        """
+        function to add data from neighboring off events for each (on) event.
+        parameters: varName, selName, nNbr=3, mean=True, returnMe=False)
+           varName: variable that you want the off-event mean/sum for
+           selName: selection used to define which events are good enough on/off events
+           nNbrs: number of off-events neighboring the current on event
+           mean: if True, return mean of variable for close off events
+                 if False, ???
+           returnMe: if False, add data to xrData; if True, also return
+        """
         if '%s_offIdx_nNbr%02d'%(selName, nNbr) in self.Keys():
             startOffIdx = self.getVar('%s_offIdx_nNbr%02d'%(selName,nNbr))
         else:
-            startOffIdx = self.getStartOffIdx(selName, nNbr=nNbr)
+            startOffIdx = self._getStartOffIdx(selName, nNbr=nNbr)
         filterOff = self.getFilter(selName.split('__')[0]+'__off')
         varArray = self.getVar(varName)
         varArrayOff =  get_offVar(varArray, filterOff, startOffIdx, nNbr=nNbr, mean=mean)
@@ -650,29 +697,9 @@ class SmallDataAna(object):
             self.addVar('offNbrs_%s_%s_nNbr%02d'%(varName.replace('/','_'),selName, nNbr), varArrayOff)
         if returnMe:
             return varArrayOff
-
-    #FIX ME: need to fix this! this will NOT work anymore....
-    def setRun(self, run):
-        self.run=run
-        self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-        if path.isfile(self.fname):
-            self.fh5=tables.open_file(self.fname,'r')
-            if self.hasKey('tt/ttCorr'):
-                self.ttCorr = 'tt/ttCorr'
-            elif self.hasKey('ttCorr/tt'):
-                self.ttCorr = 'ttCorr/tt'
-            else:
-                self.ttCorr = None
-            self.ttBaseStr = 'tt/'
-            if not self.hasKey(self.ttBaseStr+'AMPL'):
-                if self.hasKey('tt/XPP_TIMETOOL_AMPL'):
-                    self.ttBaseStr = 'tt/XPP_TIMETOOL_'
-                elif self.hasKey('tt/TIMETOOL_AMPL'):
-                    self.ttBaseStr = 'tt/TIMETOOL_'
-                elif self.hasKey('tt/TTSPEC_AMPL'):
-                    self.ttBaseStr = 'tt/TTSPEC_'
             
     def Keys2d(self, inh5 = None, printKeys=False):
+        """ return list of variables names in data that contain 2d data for each event """
         return self.Keys(inh5 = inh5, printKeys=printKeys, areaDet=True)
 
     def Keys(self, name=None, inh5 = None, printKeys=False, areaDet=False, cfgOnly=False, returnShape=False):
@@ -750,6 +777,7 @@ class SmallDataAna(object):
         return keysFiltered
         
     def nEvts(self,printThis=False):
+        """ return number of events in the smallData hdf5 file for this event"""
         if ('fiducials' in self._fields.keys()):
             nent = self._fields['fiducials'][0][0]
         elif ('EvtID/fid' in self._fields.keys()):
@@ -762,6 +790,7 @@ class SmallDataAna(object):
         return nent
 
     def printRunInfo(self):
+        """ print information for this run: total number of events and if we had a scan"""
         self.nEvts(printThis=True)
         isScan=False
         scanVar = self.getScanName()
@@ -772,6 +801,8 @@ class SmallDataAna(object):
             print 'this run is a scan of %s with %d points'%(scanVar,nPoints)
 
     def hasKey(self, inkey):
+        """ return boolean to reflect if a given variable is present in data
+            parameter: inkey (variable name as string)"""
         if inkey in self._fields.keys():
             return True
 
@@ -795,14 +826,22 @@ class SmallDataAna(object):
                 ttBaseStr = 'tt/TTSPEC_'
         return ttCorr, ttBaseStr
 
-    def addCut(self, varName, cmin=0, cmax=0, useFilter=None):
+    def addCut(self, varName, varmin=0, varmax=0, useFilter=None):
+        """
+        add a variable to the selection
+        parameters: varName, varmin, varmax
+        varName: variable name as in smallData hdf5 file (string)
+        varmin: minimum of variable varName that passes
+        varmax: maximum of variable varName that passes
+        useFilter: name of selection to add this cut to (required)
+        """
         if useFilter is None:
             print 'you need to pass the name for the filter/selection you want to use'
             return
         if not self.Sels.has_key(useFilter):
             self.Sels[useFilter] = Selection()
-        if cmin!=cmax:
-            self.Sels[useFilter].addCut(varName, cmin,cmax)
+        if varmin!=varmax:
+            self.Sels[useFilter].addCut(varName, varmin, varmax)
         else:
             if isinstance(varName, basestring):
                 if self.Sels.has_key(varName):
@@ -818,15 +857,25 @@ class SmallDataAna(object):
         #if self.Sels[useFilter]._filter is not None:
         #    print 'of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum())
     def removeCut(self, varName, useFilter):
+        """
+        remove a variable from the selection
+        parameters: varName, useFilter
+           varName: name of variable on which to not cut anymore
+           useFilter: name of selection/filter
+        """
         if not self.Sels.has_key(useFilter):
             print 'Selection with name %s does not exist, cannot remove cut'%useFilter
             return
         self.Sels[useFilter].removeCut(varName)
         Filter = self.getFilter(useFilter=useFilter)
         self.Sels[useFilter]._setFilter(Filter)
-    def printCuts(self, selName=None, brief=True):
-        self.printSelections(selName=selName, brief=brief)
     def printSelections(self, selName=None, brief=True):
+        """
+        print the square cuts that currently define the selection/filter
+        parameter: selName=None, brief=True
+           if selName is None, all available selections are listed
+           if brief is True, the cuts are not printed out
+        """
         if selName is not None:
             if selName not in self.Sels:
                 print 'could not find selection ',selName,', options are: ',
@@ -840,6 +889,11 @@ class SmallDataAna(object):
             if not brief:
                 print self.Sels[sel].printCuts()
                 print '--------------------------'
+    def printCuts(self, selName=None, brief=True):
+        """
+        alias to printSelections
+        """
+        self.printSelections(selName=selName, brief=brief)
     def getFilterLaser(self, useFilter, ignoreVar=[]):
         #moved functionality into getFilter.
         useFilterBase = useFilter.split('__')[0]
@@ -1331,43 +1385,6 @@ class SmallDataAna(object):
         else:
           print 'you passed only one number and the this does not look like a new delay scan or a normal scan'
           return []
-
-    def getScans(self, runs=[], ttCorr=False, sig='', i0='', numBins=100, useFilter=None, offData=True):
-        plotData=[]
-        currRun=self.run
-        for run in runs:
-            self.setRun(run)
-            plotData.append(self.getScan(ttCorr=ttCorr,sig=sig,i0=i0,numBins=numBins,useFilter=useFilter))
-        self.setRun(currRun)
-        if not plotData[0].has_key('scanOffPoints'):
-            offData=False
-        for ids,dataSet in enumerate(plotData):
-            if ids==0:
-                scanPoints = dataSet['scanPoints']
-                scan = dataSet['scan']
-            elif len(dataSet['scanPoints']) != len(scanPoints) or (dataSet['scanPoints']-scanPoints).sum()>0.:
-                print 'scanPoints not the same for all runs'
-                return
-            else:
-                scan += dataSet['scan']
-        if offData:
-            for ids,dataSet in enumerate(plotData):
-                if ids==0:
-                    scanOffPoints = dataSet['scanOffPoints']
-                    scanOff = dataSet['scanOff']
-                elif len(dataSet['scanOffPoints']) != len(scanPoints) or (dataSet['scanOffPoints']-scanPoints).sum()>0.:
-                    print 'scanOffPoints not the same for all runs'
-                    print scanOffPoints
-                    print dataSet['scanOffPoints']
-                    offData=False
-                    break
-                else:
-                    scanOff += dataSet['scanOff']
-
-            if offData:
-                return {'scanVarName':dataSet['scanVarName'],'scanPoints':scanPoints,'scan':scan, 'scanOffPoints':scanOffPoints,'scanoff':scanoff}
-        
-        return {'scanVarName':dataSet['scanVarName'],'scanPoints':scanPoints,'scan':scan}
 
     def getScan(self, ttCorr=False, sig='', i0='', Bins=100, useFilter=None):
         return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
