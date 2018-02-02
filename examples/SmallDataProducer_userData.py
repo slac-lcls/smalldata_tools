@@ -65,8 +65,8 @@ acqROI = [0,8000]
 epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
-#ttCalib=[]#1.860828, -0.002950]
-ttCalib=[1.860828, -0.002950]
+ttCalib=[]#1.860828, -0.002950]
+#ttCalib=[1.860828, -0.002950]
 #decide which analog input to save & give them nice names
 #aioParams=[[1],['laser']]
 aioParams=[]
@@ -169,7 +169,7 @@ except:
 if ds.rank==0:
     version='unable to detect psana version'
     for dirn in psana.__file__:
-        if dirn.find('ana-')>=0):
+        if dirn.find('ana-')>=0:
             version=dirn
     print 'Using psana version ',version
 ########################################################## 
