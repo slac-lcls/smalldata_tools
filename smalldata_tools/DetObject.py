@@ -157,6 +157,7 @@ class DetObject(dropObject):
         self.digitalCardId1 = epixCfg.digitalCardId1()
         self.analogCardId0 = epixCfg.analogCardId0()
         self.analogCardId1 = epixCfg.analogCardId1()
+        self.storeEnvironment()
       if self.det.name.__str__().find('OceanOptics')<0 and self.det.dettype != 16:
         self.rms = self.det.rms(run)
         self.ped = self.det.pedestals(run)
@@ -512,13 +513,13 @@ class DetObject(dropObject):
       self.fitCenter_threshold = threshold
       self.fitCenter_maskName = maskName
 
-    def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=False, nphotRet=100):
-      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name)
+    def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, thresADU=0.9):
+      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name)
 
-    def addPhotons2(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=False, nphotRet=100): 
+    def addPhotons2(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100): 
       self.__dict__[name] = photons.photon2(ADU_per_photon=ADU_per_photon, thresADU=thresADU, thresRms=thresRms, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name)
 
-    def addPhotons3(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=False, nphotRet=100, maxMethod=0):
+    def addPhotons3(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, maxMethod=0):
       self.__dict__[name] = photons.photon3(ADU_per_photon=ADU_per_photon, thresADU=thresADU, thresRms=thresRms, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name,maxMethod=maxMethod)
 
     def getData(self,evt):
