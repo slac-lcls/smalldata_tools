@@ -116,9 +116,23 @@ class SmallDataAna_psana(object):
 
     def Keys(self,printthis=False):
         try:
-            times = self.dsIdxRun.times()            
-            evt=self.dsIdxRun.event(times[-1])
-            keys=evt.keys()
+            keys=[]
+            for k in self.dsIdxRun.env().configStore().keys():
+                if k.alias() is not None and k.alias()!='':
+                    newKey=True
+                    for oldKey in keys:
+                        if oldkey.alias() == k.alias():
+                            newKey=False
+                    if newKey:
+                        keys.append(k)
+                else:
+                    newKey=True
+                    for oldKey in keys:
+                        if oldkey.src().__repr() == k.src().__repr():
+                            newKey=False
+                    if newKey:
+                        keys.append(k)
+            #keys=evt.keys()
             if printthis: 
                 print keys
             else:
@@ -1129,9 +1143,9 @@ class SmallDataAna_psana(object):
         self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, median=True)
         self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, std=True)
         fname='%s-end.data'%self.sda.run
-        pedImg = self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName]
+        pedImg = self.__dict__['AvImg_median_Filter%s_raw_%s'%(filterName,detname)]
         pedStat = np.logical_and(pedImg > min(pedRange), pedImg < max(pedRange))
-        rmsImg = self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName]
+        rmsImg = self.__dict__['AvImg_std_Filter%s_raw_%s'%(filterName,detname)]
         rmsStat = np.logical_and(rmsImg > min(rmsRange), rmsImg < max(rmsRange))
         status = (~(np.logical_and(rmsStat, pedStat))).astype(int)
 
@@ -1156,9 +1170,9 @@ class SmallDataAna_psana(object):
         if not os.path.exists(dirname+'pixel_status'):
             os.makedirs(dirname+'pixel_status')
         print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
-        det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_epix'%filterName], fmt='%.1f',addmetad=True)
+        det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_%s'%(filterName,detname)], fmt='%.1f',addmetad=True)
         print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-        det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_epix'%filterName], fmt='%.1f',addmetad=True)
+        det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(filterName,detname)], fmt='%.1f',addmetad=True)
         print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
