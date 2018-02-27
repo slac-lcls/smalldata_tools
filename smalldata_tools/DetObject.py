@@ -80,20 +80,20 @@ class ROIObject(dropObject):
     self.__dict__['rebin'] = shape
   def Rebin(self, array):
     return rebin(array, self.__dict__['rebin'])
-  def addProj(self, pjName = '', axis=0, singlePhoton=False, mean=False, cutADU=-1e6, cutRms=-1e6):
-    self.__dict__['proj'+pjName]=[axis, singlePhoton, mean, cutADU, cutRms, 'proj'+pjName]
+  def addProj(self, pjName = '', axis=0, singlePhoton=False, mean=False, thresADU=-1e6, thresRms=-1e6):
+    self.__dict__['proj'+pjName]=[axis, singlePhoton, mean, thresADU, thresRms, 'proj'+pjName]
   def projection(self,arrayIn,params=[]):
     if len(params)<4:
       print 'projection does not have enough parameters'
       return np.nan
     singlePhoton=params[1]
     mean=params[2]
-    cutADU=params[3]
-    cutRms=params[4]
+    thresADU=params[3]
+    thresRms=params[4]
     array = arrayIn.copy()
-    array.data[array.data<cutADU]=0
+    array.data[array.data<thresADU]=0
     if 'rms' in self.__dict__.keys() and self.rms is not None:
-      array.data[array.data<cutRms*self.rms]=0
+      array.data[array.data<thresRms*self.rms]=0
     if singlePhoton:
       array.data[array.data>0]=1
     #array.data = array.data.astype(np.float64)
