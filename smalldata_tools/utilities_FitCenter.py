@@ -21,6 +21,17 @@ def applyCanny(ar, mask, sigma=1, thres=95):
         arThres = feature.canny(ar, sigma=sigma,mask=mask, low_threshold=thres)
     return arThres,sparse.coo_matrix(arThres)
 
+def fitCircle(x,y,yerr=None, guess=None):
+    x = [x]
+    y = [y]
+    r = [0]
+    fitRes = fitCircles(x,y,r,yerr=None, guess=None)
+    #have only one circle.
+    fitRes['R']=fitRes['R'][0]
+    fitRes['residu']=fitRes['residu'][0]
+    return fitRes
+
+# --------------------------------------------------------------    
 def fitCircles(x,y,r,yerr=None, guess=None):
   def calc_R(x,y, par):
       xc,yc = par

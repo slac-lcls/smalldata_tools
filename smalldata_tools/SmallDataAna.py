@@ -2243,7 +2243,7 @@ class SmallDataAna(object):
 
     def FitCircle(self, detname=None, mask=None, method=None, thres=None):
         try:
-            from utilities import fitCircle
+            from utilities_FitCenter import fitCircle
         except:
             print 'could not import underlying code, this does not work yet'
             return
@@ -2311,14 +2311,14 @@ class SmallDataAna(object):
                 #res: xc, yc, R, residu
                 res = fitCircle(parr[:,0],parr[:,1])
                 #draw the circle.
-                circle = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
+                circle = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
                 plt.gca().add_artist(circle)
-                plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
-                plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
+                plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
+                plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
 
                 if raw_input("Happy with this fit:\n") in ["y","Y"]:
                     happy = True
-                print 'x,y: ',res[0],res[1],' R ',res[2]
+                print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
                 print 'avs: ',parr[:,0].mean(),parr[:,1].mean()
         else:
             happy = False
@@ -2349,15 +2349,15 @@ class SmallDataAna(object):
             res = fitCircle(x.flatten()[imageThres.flatten().astype(bool)],y.flatten()[imageThres.flatten().astype(bool)])
             print 'res',res
             print 'x,y av: ',(x.flatten()[imageThres.flatten().astype(bool)]).mean(),(y.flatten()[imageThres.flatten().astype(bool)].mean())
-            circleM = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
+            circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
             fig=plt.figure(figsize=(10,10))
             #will need to check of rotation necessary here???
             #plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
             plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None',aspect='auto')
             plt.gca().add_artist(circleM)
-            plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
-            plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
-            print 'x,y: ',res[0],res[1],' R ',res[2]
+            plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
+            plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
+            print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
     
             plt.show()
 

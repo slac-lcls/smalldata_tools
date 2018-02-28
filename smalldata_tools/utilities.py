@@ -215,26 +215,6 @@ def getExpName(env):
 ###  helper classes & functions
 ##########################################################################################
 
-def fitCircle(x,y):
-  def calc_R(x,y, xc, yc):
-    return np.sqrt((x-xc)**2 + (y-yc)**2)
-
-  def f(c,x,y):
-    Ri = calc_R(x,y,*c)
-    return Ri - Ri.mean()
-
-  x_m = np.mean(x)
-  y_m = np.mean(y)
-  center_estimate = x_m, y_m
-  center, ier = optimize.leastsq(f, center_estimate, args=(x,y))
-  xc, yx = center
-  Ri     = calc_R(x, y, *center)
-  R      = Ri.mean()
-  residu = np.sum((Ri - R)**2)
-  return xc, yx, R, residu
-    
-# --------------------------------------------------------------    
-
 def hasKey(inkey, inh5=None, printThis=False):
     hasKey = False
     if inh5 is None:

@@ -1,5 +1,5 @@
 import numpy as np
-from utilities import fitCircle
+from utilities_FitCenter import fitCircle
 
 class fitCenter:
     def __init__(self, maskName='', threshold=90, name='', xArr=None, yArr=None, imgShape=None):
@@ -42,9 +42,9 @@ class fitCenter:
             image = (image*self.mask)
 
         thresP = np.percentile(image, self.threshold)
-        res = fitCircle(self.xArr.flatten()[image.flatten()>thresP],self.yArr.flatten()[image.flatten()>thresP])
-    
-        ret_dict = {'center' : [res[0], res[1]]}
-        ret_dict['r'] = res[2]
-        #print ret_dict
-        return ret_dict
+        res = fitCircle(self.xArr.flatten()[image.flatten()>thresP],self.yArr.flatten()[image.flatten()>thresP])    
+        res.pop('msg',None)
+        res.pop('info',None)
+        res.pop('success',None)
+        res.pop('C',None)
+        return res

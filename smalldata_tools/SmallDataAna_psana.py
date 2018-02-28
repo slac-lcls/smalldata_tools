@@ -17,7 +17,6 @@ import os
 import psana
 import SmallDataAna as sda
 from DetObject import DetObject
-from utilities import fitCircle
 from SmallDataUtils import getUserData
 from utilities import addToHdf5
 from utilities import dropObject
@@ -27,6 +26,7 @@ import azimuthalBinning as ab
 from matplotlib import gridspec
 import RegDB.experiment_info
 from utilities_FitCenter import FindFitCenter
+from utilities_FitCenter import fitCircle
 from mpi4py import MPI
 import h5py
 comm = MPI.COMM_WORLD
@@ -664,33 +664,43 @@ class SmallDataAna_psana(object):
         print 'center Final ',combRes['xCen'],combRes['yCen']
         return combRes
  
-    def FitCircle(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5]):
+    def FitCircleMouse(self, detname=None, use_mask=False, limits=[5,99.5]):
+        self.FitCircle(detname=None, use_mouse=True, use_mask=False, use_mask_local=False, limits=[5,99.5])
+
+    def FitCircleThreshold(self, detname=None, use_mask=False, limits=[5,99.5],plotIt=False, thresIn=None):
+        self.FitCircle(detname=None, use_mouse=False, use_mask=False, use_mask_local=True, limits=[5,99.5], thresIn=thresIn, plotIt=plotIt)
+
+    def FitCircle(self, detname=None, use_mouse=None, use_mask=False, use_mask_local=False, limits=[5,99.5], plotIt=True, thresIn=None):
         detname, img, avImage = self.getAvImage(detname=None)
+
+        if use_mouse is None or (not isinstance(use_mouse, bool) and not isinstance(use_mouse, basestring)):
+            if raw_input("Select Circle Points by Mouse?:\n") in ["y","Y"]:
+                use_mouse = True
+            else:
+                use_mouse = False
 
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
             img = (img*mask)
 
-        if use_mask_local:
-            if self.__dict__.has_key('_mask_'+avImage):
+        if use_mask_local and self.__dict__.has_key('_mask_'+avImage):
                 mask = self.__dict__['_mask_'+avImage]
                 img = (img*mask)
-            else:
-                maskName = raw_input('no local mask defined for %s, please enter file name '%avImage)
+        elif use_mask_local and not use_mouse:
+            maskName = raw_input('no local mask defined for %s, please enter file name '%avImage)
                 
-                if maskName!='' and os.path.isfile(maskName):
-                    locmask=np.loadtxt(maskName)
-                    if self.__dict__[detname].x is not None and locmask.shape != self.__dict__[detname].x.shape:
-                        if locmask.shape[1] == 2:
-                            locmask = locmask.transpose(1,0)
-                        locmask = locmask.reshape(self.__dict__[detname].x.shape)
-                    self.__dict__['_mask_'+avImage] = locmask
-                    img = (img*locmask)
+            if maskName!='' and os.path.isfile(maskName):
+                locmask=np.loadtxt(maskName)
+                if self.__dict__[detname].x is not None and locmask.shape != self.__dict__[detname].x.shape:
+                    if locmask.shape[1] == 2:
+                        locmask = locmask.transpose(1,0)
+                    locmask = locmask.reshape(self.__dict__[detname].x.shape)
+                self.__dict__['_mask_'+avImage] = locmask
+                img = (img*locmask)
 
         plotMax = np.percentile(img[img!=0], 99.5)
         plotMin = np.percentile(img[img!=0], 5)
         print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
-
 
         needsGeo=False
         if self.__dict__[detname].ped is not None and self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
@@ -709,8 +719,8 @@ class SmallDataAna_psana(object):
             x,y = np.meshgrid(x,y)
         extent=[x.min(), x.max(), y.min(), y.max()]
 
-        if raw_input("Select Circle Points by Mouse?:\n") in ["y","Y"]:
-            happy = False
+        happy = False
+        if use_mouse:
             while not happy:
                 fig=plt.figure(figsize=(10,10))
                 if needsGeo:
@@ -719,7 +729,6 @@ class SmallDataAna_psana(object):
                     plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 points=ginput(n=0)
                 parr=np.array(points)
-                #res: xc, yc, R, residu
                 res = fitCircle(parr[:,0],parr[:,1])
                 #draw the circle. now need to redraw the whole image thanks to the conda matplotlib
                 fig=plt.figure(figsize=(10,10))
@@ -727,117 +736,48 @@ class SmallDataAna_psana(object):
                     plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 else:
                     plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-                circle = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
+                circle = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
                 plt.gca().add_artist(circle)
-                plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
-                plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
-                print 'x,y: ',res[0],res[1],' R ',res[2]
+                plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
+                plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
+                print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
                 if raw_input("Happy with this selection:\n") in ["y","Y"]:
                     happy = True
 
         else:
-            happy = False
             while not happy:
-                fig=plt.figure(figsize=(10,10))
-                plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-                thres = float(raw_input("min percentile % of selected points:\n"))
+                if plotIt:
+                    fig=plt.figure(figsize=(10,10))
+                    plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                if thresIn is None:
+                    thres = float(raw_input("min percentile % of selected points:\n"))
+                else:
+                    thres = thresIn
+                    happy = True
                 thresP = np.percentile(img[img!=0], thres)
                 print 'thresP',thresP
                 imageThres=image.copy()
                 imageThres[image>thresP]=1
                 imageThres[image<thresP]=0
-                fig=plt.figure(figsize=(5,5))
-                plt.imshow(imageThres,clim=[-0.1,1.1])
-                if raw_input("Happy with this threshold (y/n):\n") in ["y","Y"]:
-                    happy=True
+                if plotIt:
+                    fig=plt.figure(figsize=(5,5))
+                    plt.imshow(imageThres,clim=[-0.1,1.1])
+                    if raw_input("Happy with this threshold (y/n):\n") in ["y","Y"]:
+                        happy=True
 
             res = fitCircle(x.flatten()[img.flatten()>thresP],y.flatten()[img.flatten()>thresP])
-            circleM = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
-            fig=plt.figure(figsize=(10,10))
-            if needsGeo:
-                plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
-            else:
-                plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-            plt.gca().add_artist(circleM)
-            plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
-            plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
-            print 'x,y: ',res[0],res[1],' R ',res[2]
-    
-            plt.show()
-
-    def FitCircleThreshold(self, thresHold=None, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5], plotIt=False):
-        detname, img, avImage = self.getAvImage(detname=None)
-
-        plotMax = np.percentile(img, 99.5)
-        plotMin = np.percentile(img, 5)
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
-
-        if use_mask:
-            mask = self.__dict__[detname].det.mask_calib(self.run)
-            img = (img*mask)
-
-        if use_mask_local:
-            if self.__dict__.has_key('_mask_'+avImage):
-                mask = self.__dict__['_mask_'+avImage]
-                img = (img*mask)
-            else:
-                print 'no local mask defined for ',avImage
-
-        needsGeo=False
-        if self.__dict__[detname].ped is not None and self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
-            needsGeo=True
-
-        if needsGeo:
-            image = self.__dict__[detname].det.image(self.run, img)
-        else:
-            image = img
-
-        x = self.__dict__[detname+'_x']
-        y = self.__dict__[detname+'_y']
-        if x is None:
-            x = np.arange(0, image.shape[1])
-            y = np.arange(0, image.shape[0])
-            x,y = np.meshgrid(x,y)
-        extent=[x.min(), x.max(), y.min(), y.max()]
-
-        if plotIt:
-            fig=plt.figure(figsize=(10,10))
-            plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-        happy = False
-        while not happy:
-            if thresHold is None:
-                thresHold = float(raw_input("min percentile % of selected points:\n"))
-            thresP = np.percentile(img, thresHold)
-            print 'thresP',thresP
-            imageThres=image.copy()
-            imageThres[image>thresP]=1
-            imageThres[image<thresP]=0
+            circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
+            print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
             if plotIt:
-                fig=plt.figure(figsize=(5,5))
-                plt.imshow(imageThres,clim=[-0.1,1.1])
-                if raw_input("Happy with this threshold (y/n):\n") in ["y","Y"]:
-                    happy=True
-            else:
-                happy=True
-
-        #print 'DEBUG: ',x.shape,y.shape,img.shape
-        res = fitCircle(x.flatten()[img.flatten()>thresP],y.flatten()[img.flatten()>thresP])
-        circleM = plt.Circle((res[0],res[1]),res[2],color='b',fill=False)
-        if plotIt:
-            fig=plt.figure(figsize=(10,10))
-            if needsGeo:
-                plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
-            else:
-                plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-            plt.gca().add_artist(circleM)
-            plt.plot([res[0],res[0]],[y.min(),y.max()],'r')
-            plt.plot([x.min(),x.max()],[res[1],res[1]],'r')
-        print 'x,y: ',res[0],res[1],' R ',res[2]
-    
-        if plotIt:
-            plt.show()
-
-        return res[0], res[1], res[2]
+                fig=plt.figure(figsize=(10,10))
+                if needsGeo:
+                    plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                else:
+                    plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                plt.gca().add_artist(circleM)
+                plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
+                plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
+                plt.show()
 
     def MakeMask(self, detname=None, limits=[5,99.5]):
         detname, img, avImage = self.getAvImage(detname=None)
