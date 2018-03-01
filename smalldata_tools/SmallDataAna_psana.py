@@ -589,7 +589,7 @@ class SmallDataAna_psana(object):
     def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inParams={}):
         detname, img, avImage = self.getAvImage(detname=None)
         try:
-            mask = self.__dict__[detname].det.cmask.astype(bool)
+            mask = self.__dict__[detname].cmask.astype(bool)
         except:
             mask = self.__dict__[detname].det.mask(self.run, calib=True, status=True).astype(bool)
         nPixRaw=1.

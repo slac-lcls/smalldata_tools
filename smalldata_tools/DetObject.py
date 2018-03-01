@@ -88,12 +88,12 @@ class ROIObject(dropObject):
       return np.nan
     singlePhoton=params[1]
     mean=params[2]
-    thresADU=params[3]
-    thresRms=params[4]
+    cutADU=params[3]
+    cutRms=params[4]
     array = arrayIn.copy()
-    array.data[array.data<thresADU]=0
+    array.data[array.data<cutADU]=0
     if 'rms' in self.__dict__.keys() and self.rms is not None:
-      array.data[array.data<thresRms*self.rms]=0
+      array.data[array.data<cutRms*self.rms]=0
     if singlePhoton:
       array.data[array.data>0]=1
     #array.data = array.data.astype(np.float64)
@@ -466,7 +466,7 @@ class DetObject(dropObject):
       self.binnedImgShp = shape
       self.orgImgShp = None
 
-    def addAzAv(self,phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None):
+    def addAzAv(self,phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None, tx=None, ty=None):
       azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
       if userMask is not None and userMask.shape == self.mask.shape:
         azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool)&userMask.astype(bool))
@@ -478,13 +478,22 @@ class DetObject(dropObject):
         center = self.__dict__[azavName+'_center']
       if eBeam is None:
         eBeam = self.__dict__[azavName+'_eBeam']
-      self.__dict__[azavName] = ab.azimuthalBinning(x=self.x.flatten()/1e3,y=self.y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin)
+      if tx is None or ty is None:
+        try:
+          tx = self.__dict__[azavName+'_tx']
+          ty = self.__dict__[azavName+'_ty']
+        except:
+          tx=0
+          ty=0
+      self.__dict__[azavName] = ab.azimuthalBinning(x=self.x.flatten()/1e3,y=self.y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin,tx=tx, ty=ty)
       self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
       self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
       self.__dict__[azavName+'_norm'] = self.__dict__[azavName].norm
       self.__dict__[azavName+'_normPhi'] = self.__dict__[azavName].Cake_norm
       self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
       self.__dict__[azavName+'_Pplane'] = Pplane
+      self.__dict__[azavName+'_tx'] = tx
+      self.__dict__[azavName+'_ty'] = ty
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
       if len(ROI)>0:
