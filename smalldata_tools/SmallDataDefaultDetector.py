@@ -196,7 +196,7 @@ class aiDetector(defaultDetector):
             return
         self.aioInfo[0] = AIOPars[0]
         self.aioInfo[1] = AIOPars[1]
-        if len(AIOPars)==3:
+        if len(AIOPars)>=3:
             self.aioInfo[2] = AIOPars[2]
             if len(AIOPars)==4:
                 self.aioInfo[3] = AIOPars[3]
