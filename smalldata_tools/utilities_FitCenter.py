@@ -14,17 +14,18 @@ from scipy.spatial import cKDTree
 # stuff for new beam center fit
 #
 
-def applyCanny(ar, mask, sigma=1, thres=95):
+def applyCanny(ar, mask, sigma=1, thres=0.9, thresH=0.995):
     if thres==-999:
         arThres = feature.canny(ar, sigma=sigma,mask=mask)
     else:
-        arThres = feature.canny(ar, sigma=sigma,mask=mask, low_threshold=thres)
+        arThres = feature.canny(ar, sigma=sigma,mask=mask, low_threshold=thres, high_threshold=thresH, use_quantiles=True)
     return arThres,sparse.coo_matrix(arThres)
 
 def fitCircle(x,y,yerr=None, guess=None):
     x = [x]
     y = [y]
-    r = [0]
+    rGuess = (np.nanmax(x)-np.nanmin(x)+np.nanmax(y)-np.nanmin(y))/4. #largest differences/2/2
+    r = [rGuess]
     fitRes = fitCircles(x,y,r,yerr=None, guess=None)
     #have only one circle.
     fitRes['R']=fitRes['R'][0]
@@ -208,7 +209,8 @@ def FindFitCenter(image, mask, inParams={}):
     #parameters found to be typcially right
     #parameters for canny
     params={'sigma':1}       #gaussian blurring for canny algorithm
-    params['threshold']=95   #threshold for only strongest features
+    params['low_threshold']=0.95   #threshold for only strongest features, using quantiles
+    params['high_threshold']=0.995   #threshold for only strongest features, using quantiles
     #parameters for hough center finding
     params['precision']=1   #bin size in pixel for center in hough array
     params['nBinR']=280     #number of bins for center
@@ -220,6 +222,7 @@ def FindFitCenter(image, mask, inParams={}):
     params['minInFrac']=0.45 #require 45% of points to pass RANSAC 
     params['minPoints']=40 #minimum absolute number of points in circle to be considered for final fit. 
                            #Should maybe be a fraction of highest number.
+
     for inkey in inParams:
         try:
             params[inkey]=inParams[inkey]
@@ -228,7 +231,7 @@ def FindFitCenter(image, mask, inParams={}):
             pass
 
     print 'now find edges'
-    arThres,arSparse = applyCanny(ar, mask.astype(bool), sigma=params['sigma'], thres=params['threshold'])
+    arThres,arSparse = applyCanny(ar, mask.astype(bool), sigma=params['sigma'], thres=params['low_threshold'], thresH=params['high_threshold'])
 
     print 'use hough transform to find center & ring candidates'
     res = iterateCenter(arSparse, [arThres.shape[0], arThres.shape[1]], [1,1401], prec=params['precision'], overfillFactor=params['overFac'], nBinR=params['nBinR'])
