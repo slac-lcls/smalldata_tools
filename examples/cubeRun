@@ -190,7 +190,7 @@ else
 fi
 
 source /reg/g/psdm/etc/psconda.sh
-source activate ana-1.4.43 #special release made for MEC with mpi writing
+source activate ana-1.3.42 #special release made for MEC with mpi writing
 
 echo $CMD
 $CMD
