@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--run", help="run",type=int)
 parser.add_argument("--exp", help="experiment name")
 parser.add_argument("--dir", help="output directory")
+parser.add_argument("--nev", help="number of events/bin")
 parser.add_argument("--file", help="file name")
 args = parser.parse_args()
 
@@ -107,5 +108,7 @@ if ana is not None:
     #ana.addToCube('cube',['ipm2/sum','ipm3/sum', cspadDict])
 
     #anaps.makeCubeData('cube',  nEvtsPerBin=3, dirname='./output')
-    #anaps.makeCubeData('cubeDelay',  nEvtsPerBin=3)
-    anaps.makeCubeData('cubeDelay')
+    if args.nev:
+        anaps.makeCubeData('cubeDelay',  nEvtsPerBin=args.nev)
+    else:
+        anaps.makeCubeData('cubeDelay')
