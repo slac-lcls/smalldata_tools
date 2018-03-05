@@ -60,12 +60,11 @@ def getNmaxDrop(run):
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-acqROI = [0,8000]
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
-ttCalib=[]#1.860828, -0.002950]
+ttCalib=[]
 #ttCalib=[1.860828, -0.002950]
 #decide which analog input to save & give them nice names
 #aioParams=[[1],['laser']]
@@ -183,9 +182,28 @@ epixname='epix_diff'
 nDrop = getNmaxDrop(int(run))
 have_epix = checkDet(ds.env(), epixname)
 if have_epix:
+    #create detector object. needs run for calibration data
+    #common mode: 46 is the "original" to psana method 7(?)
+    #row & column correction on data w/ photons&neighbors removed.
     epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
+
+    #two threshold droplet finding.
+    #for data w/ > 1 photon energy this is the only thing that will work.
+    #Tends to add photons together into single droplet if occupancy
+    #is not low, might need photonizing step to get single photon positions
     epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
     epix['droplet'].addDropletSave(maxDroplets=nDrop)
+
+    #now add photon algorithms. Only works for single energy photon data
+    # ADU_per_photon: expected ADU for photon of expected energy
+    # thresADU: fraction of photon energy in photon candidate
+                #(2 neighboring pixel)
+    #retImg: 0 (def): only histogram of 0,1,2,3,...,24 photons/pixel is returned
+    #        1 return Nphot, x, y arrays
+    #        2 store image using photons /event
+    if (int(run)==444):
+        epix.addPhotons(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200)
+
     dets.append(epix)
 
 ROI_rowland = getROI_rowland(int(run))
@@ -213,6 +231,10 @@ if haveCspad:
             pass
     dets.append(cspad)
 
+##adding raw timetool traces:
+#defaultDets.append(ttRawDetector(env=ds.env()))
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 ########################################################## 
 ##
 ## <-- User Input end
@@ -228,10 +250,6 @@ if len(aioParams)>0:
     setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-##adding raw timetool traces:
-#defaultDets.append(ttRawDetector(env=ds.env()))
-##adding wave8 traces:
-#defaultDets.append(wave8Detector('Wave8WF'))
 
 #add config data here
 userDataCfg={}
