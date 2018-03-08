@@ -1595,7 +1595,7 @@ class SmallDataAna_psana(object):
             imCS = plt.subplot(gsCM[icm*2+1]).imshow(imgs[icm*2+1],clim=limsStd,interpolation='none',aspect='auto')
             plt.colorbar(imCS)
 
-    def makeCubeData(self, cubeName, dirname='', nEvtsPerBin=-1, offEventsCube=-1):
+    def makeCubeData(self, cubeName, dirname='', nEvtsPerBin=-1, offEventsCube=-1, storeMeanStd=False):
         if self.sda is None:
             return
         if dirname=='':
@@ -1623,7 +1623,7 @@ class SmallDataAna_psana(object):
             else:
                 print 'detector with this alias not in data ',det
                 myCube.targetVarsXtc.pop(idet)
-            myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in myCube.targetVarsXtc]
+        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in myCube.targetVarsXtc]
 
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)
@@ -1700,7 +1700,7 @@ class SmallDataAna_psana(object):
         for ib,fids,evttimes in itertools.izip(itertools.count(), eventIdxDict['fiducial'],eventIdxDict['evttime']):
             if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
                 continue
-            print 'bin: %d has %d events'%(ib, len(fids))
+            print 'bin: %d has %d events, will be treated in rank %d'%(ib, len(fids),rank)
             binID[ib%bins_per_job]=ib
 
             nEvts_bin=0
@@ -1838,19 +1838,21 @@ class SmallDataAna_psana(object):
 #            if rank==0:
 #                print 'print array shape before saving: ',arShape
             cubeBigData = fout.create_dataset('%s'%detName,arShape)
-            cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
-            cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
+            if storeMeanStd:
+                cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
+                cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
             if offEventsCube>0:
                 cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
+
             for iSlice,Slice,SliceO, SliceS,SliceM in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray):
-                if np.nansum(Slice)>0:
+                if np.nansum(Slice)!=0:
                     cubeBigData[rank*bins_per_job+iSlice,:] = Slice
                     print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
                 if offEventsCube>0 and np.nansum(SliceO)>0:
                     cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
-                if np.nansum(SliceS)>0:
+                if storeMeanStd and if np.nansum(SliceS)>0:
                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
-                if np.nansum(SliceM)>0:
+                if storeMeanStd and np.nansum(SliceM)>0:
                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
 
             if det.rms is not None:
