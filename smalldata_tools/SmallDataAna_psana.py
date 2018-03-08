@@ -44,6 +44,29 @@ class SmallDataAna_psana(object):
             if self.run > lastRun:
                 print 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run)
                 return None
+            
+            isLive = (RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['end_time_unix'] is None)
+            self.dsname='exp=%s:run=%i:smd'%(expname,run)
+            xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
+            ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
+            ffbxtcname=ffbxtcdirname+'/e*-r%04d-*'%int(run)
+            ffbidxname=ffbxtcdirname+'/index/e*-r%04d-*'%int(run)
+            idxname=ffbxtcdirname+'/index/e*-r%04d-*'%int(run)
+            import glob
+            present_ffbXtc=glob.glob('%s'%ffbxtcname)
+            present_ffbIdx=glob.glob('%s'%ffbidxname)
+            present_Idx=glob.glob('%s'%idxname)
+            if len(present_ffbXtc)>0:
+                self.dsname='exp=%s:run=%i:smd:dir=/reg/d/ffb/%s/%s/xtc'%(expname,run,self.hutch.lower(),expname)
+                if isLive:
+                    self.dsname=self.dsname+':live'
+            if len(present_ffbIdx)>0:
+                self.dsnameIdx='exp=%s:run=%i:idx:dir=/reg/d/ffb/%s/%s/xtc'%(expname,run,self.hutch.lower(),expname)
+            elif len(present_Idx)>0:
+                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+            else:
+                self.dsnameIdx=None
+
         else:
             xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
             haveXtc=False
@@ -54,20 +77,33 @@ class SmallDataAna_psana(object):
             if not haveXtc:
                 print 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run)
                 return None
-        self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
-        self.dsname='exp=%s:run=%i:smd'%(expname,run)
+
+            self.dsname='exp=%s:run=%i:smd'%(expname,run)
+            self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+            xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
+            idxname=xtcdirname+'/index/e*-r%04d-*'%int(run)
+            import glob
+            present_Idx=glob.glob('%s'%idxname)
+            if len(present_Idx)>0:
+                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+            else:
+                self.dsnameIdx=None
+
         print 'make SmallDataAna_psana from dsname: ',self.dsname
         try:
             self.ds = psana.DataSource(self.dsname)
         except:
             print 'Failed to set up small data psana dataset!'
             self.ds = None
-        try:
-            self.dsIdx = psana.DataSource(self.dsnameIdx)
-            self.dsIdxRun = self.dsIdx.runs().next()
-        except:
-            print 'Failed to set up index based psana dataset'
-            self.dsIdx = None
+        if self.dsnameIdx is None:
+            print 'Failed to set up index based psana dataset, likely because no idx files have been produced/moved yet'
+        else:
+            try:
+                self.dsIdx = psana.DataSource(self.dsnameIdx)
+                self.dsIdxRun = self.dsIdx.runs().next()
+            except:
+                print 'Failed to set up index based psana dataset'
+                self.dsIdx = None
         print 'try to make SmallDataAna using dirname ',dirname,' for exp: ',expname,' and run ',run
         try:
             print 'setting up SmallData ana from anaps '
@@ -524,7 +560,6 @@ class SmallDataAna_psana(object):
             avImage=avImages[0]
         detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
-        print 'DEBUG: ',img.shape
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
@@ -1116,15 +1151,15 @@ class SmallDataAna_psana(object):
         print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
-    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None):
-        detname, img, avImage = self.getAvImage(detname=None)
+    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=None,ty=None):
+        detname, img, avImage = self.getAvImage(detname=detname)
         if dis_to_sam==None:
             dis_to_sam=float(raw_input('please enter the detector distance'))
         if center==None or len(center)!=2:
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
             center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
                     int(centerString.replace('[','').replace(']','').split(',')[1])]
-        self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name, Pplane=Pplane, userMask=userMask)
+        self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name, Pplane=Pplane, userMask=userMask,tx=tx,ty=ty)
 
     def getAzAvs(self,detname=None):
       if detname is None:

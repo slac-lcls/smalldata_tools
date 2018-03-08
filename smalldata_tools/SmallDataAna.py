@@ -1075,7 +1075,7 @@ class SmallDataAna(object):
         return vals
 
     #make delay another Xarray variable.
-    def getDelay(self, use_ttCorr=True, addEnc=False):
+    def getDelay(self, use_ttCorr=True, addEnc=False, addLxt=True):
         """
         function to get the xray-laser delay from the data
         usage:
@@ -1129,7 +1129,9 @@ class SmallDataAna(object):
             print 'required to add encoder value, did not find encoder!'
         if addEnc and self.hasKey('enc/lasDelay'):
             if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
-                nomDelay+=getVar(fh5,'enc/lasDelay').value
+                nomDelay+=self.getVar('enc/lasDelay')
+        if addLxt:
+            nomDelay+=self.getVar('epics/lxt_ttc')*1e12
 
         if use_ttCorr:
             #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()
