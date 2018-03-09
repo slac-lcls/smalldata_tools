@@ -118,6 +118,8 @@ class SmallDataAna_psana(object):
             return 'raw_'
         elif common_mode==5:
             return 'unb_'
+        elif common_mode==6:
+            return 'cm6_'
         elif common_mode==45:
             return 'median_'
         elif common_mode==46:
@@ -624,7 +626,7 @@ class SmallDataAna_psana(object):
     def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inParams={}):
         detname, img, avImage = self.getAvImage(detname=None)
         try:
-            mask = self.__dict__[detname].cmask.astype(bool)
+            mask = self.__dict__[detname].det.cmask.astype(bool)
         except:
             mask = self.__dict__[detname].det.mask(self.run, calib=True, status=True).astype(bool)
         nPixRaw=1.
@@ -1649,7 +1651,13 @@ class SmallDataAna_psana(object):
         try:
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
         except:
-            print 'you will need an analysis release < ana.1.3.21 or ana-1.3.42 for the cube to work. Solution in progress...'
+            try:
+                fout = h5py.File('/tmp/%d'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
+                print 'could not open the desired file for MPI writing. Likely a permission issue:'
+                import pwd
+                print 'owner: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,'(',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,'), permissions: ',oct(os.stat(outFileName).st_mode)[-3:]
+            except:
+                print 'you will need an analysis release < ana.1.3.21 or >= ana-1.3.42 for the cube to work. Solution in progress...'
             print 'we will save the small cubed data only and return'
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
@@ -1850,7 +1858,7 @@ class SmallDataAna_psana(object):
                     print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
                 if offEventsCube>0 and np.nansum(SliceO)>0:
                     cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
-                if storeMeanStd and if np.nansum(SliceS)>0:
+                if storeMeanStd and np.nansum(SliceS)>0:
                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
                 if storeMeanStd and np.nansum(SliceM)>0:
                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM

@@ -478,13 +478,17 @@ class DetObject(dropObject):
         center = self.__dict__[azavName+'_center']
       if eBeam is None:
         eBeam = self.__dict__[azavName+'_eBeam']
-      if tx is None or ty is None:
+      if tx is None:
         try:
           tx = self.__dict__[azavName+'_tx']
-          ty = self.__dict__[azavName+'_ty']
         except:
           tx=0
+      if ty is None:
+        try:
+          ty = self.__dict__[azavName+'_ty']
+        except:
           ty=0
+
       self.__dict__[azavName] = ab.azimuthalBinning(x=self.x.flatten()/1e3,y=self.y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin,tx=tx, ty=ty)
       self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
       self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
@@ -561,7 +565,7 @@ class DetObject(dropObject):
       elif self.common_mode%100==5:
         self.evt.dat = self.det.calib(evt, cmpars=(5,100))
       elif self.common_mode%100==6:
-        self.evt.dat = self.det.calib(evt, cmpars=(6))
+        self.evt.dat = self.det.calib(evt, cmpars=[6], rms = self.rms, normAll=True)
       elif self.common_mode%100==4:
         self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30))
       elif self.common_mode%100==7:
