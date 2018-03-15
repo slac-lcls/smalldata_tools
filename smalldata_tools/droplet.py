@@ -72,6 +72,12 @@ class dropletSave:
                                 continue
                         try: 
                                 inputSize = len(returnDict[key])
+                        except:
+                                print 'cannot get len of: ',key
+                                print '--> ',returnDict[key]
+                                import sys
+                                sys.exit()
+                        try:
                                 if key.find('Pix')<0:
                                         if inputSize>=self.maxDroplets:
                                                 returnDict[key] = returnDict[key][:self.maxDroplets]
@@ -83,7 +89,8 @@ class dropletSave:
                                         else:
                                                 returnDict[key] = np.append(returnDict[key], np.zeros(self.retPixel*self.maxDroplets-len(returnDict[key])))
                         except:
-                                print 'cannot get len of: ',key
+                                print 'something else went wrong for: ',key
+                                print 'maxdroplets: ',self.maxDroplets
                                 print '--> ',returnDict[key]
                                 import sys
                                 sys.exit()
@@ -263,6 +270,9 @@ class droplet:
         vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
         imgDrop[vetoed]=0
         drop_ind_thres = np.delete(drop_ind,vThres)
+        ##solution?
+        #if drop_ind_thres==[]:
+        #        return
 
         ###
         # add label_img_neighbor w/ mask as image -> sum ADU , field "masked" (binary)?
@@ -344,13 +354,13 @@ class droplet:
                         dropName = dropName+'_'+saveD.name
                 aduArray = np.array(adu_drop).copy()
                 Filter = np.ones_like(aduArray).astype(bool)
-                if saveD.thresADU[0] is not np.nan and saveD.thresADU[1] is not np.nan:
+                if (saveD.thresADU[0] is not np.nan) and (saveD.thresADU[1] is not np.nan):
                         Filter = ((aduArray>saveD.thresADU[0]) & (aduArray<saveD.thresADU[1]))
                 elif saveD.thresADU[0] is not np.nan:
                         Filter = (aduArray>saveD.thresADU[0]) 
                 elif saveD.thresADU[1] is not np.nan:
                         Filter = (aduArray<saveD.thresADU[1])                        
-                if saveD.ROI is not None:
+                if saveD.ROI is not None and len(pos_drop)>0:
                         dx = np.array(pos_drop)[:,0].flatten()
                         dy = np.array(pos_drop)[:,1].flatten()
                         Filter = np.logical_and(Filter, dx > np.array(saveD.ROI).flatten()[0])
