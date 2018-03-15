@@ -48,10 +48,10 @@ class SmallDataAna_psana(object):
             isLive = (RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['end_time_unix'] is None)
             self.dsname='exp=%s:run=%i:smd'%(expname,run)
             xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
+            idxname=xtcdirname+'/index/e*-r%04d-*'%int(run)
             ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
             ffbxtcname=ffbxtcdirname+'/e*-r%04d-*'%int(run)
             ffbidxname=ffbxtcdirname+'/index/e*-r%04d-*'%int(run)
-            idxname=ffbxtcdirname+'/index/e*-r%04d-*'%int(run)
             import glob
             present_ffbXtc=glob.glob('%s'%ffbxtcname)
             present_ffbIdx=glob.glob('%s'%ffbidxname)
@@ -493,6 +493,7 @@ class SmallDataAna_psana(object):
             else:
                 gs=gridspec.GridSpec(1,2,width_ratios=[99,1])        
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
+            #plt.subplot(gs[0]).colorbar()#not like that, neither plt.colorbar() , the latter does not have plottable.
             plt.title(avImage)
             plt.show()
 
