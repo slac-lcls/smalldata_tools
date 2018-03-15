@@ -526,8 +526,10 @@ class DetObject(dropObject):
       self.fitCenter_threshold = threshold
       self.fitCenter_maskName = maskName
 
-    def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, thresADU=0.9):
-      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name)
+    def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, thresADU=0.9, ROI=None):
+      if name.find('ph')<0:
+        name='ph_%s'%name
+      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name,ROI=ROI)
 
     def addPhotons2(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100): 
       self.__dict__[name] = photons.photon2(ADU_per_photon=ADU_per_photon, thresADU=thresADU, thresRms=thresRms, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name)

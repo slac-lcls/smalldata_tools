@@ -11,7 +11,7 @@ def fcn(buffer):
         return 0.
 
 class photon:
-    def __init__(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0):
+    def __init__(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0, ROI=None):
         self.ADU_per_photon = ADU_per_photon
         self.name = name
         self.mask = mask
@@ -20,29 +20,46 @@ class photon:
         self.nphotRet = nphotRet
         self.retImg = retImg
         self.thresADU = thresADU
+        self.ROI = ROI
+        if isinstance(self.ROI, list):
+            self.ROI = np.array(self.ROI)
 
-    def prepImage(self,image):
-        return image/self.ADU_per_photon
+    def prepImage(self,image, mask):
+        image = image/self.ADU_per_photon
+        if self.ROI is None:
+            return image, mask
+
+        if self.ROI.ndim != image.ndim:
+            print 'photons: have wrong ROI shape compared to image: ',self.ROI.shape, image.shape
+            return image, mask
+                
+        if self.ROI.shape[0]==2 and len(self.ROI.shape)==2:
+            return image[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1]], mask[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1]]
+        elif self.ROI.shape[0]==3:
+            return image[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]], mask[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]]
+        else:
+            print 'ROI format not correct(ly treated) ',self.ROI.shape, image.shape
+            return image, mask
 
     def photon(self,image):
         """
         use PyAlgo method to find photons.
-    
+
         """
         tstart=time.time()
-        fimage = self.prepImage(image)
-        photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
-        photons_nda = photons(fimage, self.mask)
+        fimage, locMask = self.prepImage(image, self.mask)
 
+        #photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
+        #note: this works on tiled detectors.
+        photons_nda = photons(fimage, locMask)
         ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
         ret_dict['nPhot']=photons_nda.sum()
-        ret_dict['nPhot_mask']=photons_nda[self.mask>0].sum()
-        ret_dict['nPhot_nomask']=photons_nda_nomask.sum()
-
+        ret_dict['nPhot_mask']=photons_nda[locMask>0].sum()
+        #ret_dict['nPhot_nomask']=photons_nda_nomask.sum()
         if self.retImg>0:
             #next line: work around fact that mask sometimes gets ignored.
             photonsImg = photons_nda.copy()
-            photonsImg[self.mask==0]=0
+            photonsImg[locMask==0]=0
             if self.retImg>1:
                 ret_dict['img']=photonsImg
             else:    
