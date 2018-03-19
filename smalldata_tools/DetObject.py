@@ -162,6 +162,7 @@ class DetObject(dropObject):
         self.rms = self.det.rms(run)
         self.ped = self.det.pedestals(run)
         self.gain = self.det.gain(run)
+        self.local_gain = None
         self.imgShape = None
         if self.det.dettype == 19:
           npix = int(170e-3/self.pixelsize[0])
@@ -208,6 +209,7 @@ class DetObject(dropObject):
         except:
           pass
         try:
+          self.statusMask = self.det.mask(run, status=True)
           self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True).squeeze()
           if rank==0:
             print 'masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum())
@@ -289,7 +291,7 @@ class DetObject(dropObject):
     def setcMask(self, mask):
       self.cmask = np.amin(np.array([self.mask,mask]),axis=0)
     def setGain(self, gain):
-      self.gain = gain
+      self.local_gain = gain
     def getAzAvs(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], ab.azimuthalBinning) ]
     def getAzAvKeys(self):
@@ -549,11 +551,15 @@ class DetObject(dropObject):
         if self.wfx is None:
             self.wfx = self.det.wftime(evt)
         return
+      mbits=0 #do not apply mask (would set pixels to zero)
+      #mbits=1 #set bad pixels to 0
+      needGain = (self.gain is not None) #check if we can/need to apply gain later
       if self.common_mode<0:
           self.evt.dat = self.det.raw_data(evt)
+          needGain=False
       elif self.common_mode==0:
         if self.det.dettype==26:
-          self.evt.dat = self.det.calib(evt, cmpars=(7,0,100))
+          self.evt.dat = self.det.calib(evt, cmpars=(7,0,100), mbits=mbits)
         else:
           self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
@@ -563,49 +569,64 @@ class DetObject(dropObject):
         if self.applyMask==2:
           self.evt.dat[self.cmask==0]=0
       elif self.common_mode%100==1:
-        self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100))
+        self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100), mbits=mbits)
+        needGain=False
       elif self.common_mode%100==5:
-        self.evt.dat = self.det.calib(evt, cmpars=(5,100))
+        self.evt.dat = self.det.calib(evt, cmpars=(5,100), mbits=mbits)
+        needGain=False
       elif self.common_mode%100==6:
-        self.evt.dat = self.det.calib(evt, cmpars=[6], rms = self.rms, normAll=True)
+        self.evt.dat = self.det.calib(evt, cmpars=[6], mbits=mbits, rms = self.rms, normAll=True)
+        needGain=False
+      elif self.common_mode%100==36:
+        self.evt.dat = self.det.calib(evt, cmpars=[6], mbits=mbits, rms = self.rms)
+        needGain=False
       elif self.common_mode%100==4:
-        self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30))
+        self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30), mbits=mbits)
+        needGain=False
       elif self.common_mode%100==7:
-          self.evt.dat = self.det.calib(evt, cmpars=(7,1,100)) #correction in rows
+        self.evt.dat = self.det.calib(evt, cmpars=(7,1,100), mbits=mbits) #correction in rows
+        needGain=False
       elif self.common_mode%100==45:
         self.evt.dat = self.det.raw_data(evt)-self.ped
-        self.evt.dat[self.mask==0]=0
-        self.evt.dat = cm_epix(self.evt.dat,self.rms)
+        self.evt.dat = cm_epix(self.evt.dat,self.rms,mask=self.statusMask)
       elif self.common_mode%100==46:
         self.evt.dat = self.det.raw_data(evt)-self.ped
-        self.evt.dat[self.mask==0]=0
-        self.evt.dat = cm_epix(self.evt.dat,self.rms,normAll=True)
+        self.evt.dat = cm_epix(self.evt.dat,self.rms,normAll=True,mask=self.statusMask)
       elif self.common_mode%100==47:
         self.evt.dat = self.det.raw_data(evt)-self.ped
-        self.evt.dat[self.mask==0]=0
         for ib,bMask in enumerate(self.bankMasks):
           #print ib, np.median(self.evt.dat[bMask]), bMask.sum()
           self.evt.dat[bMask]-=np.median(self.evt.dat[bMask])
-        self.evt.dat = cm_epix(self.evt.dat,self.rms)
+        self.evt.dat = cm_epix(self.evt.dat,self.rms,mask=self.statusMask)
       elif self.common_mode%100==55:
-        self.evt.dat = self.det.calib(evt, cmpars=(5,5000))
+        self.evt.dat = self.det.calib(evt, cmpars=(5,5000), mbits=mbits)
+        needGain=False
       elif self.common_mode%100==10:
+        needGain=False
         #data = self.det.raw_data(evt)-self.det.pedestals(evt)        
         data = self.det.raw_data(evt)-self.ped
         if self.applyMask==1:
           data[self.mask==0]=0
         if self.applyMask==2:
           data[self.cmask==0]=0
-        data_def = self.det.calib(evt, cmpars=(1,25,40,200))
-        data_unb = self.det.calib(evt, cmpars=(5,100))
+        data_def = self.det.calib(evt, cmpars=(1,25,40,200), mbits=mbits)
+        data_unb = self.det.calib(evt, cmpars=(5,100), mbits=mbits)
         data_diff = data_unb-data_def
         data_diff[(data_def-data)!=0]=0
         self.evt.dat = data_def + data_diff
         #tileAvs = [ tile[tile!=0].flatten().mean() for tile in data]
       else:
-        self.evt.dat = self.det.calib(evt)
-      if self.gain is not None and self.gain.shape == self.evt.dat.shape and self.common_mode>=0 and self.common_mode<100:
-        self.evt.dat*=self.gain
+        self.evt.dat = self.det.calib(evt, mbits=mbits)
+      #now apply gain if necessary
+      if (needGain and self.common_mode>=0 and self.common_mode<100):
+        if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape:
+          self.evt.dat*=self.local_gain
+        elif self.gain is not None and self.gain.shape == self.evt.dat.shape:
+          self.evt.dat*=self.gain
+      #override gain if desired
+      elif self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode!=-1:
+        self.evt.dat/=self.gain         #remove default gain
+        self.evt.dat*=self.local_gain   #apply own gain
       self.dataAccessTime+=MPI.Wtime()-time_start
       #store environmental row if desired.
       if self.storeEnv:
@@ -614,4 +635,3 @@ class DetObject(dropObject):
           self.evt.envRow = e.environmentalRows()[1]
         except:
           self.evt.envRow = None
-        

@@ -382,17 +382,18 @@ def neighborImg(img):
     img_right = np.roll(img,-1,axis=1); img_right[:,-1]=0
     return np.amax(np.array([img_up, img_down, img_left, img_right]),axis=0)
 
-def cm_epix(img,rms,maxCorr=30, histoRange=30, colrow=3, minFrac=0.25, normAll=False):
+def cm_epix(img,rms,maxCorr=30, histoRange=30, colrow=3, minFrac=0.25, normAll=False, mask=None):
     #make a mask: all pixels > 10 rms & neighbors & pixels out of historange
     imgThres = img.copy()
     imgThres[img>=rms*10]=1
     imgThres[img<rms*10]=0
     imgThres+=neighborImg(imgThres)
     imgThres+=imgThres+(abs(img)>histoRange)
+    if mask is not None:
+      imgThres+=(mask==0).astype(int)
 
     maskedImg = np.ma.masked_array(img, imgThres)
     if normAll:
-      #this should be done in the 16 blocks.
       maskedImg -= maskedImg.mean()
     if colrow%2==1:
         rs = maskedImg.reshape(704/2,768*2,order='F')
