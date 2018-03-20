@@ -232,8 +232,11 @@ class SmallDataAna(object):
                 makedirs(self.plot_dirname)
 
         if filename == '':
-            self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
+            self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
+            if self.plot_dirname.find('results')<0:
+                self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
+                self.dirname='/reg/d/psdm/%s/%s/results/arphdf5'%(self.hutch,self.expname)
                 self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
