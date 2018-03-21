@@ -9,7 +9,7 @@ unset LD_LIBRARY_PATH
 unset DISPLAY XAUTHORITY
 export PYTHONPATH=
 echo "$@"
-cd /reg/g/xpp/xppcode/python/smalldata_tools
+cd /reg/g/xpp/xppcode/python/smalldata_tools/examples
 
 source /reg/g/psdm/etc/psconda.sh
 source activate ana-1.3.47
@@ -60,6 +60,7 @@ fi
 
 : ${PYFILE:="SmallDataProducer_default.py"}
 : ${QUEUEREQ:="psanaq"}
+#: ${QUEUEREQ:="psnehq"}
 RUNFILE="$DIR/$PYFILE"
 JOBNAME="smdd_$EXPRUN"
 

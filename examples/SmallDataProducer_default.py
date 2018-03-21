@@ -12,7 +12,6 @@ sys.path.append('/reg/g/xpp/xppcode/python/smalldata_tools/')
 
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
 from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
-#from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
 
 ##########################################################
 #command line input parameter: definitions & reading
@@ -68,8 +67,9 @@ else:
     expname=args.exp
     hutch=expname[0:3].upper()
     expnameCurr=RegDB.experiment_info.active_experiment(hutch)[1]
-    dsname='exp='+expname+':run='+run+':smd:live'
+    dsname='exp='+expname+':run='+run+':smd'
     if expnameCurr == expname:
+        dsname='exp='+expname+':run='+run+':smd'
         lastRun = RegDB.experiment_info.experiment_runs(hutch)[-1]['num'] 
         if (int(run) < int(lastRun)) or (int(run) == int(lastRun) and (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is not None)):
             xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
@@ -77,7 +77,7 @@ else:
             import glob
             presentXtc=glob.glob('%s'%xtcname)
             if len(presentXtc)>0:
-                dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
+                dsname='%s:dir=/reg/d/ffb/%s/%s/xtc'%(dsnam,hutch.lower(),expname)
 if args.offline:
     dsname='exp='+expname+':run='+run+':smd'
 if args.gather:
@@ -99,7 +99,6 @@ time_ev_sum = 0.
 try:
     ds = psana.MPIDataSource(dsname)
 except:
-    print 'failed to make MPIDataSource for ',dsname
     import sys
     sys.exit()
 
@@ -108,9 +107,8 @@ try:
         #dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(hutch.lower(),expname)
         dirname = '/reg/d/psdm/%s/%s/results/arphdf5'%(hutch.lower(),expname)
     directory = os.path.dirname(dirname)
-    try:
-        os.stat(directory)
-    except:
+    #I think this is not actually working. Can't do it from script. Need to create first.
+    if ds.rank==0 and not os.path.isdir(dirname):
         print 'made directory for output files: %s'%dirname
         os.mkdir(directory)
 
@@ -135,6 +133,7 @@ epicsPV=[] #automatically read PVs from questionnaire/epicsArch file
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
+print 'DEBUG: now start event loop'
 for eventNr,evt in enumerate(ds.events()):
     printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
