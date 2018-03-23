@@ -182,10 +182,12 @@ class DetObject(dropObject):
           self.imgShape = self.ped.shape
         elif self.det.dettype == 27:
           zylaCfg = env.configStore().get(psana.Zyla.ConfigV1, psana.Source(srcName))
-          self.imgShape = (zylaCfg.numPixelsX(), zylaCfg.numPixelsY())
-          self.common_mode = 0
+          #needs to be this way around to match shape of data.....
+          self.imgShape = (zylaCfg.numPixelsY(), zylaCfg.numPixelsX())
+          if common_mode is None:
+            self.common_mode = 0
           if self.ped is None:
-            self.ped = np.zeros([zylaCfg.numPixelsX(), zylaCfg.numPixelsY()])
+            self.ped = np.zeros([zylaCfg.numPixelsY(), zylaCfg.numPixelsX()])
           if self.imgShape != self.ped.shape:            
             self.common_mode = -1
         elif self.det.dettype == 28:
@@ -253,7 +255,6 @@ class DetObject(dropObject):
         else:          
           self.iX=self.x
           self.iY=self.y
-
       else:
         self.rms = None
         self.mask = None
@@ -556,6 +557,7 @@ class DetObject(dropObject):
       needGain = (self.gain is not None) #check if we can/need to apply gain later
       if self.common_mode<0:
           self.evt.dat = self.det.raw_data(evt)
+          print 'DEBUG, got event ',self.evt.dat
           needGain=False
       elif self.common_mode==0:
         if self.det.dettype==26:
