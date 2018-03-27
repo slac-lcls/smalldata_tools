@@ -199,7 +199,12 @@ def getCfgOutput(det):
     for drops in det.getDroplets():
         for aduHist in drops.aduHists:
             cfgDict[baseName+aduHist.name+'_bins'] = np.array(aduHist.bins)
-        
+            if aduHist.ROI is not None:
+                cfgDict[baseName+aduHist.name+'_ROI'] = np.array(aduHist.ROI)
+        for dropSave in drops.dropletSaves:
+            cfgDict[baseName+dropSave.name+'_thresADU'] = np.array(dropSave.thresADU)
+            if dropSave.ROI is not None:
+                cfgDict[baseName+dropSave.name+'_ROI'] = np.array(dropSave.ROI)
     return cfgDict
 
 def defaultRedisVars(hutch):

@@ -533,6 +533,9 @@ class DetObject(dropObject):
       if name.find('ph')<0:
         name='ph_%s'%name
       self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name,ROI=ROI)
+      self.__dict__[name+'_ADU_per_photon'] = ADU_per_photon
+      self.__dict__[name+'_thresADU'] = thresADU
+      self.__dict__[name+'_ROI'] = np.array(ROI)
 
     def addPhotons2(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100): 
       self.__dict__[name] = photons.photon2(ADU_per_photon=ADU_per_photon, thresADU=thresADU, thresRms=thresRms, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name)
