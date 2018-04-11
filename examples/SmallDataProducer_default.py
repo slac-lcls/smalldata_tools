@@ -63,6 +63,7 @@ if not args.exp:
         presentXtc=glob.glob('%s'%xtcname)
         if len(presentXtc)==0:
             dsname='exp='+expname+':run='+run+':smd'
+    #this will fail when the data is not there after the timeout. On purpose to not fill up the queue.
 else:
     expname=args.exp
     hutch=expname[0:3].upper()
@@ -78,6 +79,25 @@ else:
             presentXtc=glob.glob('%s'%xtcname)
             if len(presentXtc)>0:
                 dsname='%s:dir=/reg/d/ffb/%s/%s/xtc'%(dsnam,hutch.lower(),expname)
+                #check if we need live mode.
+                for currXtc in presentXtc:
+                    if currXtc.find('inprogress')>=0:
+                        dsname=dsname+':live'
+            else:
+                xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(hutch.lower(),expname)
+                xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
+                files_there=False; nWait=0
+                while not files_there:
+                    presentXtc=glob.glob('%s'%xtcname)
+                    if len(presentXtc)==0:
+                        print 'no files yet, wait'
+                        sleep(30)
+                        nWait=nWait+1
+                    else:
+                        files_there=True
+                        for currXtc in presentXtc:
+                            if currXtc.find('inprogress')>=0:
+                                dsname=dsname+':live'
 if args.offline:
     dsname='exp='+expname+':run='+run+':smd'
 if args.gather:
@@ -132,8 +152,9 @@ defaultDets = defaultDetectors(hutch)
 epicsPV=[] #automatically read PVs from questionnaire/epicsArch file 
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+#adding raw timetool traces:
+defaultDets.append(ttRawDetector(env=ds.env()))
 
-print 'DEBUG: now start event loop'
 for eventNr,evt in enumerate(ds.events()):
     printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
