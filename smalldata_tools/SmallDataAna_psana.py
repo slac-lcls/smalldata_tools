@@ -384,18 +384,18 @@ class SmallDataAna_psana(object):
 
         img = np.array(imgAr)
         if thresADU >= 0 and thresRms >=0:
-            imgA = img.mean(axis=0)
+            imgA = img.mean(axis=0)#.squeeze()
         else:
-            imgA = img.sum(axis=0)
+            imgA = img.sum(axis=0)#.squeeze()
         if det.mask is not None and useMask:
             imgA[det.mask==0]=0
-
+                
         self.__dict__[data]=imgA
         if std:
-            imgS = img.std(axis=0)
+            imgS = img.std(axis=0)#.squeeze()
             self.__dict__[data.replace('AvImg_','AvImg_std_')]=imgS
         if median:
-            imgM = np.median(img,axis=0)
+            imgM = np.median(img,axis=0)#.squeeze()
             self.__dict__[data.replace('AvImg_','AvImg_median_')]=imgM
 
     def getAvImage(self,detname=None, imgName=None):
@@ -472,6 +472,8 @@ class SmallDataAna_psana(object):
 
         if len(img.shape)>2:
             image = self.__dict__[detname].det.image(self.run, img)
+            if image is None:
+                image = img.squeeze()
         else:
             image = img
 
@@ -572,15 +574,17 @@ class SmallDataAna_psana(object):
         gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
 
         needsGeo=False
-        if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
+        if self.__dict__[detname].det.dettype==26:
+            if self.__dict__[detname].ped[0].shape != self.__dict__[detname].imgShape:
+                needsGeo=True
+        elif self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
             needsGeo=True
 
         if needsGeo:
             image = self.__dict__[detname].det.image(self.run, img)
         else:
-            image = img
+            image = img.squeeze()
 
-        print 'DEBUG: ',needsGeo, image.shape
         plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
         plt.pause(0.0001)
 
@@ -830,6 +834,8 @@ class SmallDataAna_psana(object):
 
         if needsGeo:
             image = self.__dict__[detname].det.image(self.run, img)
+            if image is None and self.__dict__[detname].ped.shape[1]==1:
+                image = img.squeeze()
         else:
             image = img
 
@@ -843,7 +849,7 @@ class SmallDataAna_psana(object):
         iX = self.__dict__[detname+'_iX']
         iY = self.__dict__[detname+'_iY']
         extent=[x.min(), x.max(), y.min(), y.max()]
-        print 'DEBUG: extent(x,y min,max)',extent
+        #print 'DEBUG: extent(x,y min,max)',extent
         
         mask=[]
         mask_r_nda=None
@@ -851,9 +857,11 @@ class SmallDataAna_psana(object):
         while select:
             fig=plt.figure(figsize=(12,10))
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
+            #print "rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:"
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
             shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
+            #shape = raw_input()
             #this definitely works for the rayonix...
             if shape=='r':
                 print 'select two corners: '
@@ -942,9 +950,13 @@ class SmallDataAna_psana(object):
                 gsPed=gridspec.GridSpec(1,2,width_ratios=[1,1])
                 if shape=='d':
                     pedResult = det.pedestals(self.run)
+                    if det.dettype==26:
+                        pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05))
                 else:
                     pedResult = det.rms(self.run)
+                    if det.dettype==26:
+                        pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05,0.05))
                 if needsGeo:
                     pedResultImg = det.image(self.run,pedResult)
@@ -952,12 +964,8 @@ class SmallDataAna_psana(object):
                     pedResultImg = pedResult.copy()
                 plt.subplot(gsPed[0]).imshow(pedResultImg,clim=[np.percentile(pedResult,1),np.percentile(pedResult,99)])
                 plt.subplot(gsPed[1]).plot(hstPed[1][:-1],np.log(hstPed[0]),'o')
-                if raw_input("Select range by mouse?\n") in ["y","Y"]: 
-                    c=ginput(2)
-                    pedMin=c[0][0];pedMax=c[1][0]
-                else:
-                    ctot=raw_input("Enter allowed pedestal range (min max)")
-                    c = ctot.split(' ');pedMin=float(c[0]);pedMax=float(c[1]);
+                ctot=raw_input("Enter allowed pedestal range (min max)")
+                c = ctot.split(' ');pedMin=float(c[0]);pedMax=float(c[1]);
                 mask_r_nda=np.zeros_like(pedResult)
                 print mask_r_nda.sum()
                 mask_r_nda[pedResult<pedMin]=1
@@ -1005,6 +1013,7 @@ class SmallDataAna_psana(object):
                     countMask+=1
                 else:
                     totmask = totmask_nm1
+            print 'DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape
             print 'masked in this step: ',np.ones_like(x)[mask_r_nda.astype(bool)].sum()
             print 'masked up to this step: ',np.ones_like(x)[totmask_nm1].sum()
             print 'masked tot: ',np.ones_like(x)[totmask].sum()
@@ -1434,11 +1443,28 @@ class SmallDataAna_psana(object):
         if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
             needsGeo=True
 
-        hstPed = np.histogram(pedestals.flatten(), np.arange(0, pedestals.max()*1.05))
-        hstRms = np.histogram(rms.flatten(), np.arange(0, rms.max()*1.05,0.05))
+        np.seterr(divide='ignore', invalid='ignore')
+        if det.dettype==26:
+            hstPed = np.histogram(pedestals[0].flatten(), np.arange(0, pedestals.max()*1.05))
+            hstRms = np.histogram(rms[0].flatten(), np.arange(0, rms.max()*1.05,0.05))
+            hstPed1 = np.histogram(pedestals[1].flatten(), np.arange(0, pedestals.max()*1.05))
+            hstRms1 = np.histogram(rms[1].flatten(), np.arange(0, rms.max()*1.05,0.05))
+            hstPed2 = np.histogram(pedestals[2].flatten(), np.arange(0, pedestals.max()*1.05))
+            hstRms2 = np.histogram(rms[2].flatten(), np.arange(0, rms.max()*1.05,0.05))
+        else:
+            hstPed = np.histogram(pedestals.flatten(), np.arange(0, pedestals.max()*1.05))
+            hstRms = np.histogram(rms.flatten(), np.arange(0, rms.max()*1.05,0.05))
+
         if needsGeo:
-            pedImg = det.image(self.run,pedestals)
-            rmsImg = det.image(self.run,rms)
+            if det.dettype==26:
+                pedImg = det.image(self.run,pedestals[0])
+                rmsImg = det.image(self.run,rms[0])
+                if pedImg is None and pedestals.shape[1]==1:
+                    pedImg = pedestals[0].squeeze()
+                    rmsImg = rms[0].squeeze()
+            else:
+                pedImg = det.image(self.run,pedestals)
+                rmsImg = det.image(self.run,rms)
         else:
             pedImg = pedestals
             rmsImg = rms
@@ -1447,11 +1473,19 @@ class SmallDataAna_psana(object):
         gsPed=gridspec.GridSpec(2,2,width_ratios=[1,1])
         plt.subplot(gsPed[1]).plot(hstPed[1][:-1],np.log(hstPed[0]),'o')
         plt.subplot(gsPed[3]).plot(hstRms[1][:-1],np.log(hstRms[0]),'o')
+        if det.dettype==26:
+            plt.subplot(gsPed[1]).plot(hstPed1[1][:-1],np.log(hstPed1[0]),'o')
+            plt.subplot(gsPed[1]).plot(hstPed2[1][:-1],np.log(hstPed2[0]),'o')
+            plt.subplot(gsPed[3]).plot(hstRms1[1][:-1],np.log(hstRms1[0]),'o')
+            plt.subplot(gsPed[3]).plot(hstRms2[1][:-1],np.log(hstRms2[0]),'o')
 
-        im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals,1),np.percentile(pedestals,99)])
-        cbar0 = plt.colorbar(im0)
-
-        im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms,1),np.percentile(rms,99)])
+            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals[0],1),np.percentile(pedestals[0],99)])
+            cbar0 = plt.colorbar(im0)
+            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms[0],1),np.percentile(rms[0],99)])
+        else:
+            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals,1),np.percentile(pedestals,99)])
+            cbar0 = plt.colorbar(im0)
+            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms,1),np.percentile(rms,99)])
         cbar2 = plt.colorbar(im2)
 
     def calibHisto(self, detname='None', common_mode=0, printVal=[-1]):
