@@ -148,8 +148,10 @@ class DetObject(dropObject):
       if srcName.find('ayon')>=0:
         binning=env.configStore().get(psana.Rayonix.ConfigV2,psana.Source('rayonix')).binning_s()
         self.pixelsize=[170e-3/3840*binning]
-      if srcName.find('epix')>=0:
+      if srcName.find('jungfrau')>=0:
         self.pixelsize=[75e-6]
+      if srcName.find('epix')>=0:
+        self.pixelsize=[50e-6]
         epixCfg = env.configStore().get(psana.Epix.Config100aV2, self.det.source)
         self.carrierId0 = epixCfg.carrierId0()
         self.carrierId1 = epixCfg.carrierId1()
@@ -205,13 +207,20 @@ class DetObject(dropObject):
         elif self.ped is not None:
           self.imgShape = self.ped.shape
         try:
-          pedImg = self.det.image(run, self.ped)
+          if self.det.dettype==26:
+            pedImg = self.det.image(run, self.ped[0])
+          else:
+            pedImg = self.det.image(run, self.ped)
           if pedImg is not None:# and self.imgShape is None:
             self.imgShape = pedImg.shape
+          else:
+            if len(self.ped.shape)>2:
+              print 'multi dim pedestal & image function does do nothing: multi gain detector.....'
+              self.imgShape=self.ped.shape[1:]
         except:
           pass
         try:
-          self.statusMask = self.det.mask(run, status=True)
+          self.statusMask = self.det.mask(run, status=True).squeeze()
           self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True).squeeze()
           if rank==0:
             print 'masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum())
@@ -227,21 +236,28 @@ class DetObject(dropObject):
           self.cmask = None
         #geometry
         try:
-          self.x = self.det.coords_x(run).squeeze()
-          self.y = self.det.coords_y(run).squeeze()
+          self.x = self.det.coords_x(run)#.squeeze()
+          self.y = self.det.coords_y(run)#.squeeze()
         except:
           if self.det.dettype == 19:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-          if self.det.dettype == 6 or self.det.dettype == 27:
+          elif self.det.dettype == 6 or self.det.dettype == 27:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-          if self.det.dettype == 28:
+          elif self.det.dettype == 28:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
+          elif self.det.dettype == 26:
+            self.x = np.arange(0,self.ped.shape[2]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.y = np.arange(0,self.ped.shape[3]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.x, self.y = np.meshgrid(self.x, self.y)
+          else:
+            if (rank == 0):
+              print 'detector of type ',self.det.dettype,' has no fallback for x/y coords!'
         if self.det.dettype == 1 or self.det.dettype == 2 or self.det.dettype == 13 or self.det.dettype == 26: 
             try:
               iX, iY = self.det.indexes_xy(run)
@@ -560,7 +576,6 @@ class DetObject(dropObject):
       needGain = (self.gain is not None) #check if we can/need to apply gain later
       if self.common_mode<0:
           self.evt.dat = self.det.raw_data(evt)
-          print 'DEBUG, got event ',self.evt.dat
           needGain=False
       elif self.common_mode==0:
         if self.det.dettype==26:
