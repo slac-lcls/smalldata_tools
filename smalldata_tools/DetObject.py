@@ -220,11 +220,11 @@ class DetObject(dropObject):
         except:
           pass
         try:
-          self.statusMask = self.det.mask(run, status=True).squeeze()
-          self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True).squeeze()
+          self.statusMask = self.det.mask(run, status=True)
+          self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True)
           if rank==0:
             print 'masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum())
-          self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True).squeeze()
+          self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
           if self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
           if len(self.mask.shape)==2 and self.mask.shape!=self.imgShape and self.mask.shape!=self.ped.shape:
@@ -236,8 +236,8 @@ class DetObject(dropObject):
           self.cmask = None
         #geometry
         try:
-          self.x = self.det.coords_x(run)#.squeeze()
-          self.y = self.det.coords_y(run)#.squeeze()
+          self.x = self.det.coords_x(run)
+          self.y = self.det.coords_y(run)
         except:
           if self.det.dettype == 19:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -345,7 +345,11 @@ class DetObject(dropObject):
 
     def processDroplets(self):
       for Drops in self.getDroplets():
-        return_vals = Drops.dropletize(self.evt.dat)
+        dataToDropletize = self.evt.dat
+        if len(self.evt.dat.shape)>2:
+          dataToDropletize = self.det.image(self.run, self.evt.dat)
+        return_vals = Drops.dropletize(dataToDropletize)
+        #return_vals = Drops.dropletize(self.evt.dat)
         if return_vals is None:
           return_vals = Drops.ret_dict
         for key in return_vals:
@@ -388,7 +392,10 @@ class DetObject(dropObject):
       for photon in self.getPhotons():
         return_vals = photon.photon(self.evt.dat)
         for key in return_vals.keys():
-          self.evt.__dict__['write_%s_%s'%(photon.name, key)] = return_vals[key]
+          if key=='img' and photon.retImg>2:
+            self.evt.__dict__['write_%s_%s'%(photon.name,key)] = self.det.image(self.run, return_vals[key])          
+          else:
+            self.evt.__dict__['write_%s_%s'%(photon.name, key)] = return_vals[key]
 
     def getPhotons2(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], photons.photon2) ]
@@ -524,7 +531,13 @@ class DetObject(dropObject):
         mask = ( self.mask.astype(bool) & self.cmask.astype(bool) & self.getMask(ROI).astype(bool) )
       else:
         mask = ( self.cmask.astype(bool) & self.mask.astype(bool) )
-      self.__dict__[name] = droplet.droplet(threshold=threshold, thresholdLow=thresholdLow, thresADU=thresADU, rms=self.rms, mask=mask, name=name,useRms=useRms,relabel=relabel)
+      rms = self.rms
+      if self.det.dettype==26:
+        rms = self.rms[0]
+      if len(mask.shape)>2:
+        mask = self.det.image(self.run, mask)
+        rms = self.det.image(self.run, rms)
+      self.__dict__[name] = droplet.droplet(threshold=threshold, thresholdLow=thresholdLow, thresADU=thresADU, rms=rms, mask=mask, name=name,useRms=useRms,relabel=relabel)
       self.__dict__[name+'_threshold'] = threshold
       self.__dict__[name+'_thresholdLow'] = thresholdLow
       self.__dict__[name+'_thresADU'] = thresADU
@@ -548,10 +561,15 @@ class DetObject(dropObject):
     def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, thresADU=0.9, ROI=None):
       if name.find('ph')<0:
         name='ph_%s'%name
-      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name,ROI=ROI)
+      if mask is None:
+        mask = self.cmask
+      if rms is None:
+        rms = self.rms
+      self.__dict__[name] = photons.photon(ADU_per_photon=ADU_per_photon, mask=mask, rms=rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,thresADU=thresADU,name=name,ROI=ROI)
       self.__dict__[name+'_ADU_per_photon'] = ADU_per_photon
       self.__dict__[name+'_thresADU'] = thresADU
-      self.__dict__[name+'_ROI'] = np.array(ROI)
+      if ROI is not None:
+        self.__dict__[name+'_ROI'] = np.array(ROI)
 
     def addPhotons2(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100): 
       self.__dict__[name] = photons.photon2(ADU_per_photon=ADU_per_photon, thresADU=thresADU, thresRms=thresRms, mask=self.cmask, rms=self.rms, nphotMax=nphotMax, retImg=retImg, nphotRet=nphotRet,name=name)
