@@ -491,11 +491,12 @@ class SmallDataAna_psana(object):
             fig=plt.figure(figsize=(10,6))
             if ROI!=[]:
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
-                plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],clim=[plotMin,plotMax],interpolation='None')
+                im1 = plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],clim=[plotMin,plotMax],interpolation='None')
+                cbar1 = plt.colorbar(im1)
             else:
                 gs=gridspec.GridSpec(1,2,width_ratios=[99,1])        
-            plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
-            #plt.subplot(gs[0]).colorbar()#not like that, neither plt.colorbar() , the latter does not have plottable.
+            im0 = plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
+            cbar1 = plt.colorbar(im0)
             plt.title(avImage)
             plt.show()
 

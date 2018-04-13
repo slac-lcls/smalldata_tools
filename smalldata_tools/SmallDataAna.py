@@ -566,6 +566,7 @@ class SmallDataAna(object):
 
         #create new xrData to be merged
         name = name.replace('/','__')
+        data = data.squeeze()
         if len(data.shape)==1:
             self.xrData = xr.merge([self.xrData, xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name) ])
         else:
@@ -1219,11 +1220,12 @@ class SmallDataAna(object):
             if len(vals.shape)==0:
                 print 'mean of plotvar is ',vals
                 return 
+
             if len(vals.shape)==1:
                 hst = [vals, np.arange(0,vals.shape[0]+1)]
             elif len(vals.shape)==2:
                 if plotWith.find('matplotlib')>=0:
-                    plotImage(vals, ylim=[np.percentile(vals,1),np.percentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
+                    plotImage(vals, ylim=[np.nanpercentile(vals,1),np.nanpercentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
                     return
                 elif plotWith.find('bokeh')>=0:
                     plotImage(vals, xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
