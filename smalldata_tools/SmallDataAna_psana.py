@@ -104,6 +104,7 @@ class SmallDataAna_psana(object):
             except:
                 print 'Failed to set up index based psana dataset'
                 self.dsIdx = None
+                self.dsIdxRun = None
         print 'try to make SmallDataAna using dirname ',dirname,' for exp: ',expname,' and run ',run
         try:
             print 'setting up SmallData ana from anaps '
@@ -159,20 +160,21 @@ class SmallDataAna_psana(object):
                 if k.alias() is not None and k.alias()!='':
                     newKey=True
                     for oldKey in keys:
-                        if oldkey.alias() == k.alias():
+                        if oldKey.alias() == k.alias():
                             newKey=False
                     if newKey:
                         keys.append(k)
                 else:
                     newKey=True
                     for oldKey in keys:
-                        if oldkey.src().__repr() == k.src().__repr():
+                        if oldKey.src().__repr__() == k.src().__repr__():
                             newKey=False
                     if newKey:
                         keys.append(k)
             #keys=evt.keys()
             if printthis: 
                 print keys
+                return
             else:
                 return keys
         except:
@@ -181,6 +183,7 @@ class SmallDataAna_psana(object):
                 keys=self.ds.events().next().keys()
                 if printthis: 
                     print keys
+                    return
                 else:
                     return keys
             except:
@@ -257,7 +260,15 @@ class SmallDataAna_psana(object):
                     self.__dict__[detname].saveFull()
                 if key.find('ROI')==0:
                     self.__dict__[detname].addROI(key,detnameDict[key],writeArea=True)
-        
+                if key.find('photon')==0:
+                    thres=0.9
+                    if key.find('_')>0:
+                        try:
+                            thres=float(key.split('_')[1].replace('p','.'))
+                        except:
+                            pass
+                    self.__dict__[detname].addPhotons(ADU_per_photon=detnameDict[key], thresADU=thres, retImg=2)
+
         return detname
 
     def _getDetName(self, detname=None):
@@ -1728,6 +1739,8 @@ class SmallDataAna_psana(object):
         detOffArrays=[]
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
             detShape = self.__dict__[thisdetName].ped.shape
+            if self.__dict__[thisdetName].det.dettype==26:
+                detShape = (self.__dict__[thisdetName].ped[0]).shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
             det_arrayBin=np.zeros(csShape)
@@ -1754,8 +1767,7 @@ class SmallDataAna_psana(object):
                 nEvts_bin=nEvts_bin+1
 
                 evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
-                evt = runIdx.event(evtt)
-                #now loop over detectors in this event
+                evt = runIdx.event(evtt)                #now loop over detectors in this event
                 for thisdetName,thisdetDict,dArray,dMArray,dSArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays):
                     det = self.__dict__[thisdetName]
                     det.evt = dropObject()
@@ -1764,16 +1776,14 @@ class SmallDataAna_psana(object):
                     
                     thisDetDataDict=getUserData(det)
                     for key in thisDetDataDict.keys():
-                        if not (key=='full' or key.find('ROI')>=0):
+                        if not (key=='full' or key.find('ROI')>=0 or key.find('photon_img')>=0):
                             continue
-                        if thisdetDict.has_key('thresADU'):
-                            thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
-                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-                        elif thisdetDict.has_key('thresRms'):
-                            thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
-                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-                        else:
-                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                        if (key=='full' or key.find('ROI')>=0):
+                            if thisdetDict.has_key('thresADU'):
+                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
+                            elif thisdetDict.has_key('thresRms'):
+                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
+                        dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
 
                         x = thisDetDataDict[key]
                         oldM = dMArray
@@ -1851,10 +1861,12 @@ class SmallDataAna_psana(object):
                 binSData = np.sqrt(binSData/(nent-1))
                 binMData = binMData/nent
                 if  detDict.has_key('image'):
+                    print 'DEBUG: make image shape ',binData.shape
                     thisImg = det.det.image(self.run, binData)
                     thisImgO = det.det.image(self.run, binOData)
                     thisImgS = det.det.image(self.run, binSData)
                     thisImgM = det.det.image(self.run, binMData)
+                    print 'made image ',thisImg.shape
                 else:
                     thisImg = binData
                     thisImgO = binOData
@@ -1910,9 +1922,14 @@ class SmallDataAna_psana(object):
                         addToHdf5(fout, 'Cfg_'+detName+'_x', det.x)
                         addToHdf5(fout, 'Cfg_'+detName+'_y', det.y)
                 else:
-                    addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped))
-                    addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms))
-                    addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain))
+                    if det.det.dettype==26:
+                        addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped[0]))
+                        addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms[0]))
+                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain[0]))
+                    else:
+                        addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped))
+                        addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms))
+                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain))
                     addToHdf5(fout, 'Cfg_'+detName+'_mask', det.det.image(self.run,det.mask))
                     addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.det.image(self.run,det.cmask))
         comm.Barrier()
