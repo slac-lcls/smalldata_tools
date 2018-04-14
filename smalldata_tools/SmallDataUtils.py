@@ -52,6 +52,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
     #dets.append(ttDetector(baseName='TTSPEC:'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
+    dets.append(aiDetector('FEE-SPEC0','feeBld'))
     try:
         dets.append(encoderDetector('usbencoder','enc'))
     except:
@@ -82,8 +83,9 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XCS-SND-DIO','snd_dio'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
-    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'DIFF_phis', 'DIFF_th', 'DIFF_tth', 'DIFF_xs', 'DIFF_ys', 'DIFF_zs', 'DIFF_x', 'DIFF_y', 'DIFF_chis','DIFF_dety','ladm_theta','LAM_Z','LAM_X1','LAM_X2','LAM_Y1','LAM_Y2','LAM_DET_Y','LAM_DET_X','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
+    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
     dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     try:
         dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
     except:

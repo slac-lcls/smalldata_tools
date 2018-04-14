@@ -228,6 +228,19 @@ class adcDetector(defaultDetector):
             dl['ch%d'%ichn]=chv
         return dl
 
+class feeBldDetector(defaultDetector):
+    def __init__(self, detname, name=None):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        defaultDetector.__init__(self, detname, name)
+
+    def data(self, evt):
+        dl={}
+        dl['hproj'] = self.det.get(evt).hproj()
+        return dl
+
 class ttDetector(defaultDetector):
     def __init__(self, name='tt', baseName='TTSPEC:'):
         self.name = name
