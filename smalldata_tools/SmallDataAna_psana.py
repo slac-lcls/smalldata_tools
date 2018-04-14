@@ -1737,6 +1737,7 @@ class SmallDataAna_psana(object):
         detSArrays=[] #for error calculation
         detMArrays=[] #for error calculation
         detOffArrays=[]
+        detIArrays=[]
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
             detShape = self.__dict__[thisdetName].ped.shape
             if self.__dict__[thisdetName].det.dettype==26:
@@ -1748,6 +1749,7 @@ class SmallDataAna_psana(object):
             detSArrays.append(det_arrayBin)
             detMArrays.append(det_arrayBin)
             detOffArrays.append(det_arrayBin)
+            detIArrays.append(det_arrayBin)
             if rank==0:
                 print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
 
@@ -1768,7 +1770,7 @@ class SmallDataAna_psana(object):
 
                 evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
                 evt = runIdx.event(evtt)                #now loop over detectors in this event
-                for thisdetName,thisdetDict,dArray,dMArray,dSArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays):
+                for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
                     det = self.__dict__[thisdetName]
                     det.evt = dropObject()
                     det.getData(evt)
@@ -1783,7 +1785,9 @@ class SmallDataAna_psana(object):
                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
                             elif thisdetDict.has_key('thresRms'):
                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
-                        dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                        else:
+                            dIArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
 
                         x = thisDetDataDict[key]
                         oldM = dMArray
@@ -1850,28 +1854,31 @@ class SmallDataAna_psana(object):
             addToHdf5(fout, 'nEntries_off', np.array(nEntries_off))
 
         #loop over arrays & bins, make image & rebin if requested.
-        for detName, dArray, dOArray, dSArray, dMArray, detDict in zip(detNames, detArrays, detOffArrays, detSArrays,detMArrays, (myCube.targetVarsXtc)):
+        for detName, dArray, dOArray, dSArray, dMArray, dIArray, detDict in zip(detNames, detArrays, detOffArrays, detSArrays,detMArrays, detIArrays, (myCube.targetVarsXtc)):
             det = self.__dict__[detName]
             imgArray=[]
             imgOArray=[]
             imgSArray=[]
             imgMArray=[]
-            for binData,binOData, binSData,binMData,nent in zip(dArray,dOArray, dSArray,dMArray,cubeData['nEntries'].values):
+            imgIArray=[]
+            for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,cubeData['nEntries'].values):
                 #now divide mean & std sums to be correct.
                 binSData = np.sqrt(binSData/(nent-1))
                 binMData = binMData/nent
                 if  detDict.has_key('image'):
-                    print 'DEBUG: make image shape ',binData.shape
+                    #print 'DEBUG: make image shape ',binData.shape
                     thisImg = det.det.image(self.run, binData)
                     thisImgO = det.det.image(self.run, binOData)
                     thisImgS = det.det.image(self.run, binSData)
                     thisImgM = det.det.image(self.run, binMData)
-                    print 'made image ',thisImg.shape
+                    thisImgI = det.det.image(self.run, binIData)
+                    #print 'made image ',thisImg.shape
                 else:
                     thisImg = binData
                     thisImgO = binOData
                     thisImgS = binSData
                     thisImgM = binMData
+                    thisImgI = binIData
                 if  detDict.has_key('rebin'):
                     thisImg = rebin(thisImg, detDict['rebin'])
                     imgArray.append(thisImg)
@@ -1886,6 +1893,7 @@ class SmallDataAna_psana(object):
                     imgOArray.append(thisImgO)
                     imgSArray.append(thisImgS)
                     imgMArray.append(thisImgM)
+                    imgIArray.append(thisImgI)
 
             #write hdf5 file w/ mpi for big array
             arShape=(numBin,)
@@ -1899,8 +1907,10 @@ class SmallDataAna_psana(object):
                 cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
             if offEventsCube>0:
                 cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
+            if (np.array(imgIArray).sum()>0):
+                cubeBigIData = fout.create_dataset('%s_photon'%detName,arShape)
 
-            for iSlice,Slice,SliceO, SliceS,SliceM in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray):
+            for iSlice,Slice,SliceO, SliceS,SliceM,SliceI in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray,imgIArray):
                 if np.nansum(Slice)!=0:
                     cubeBigData[rank*bins_per_job+iSlice,:] = Slice
                     print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
@@ -1910,6 +1920,8 @@ class SmallDataAna_psana(object):
                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
                 if storeMeanStd and np.nansum(SliceM)>0:
                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
+                if np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
+                    cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
             if det.rms is not None:
                 if not detDict.has_key('image'):
