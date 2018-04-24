@@ -621,8 +621,14 @@ class DetObject(dropObject):
       elif self.common_mode%100==4:
         self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30), mbits=mbits)
         needGain=False
-      elif self.common_mode%100==7:
+      elif self.common_mode%100==71:
         self.evt.dat = self.det.calib(evt, cmpars=(7,1,100), mbits=mbits) #correction in rows
+        needGain=False
+      elif self.common_mode%100==72:
+        self.evt.dat = self.det.calib(evt, cmpars=(7,2,100), mbits=mbits) #correction in columns
+        needGain=False
+      elif self.common_mode%100==7:
+        self.evt.dat = self.det.calib(evt, cmpars=(7,3,100), mbits=mbits) #correction in rows&columns
         needGain=False
       elif self.common_mode%100==45:
         self.evt.dat = self.det.raw_data(evt)-self.ped
@@ -655,6 +661,19 @@ class DetObject(dropObject):
         #tileAvs = [ tile[tile!=0].flatten().mean() for tile in data]
       else:
         self.evt.dat = self.det.calib(evt, mbits=mbits)
+
+      #store environmental row if desired.
+      if self.storeEnv:
+        try:
+          e = evt.get(psana.Epix.ElementV3,psana.Source(self._srcName))
+          self.evt.envRow = e.environmentalRows()[1]
+        except:
+          self.evt.envRow = None
+
+      #return is data is broken prior to shape comparisons
+      if self.evt.dat is None:
+        return
+
       #now apply gain if necessary
       if (needGain and self.common_mode>=0 and self.common_mode<100):
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape:
@@ -666,10 +685,3 @@ class DetObject(dropObject):
         self.evt.dat/=self.gain         #remove default gain
         self.evt.dat*=self.local_gain   #apply own gain
       self.dataAccessTime+=MPI.Wtime()-time_start
-      #store environmental row if desired.
-      if self.storeEnv:
-        try:
-          e = evt.get(psana.Epix.ElementV3,psana.Source(self._srcName))
-          self.evt.envRow = e.environmentalRows()[1]
-        except:
-          self.evt.envRow = None
