@@ -22,6 +22,7 @@ from utilities import hist2d
 from utilities import running_median_insort
 from utilities import get_startOffIdx, get_offVar
 from utilities import getBins as util_getBins
+from utilities import printR
 from utilities_plotting import plotImageBokeh, plotMarker, plotImage
 import bokeh
 import bokeh.plotting as bp
@@ -35,6 +36,10 @@ from pscache import client #works from ana-1.2.9 on
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
 
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
  
 class Cube(object):
@@ -218,9 +223,9 @@ class SmallDataAna(object):
         self.plotWith=plotWith
         if len(expname)>3:
             self.hutch=self.expname[:3]
+            self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
             if dirname=='':
                 self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
-                self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
@@ -233,7 +238,8 @@ class SmallDataAna(object):
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-            if self.plot_dirname.find('results')<0:
+            print 'setting up dirs:'
+            if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
                 self.dirname='/reg/d/psdm/%s/%s/results/arphdf5'%(self.hutch,self.expname)
@@ -1108,19 +1114,19 @@ class SmallDataAna(object):
         if not isDaqDelayScan:
             if self.hasKey('enc/lasDelay'):
                 encVal = self.getVar('enc/lasDelay')
-                #print 'DEBUG: encoder info',encVal.std()
-                if encVal.std()>1e-9:
+                #print 'DEBUG: encoder info',np.nanstd(encVal)
+                if np.nanstd(encVal)>1e-9:
                     nomDelay=encVal
                     addEnc=False
-                elif encVal.std()>1e-15:
+                elif np.nanstd(encVal)>1e-15:
                     nomDelay=encVal*1e12
                     addEnc=False
                 elif self.hasKey('enc/ch0'):
                     encVal = self.getVar('enc/ch0')
-                    if encVal.std()>1e-15 and encVal.std()<1e-9:
+                    if np.nanstd(encVal)>1e-15 and np.nanstd(encVal)<1e-9:
                         nomDelay=encVal*1e12
                         #now look at the EPICS PV if everything else has failed.
-                    elif encVal.std()>1e-3:
+                    elif np.nanstd(encVal)>1e-3:
                         nomDelay=encVal
                     else:
                         print 'strange encoder value for runs taken before encoder FEX....', encCal.std()
@@ -1133,9 +1139,10 @@ class SmallDataAna(object):
             print 'required to add encoder value, did not find encoder!'
         if addEnc and self.hasKey('enc/lasDelay'):
             if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
-                nomDelay+=self.getVar('enc/lasDelay')
+                nomDelay=nomDelay.copy()+self.getVar('enc/lasDelay')
+
         if addLxt:
-            nomDelay+=self.getVar('epics/lxt_ttc')*1e12
+            nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
 
         if use_ttCorr:
             #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()
@@ -1305,7 +1312,7 @@ class SmallDataAna(object):
         iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
         extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
 
-        plotImage(iSig, extent=extent, ylim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith)
+        plotImage(iSig, extent=extent, ylim=[np.nanpercentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith)
 
         return iSig, extent
 
@@ -1810,7 +1817,7 @@ class SmallDataAna(object):
         else:
             binVar = self.get1dVar(cube.binVar)
                 
-        if debug:
+        if debug and rank==0:
             cube.printCube(cubeName)
             cube.printSelection(self.Sels[cube.useFilter])
 
@@ -1826,9 +1833,9 @@ class SmallDataAna(object):
 
         binVar = binVar[cubeFilter]
         if binVar.shape[0] == 0:
-            print 'did not select any event, quit now!'
+            printR(rank, 'did not select any event, quit now!')
             return
-        if debug:
+        if debug and rank==0:
             print 'bin boundaries: ',Bins
 
         nTotBins=Bins.shape[0]-1
@@ -1836,7 +1843,7 @@ class SmallDataAna(object):
         if len(cube.addBinVars.keys())>0:
             binIdx=[np.digitize(binVar, Bins)]
             if np.array(binIdx).min()<1:
-                print 'something went wrong in the setting of the cube selection, please fix me....'
+                printR(rank, 'something went wrong in the setting of the cube selection, please fix me....')
                 return
             binIdx = (np.array(binIdx)-1).tolist()
             for addVar in cube.addBinVars.keys():
@@ -1847,7 +1854,7 @@ class SmallDataAna(object):
                 addBinVar = addBinVar[cubeFilter]
                 addBinIdx = np.digitize(addBinVar, cube.addBinVars[addVar])
                 if np.array(addBinIdx).min()<1:
-                    print 'something went wrong in the setting of the cube selection for variable %s, please fix me....'%addVar
+                    printR(rank, 'something went wrong in the setting of the cube selection for variable %s, please fix me....'%addVar)
                     return
                 addBinIdx = (np.array(addBinIdx)-1).tolist()
                 binShp.append(cube.addBinVars[addVar].shape[0]-1)
@@ -1866,7 +1873,7 @@ class SmallDataAna(object):
         for tVar in cube.targetVars:
             if not self.hasKey(tVar):                
                 continue
-            #print 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape
+            #printR(rank, 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape)
             filteredVar = self.getVar(tVar,cubeFilter).squeeze()
             tVar=tVar.replace('/','__')
             if len(filteredVar.shape)==1:
@@ -1889,10 +1896,10 @@ class SmallDataAna(object):
             
         if len(cube.addBinVars.keys())>0:
             newXr = None
-            for key in cubeData.keys():
-                #treat only actual data
-                if key in cubeData.dims:
-                    continue
+            for key in cubeData.variables:
+                ##treat only actual data -- this is taken care of by using .variables instead.
+                #if key in cubeData.dims:
+                #    continue
                 #get dimensions & coords for reshaped data
                 dims = [cube.binVar]
                 coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
@@ -1914,10 +1921,10 @@ class SmallDataAna(object):
                 else:
                     newXr = xr.merge([newXr, dataArray])
 
-            for key in cubeDataErr.keys():
-                #treat only actual data
-                if key in cubeDataErr.dims:
-                    continue
+            for key in cubeDataErr.variables:
+                ##treat only actual data
+                #if key in cubeDataErr.dims:
+                #    continue
                 if key == 'nEntries' or key == 'binVar':
                     continue
                 #get dimensions & coords for reshaped data
@@ -1936,15 +1943,16 @@ class SmallDataAna(object):
                 newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
                 data = cubeDataErr[key].data.reshape(newShp)
                 newKey = ('std_%s'%key)
-                print 'key ',key, newKey
+                #DEBUG?
+                printR(rank, 'key %s %s'%(key, newKey))
                 dataArray = xr.DataArray(data, coords=coords, dims=dims,name=newKey)
                 newXr = xr.merge([newXr, dataArray])
             cubeData = newXr
         else:
-            for key in cubeDataErr:
+            for key in cubeDataErr.variables:
                 if key.replace('std_','').replace('__','/') in cube.targetVars:
                     cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
-            for key in cubeDataErr:
+            for key in cubeDataErr.variables:
                 if key not in cubeData.keys():
                     cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
@@ -1968,7 +1976,7 @@ class SmallDataAna(object):
         elif 'EvtID/fid' in self.Keys():
             fidVar='EvtID/fid'
             evttVar='EvtID/time'
-        print 'we will use fiducials from here: ',fidVar
+        printR(rank, 'we will use fiducials from here: %s'%fidVar)
 
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
@@ -2033,7 +2041,8 @@ class SmallDataAna(object):
                         row = tx
                         col = ty
                         if max(row)>=cube.dropletProc[droplet]['shape'][0] or max(col)>=cube.dropletProc[droplet]['shape'][1]:
-                            print 'inconsistent shape ',self.shape, max(row), max(col)
+                            if rank==0:
+                                print 'inconsistent shape ',self.shape, max(row), max(col)
                         imageAsMatrix = sparse.coo_matrix( (data, (row, col)),shape=cube.dropletProc[droplet]['shape']).todense()
                         imageList.append(np.asarray(imageAsMatrix))
                     else:
@@ -2369,10 +2378,10 @@ class SmallDataAna(object):
             plt.show()
 
     def MakeMask(self, detname=None):
-        print ' not yet implemented, exists in LittleDataAna_psana.py'
+        print ' not yet implemented, exists in SmallDataAna_psana.py'
 
     def azimuthalBinning(self, detname=None):
-        print ' not yet implemented, exists in LittleDataProduced.py, uses code in xppmodules/src. Not sure if good idea'
+        print ' not yet implemented, exists in SmallDataProduced.py, uses code in xppmodules/src. Not sure if good idea'
 
     ##########################################################################
     ###
