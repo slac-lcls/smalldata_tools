@@ -18,6 +18,7 @@ import psana
 import SmallDataAna as sda
 from DetObject import DetObject
 from SmallDataUtils import getUserData
+from utilities import printR
 from utilities import addToHdf5
 from utilities import dropObject
 from utilities_plotting import plotImageBokeh
@@ -42,7 +43,7 @@ class SmallDataAna_psana(object):
         if expname==currExpname:
             lastRun = RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['num']
             if self.run > lastRun:
-                print 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run)
+                printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run))
                 return None
             
             isLive = (RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['end_time_unix'] is None)
@@ -75,7 +76,7 @@ class SmallDataAna_psana(object):
                     if fname.find('r%04d'%run)>=0:
                         haveXtc=True
             if not haveXtc:
-                print 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run)
+                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run))
                 return None
 
             self.dsname='exp=%s:run=%i:smd'%(expname,run)
@@ -89,28 +90,28 @@ class SmallDataAna_psana(object):
             else:
                 self.dsnameIdx=None
 
-        print 'make SmallDataAna_psana from dsname: ',self.dsname
+        printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
             self.ds = psana.DataSource(self.dsname)
         except:
-            print 'Failed to set up small data psana dataset!'
+            printR(rank, 'Failed to set up small data psana dataset!')
             self.ds = None
         if self.dsnameIdx is None:
-            print 'Failed to set up index based psana dataset, likely because no idx files have been produced/moved yet'
+            printR(rank, 'Failed to set up index based psana dataset, likely because no idx files have been produced/moved yet')
         else:
             try:
                 self.dsIdx = psana.DataSource(self.dsnameIdx)
                 self.dsIdxRun = self.dsIdx.runs().next()
             except:
-                print 'Failed to set up index based psana dataset'
+                printR(rank, 'Failed to set up index based psana dataset')
                 self.dsIdx = None
                 self.dsIdxRun = None
-        print 'try to make SmallDataAna using dirname ',dirname,' for exp: ',expname,' and run ',run
+        printR(rank, 'try to make SmallDataAna using dirname %s, for exp %s and run %s'%(dirname,expname,run))
         try:
-            print 'setting up SmallData ana from anaps '
+            printR(rank, 'setting up SmallData ana from anaps ')
             self.sda = sda.SmallDataAna(expname,run,dirname=dirname, filename=filename)
         except:
-            print 'failed, set anaps.lda to None'
+            printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
         self.jobsIds = []
 
@@ -127,6 +128,10 @@ class SmallDataAna_psana(object):
             return 'cm46_'
         elif common_mode==47:
             return 'cm47_'
+        elif common_mode==71:
+            return 'cm71_'
+        elif common_mode==72:
+            return 'cm72_'
         elif common_mode==10:
             return 'cm10_'
         elif common_mode==105:
@@ -178,7 +183,7 @@ class SmallDataAna_psana(object):
             else:
                 return keys
         except:
-            print 'failed to use last event in idx mode, try smlData'
+            printR(rank, 'failed to use last event in idx mode, try smlData')
             try:
                 keys=self.ds.events().next().keys()
                 if printthis: 
@@ -187,7 +192,7 @@ class SmallDataAna_psana(object):
                 else:
                     return keys
             except:
-                print 'WARNING: smd data also did not work, give up. No keys returned! '
+                printR(rank, 'WARNING: smd data also did not work, give up. No keys returned! ')
 
     def CfgKeys(self,idx=True,printthis=False):
         if idx:
@@ -228,7 +233,7 @@ class SmallDataAna_psana(object):
                 for alias in aliases:
                     print alias
                 detname = raw_input("Select detector to get detector info for?:\n")
-        print 'try to make psana Detector with: ',detname
+        printR(rank, 'try to make psana Detector with: %s'%detname)
 
         detnameDict=None
         if isinstance(detname, dict):
@@ -242,7 +247,7 @@ class SmallDataAna_psana(object):
             return detname
 
         if detname in self.__dict__.keys():
-            print 'redefine detector object with different common mode: ',common_mode,' instead of ', self.__dict__[detname].common_mode
+            printR(rank, 'redefine detector object with different common mode: %d instead of %d'%( common_mode,self.__dict__[detname].common_mode))
         det = DetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
         self.__dict__[detname]=det
         if (detname+'_pedestals') in self.__dict__.keys():
@@ -462,7 +467,7 @@ class SmallDataAna_psana(object):
 
     def _getDetName_from_AvImage(self,avimage):
         detname=''
-        dns = avimage.replace('AvImg_','').replace('std_','').replace('median_','').replace('pedSub_','').replace('cm46_','').replace('raw_','').replace('unb_','').split('_')
+        dns = avimage.replace('AvImg_','').replace('std_','').replace('median_','').replace('pedSub_','').replace('cm46_','').replace('cm72_','').replace('cm71_','').replace('raw_','').replace('unb_','').split('_')
         for ddns in dns:
             if ddns.find('thres')<0 and ddns.find('Filter')<0:
                 detname+=ddns;detname+='_'
@@ -754,7 +759,7 @@ class SmallDataAna_psana(object):
 
         plotMax = np.percentile(img[img!=0], 99.5)
         plotMin = np.percentile(img[img!=0], 5)
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
+        printR(rank, 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
         if self.__dict__[detname].ped is not None and self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
@@ -1644,7 +1649,7 @@ class SmallDataAna_psana(object):
             imCS = plt.subplot(gsCM[icm*2+1]).imshow(imgs[icm*2+1],clim=limsStd,interpolation='none',aspect='auto')
             plt.colorbar(imCS)
 
-    def makeCubeData(self, cubeName, dirname='', nEvtsPerBin=-1, offEventsCube=-1, storeMeanStd=False):
+    def makeCubeData(self, cubeName, dirname='', nEvtsPerBin=-1, offEventsCube=-1, storeMeanStd=False, onoff=2):
         if self.sda is None:
             return
         if dirname=='':
@@ -1654,7 +1659,8 @@ class SmallDataAna_psana(object):
         #myCube = self.sda.prepCubeData(cubeName)
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
-        print 'variables to be read from xtc: ',myCube.targetVarsXtc
+        if (rank==0):
+            print 'variables to be read from xtc: ',myCube.targetVarsXtc
 
         detInData=[]
         for k in self.Keys():
@@ -1670,7 +1676,7 @@ class SmallDataAna_psana(object):
             if dName in detInData:
                 detNames.append(dName)
             else:
-                print 'detector with this alias not in data ',det
+                printR(rank, 'detector with alias %s not in data '%det)
                 myCube.targetVarsXtc.pop(idet)
         myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in myCube.targetVarsXtc]
 
@@ -1681,36 +1687,47 @@ class SmallDataAna_psana(object):
         if len(myCube.targetVarsXtc)<=0:
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
+                if (onoff==0):
+                    outFileName=outFileName.replace('.h5','_off.h5')
+                elif (onoff==1):
+                    outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
-                print 'no big data, bin the data now....be patient'
-                cubeData = self.sda.makeCubeData(cubeName)  
-                print 'now write outputfile (only small data) to : ',outFileName
+                printR(rank, 'no big data, bin the data now....be patient')
+                cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
+                printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
                 for key in cubeData.keys():
                     addToHdf5(fout, key, cubeData[key].values)
                 fout.close()
             return
 
-        print 'now make big cube'
+        printR(rank, 'now make big cube')
         #only run on rank=0 & broadcast.
         outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5.inprogress'%cubeName)
-        if rank==0:
-            print 'now write outputfile to : ',outFileName
+        if (onoff==0):
+            outFileName=outFileName.replace('.h5','_off.h5')
+        elif (onoff==1):
+            outFileName=outFileName.replace('.h5','_on.h5')
+        printR(rank, 'now write outputfile to : %s'%outFileName)
         try:
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
         except:
             try:
                 fout = h5py.File('/tmp/%d'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
-                print 'could not open the desired file for MPI writing. Likely a permission issue:'
+                printR(rank, 'could not open the desired file for MPI writing. Likely a permission issue:')
                 import pwd
-                print 'owner: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,'(',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,'), permissions: ',oct(os.stat(outFileName).st_mode)[-3:]
+                printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
             except:
-                print 'you will need an analysis release < ana.1.3.21 or >= ana-1.3.42 for the cube to work. Solution in progress...'
-            print 'we will save the small cubed data only and return'
+                printR(rank, 'you will need an analysis release < ana.1.3.21 or >= ana-1.3.42 for the cube to work. Solution in progress...')
+            printR(rank, 'we will save the small cubed data only and return')
             if rank==0:
                 outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
+                if (onoff==0):
+                    outFileName=outFileName.replace('.h5','_off.h5')
+                elif (onoff==1):
+                    outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
                 print 'bin the data now....be patient'
-                cubeData = self.sda.makeCubeData(cubeName)  
+                cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
                 print 'now write outputfile (only small data) to : ',outFileName
                 for key in cubeData.keys():
                     addToHdf5(fout, key, cubeData[key].values)
@@ -1722,7 +1739,7 @@ class SmallDataAna_psana(object):
             self.sda.getOffVar('event_time','xon',nNbr=offEventsCube, mean=False)
             addVars = [ 'offNbrs_event_time_xon_nNbr%02d'%offEventsCube,'offNbrs_fiducials_xon_nNbr%02d'%offEventsCube]
             self.sda.cubes[cubeName].addIdxVar(addVars)
-        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True)
+        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True,onoff=onoff)
         #add small data to hdf5
         for key in cubeData.keys():
             addToHdf5(fout, key, cubeData[key].values)
@@ -1945,8 +1962,7 @@ class SmallDataAna_psana(object):
                     addToHdf5(fout, 'Cfg_'+detName+'_mask', det.det.image(self.run,det.mask))
                     addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.det.image(self.run,det.cmask))
         comm.Barrier()
-        if rank==0:
-            print 'first,last img mean: ',np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])
+        printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
         fout.close()
         if rank==0:
             print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
