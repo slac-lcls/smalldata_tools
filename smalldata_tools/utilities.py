@@ -102,6 +102,17 @@ def rebin(a, shape):
       img = rebinFactor(bigImg, shape)
     return img
 
+def rebinShape( a, newshape ):
+  '''Rebin an array to a new shape.
+  '''
+  assert len(a.shape) == len(newshape)
+
+  slices = [ slice(0,old, float(old)/new) for old,new in zip(a.shape,newshape) ]
+  coordinates = np.mgrid[slices]
+  indices = coordinates.astype('i')   #choose the biggest smaller integer index
+  return a[tuple(indices)]
+
+
 def reduceVar(vals, sigROI,threshold=-1e25):
     if threshold!=-1e25:
       vals = vals[vals<threshold]=0
@@ -191,6 +202,10 @@ def checkDet(env, detname):
       return True
   return False
         
+def printR(rank=0, message=''):
+  if rank==0:
+    print message
+
 def printMsg(eventNr, run, rank=0, size=1):
   printFreq = 10
   #if eventNr > 10000:
