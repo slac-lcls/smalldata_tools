@@ -20,6 +20,10 @@ class droplets(object):
         return keyList
 
     def fillDropArrays(self, only_XYADU=False, Filter=None):
+        #get shape of detector, right now EPIX is hardcoded...
+        dX = self._h5.get_node('/UserDataCfg/'+self._detName, 'iX').read().max() - self._h5.get_node('/UserDataCfg/'+self._detName, 'iX').read().min()
+        dY = self._h5.get_node('/UserDataCfg/'+self._detName, 'iY').read().max() - self._h5.get_node('/UserDataCfg/'+self._detName, 'iY').read().min()
+        self.__dict__['detSize'] = [dX, dY] #708, 772 or epix
         for node in self._h5dir._f_list_nodes():
             if not (node.name.find(self._dropName)>=0):
                 continue
@@ -29,13 +33,15 @@ class droplets(object):
             h5Name = self._dropName+node.name.replace(self._dropName,'')
             keyName=node.name.replace(self._dropName,'')
             if not only_XYADU:
-                print 'fill drop ',h5Name
+                print 'fill drop all ',h5Name
                 if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
                 else:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
             elif (keyName=='X' or keyName=='Y' or keyName=='adu' or keyName=='npix'):
-                print 'fill drop ',h5Name
+                print 'fill drop (only x,y,adu) ',h5Name
+                #if Filter is not None:
+                #    print 'DEBUG Shapes', h5Name, Filter.shape[0], self._h5.get_node('/'+self._detName, h5Name).shape[0]
                 if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
                 else:
@@ -43,14 +49,16 @@ class droplets(object):
 
     def flattenDropArray(self, filterArray=None):
         if filterArray is None:
-            if 'adau' in self.getKeys():
+            if 'adu' in self.getKeys():
                 filterArray = (self.__dict__['adu']>0)
             else:
                 print 'did not find adu, will not flatten'
                 return
 
         for key in self.getKeys():
-            if filterArray.shape == self.__dict__[key].shape:
+            if key == 'detSize':
+                continue
+            if np.array(filterArray).shape == self.__dict__[key].shape:
                 self.__dict__[key] = self.__dict__[key][filterArray].flatten()
 
     def getDropPixels(self, ievt, debug=False):
@@ -110,21 +118,31 @@ class droplets(object):
             plt.plot(hst[1][1:],hst[0],'o')
             
     def plotAduX(self, ADUrange=[120,180],maxLim=99.5):
+        #self.__dict__['detSize'] = [dX, dY] #708, 772 or epix
+        dX = self.__dict__['detSize'][0]
+        dY = self.__dict__['detSize'][1]
         if len(self.__dict__['X'].shape)>1:
             self.flattenDropArray()
         plt.figure()
-        hist2d(self.__dict__['X'][self.__dict__['Y']<1000],self.__dict__['adu'][self.__dict__['Y']<1000], numBins=[702,180], histLims=[0,702,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+        hist2d(self.__dict__['X'][self.__dict__['Y']<=dY],self.__dict__['adu'][self.__dict__['Y']<=dY], numBins=[dX,180], histLims=[0,dX,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
 
     def plotAduY(self, ADUrange=[120,180],maxLim=99.5):    
+        dX = self.__dict__['detSize'][0]
+        dY = self.__dict__['detSize'][1]
         if len(self.__dict__['Y'].shape)>1:
             self.flattenDropArray()
         plt.figure()
-        plt.subplot(211)
-        hist2d(self.__dict__['Y'][self.__dict__['X']<351],self.__dict__['adu'][self.__dict__['X']<351], numBins=[766,180], histLims=[0,766,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
-        plt.subplot(212)
-        hist2d(self.__dict__['Y'][self.__dict__['X']>353],self.__dict__['adu'][self.__dict__['X']>353], numBins=[766,180], histLims=[0,766,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+        if self._detName.find('epix')>=0 or self._detName.find('Epix')>=0:
+            plt.subplot(211)
+            hist2d(self.__dict__['Y'][self.__dict__['X']<351],self.__dict__['adu'][self.__dict__['X']<351], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+            plt.subplot(212)
+            hist2d(self.__dict__['Y'][self.__dict__['X']>353],self.__dict__['adu'][self.__dict__['X']>353], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+        else:
+            hist2d(self.__dict__['Y'][self.__dict__['X']<=dX],self.__dict__['adu'][self.__dict__['X']<=dX], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
 
     def plotXY(self, ADUrange=[120,180], npix=0):            
+        dX = self.__dict__['detSize'][0]
+        dY = self.__dict__['detSize'][1]
         allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
         allY = self.__dict__['Y'][self.__dict__['adu']>ADUrange[0]]
         alladu = self.__dict__['adu'][self.__dict__['adu']>ADUrange[0]]
@@ -149,7 +167,7 @@ class droplets(object):
 
         plt.figure()
         ndrop_int = max(1,490000./allX.shape[0])
-        hist2d(allX,allY, numBins=[int(702/ndrop_int),int(766/ndrop_int)])
+        hist2d(allX,allY, numBins=[int(dX/ndrop_int),int(dY/ndrop_int)])
 
     def aduSlices(self,axis='y', ADUrange=[0,-1], npix=0):
         allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
