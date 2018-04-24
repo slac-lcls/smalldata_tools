@@ -52,6 +52,7 @@ class photon:
         #photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
         #note: this works on tiled detectors.
         photons_nda = photons(fimage, locMask)
+
         ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
         ret_dict['nPhot']=photons_nda.sum()
         ret_dict['nPhot_mask']=photons_nda[locMask>0].sum()
@@ -62,47 +63,44 @@ class photon:
             photonsImg[locMask==0]=0
             if self.retImg>1:
                 ret_dict['img']=photonsImg
-            else:    
-                if len(photonsImg.shape)>2: #tiled detector!
-                    data=[]
-                    row=[]
-                    col=[]
-                    tile=[]
-                    for iTile,photonTile in enumerate(photonsImg):
-                        sImage = sparse.coo_matrix(photonTile)
-                        data.append(sImage.data.tolist())
-                        row.append(sImage.row.tolist())
-                        col.append(sImage.col.tolist())
-                        tile.append((np.ones_like(sImage.data)*iTile).tolist())
-                else:
-                    sImage = sparse.coo_matrix(photonsImg)
-                    data = sImage.data
-                    row = sImage.row
-                    col = sImage.col
-                    tile=None
-                #back to normal code
-                if tile is not None:
-                    data = np.array(data)
-                    row = np.array(row)
-                    col = np.array(col)
-                if data.shape[0] >= self.nphotRet:
-                    ret_dict['data']=data[:self.nphotRet]
-                    ret_dict['row']=row[:self.nphotRet]
-                    ret_dict['col']=col[:self.nphotRet]
-                    if tile is not None:
-                        ret_dict['tile']=tile[:self.nphotRet]
-                else:
-                    ret_dict['data']=(np.append(data[:self.nphotRet], np.zeros(self.nphotRet-len(data)))).astype(int)
-                    ret_dict['row']=(np.append(row[:self.nphotRet], np.zeros(self.nphotRet-len(row)))).astype(int)
-                    ret_dict['col']=(np.append(col[:self.nphotRet], np.zeros(self.nphotRet-len(col)))).astype(int)
-                    if tile is not None:
-                        ret_dict['tile']=(np.append(tile[:self.nphotRet], np.zeros(self.nphotRet-len(tile)))).astype(int)
-        ret_dict['evtTime']=time.time() - tstart
-        #print 'shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape
-        #print ret_dict['data'][:10]
-        #print ret_dict['row'][:10]
-        #print ret_dict['col'][:10]
-        return ret_dict
+                return ret_dict
+
+            if len(photonsImg.shape)>2: #tiled detector!
+                data=[]
+                row=[]
+                col=[]
+                tile=[]
+                for iTile,photonTile in enumerate(photonsImg):
+                    sImage = sparse.coo_matrix(photonTile)
+                    data.append(sImage.data.tolist())
+                    row.append(sImage.row.tolist())
+                    col.append(sImage.col.tolist())
+                    tile.append((np.ones_like(sImage.data)*iTile).tolist())
+                data = np.array(data)
+                row = np.array(row)
+                col = np.array(col)
+                tile= np.array(tile)
+            else:
+                sImage = sparse.coo_matrix(photonsImg)
+                data = sImage.data
+                row = sImage.row
+                col = sImage.col
+                tile = np.zeros_like(data)
+
+            if data.shape[0] >= self.nphotRet:
+                ret_dict['data']=data[:self.nphotRet]
+                ret_dict['row']=row[:self.nphotRet]
+                ret_dict['col']=col[:self.nphotRet]
+                ret_dict['tile']=tile[:self.nphotRet]
+            else:
+                ret_dict['data']=(np.append(data[:self.nphotRet], np.zeros(self.nphotRet-len(data)))).astype(int)
+                ret_dict['row']=(np.append(row[:self.nphotRet], np.zeros(self.nphotRet-len(row)))).astype(int)
+                ret_dict['col']=(np.append(col[:self.nphotRet], np.zeros(self.nphotRet-len(col)))).astype(int)
+                ret_dict['tile']=(np.append(tile[:self.nphotRet], np.zeros(self.nphotRet-len(tile)))).astype(int)
+
+            if ret_dict['data'].shape[0]!=nphotRet or  ret_dict['row'].shape[0]!=nphotRet or  ret_dict['col'].shape[0]!=nphotRet or  ret_dict['tile'].shape[0]!=nphotRet:
+                print 'shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape,ret_dict['tile'].shape
+            return ret_dict
 
 #
 #
