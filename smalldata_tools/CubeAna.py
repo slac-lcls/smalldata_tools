@@ -2,6 +2,7 @@ import glob
 from os import path
 import tables
 import numpy as np
+from utilities import rebinShape
 from utilities_plotting import plotMarker, plotImage
 import xarray as xr
 #plot functions: 3-d plotting, fix origin.
@@ -9,15 +10,15 @@ import xarray as xr
 #test function to add cubes & to sum runs & extend plot (azav as fct of run) 
 class CubeAna(object):
     def __init__(self, expname='', run=0, dirname='', cubeName='', cubeDict=None, plotWith='matplotlib', debug=False):
-        print 'DEBUG INIT; ',expname, run
+        if debug: print 'DEBUG INIT; ',expname, run
         self._fields={}
         self.expname=expname
         self._initrun=run
         self.runs=[run]
         self.runLabel='Run%03d'%run
-        self.plotWith=plotWith
+        self._plotWith=plotWith
         self._inDict=cubeDict
-        self.debug = debug
+        self._debug = debug
         if len(expname)>3:
             self.hutch=self.expname[:3]
             #do not look at ftc anymore. If that old data is used, 
@@ -75,7 +76,8 @@ class CubeAna(object):
         self._cubeDict = { "Run%03d"%run: thisXrdata}
         self._cubeSumDict = thisXrdata.copy(deep=True)
         self._cubeExtendDict = thisXrdata.copy(deep=True)
-        
+        self._variableDefs={} #dictionary of variable definitions: key is name, value is list of [varname, ROI]
+
     def _getXarrayDims(self,key,dataShape):
         coords=None
         dims=None
@@ -121,15 +123,17 @@ class CubeAna(object):
         cubeTable=tables.open_file(fname,'r')
         self._bins = cubeTable.get_node('/binVar_bins').read()
         thisXrdata = xr.DataArray(self._bins, coords={'bins': self._bins}, dims=('bins'), name='Bins')
-        self._detConfig=[]
+        self._detConfig={}
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
+            #print 'lookin at key: ',key
             if key == '/binVar_bins':
                 continue
             tArrName = key[1:]
             #make a dictionary with detector config data is present
             if key.find('Cfg')>=0:
                 detname = key.split('_')[1]
+                #print 'DEBUG: ',self._detConfig
                 if not (detname in self._detConfig.keys()):
                     self._detConfig[detname]={}
                 if key.split('_')[2] not in self._detConfig[detname].keys():
@@ -137,11 +141,12 @@ class CubeAna(object):
                 continue
             dataShape = cubeTable.get_node(key).shape
             if dataShape[0]!=self._bins.shape[0]:
-                if self.debug:
+                if self._debug:
                     print 'data for %s is not of the right shape: '%(key), dataShape
                 continue
             dataShape,coords, dims = self._getXarrayDims(key, dataShape)
             thisXrdata = xr.merge([thisXrdata, xr.DataArray(cubeTable.get_node(key).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
+            #print 'data has been added for ',key, dataShape
         return thisXrdata
 
     def _reduceData(self, inArray, sigROI=None):
@@ -171,10 +176,18 @@ class CubeAna(object):
             print 'this dimension is not yet implemented:',len(sig.shape)
         return inArray
         
-    def Keys(self, name=None):
+    def setPlottingTool(self, plotWith):
+        self._plotWith=plotWith
+
+    def setDebug(self, debug):
+        self._debug=bool(debug)
+
+    def Keys(self, name=None, img=False):
         keys=[]
-        for key in self._cubeDict[self._cubeDict.keys()[0]]:
+        for key in self._cubeDict[self._cubeDict.keys()[0]].variables:
             if name is not None and key.find(name)<0:
+                continue
+            if img and len(self._cubeDict[self._cubeDict.keys()[0]][key].shape)<3:
                 continue
             keys.append(key)
         return keys
@@ -186,7 +199,8 @@ class CubeAna(object):
             return            
         thisXrdata = self._xrFromRun(run)
         self._cubeDict["Run%03d"%run] = thisXrdata
-        for k in self._cubeSumDict.keys():
+        for k in self._cubeSumDict.variables:
+            if k == 'bins' or k == 'Bins': continue
             if self._cubeSumDict[k].shape[0]==self._cubeSumDict['Bins'].shape[0]:
                 self._cubeSumDict[k].data = self._cubeSumDict[k].data + thisXrdata[k].data
 
@@ -244,9 +258,9 @@ class CubeAna(object):
 
 
     # add support for defining ROIs and reducing as well as plotting as img
-    def plotCube(self, run=None, sig=None, i0='nEntries', plotWith=None, addData=None):
+    def plotCube(self, run=None, sig=None, i0='nEntries', plotWith=None, addData=None, nPoints=None, plotLog=False):
         if plotWith==None:
-            plotWith=self.plotWith
+            plotWith=self._plotWith
         runKey = None
         if run is not None and isinstance(run, int):
             runKey = 'Run%03d'%run
@@ -260,14 +274,20 @@ class CubeAna(object):
         else:
             cubeDict = self._cubeDict[runKey]
         binVar = cubeDict['bins'].data
+        plotvar = 'binVar'
+
+        if i0 is not None and i0 not in cubeDict.variables:
+            print 'could not find i0, return'; return
+
         sigROI = None
+        aimDim=0
         if isinstance(sig, list):
+            if len(sig)>2:
+                aimDim=sig[2]
             sigROI = sig[1]
             sig = sig[0]
-        if sig not in cubeDict.keys():
+        if sig not in cubeDict.variables:
             print 'could not find sig, return'; return
-        if i0 is not None and i0 not in cubeDict.keys():
-            print 'could not find i0, return'; return
 
         if i0 is None:
             i0Var = np.ones_like(sigVar)
@@ -275,25 +295,76 @@ class CubeAna(object):
         else:
             i0Var=cubeDict[i0].data
             sigvar = '%s/%s'%(sig,i0)
+
         sigVar = cubeDict[sig].data
         sigVar = self._reduceData(sigVar, sigROI)   
+        if aimDim>0:
+            while len(sigVar.shape)>aimDim:
+                sigVar = np.nanmean(sigVar,axis=1)
+        if len(sigVar.shape)==1 and nPoints is not None and nPoints < sigVar.shape[0]:
+            i0Var = rebinShape(i0Var,(nPoints,))
+            sigVar = rebinShape(sigVar,(nPoints,))
+            binVar = rebinShape(binVar,(nPoints,))
         sigVar = np.divide(np.array(sigVar.T),np.array(i0Var))
-        plotvar = 'binVar'
+
+        #if addVar were dict of form {varname:ROI} woth ROI=None->no ROI
+        #loop & get list of points to be passed to plotMarker.
 
         if plotWith is 'returnData':
             return sigVar
         if len(sigVar.shape)==1:
             if addData is None:
-                plotMarker(sigVar, xData=[binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname)
+                if nPoints is not None and nPoints < sigVar.shape[0]:
+                    sigVar = rebinShape(sigVar,(nPoints,))
+                    binVar = rebinShape(binVar,(nPoints,))
+                plotMarker(sigVar, xData=[binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname, line_dash='dashed')
             else:
-                print 'plot2Data '
-                plotMarker([sigVar, addData], xData=[binVar, binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname)
+                print 'plot2Data NOT SURE WHAT THIS WAS SUPPOSED TO ACTUALLY DO'
+                plotMarker([sigVar, addData], xData=[binVar, binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname, line_dash='dashed')
         elif len(sigVar.shape)==2:
             extent=[binVar[0], binVar[-1],0,sigVar.shape[0]]
-            plotImage(sigVar, xLabel=plotvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname, extent=extent)
+            plotImage(sigVar, xLabel=plotvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
         else:
             print 'no code yet to plot 3-d data'
             return
 
         return None
 
+    def plotImage(self, run=None, sig=None, plotWith=None, plotLog=False):
+        if plotWith==None:
+            plotWith=self._plotWith
+        runKey = None
+        if run is not None and isinstance(run, int):
+            runKey = 'Run%03d'%run
+        elif  run is not None and isinstance(run, basestring):
+            if run[:3]=='Run': 
+                runKey = run
+            else:
+                runKey = 'Run%03d'%int(run)
+        if runKey is None:
+            cubeDict = self._cubeSumDict
+        else:
+            cubeDict = self._cubeDict[runKey]
+
+        if sig is None:
+            print 'we have the following cubed images: ',
+            for k in self.Keys(img=True):
+                print k
+            sig = raw_input('Please select one:')
+        
+        sigIdx = None
+        if isinstance(sig, list):
+            sigIdx = sig[1]
+            sig = sig[0]
+        if sig not in cubeDict.variables:
+            print 'could not find sig, return'; return
+
+        if sigIdx is not None:
+            sigVar=cubeDict[sig].data[sigIdx]
+        else:
+            sigVar=cubeDict[sig].data.sum(axis=0)
+
+        extent=[0,sigVar.shape[0],0,sigVar.shape[1]]
+        plotImage(sigVar, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
+
+            
