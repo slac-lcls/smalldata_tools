@@ -14,6 +14,8 @@ import bokeh
 import bokeh.plotting as bp
 from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
 from bokeh.models import WheelZoomTool, BoxZoomTool
+from bokeh.models import BoxSelectTool
+from bokeh.models import ColumnDataSource
 
 from collections import deque
 from itertools import islice
@@ -29,30 +31,107 @@ except:
   print 'no bokeh utils'
   pass
 
-def create_range_slider(vabsmin,vabsmax,vmin,vmax,im,step=0.1):
+def create_range_input_button(plotMin,plotMax,im,width=450):
+    JS_code_plotMin_plotMax = """
+        var plotMin = parseFloat(input_plotMin.value);
+        var plotMax = parseFloat(input_plotMax.value);
+        im.glyph.color_mapper.high = plotMax;
+        im.glyph.color_mapper.low = plotMin;
+        im.data_source.trigger('change');
+    """
+    callback_update = bokeh.models.CustomJS(code=JS_code_plotMin_plotMax)
+    input_plotMin = bokeh.models.widgets.TextInput(value="%g"%plotMin,title="plotMin")
+    input_plotMax = bokeh.models.widgets.TextInput(value="%g"%plotMax,title="plotMax")
+    button_update =  bokeh.models.Button(label="Update plotMin/plotMax", callback=callback_update)
+
+    callback_update.args['input_plotMin'] = input_plotMin
+    callback_update.args['input_plotMax'] = input_plotMax
+    callback_update.args['im'] = im
+
+    return input_plotMin,input_plotMax,button_update
+
+def create_range_slider(vabsmin,vabsmax,plotMin,plotMax,im,step=0.1):
     JS_code_slider = """                                                                            
-        var vmin = rslider.range[0];
-        var vmax = rslider.range[1];
-        im.glyph.color_mapper.high = vmax;
-        im.glyph.color_mapper.low = vmin; 
+        var plotMin = rslider.range[0];
+        var plotMax = rslider.range[1];
+        im.glyph.color_mapper.high = plotMax;
+        im.glyph.color_mapper.low = plotMin; 
         im.data_source.trigger('change');
     """
     callback_slider = bokeh.models.CustomJS(args=dict( im=im),
                                         code=JS_code_slider)
 
     try:
-        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[vmin,vmax],callback=callback_slider,orientation="horizontal")
+        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[plotMin,plotMax],callback=callback_slider,orientation="horizontal")
     except:
-        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, value=[vmin,vmax],callback=callback_slider,orientation="horizontal")
+        rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, value=[plotMin,plotMax],callback=callback_slider,orientation="horizontal")
 
     callback_slider.args['rslider'] = rslider
 
     return rslider
 
-def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP=None, plotMaxP=None, plotMin="auto", plotMax="auto", initial_cmap='jet', output_quad=False, tools=None):
-    if plotMinP is None: 
+def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
+    JS_code_slider = """                                                                            
+        var img_idx_val = rslider.value; 
+        var cmin=1000000000000
+        var cminIdx=-1        
+
+        for (var i=0; i < sourceCoords.data.coords.length; i++){
+            if (Math.abs(sourceCoords.data.coords[i] - img_idx_val) < cmin){
+                cmin = Math.abs(sourceCoords.data.coords[i] - img_idx_val);
+                cminIdx=i;
+            }
+        }
+        var arShp = sourceShp.data.imShp[1]*sourceShp.data.imShp[2]
+        var d3data_flat = source.data.im3d
+        var newArr=[]
+        for(var i = 0; i < d3data_flat.length; i += arShp) {
+            newArr.push(d3data_flat.slice(i, i + arShp));
+        }
+        var selArr = newArr[cminIdx]
+        im.data_source.data['image'][0] = selArr;  
+        im.data_source.trigger('change')
+        p.title.text = "bin value: "+img_idx_val+", idx "+cminIdx
+        p.update()
+    """
+    if coords is not None and not isinstance(coords, list):
+        print 'if coords is given it needs to be a list.'
+        coords = None
+    if coords is None:
+        coords=np.arange(imOrg.shape[0]).tolist()
+        coords.append(imOrg.shape[0])
+        step=1
+    else:
+        step = (max(coords)-min(coords))/(imOrg.shape[0]-1)
+
+    #is valStart is not index, calculate.
+    if isinstance(valStart, float) or valStart>=imOrg.shape[0]:
+        valStart = np.argmin(abs(coords-valStart))
+
+    source = ColumnDataSource(data=dict(im3d=imOrg))
+    sourceShp = ColumnDataSource(data=dict(imShp = imOrg.shape))
+    sourceCoords = ColumnDataSource(data=dict(coords = coords))
+
+    callback_slider = bokeh.models.CustomJS(args=dict(im=im,p=p,source=source, sourceShp=sourceShp, sourceCoords=sourceCoords), 
+                                            code=JS_code_slider)
+
+    rslider = bokeh.models.Slider(title="image",start=0,end=imOrg.shape[0],step=1,
+                                  value=valStart, callback=callback_slider, orientation="horizontal")
+    callback_slider.args['rslider'] = rslider
+
+    return rslider
+ 
+def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP="auto", plotMaxP="auto", plotMin="auto", plotMax="auto", palette_name='jet', output_quad=False, tools=None, plotLog=False, rangeInput=True):
+    if plotLog: data = np.log(data)
+    data[np.isinf(data)]=np.nan 
+    data[np.isneginf(data)]=np.nan 
+    if plotMin=="auto":
+        plotMin = np.nanmin(data)
+    if plotMax=="auto":
+        plotMax = np.nanmax(data)
+    if plotMinP=="auto": 
         plotMinP = np.nanpercentile(data, 5)
-    if plotMaxP is None: 
+    if plotMaxP=="auto": 
         plotMaxP = np.nanpercentile(data, 95)
     if xRange is None:
         xRange=(0,data.shape[0])
@@ -67,21 +146,22 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
         hover=HoverTool(tooltips=[
             ("(x,y)","($x, $y)")
         ])
-        tools = [pan, wheel_zoom,box_zoom,save,hover,reset]
+        box_select=BoxSelectTool()
+        tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset]
         if bokeh.__version__=='0.12.6':
             resize=ResizeTool()
-            tools = [pan, wheel_zoom,box_zoom,save,hover,reset,resize]
+            tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset,resize]
     
     if dateTime:
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+        created_map = bokeh_utils.create_map(data2plot=data,palette_name=palette_name,
                                             fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
                                             y_range=yRange,title=plot_title,x_axis_type="datetime", tools=tools,
-                                            cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
+                                            cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP, output_quad=output_quad)
     else: 
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=initial_cmap,
+        created_map = bokeh_utils.create_map(data2plot=data,palette_name=palette_name,
                                             fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
                                             y_range=yRange,title=plot_title, tools=tools,
-                                            cmaps=cmaps,vmin=plotMinP,vmax=plotMaxP, output_quad=output_quad)
+                                            cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP, output_quad=output_quad)
 
     if output_quad:
         p, im, q = created_map
@@ -89,18 +169,128 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
         p, im = created_map
         
     # Controls
-    vabsmin,vabsmax = plotMin, plotMax
-    step=(plotMaxP-plotMinP)/50.
-    range_slider = create_range_slider(np.nanmin(data),np.nanmax(data),plotMinP,plotMaxP,im=im,step=step)
-    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=initial_cmap)
-
-    # Layout
-    layout = bp.gridplot([[p],[range_slider,select_cm]])
+    #vabsmin,vabsmax = plotMin, plotMax
+    step=(plotMaxP-plotMinP)/100.
+    range_slider = create_range_slider(plotMin,plotMax,plotMinP,plotMaxP,im=im,step=step)
+    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+    if rangeInput:
+        range_input = create_range_input_button(plotMin,plotMax,im=im, width=plotWidth)
+        # Layout
+        layout = bp.gridplot([[p],[range_slider,select_cm], [range_input[2], range_input[0], range_input[1]]])
+    else:
+        layout = bp.gridplot([[p],[range_slider,select_cm]])
 
     if output_quad:
         return layout,p,im,q
     else:
         return layout,p,im
+
+
+def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fig_width_pxls=800,fig_height_pxls=500,
+                  x_range=None,y_range=None, title="Binned Image Data",x_axis_type="linear", cmaps=None,
+                  cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
+                  min_border_top=30, min_border_bottom=10,title_font_size="12pt",title_align="center",
+                  output_quad=False,plotMinP="auto", plotMaxP="auto", plotMin="auto", plotMax="auto",
+                  tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"]):
+    """                                                                           
+    x_axis_type: "linear", "log", "datetime", "auto"                     
+    """
+    if type(cmaps)==type(None):
+        cmaps = get_all_palettes()
+
+    #get auto scale. Use full set of images.
+    if plotMin=="auto":
+        plotMin = np.nanmin(data2plot)
+    if plotMax=="auto":
+        plotMax = np.nanmax(data2plot)
+    if plotMinP=="auto": 
+        plotMinP = np.nanpercentile(data2plot, 5)
+    if plotMaxP=="auto": 
+        plotMaxP = np.nanpercentile(data2plot, 95)
+
+    #deal with getting (initial) 2-d image to plot
+    if len(data2plot.shape)<2:
+        print 'data to plot has less than 2 dims'
+        return 
+    elif len(data2plot.shape)>3:
+        print 'data to plot has more than 3 dims'
+        return
+    elif len(data2plot.shape)==2:
+        init_plot=-1
+        init_dat = data2plot
+    else:
+        if init_plot is not None:
+            if not isinstance(init_plot, int):
+                print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
+                init_plot = 0
+        else:
+            init_plot = 0
+        init_dat = data2plot[init_plot]
+        
+    if coord is None or (len(data2plot.shape)==3 and data2plot.shape[0]!=len(coord)):
+        coord = np.arange(0,data2plot.shape[0])              
+            
+    #plot range X&Y
+    if x_range is None:
+        x0=0; x1=init_dat.shape[0]
+    else:
+        x_range = np.array(x_range)
+        if x_range.shape[0]==1:
+            x0=min(x_range,0); x1 = max(x_range,0)
+        else:
+            x0=min(x_range); x1 = max(x_range)
+
+    if y_range is None:
+        y0=0
+        y1=init_dat.shape[1]
+    else:
+        y_range = np.array(y_range)
+        if y_range.shape[0]==1:
+            y0=min(y_range,0); y1 = max(y_range,0)
+        else:
+            y0=min(y_range); y1 = max(y_range)
+
+
+    imgSource = ColumnDataSource(
+            {'value': init_dat})
+    #create figure.
+    p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
+                              plot_width=fig_width_pxls,plot_height=fig_height_pxls, 
+                              min_border_left=min_border_left,min_border_right=min_border_right,
+                              title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
+                              tools= tools)
+    p.title.text_font_size = title_font_size
+    p.title.align = title_align
+    im = p.image(image=[init_dat],dw=[x1-x0],dh=[y1-y0],x=[x0],y=[y0],palette=cmaps["palettes_dict"][palette_name])
+
+    im.glyph.color_mapper.high = plotMax
+    im.glyph.color_mapper.low = plotMin
+    imquad = p.quad(top=[y1], bottom=[y0], left=[x0], right=[x1],alpha=0) # This is used for hover and taptool
+    
+    if create_colorbar:
+        color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
+        p.add_layout(color_bar, 'right')
+
+    #create more tools.
+    #colormap selection
+    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+
+    #range slider.
+    step=(plotMaxP-plotMinP)/50.
+    #vabsmin,vabsmax = plotMin, plotMax
+    range_slider = create_range_slider(np.nanmin(data2plot),np.nanmax(data2plot),plotMinP,plotMaxP,im=im,step=step)
+
+    if len(data2plot.shape)==3:
+        img_slider = create_img_slider_scale(im, data2plot,valStart=init_plot,coords=coord,p=p)
+        #put them togeter.
+        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider]])
+    else:
+        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm]])
+
+    if output_quad:
+        return layout, p,im,imquad
+    else:
+        return layout, p,im
 
 
 def getColors(nColors=None, maxCol=2.6, minCol=0.25):
@@ -321,6 +511,7 @@ def plotImage(image, **kwargs):
     width_height: measurements for to be created figures
     dateTime: default False, True will make the plot use time coords on x-axis, bokeh only (?)
     output_quad: default False, bokeh only, determines what of layout is return
+    plotLog: default False, bokeh only
     """
     
     if not isinstance(image, np.ndarray):
@@ -346,6 +537,8 @@ def plotImage(image, **kwargs):
     width_height = kwargs.pop("width_height", None)
     dateTime = kwargs.pop("dateTime", False)
     output_quad = kwargs.pop("output_quad", False)
+    plotLog = kwargs.pop("plotLog", False)
+    rangeInput = kwargs.pop("rangeInput", True)
     if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
@@ -358,7 +551,7 @@ def plotImage(image, **kwargs):
             fig = (gridspec.GridSpec(1,1)[0])
         if ylim is None:
             ylim = [np.nanpercentile(image,1), np.nanpercentile(image,99.5)]
-        plt.subplot(fig).imshow(image, clim=ylim, extent=extent, aspect='auto', interpolation='none')
+        plt.subplot(fig).imshow(image, clim=ylim, extent=extent, aspect='auto', interpolation='none',origin='lower')
         plt.subplot(fig).set_xlabel(xLabel)
         plt.subplot(fig).set_ylabel(yLabel)
         plt.subplot(fig).set_title(plotTitle)
@@ -369,7 +562,7 @@ def plotImage(image, **kwargs):
             ylim=['auto', 'auto']
         fig = kwargs.pop("fig", None)
         #retValues are layout,p,im[,q] (latter if output_quad is True)
-        retValues = plotImageBokeh(image, plotWidth=width_height[0], plotHeight=width_height[1], initial_cmap='jet', output_quad=output_quad, tools=tools,  plot_title=plotTitle, dateTime=dateTime, xRange=(extent[0], extent[1]), yRange=(extent[2], extent[3]), plotMinP=None, plotMaxP=None, plotMin=ylim[0], plotMax=ylim[1])
+        retValues = plotImageBokeh(image, plotWidth=width_height[0], plotHeight=width_height[1], palette_name='jet', output_quad=output_quad, tools=tools,  plot_title=plotTitle, dateTime=dateTime, xRange=(extent[0], extent[1]), yRange=(extent[2], extent[3]), plotMinP="auto", plotMaxP="auto", plotMin=ylim[0], plotMax=ylim[1],plotLog=plotLog,rangeInput=rangeInput)
 
         if fig is not None:
             return retValues
