@@ -188,7 +188,7 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
         return layout,p,im
 
 
-def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fig_width_pxls=800,fig_height_pxls=500,
+def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fig_width_pxls=600,fig_height_pxls=400,
                   x_range=None,y_range=None, title="Binned Image Data",x_axis_type="linear", cmaps=None,
                   cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
                   min_border_top=30, min_border_bottom=10,title_font_size="12pt",title_align="center",
@@ -227,11 +227,21 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
         init_dat = data2plot
     else:
         if init_plot is not None:
-            if coord is not None and (isinstance(init_plot, float) or init_plot>=imOrg.shape[0] or init_plot<0):
-                initIdx = np.argmin(abs(np.array(coord)-init_plot))
+            initIdx=None
+            if coord is not None:
+                if isinstance(init_plot, int):
+                    if (init_plot>=data2plot.shape[0] or init_plot<0):
+                        initIdx=0
+                    else:
+                        initIdx = init_plot
+                else:
+                    initIdx = np.argmin(abs(np.array(coord)-init_plot))
             if not isinstance(initIdx, int):
-                print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
-                initIdx = 0
+                if not isinstance(init_plot, int):
+                    print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
+                    initIdx = 0
+                else:
+                    initIdx = init_plot
         else:
             initIdx = 0
         init_dat = data2plot[initIdx]

@@ -3,11 +3,16 @@ from os import path
 import tables
 import numpy as np
 from utilities import rebinShape
-from utilities_plotting import plotMarker, plotImage
+from utilities_plotting import plotMarker, plotImage, plot2d_from3d
 import xarray as xr
+from bokeh.io import show
 #plot functions: 3-d plotting, fix origin.
 #example cube for xpptut - 2 runs or Tims data (azav,...)
 #test function to add cubes & to sum runs & extend plot (azav as fct of run) 
+
+import bokeh_utils
+cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
+
 class CubeAna(object):
     def __init__(self, expname='', run=0, dirname='', cubeName='', cubeDict=None, plotWith='matplotlib', debug=False):
         if debug: print 'DEBUG INIT; ',expname, run
@@ -330,7 +335,7 @@ class CubeAna(object):
 
         return None
 
-    def plotImage(self, run=None, sig=None, plotWith=None, plotLog=False):
+    def plotImage(self, run=None, sig=None, plotWith=None, plotLog=False, plot3d=False):
         if plotWith==None:
             plotWith=self._plotWith
         runKey = None
@@ -359,12 +364,24 @@ class CubeAna(object):
         if sig not in cubeDict.variables:
             print 'could not find sig, return'; return
 
-        if sigIdx is not None:
-            sigVar=cubeDict[sig].data[sigIdx]
+        if plot3d:
+            if plotWith=='matplotlib':
+                print 'only supported with bokeh'
+                return
+            bins = self._cubeSumDict['bins'].data
+            data2plot = cubeDict[sig].data
+            if sigIdx is not None:
+                data2plot=data2plot[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
+                bins=bins[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
+            layout,im,p=plot2d_from3d(data2plot=data2plot,cmaps=cmaps,coord=bins.tolist(),init_plot=bins[bins.shape[0]/2])
+            show(layout)
         else:
-            sigVar=cubeDict[sig].data.sum(axis=0)
+            if sigIdx is not None:
+                sigVar=cubeDict[sig].data[sigIdx]
+            else:
+                sigVar=cubeDict[sig].data.sum(axis=0)
 
-        extent=[0,sigVar.shape[0],0,sigVar.shape[1]]
-        plotImage(sigVar, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
+            extent=[0,sigVar.shape[0],0,sigVar.shape[1]]
+            plotImage(sigVar, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
 
             
