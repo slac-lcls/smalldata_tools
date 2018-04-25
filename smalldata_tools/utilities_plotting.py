@@ -31,7 +31,7 @@ except:
   print 'no bokeh utils'
   pass
 
-def create_range_input_button(plotMin,plotMax,im,width=450):
+def create_range_input_button(plotMin,plotMax,im):
     JS_code_plotMin_plotMax = """
         var plotMin = parseFloat(input_plotMin.value);
         var plotMax = parseFloat(input_plotMax.value);
@@ -94,6 +94,8 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
         p.title.text = "bin value: "+img_idx_val+", idx "+cminIdx
         p.update()
     """
+    if coords is not None and isinstance(coords, np.ndarray):
+        coords = coords.tolist()
     if coords is not None and not isinstance(coords, list):
         print 'if coords is given it needs to be a list.'
         coords = None
@@ -106,7 +108,7 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
 
     #is valStart is not index, calculate.
     if isinstance(valStart, float) or valStart>=imOrg.shape[0]:
-        valStart = np.argmin(abs(coords-valStart))
+        valStart = np.argmin(abs(coords-np.ones_like(coords)*valStart))
 
     source = ColumnDataSource(data=dict(im3d=imOrg))
     sourceShp = ColumnDataSource(data=dict(imShp = imOrg.shape))
@@ -115,7 +117,7 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
     callback_slider = bokeh.models.CustomJS(args=dict(im=im,p=p,source=source, sourceShp=sourceShp, sourceCoords=sourceCoords), 
                                             code=JS_code_slider)
 
-    rslider = bokeh.models.Slider(title="image",start=0,end=imOrg.shape[0],step=1,
+    rslider = bokeh.models.Slider(title="image",start=coords[0],end=coords[-1],step=step,
                                   value=valStart, callback=callback_slider, orientation="horizontal")
     callback_slider.args['rslider'] = rslider
 
@@ -174,7 +176,7 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
     range_slider = create_range_slider(plotMin,plotMax,plotMinP,plotMaxP,im=im,step=step)
     select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
     if rangeInput:
-        range_input = create_range_input_button(plotMin,plotMax,im=im, width=plotWidth)
+        range_input = create_range_input_button(plotMin,plotMax,im=im)
         # Layout
         layout = bp.gridplot([[p],[range_slider,select_cm], [range_input[2], range_input[0], range_input[1]]])
     else:
@@ -191,12 +193,17 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
                   cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
                   min_border_top=30, min_border_bottom=10,title_font_size="12pt",title_align="center",
                   output_quad=False,plotMinP="auto", plotMaxP="auto", plotMin="auto", plotMax="auto",
-                  tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"]):
+                  tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"], rangeInput=True, plotLog=False):
     """                                                                           
     x_axis_type: "linear", "log", "datetime", "auto"                     
     """
     if type(cmaps)==type(None):
         cmaps = get_all_palettes()
+
+    if plotLog:
+        data2plot = np.log(data2plot)
+        data2plot[np.isinf(data2plot)]=np.nan 
+        data2plot[np.isneginf(data2plot)]=np.nan 
 
     #get auto scale. Use full set of images.
     if plotMin=="auto":
@@ -220,12 +227,14 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
         init_dat = data2plot
     else:
         if init_plot is not None:
-            if not isinstance(init_plot, int):
+            if coord is not None and (isinstance(init_plot, float) or init_plot>=imOrg.shape[0] or init_plot<0):
+                initIdx = np.argmin(abs(np.array(coord)-init_plot))
+            if not isinstance(initIdx, int):
                 print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
-                init_plot = 0
+                initIdx = 0
         else:
-            init_plot = 0
-        init_dat = data2plot[init_plot]
+            initIdx = 0
+        init_dat = data2plot[initIdx]
         
     if coord is None or (len(data2plot.shape)==3 and data2plot.shape[0]!=len(coord)):
         coord = np.arange(0,data2plot.shape[0])              
@@ -249,7 +258,6 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
             y0=min(y_range,0); y1 = max(y_range,0)
         else:
             y0=min(y_range); y1 = max(y_range)
-
 
     imgSource = ColumnDataSource(
             {'value': init_dat})
@@ -280,12 +288,21 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
     #vabsmin,vabsmax = plotMin, plotMax
     range_slider = create_range_slider(np.nanmin(data2plot),np.nanmax(data2plot),plotMinP,plotMaxP,im=im,step=step)
 
+    if rangeInput:
+        range_input = create_range_input_button(plotMin,plotMax,im=im)
+
     if len(data2plot.shape)==3:
         img_slider = create_img_slider_scale(im, data2plot,valStart=init_plot,coords=coord,p=p)
         #put them togeter.
-        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider]])
+        if rangeInput:
+            layout = bp.gridplot([[p],[range_slider,select_cm,img_slider], [range_input[2], range_input[0], range_input[1]]])
+        else:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider]])
     else:
-        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm]])
+        if rangeInput:
+            layout = bp.gridplot([[p],[range_slider,select_cm], [range_input[2], range_input[0], range_input[1]]])
+        else:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm]])
 
     if output_quad:
         return layout, p,im,imquad
