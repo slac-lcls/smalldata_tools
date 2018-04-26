@@ -474,28 +474,30 @@ def plotMarker(data, **kwargs):
                 iRunLabel=RunLabel[ic]
             else:
                 iRunLabel=runLabel
+                if len(data)==1:
+                    iRunLabel=None
             if isinstance(marker, list) and len(marker)==len(data):
                 plotMarker = marker[ic]
             else:
                 plotMarker = marker
             if plotMarker=='o':
-                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='*':
-                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='+':
-                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='x':
-                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='s':
-                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='^':
-                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='D':
-                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor)
+                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             else:
                 print 'unsupported marker option'
             if line_dash is not None:
-                p.line(ixdata, idata, line_dash=line_dash, line_color=thiscolor)
+                p.line(ixdata, idata, line_dash=line_dash, line_color=thiscolor, name='p%d'%ic)
         if plotWith=='bokeh_notebook':
             bp.output_notebook()
             if fig is None:
@@ -610,3 +612,150 @@ def plotImage(image, **kwargs):
         print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
             
     return
+
+def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
+                    fig_width_pxls=600,fig_height_pxls=500,
+                    x_range=None,y_range=None, title="MAP",x_axis_type="linear", cmaps=None,
+                    plotMinP="auto", plotMaxP="auto",
+                    cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
+                    min_border_top=30, min_border_bottom=10,title_font_size="12pt",
+                    title_align="center",vmin="auto",vmax="auto",output_quad=False,
+                    tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"]):
+    """                                                                           
+    x_axis_type: "linear", "log", "datetime", "auto"                     
+
+    """
+    if type(cmaps)==type(None):
+        cmaps = get_all_palettes()
+
+    #get auto scale. Use full set of images.
+    if vmin=="auto":
+        vmin = np.nanmin(data2plot)
+    if vmax=="auto":
+        vmax = np.nanmax(data2plot)
+
+    #deal with getting (initial) 2-d image to plot
+    if len(data2plot.shape)<2:
+        print 'data to plot has less than 2 dims'
+        return 
+    elif len(data2plot.shape)>3:
+        print 'data to plot has more than 3 dims'
+        return
+    elif len(data2plot.shape)==2:
+        init_plot=-1
+        init_dat = data2plot
+    else:
+        if init_plot is not None:
+            if not isinstance(init_plot, int):
+                print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
+                init_plot = 0
+        else:
+            init_plot = 0
+        init_dat = data2plot[init_plot]
+        
+    if coord is None or (len(data2plot.shape)==3 and data2plot.shape[0]!=len(coord)):
+        coord = np.arange(0,data2plot.shape[0])              
+            
+    #plot range X&Y
+    if x_range is None:
+        x0=0; x1=init_dat.shape[0]
+    else:
+        x_range = np.array(x_range)
+        if x_range.shape[0]==1:
+            x0=min(x_range,0); x1 = max(x_range,0)
+        else:
+            x0=min(x_range); x1 = max(x_range)
+
+    if y_range is None:
+        y0=0
+        y1=init_dat.shape[1]
+    else:
+        y_range = np.array(y_range)
+        if y_range.shape[0]==1:
+            y0=min(y_range,0); y1 = max(y_range,0)
+        else:
+            y0=min(y_range); y1 = max(y_range)
+
+    imgSource = ColumnDataSource(
+            {'value': init_dat})
+
+    data1d = data2plot.copy()
+    while len(data1d.shape)>1:
+        data1d=data1d.mean(axis=1)
+    bin1d = np.arange(data1d.shape[0])+10
+
+    #create figure.
+    p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
+                              plot_width=fig_width_pxls,plot_height=fig_height_pxls, 
+                              min_border_left=min_border_left,min_border_right=min_border_right,
+                              title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
+                              tools= tools)
+    p.title.text_font_size = title_font_size
+    p.title.align = title_align
+    im = p.image(image=[init_dat],dw=[x1-x0],dh=[y1-y0],x=[x0],y=[y0],palette=cmaps["palettes_dict"][palette_name])
+    p1d = plotMarker(data1d, xData=bin1d, fig='return_me',plotWith='bokeh_notebook',
+                     width_height=(fig_width_pxls,fig_height_pxls),plotTitle='ROI vs scan')
+
+    im.glyph.color_mapper.high = vmax
+    im.glyph.color_mapper.low = vmin
+    imquad = p.quad(top=[y1], bottom=[y0], left=[x0], right=[x1],alpha=0) # This is used for hover and taptool
+    
+    if create_colorbar:
+        color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
+        p.add_layout(color_bar, 'right')
+
+    #p.add_tools(box_select)
+    source = ColumnDataSource(data=dict(im3d=data2plot))
+    sourceShp = ColumnDataSource(data=dict(imShp = data2plot.shape))
+
+    callback = bokeh.models.CustomJS(args=dict(p1d=p1d, sourceShp=sourceShp, source=source), code="""
+        /// get BoxSelectTool dimensions from cb_data parameter of Callback
+        var geometry = cb_data['geometry'];
+        var arShp = sourceShp.data.imShp[1]*sourceShp.data.imShp[2]
+        var d3data_flat = source.data.im3d
+        var newArr=[]
+        //newArr is a flattened array. 
+        nPixROI = (Math.round(geometry['y1']) - Math.round(geometry['y0']))*(Math.round(geometry['x1']) - Math.round(geometry['x0']))
+        ROIsums=[]
+        for(var i = 0; i < d3data_flat.length; i += arShp) {
+            loc_image = d3data_flat.slice(i, i + arShp)
+            newArr.push(loc_image);
+            var ir = 0;
+            for(var irc = 0; irc < newArr.length; irc += sourceShp.data.imShp[1]) {
+                thisSlice = loc_image.slice(irc+Math.round(geometry['y0']), irc+Math.round(geometry['y1']))
+                var sum = thisSlice.reduce(function(a, b) { return a + b; }, 0);
+                ROIsums.push(sum/nPixROI)
+            }
+        }
+
+        p1d.select(name='p0')[0].data_source.data['y'] = ROIsums
+        p1d.select(name='p0')[0].data_source.trigger('change')
+        p1d.title.text = "ROI: X "+Math.round(geometry['x0'])+":"+Math.round(geometry['x1'])+" Y "+Math.round(geometry['y0'])+":"+Math.round(geometry['y1'])
+        //p1d.title.text = "ROIsum: "+newArr.length+" "+sourceShp.data.imShp[1]+" "+nPixROI
+        p1d.update()
+        """)
+
+    box_select = BoxSelectTool(callback=callback)
+    p.add_tools(box_select)
+
+    #colormap selection
+    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+
+    #range slider.
+    if plotMinP=="auto": 
+        plotMinP = np.nanpercentile(data2plot, 5)
+    if plotMaxP=="auto": 
+        plotMaxP = np.nanpercentile(data2plot, 95)
+    step=(plotMaxP-plotMinP)/50.
+    range_slider = create_range_slider(np.nanmin(data2plot),np.nanmax(data2plot),plotMinP,plotMaxP,im=im,step=step)
+
+    if len(data2plot.shape)==3:
+        img_slider = create_img_slider_scale(im, data2plot,valStart=init_plot,coords=coord,p=p)
+        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[p1d]])
+    else:
+        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[p1d]])
+
+    if output_quad:
+        return layout, p,im,p1d,imquad
+    else:
+        return layout, p,im,p1d
