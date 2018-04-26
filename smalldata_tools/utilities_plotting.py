@@ -613,6 +613,7 @@ def plotImage(image, **kwargs):
             
     return
 
+
 def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
                     fig_width_pxls=600,fig_height_pxls=500,
                     x_range=None,y_range=None, title="MAP",x_axis_type="linear", cmaps=None,
@@ -620,7 +621,8 @@ def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
                     cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
                     min_border_top=30, min_border_bottom=10,title_font_size="12pt",
                     title_align="center",vmin="auto",vmax="auto",output_quad=False,
-                    tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"]):
+                    tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"],
+                    rangeInput=True):
     """                                                                           
     x_axis_type: "linear", "log", "datetime", "auto"                     
 
@@ -746,14 +748,24 @@ def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
         plotMinP = np.nanpercentile(data2plot, 5)
     if plotMaxP=="auto": 
         plotMaxP = np.nanpercentile(data2plot, 95)
+    plotMin = np.nanmin(data2plot)
+    plotMax = np.nanmax(data2plot)
     step=(plotMaxP-plotMinP)/50.
-    range_slider = create_range_slider(np.nanmin(data2plot),np.nanmax(data2plot),plotMinP,plotMaxP,im=im,step=step)
+    range_slider = create_range_slider(plotMin, plotMax,plotMinP,plotMaxP,im=im,step=step)
+    if rangeInput:
+        range_input = create_range_input_button(plotMin,plotMax,im=im)
 
     if len(data2plot.shape)==3:
         img_slider = create_img_slider_scale(im, data2plot,valStart=init_plot,coords=coord,p=p)
-        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[p1d]])
+        if rangeInput:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[range_input[2], range_input[0], range_input[1]],[p1d]])
+        else:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[p1d]])
     else:
-        layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[p1d]])
+        if rangeInput:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[range_input[2], range_input[0], range_input[1]],[p1d]])
+        else:
+            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[p1d]])
 
     if output_quad:
         return layout, p,im,p1d,imquad
