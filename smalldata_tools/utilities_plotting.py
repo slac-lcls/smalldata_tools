@@ -123,7 +123,46 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
 
     return rslider
  
-def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None, plot_title='', dateTime=False, plotMinP="auto", plotMaxP="auto", plotMin="auto", plotMax="auto", palette_name='jet', output_quad=False, tools=None, plotLog=False, rangeInput=True):
+def plotImageBokeh(data, **kwargs):
+    """
+    class to plot images with bokeh
+    Input are data (2-d array)
+
+    Parameters
+    ----------
+    plotTitle: title to show on plot, default ''
+    plotLog: color scale relating to log of Z-values, default False
+    plotWidth: width of figure in pxls, default 600
+    plotHeight: height of figure in pxls, default 400    
+    plotMinP: minimum for color scale to start, default "auto" (uses np.nanpercentile,1)
+    plotMaxP: maximum for color scale to start, default "auto" (uses np.nanpercentile,99)
+    plotMin: minimum for color scale, default "auto" (uses np.nanmin)
+    plotMax: maximum for color scale, default "auto" (uses np.nanmax)
+    xRange: values for x-axis, defaults to range(image size)
+    yRange: values for y-axis, defaults to range(image size)
+    rangeInput: add tools to enter exact ranges of color scale in addition to slider, default True
+    tools: for bokeh plotting, tools can be passed. Default tools will be used otherwise
+    palette name: name of default color palette, default is jet
+    datetime: x-axis data in form of date time, default False
+    """
+    plot_title = kwargs.pop("plot_title","")
+    plotLog = kwargs.pop("plotLog",False)
+    plotWidth = kwargs.pop("plotWidth",600)
+    plotHeight = kwargs.pop("plotHeight",400)
+    rangeInput = kwargs.pop("rangeInput",True)
+    palette_name = kwargs.pop("palette_name","jet")
+    plotMin = kwargs.pop("plotMin","auto")
+    plotMax = kwargs.pop("plotMax","auto")
+    plotMinP = kwargs.pop("plotMinP","auto")
+    plotMaxP = kwargs.pop("plotMaxP","auto")
+    xRange = kwargs.pop("xRange",None)
+    yRange = kwargs.pop("yRange",None)
+    tools = kwargs.pop("tools",None)
+    dateTime = kwargs.pop("dateTime",None)
+    output_quad = kwargs.pop("output_quad",False)
+    if len(kwargs)>0:
+        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+
     if plotLog: data = np.log(data)
     data[np.isinf(data)]=np.nan 
     data[np.isneginf(data)]=np.nan 
@@ -187,18 +226,67 @@ def plotImageBokeh(data, plotWidth=600, plotHeight=400, xRange=None, yRange=None
     else:
         return layout,p,im
 
-
-def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fig_width_pxls=600,fig_height_pxls=400,
-                  x_range=None,y_range=None, title="Binned Image Data",x_axis_type="linear", cmaps=None,
-                  cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
-                  min_border_top=30, min_border_bottom=10,title_font_size="12pt",title_align="center",
-                  output_quad=False,plotMinP="auto", plotMaxP="auto", plotMin="auto", plotMax="auto",
-                  tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"], rangeInput=True, plotLog=False):
-    """                                                                           
-    x_axis_type: "linear", "log", "datetime", "auto"                     
+def plot2d_from3d(data2plot, **kwargs):
     """
+    class to plot images with bokeh w. slider on 1st axis (for cube display)
+    Input are data (3-d array)
+
+    Parameters
+    ----------
+    title: title to show on plot, default 'Binned Image Data'
+    coords: coordinates on Z-axis, default None (range of cube depth)
+    init_plot: value of coordinate for initial image, default None (summed image)
+    plotLog: color scale relating to log of Z-values, default False
+    rangeInput: add tools to enter exact ranges of color scale in addition to slider, default True
+    cmaps: list of color maps, default None, meaning all defined.
+    plotWidth: width of figure in pxls, default 600
+    plotHeight: height of figure in pxls, default 400    
+    plotMinP: minimum for color scale to start, default "auto" (uses np.nanpercentile,1)
+    plotMaxP: maximum for color scale to start, default "auto" (uses np.nanpercentile,99)
+    plotMin: minimum for color scale, default "auto" (uses np.nanmin)
+    plotMax: maximum for color scale, default "auto" (uses np.nanmax)
+    x_range: values for x-axis, defaults to range(image size)
+    y_range: values for y-axis, defaults to range(image size)
+    tools: for bokeh plotting, tools can be passed. Default tools will be used otherwise
+    palette name: name of default color palette, default is jet
+    x_axis_type: x-axis type, "linear", "log", "datetime", "auto", default linear
+    min_border_left: figure borders: left, default 20
+    min_border_right: figure borders: right, default 10
+    min_border_top: figure borders: top, default 30
+    min_border_bottom: figure borders: bottom, default 10
+    title_font_size: font size of title, default 12pt
+    title_align: alignment of plot title, default center
+    """
+    title = kwargs.pop("title","")
+    plotLog = kwargs.pop("plotLog",False)
+    plotWidth = kwargs.pop("plotWidth",600)
+    plotHeight = kwargs.pop("plotHeight",400)
+    rangeInput = kwargs.pop("rangeInput",True)
+    palette_name = kwargs.pop("palette_name","jet")
+    plotMin = kwargs.pop("plotMin","auto")
+    plotMax = kwargs.pop("plotMax","auto")
+    plotMinP = kwargs.pop("plotMinP","auto")
+    plotMaxP = kwargs.pop("plotMaxP","auto")
+    x_range = kwargs.pop("x_range",None)
+    y_range = kwargs.pop("y_range",None)
+    tools = kwargs.pop("tools",None)
+    dateTime = kwargs.pop("dateTime",None)
+    cmaps = kwargs.pop("cmaps",None)
+    coord = kwargs.pop("coord",None)
+    init_plot = kwargs.pop("init_plot",None)
+    output_quad = kwargs.pop("output_quad",False)
+    min_border_right = kwargs.pop("min_border_right",10)
+    min_border_left = kwargs.pop("min_border_left",20)
+    min_border_top = kwargs.pop("min_border_top",30)
+    min_border_bottom = kwargs.pop("min_border_bottom",10)
+    title_font_size = kwargs.pop("title_font_size","12pt")
+    title_align = kwargs.pop("title_align","center")
+    x_axis_type = kwargs.pop("x_axis_type","linear")
+    if len(kwargs)>0:
+        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+
     if type(cmaps)==type(None):
-        cmaps = get_all_palettes()
+        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
 
     if plotLog:
         data2plot = np.log(data2plot)
@@ -214,6 +302,21 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
         plotMinP = np.nanpercentile(data2plot, 5)
     if plotMaxP=="auto": 
         plotMaxP = np.nanpercentile(data2plot, 95)
+
+    if tools is None:
+        pan=PanTool()
+        wheel_zoom=WheelZoomTool()
+        box_zoom=BoxZoomTool()
+        save=SaveTool()
+        reset=ResetTool()
+        hover=HoverTool(tooltips=[
+            ("(x,y)","($x, $y)")
+        ])
+        box_select=BoxSelectTool()
+        tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset]
+        if bokeh.__version__=='0.12.6':
+            resize=ResizeTool()
+            tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset,resize]
 
     #deal with getting (initial) 2-d image to plot
     if len(data2plot.shape)<2:
@@ -273,7 +376,7 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
             {'value': init_dat})
     #create figure.
     p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
-                              plot_width=fig_width_pxls,plot_height=fig_height_pxls, 
+                              plot_width=plotWidth,plot_height=plotHeight, 
                               min_border_left=min_border_left,min_border_right=min_border_right,
                               title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
                               tools= tools)
@@ -285,9 +388,8 @@ def plot2d_from3d(data2plot=None,init_plot=None,coord=None,palette_name="jet",fi
     im.glyph.color_mapper.low = plotMin
     imquad = p.quad(top=[y1], bottom=[y0], left=[x0], right=[x1],alpha=0) # This is used for hover and taptool
     
-    if create_colorbar:
-        color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
-        p.add_layout(color_bar, 'right')
+    color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
+    p.add_layout(color_bar, 'right')
 
     #create more tools.
     #colormap selection
@@ -614,27 +716,89 @@ def plotImage(image, **kwargs):
     return
 
 
-def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
-                    fig_width_pxls=600,fig_height_pxls=500,
-                    x_range=None,y_range=None, title="MAP",x_axis_type="linear", cmaps=None,
-                    plotMinP="auto", plotMaxP="auto",
-                    cb_title="",create_colorbar=True, min_border_left=20,min_border_right=10,
-                    min_border_top=30, min_border_bottom=10,title_font_size="12pt",
-                    title_align="center",vmin="auto",vmax="auto",output_quad=False,
-                    tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"],
-                    rangeInput=True):
-    """                                                                           
-    x_axis_type: "linear", "log", "datetime", "auto"                     
-
+def plot3d_img_time(data2plot, **kwargs):
     """
+    class to plot images with bokeh w. slider on 1st axis (for cube display)
+    plot ROI against coords.
+    Input are data (3-d array)
+
+    Parameters
+    ----------
+    title: title to show on plot, default 'Binned Image Data'
+    coords: coordinates on Z-axis, default None (range of cube depth)
+    init_plot: value of coordinate for initial image, default None (summed image)
+    plotLog: color scale relating to log of Z-values, default False
+    rangeInput: add tools to enter exact ranges of color scale in addition to slider, default True
+    cmaps: list of color maps, default None, meaning all defined.
+    plotWidth: width of figure in pxls, default 600
+    plotHeight: height of figure in pxls, default 400    
+    plotMinP: minimum for color scale to start, default "auto" (uses np.nanpercentile,1)
+    plotMaxP: maximum for color scale to start, default "auto" (uses np.nanpercentile,99)
+    plotMin: minimum for color scale, default "auto" (uses np.nanmin)
+    plotMax: maximum for color scale, default "auto" (uses np.nanmax)
+    x_range: values for x-axis, defaults to range(image size)
+    y_range: values for y-axis, defaults to range(image size)
+    tools: for bokeh plotting, tools can be passed. Default tools will be used otherwise
+    palette name: name of default color palette, default is jet
+    x_axis_type: x-axis type, "linear", "log", "datetime", "auto", default linear
+    min_border_left: figure borders: left, default 20
+    min_border_right: figure borders: right, default 10
+    min_border_top: figure borders: top, default 30
+    min_border_bottom: figure borders: bottom, default 10
+    title_font_size: font size of title, default 12pt
+    title_align: alignment of plot title, default center
+    """
+    title = kwargs.pop("title","")
+    plotLog = kwargs.pop("plotLog",False)
+    plotWidth = kwargs.pop("plotWidth",600)
+    plotHeight = kwargs.pop("plotHeight",400)
+    rangeInput = kwargs.pop("rangeInput",True)
+    palette_name = kwargs.pop("palette_name","jet")
+    plotMin = kwargs.pop("plotMin","auto")
+    plotMax = kwargs.pop("plotMax","auto")
+    plotMinP = kwargs.pop("plotMinP","auto")
+    plotMaxP = kwargs.pop("plotMaxP","auto")
+    x_range = kwargs.pop("x_range",None)
+    y_range = kwargs.pop("y_range",None)
+    tools = kwargs.pop("tools",None)
+    dateTime = kwargs.pop("dateTime",None)
+    cmaps = kwargs.pop("cmaps",None)
+    coord = kwargs.pop("coord",None)
+    init_plot = kwargs.pop("init_plot",None)
+    output_quad = kwargs.pop("output_quad",False)
+    min_border_right = kwargs.pop("min_border_right",10)
+    min_border_left = kwargs.pop("min_border_left",20)
+    min_border_top = kwargs.pop("min_border_top",30)
+    min_border_bottom = kwargs.pop("min_border_bottom",10)
+    title_font_size = kwargs.pop("title_font_size","12pt")
+    title_align = kwargs.pop("title_align","center")
+    x_axis_type = kwargs.pop("x_axis_type","linear")
+    if len(kwargs)>0:
+        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+
     if type(cmaps)==type(None):
-        cmaps = get_all_palettes()
+        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
+
+    if tools is None:
+        pan=PanTool()
+        wheel_zoom=WheelZoomTool()
+        box_zoom=BoxZoomTool()
+        save=SaveTool()
+        reset=ResetTool()
+        hover=HoverTool(tooltips=[
+            ("(x,y)","($x, $y)")
+        ])
+        box_select=BoxSelectTool()
+        tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset]
+        if bokeh.__version__=='0.12.6':
+            resize=ResizeTool()
+            tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset,resize]
 
     #get auto scale. Use full set of images.
-    if vmin=="auto":
-        vmin = np.nanmin(data2plot)
-    if vmax=="auto":
-        vmax = np.nanmax(data2plot)
+    if plotMin=="auto":
+        plotMin = np.nanmin(data2plot)
+    if plotMax=="auto":
+        plotMax = np.nanmax(data2plot)
 
     #deal with getting (initial) 2-d image to plot
     if len(data2plot.shape)<2:
@@ -688,7 +852,7 @@ def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
 
     #create figure.
     p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
-                              plot_width=fig_width_pxls,plot_height=fig_height_pxls, 
+                              plot_width=plotWidth,plot_height=plotHeight, 
                               min_border_left=min_border_left,min_border_right=min_border_right,
                               title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
                               tools= tools)
@@ -696,15 +860,14 @@ def plot3d_img_time(data2plot=None,init_plot=None,coord=None,palette_name="jet",
     p.title.align = title_align
     im = p.image(image=[init_dat],dw=[x1-x0],dh=[y1-y0],x=[x0],y=[y0],palette=cmaps["palettes_dict"][palette_name])
     p1d = plotMarker(data1d, xData=bin1d, fig='return_me',plotWith='bokeh_notebook',
-                     width_height=(fig_width_pxls,fig_height_pxls),plotTitle='ROI vs scan')
+                     width_height=(plotWidth,plotHeight),plotTitle='ROI vs scan')
 
-    im.glyph.color_mapper.high = vmax
-    im.glyph.color_mapper.low = vmin
+    im.glyph.color_mapper.high = plotMax
+    im.glyph.color_mapper.low = plotMin
     imquad = p.quad(top=[y1], bottom=[y0], left=[x0], right=[x1],alpha=0) # This is used for hover and taptool
     
-    if create_colorbar:
-        color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
-        p.add_layout(color_bar, 'right')
+    color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
+    p.add_layout(color_bar, 'right')
 
     #p.add_tools(box_select)
     source = ColumnDataSource(data=dict(im3d=data2plot))
