@@ -8,6 +8,7 @@ import tables
 from matplotlib import pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib import gridspec
+import matplotlib.cm
 import resource
 
 import bokeh
@@ -26,13 +27,126 @@ from bisect import insort, bisect_left
  
 import sys
 
-try:
-    sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
-    import bokeh_utils
-    cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
-except:
-  print 'no bokeh utils'
-  pass
+def valid_mpl_palettes():
+    return sorted(matplotlib.cm.cmaps_listed.keys() + matplotlib.cm.datad.keys())
+
+def get_all_mpl_palettes(allmaps=None):
+    """
+    map_names, palettes_dict, palette_nums_dict = get_all_palettes()
+    """
+    if type(allmaps)==type(None):
+        # Getting all the map names available in matplotlib
+        allmaps = valid_mpl_palettes()
+    palette_nums = []
+    palettes = []
+    map_names = []
+    for cmap_name in allmaps:
+        palette_nums += [[]]
+        palettes += [[]]
+        cmap = matplotlib.cm.get_cmap(cmap_name)
+        if cmap.N < 256:
+            pts = np.linspace(0,255,cmap.N).round()
+            rr = np.interp(np.arange(256),pts,np.array(cmap.colors)[:,0])
+            gg = np.interp(np.arange(256),pts,np.array(cmap.colors)[:,1])
+            bb = np.interp(np.arange(256),pts,np.array(cmap.colors)[:,2])
+            palette = []
+            for i in range(256):
+                palette += [matplotlib.colors.rgb2hex((rr[i],gg[i],bb[i]))]
+            palettes[-1] += palette
+            palette_nums[-1] += [int(m[1:],16) for m in palette]
+            map_names += [cmap_name+"_smooth"]
+            palette_nums += [[]]
+            palettes += [[]]
+        cmap = matplotlib.cm.get_cmap(cmap_name,256)
+        palette = [matplotlib.colors.rgb2hex(m) for m in cmap(np.arange(cmap.N))]  # always 256 pts!!!
+        palettes[-1] += palette
+        palette_nums[-1] += [int(m[1:],16) for m in palette]
+        map_names += [cmap_name]
+    palettes_dict = dict(zip(map_names, palettes))
+    palette_nums_dict = dict(zip(map_names, palette_nums))
+    return {"map_names":map_names,"palettes_dict":palettes_dict,"palette_nums_dict":palette_nums_dict}
+
+#
+# define cmaps.
+#
+cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
+
+
+def create_cmap_selection(im,cmaps=None,value="jet"):
+    if type(cmaps)==type(None):
+        cmaps = get_all_palettes()
+    bmem_cmaps = bokeh.models.ColumnDataSource(data=cmaps["palettes_dict"])
+    call_cm = bokeh.models.CustomJS(args=dict(im=im,bmem_cmaps=bmem_cmaps),code="""
+        sel_map = select_cm.value; // select_cm will be added to the args dictionary after creating the widget!!
+        numpalette = bmem_cmaps.data[sel_map];  // needs to be added if a list of list
+
+        var numglyph_palette1 = im.glyph.color_mapper["palette"];
+        for (var i=0; i<numpalette.length; i++){
+            numglyph_palette1[i] = numpalette[i];   // changing values of the palette with those of selected one
+        }
+        // this is needed to refresh the colorbar:
+        var old = im.glyph.color_mapper.high;
+        im.glyph.color_mapper.high = old+1;
+        im.data_source.trigger.change.emit();
+        im.glyph.color_mapper.high = old;
+        im.data_source.trigger.change.emit();
+        """)
+    select_cm = bokeh.models.Select(title="Color Map:", value =value, options=cmaps["map_names"],callback=call_cm)
+    call_cm.args.update(dict(select_cm=select_cm))
+
+    return select_cm
+
+def create_map(data2plot=None,palette_name="jet",fig_width_pxls=800,
+               fig_height_pxls=500,x_range=(0,1),y_range=(0,1),
+               title="MAP",x_axis_type="linear", cmaps=None,cb_title="",
+               create_colorbar=True, min_border_left=20,min_border_right=10,
+               min_border_top=30, min_border_bottom=10,title_font_size="12pt",
+               title_align="center",plotMin="auto",plotMax="auto",
+               output_quad=False,
+               tools= ["box_zoom,wheel_zoom,pan,reset,previewsave,resize"]):
+    """
+    x_axis_type: "linear", "log", "datetime", "auto"
+    """
+    if type(cmaps)==type(None):
+        cmaps = get_all_palettes()
+    if plotMin=="auto":
+        plotMin = np.nanmin(data2plot)
+    if plotMax=="auto":
+        plotMax = np.nanmax(data2plot)
+    try:
+        x0=x_range[0]
+        x1=x_range[1]
+    except:
+        x0 = x_range.start
+        x1 = x_range.end
+    try:
+        y0=y_range[0]
+        y1=y_range[1]
+    except:
+        y0 = y_range.start
+        y1 = y_range.end
+                    
+    p = bp.figure(x_range=x_range, y_range=y_range,x_axis_type=x_axis_type,
+                  plot_width=fig_width_pxls, plot_height=fig_height_pxls, 
+                  min_border_left=min_border_left,
+                  min_border_right=min_border_right,
+                  min_border_top=min_border_top,
+                  min_border_bottom=min_border_bottom,
+                  tools= tools,title=title)
+    p.title.text_font_size = title_font_size
+    p.title.align = title_align
+    im = p.image(image=[data2plot],dw=[x1-x0],dh=[y1-y0],x=[x0],y=[y0],palette=cmaps["palettes_dict"][palette_name])
+    im.glyph.color_mapper.high = plotMax
+    im.glyph.color_mapper.low = plotMin
+    imquad = p.quad(top=[y1], bottom=[y0], left=[x0], right=[x1],alpha=0) # This is used for hover and taptool
+    if create_colorbar:
+        color_bar = bokeh.models.ColorBar(color_mapper=im.glyph.color_mapper, label_standoff=12, location=(0,0))
+        p.add_layout(color_bar, 'right')
+    if output_quad:
+        return p,im,imquad
+    else:
+        return p,im
+
 
 def create_range_input_button(plotMin,plotMax,im):
     JS_code_plotMin_plotMax = """
@@ -210,15 +324,20 @@ def plotImageBokeh(data, **kwargs):
             tools = [pan, wheel_zoom,box_zoom,save,hover,box_select,reset,resize]
     
     if dateTime:
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=palette_name,
-                                            fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                            y_range=yRange,title=plot_title,x_axis_type="datetime", tools=tools,
-                                            cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP, output_quad=output_quad)
+        created_map = create_map(data2plot=data,palette_name=palette_name,
+                                 fig_width_pxls=plotWidth, 
+                                 fig_height_pxls=plotHeight,x_range=xRange,
+                                 y_range=yRange,title=plot_title,
+                                 x_axis_type="datetime", tools=tools,
+                                 cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP,
+                                 output_quad=output_quad)
     else: 
-        created_map = bokeh_utils.create_map(data2plot=data,palette_name=palette_name,
-                                            fig_width_pxls=plotWidth, fig_height_pxls=plotHeight,x_range=xRange,
-                                            y_range=yRange,title=plot_title, tools=tools,
-                                            cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP, output_quad=output_quad)
+        created_map = create_map(data2plot=data,palette_name=palette_name,
+                                 fig_width_pxls=plotWidth, 
+                                 fig_height_pxls=plotHeight,x_range=xRange,
+                                 y_range=yRange,title=plot_title, tools=tools,
+                                 cmaps=cmaps,plotMin=plotMinP,plotMax=plotMaxP,
+                                 output_quad=output_quad)
 
     if output_quad:
         p, im, q = created_map
@@ -229,7 +348,7 @@ def plotImageBokeh(data, **kwargs):
     #vabsmin,vabsmax = plotMin, plotMax
     step=(plotMaxP-plotMinP)/100.
     range_slider = create_range_slider(plotMin,plotMax,plotMinP,plotMaxP,im=im,step=step)
-    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+    select_cm = create_cmap_selection(im,cmaps=cmaps, value=palette_name)
     if rangeInput:
         range_input = create_range_input_button(plotMin,plotMax,im=im)
         # Layout
@@ -305,7 +424,7 @@ def plot2d_from3d(data2plot, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if type(cmaps)==type(None):
-        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
+        cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
 
     if plotLog:
         data2plot = np.log(data2plot)
@@ -394,11 +513,11 @@ def plot2d_from3d(data2plot, **kwargs):
     imgSource = ColumnDataSource(
             {'value': init_dat})
     #create figure.
-    p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
-                              plot_width=plotWidth,plot_height=plotHeight, 
-                              min_border_left=min_border_left,min_border_right=min_border_right,
-                              title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
-                              tools= tools)
+    p = bp.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
+                  plot_width=plotWidth,plot_height=plotHeight, 
+                  min_border_left=min_border_left,min_border_right=min_border_right,
+                  title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
+                  tools= tools)
     p.title.text_font_size = title_font_size
     p.title.align = title_align
     im = p.image(image=[init_dat],dw=[x1-x0],dh=[y1-y0],x=[x0],y=[y0],palette=cmaps["palettes_dict"][palette_name])
@@ -412,7 +531,7 @@ def plot2d_from3d(data2plot, **kwargs):
 
     #create more tools.
     #colormap selection
-    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+    select_cm = create_cmap_selection(im,cmaps=cmaps, value=palette_name)
 
     #range slider.
     step=(plotMaxP-plotMinP)/50.
@@ -428,12 +547,12 @@ def plot2d_from3d(data2plot, **kwargs):
         if rangeInput:
             layout = bp.gridplot([[p],[range_slider,select_cm,img_slider], [range_input[2], range_input[0], range_input[1]]])
         else:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider]])
+            layout = bp.gridplot([[p],[range_slider,select_cm,img_slider]])
     else:
         if rangeInput:
             layout = bp.gridplot([[p],[range_slider,select_cm], [range_input[2], range_input[0], range_input[1]]])
         else:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm]])
+            layout = bp.gridplot([[p],[range_slider,select_cm]])
 
     if output_quad:
         return layout, p,im,imquad
@@ -796,7 +915,7 @@ def plot3d_img_time(data2plot, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if type(cmaps)==type(None):
-        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
+        cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
 
     if tools is None:
         pan=PanTool()
@@ -866,16 +985,12 @@ def plot3d_img_time(data2plot, **kwargs):
             {'value': init_dat})
 
     data1d = data2plot.copy()
-    print 'DEBUG: data1d A ',data1d.shape
     while len(data1d.shape)>1:
         data1d=np.nanmean(data1d,axis=1)
-    print 'DEBUG: data1d B ',data1d.shape
     bin1d = coord #np.arange(data1d.shape[0])
-    print 'DEBUG: data ',data1d
-    print 'DEBUG: bin  ',bin1d
 
     #create figure.
-    p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
+    p = bp.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
                               plot_width=plotWidth,plot_height=plotHeight, 
                               min_border_left=min_border_left,min_border_right=min_border_right,
                               title=title,min_border_top=min_border_top,min_border_bottom=min_border_bottom,
@@ -937,7 +1052,7 @@ def plot3d_img_time(data2plot, **kwargs):
     p.add_tools(box_select)
 
     #colormap selection
-    select_cm = bokeh_utils.create_cmap_selection(im,cmaps=cmaps, value=palette_name)
+    select_cm = create_cmap_selection(im,cmaps=cmaps, value=palette_name)
 
     #range slider.
     if plotMinP=="auto": 
@@ -954,14 +1069,14 @@ def plot3d_img_time(data2plot, **kwargs):
     if len(data2plot.shape)==3:
         img_slider = create_img_slider_scale(im, data2plot,valStart=init_plot,coords=coord,p=p)
         if rangeInput:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[range_input[2], range_input[0], range_input[1]],[p1d]])
+            layout = bp.gridplot([[p],[range_slider,select_cm,img_slider],[range_input[2], range_input[0], range_input[1]],[p1d]])
         else:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm,img_slider],[p1d]])
+            layout = bp.gridplot([[p],[range_slider,select_cm,img_slider],[p1d]])
     else:
         if rangeInput:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[range_input[2], range_input[0], range_input[1]],[p1d]])
+            layout = bp.gridplot([[p],[range_slider,select_cm],[range_input[2], range_input[0], range_input[1]],[p1d]])
         else:
-            layout = bokeh.plotting.gridplot([[p],[range_slider,select_cm],[p1d]])
+            layout = bp.gridplot([[p],[range_slider,select_cm],[p1d]])
 
     if output_quad:
         return layout, p,im,p1d,imquad
