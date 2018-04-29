@@ -3,7 +3,8 @@ from os import path
 import tables
 import numpy as np
 from utilities import rebinShape
-from utilities_plotting import plotMarker, plotImage, plot2d_from3d
+from utilities_plotting import plotMarker, plotImage
+from utilities_plotting import plot2d_from3d, plot3d_img_time
 import xarray as xr
 from bokeh.io import show
 #plot functions: 3-d plotting, fix origin.
@@ -335,7 +336,8 @@ class CubeAna(object):
 
         return None
 
-    def plotImage(self, run=None, sig=None, plotWith=None, plotLog=False, plot3d=False):
+    #change this: do not use what typically contains ROI to pick slice, add explicit value.
+    def plotCubeImage(self, run=None, sig=None, plotWith=None, plotLog=False, plot3d=False, sigIdx=None):
         if plotWith==None:
             plotWith=self._plotWith
         runKey = None
@@ -352,15 +354,22 @@ class CubeAna(object):
             cubeDict = self._cubeDict[runKey]
 
         if sig is None:
-            print 'we have the following cubed images: ',
-            for k in self.Keys(img=True):
-                print k
-            sig = raw_input('Please select one:')
+            if len(self.Keys(img=True))>1:
+                print 'we have the following cubed images: ',
+                for k in self.Keys(img=True):
+                    print k
+                sig = raw_input('Please select one:')
+            elif len(self.Keys(img=True))==1:
+                sig = self.Keys(img=True)[0]
+            else:
+                print 'have no 2d image, return'
+                return
         
-        sigIdx = None
         if isinstance(sig, list):
-            sigIdx = sig[1]
+            sigROI = sig[1] #this is not used yet...
             sig = sig[0]
+        else:
+            sigROI=None
         if sig not in cubeDict.variables:
             print 'could not find sig, return'; return
 
@@ -370,6 +379,7 @@ class CubeAna(object):
                 return
             bins = self._cubeSumDict['bins'].data
             data2plot = cubeDict[sig].data
+            data2plot = self._reduceData(data2plot, sigROI).copy()
             if sigIdx is not None:
                 data2plot=data2plot[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
                 bins=bins[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
@@ -377,11 +387,74 @@ class CubeAna(object):
             show(layout)
         else:
             if sigIdx is not None:
-                sigVar=cubeDict[sig].data[sigIdx]
+                data2plot=cubeDict[sig].data[sigIdx]
             else:
-                sigVar=cubeDict[sig].data.sum(axis=0)
+                data2plot=cubeDict[sig].data.sum(axis=0)
 
-            extent=[0,sigVar.shape[0],0,sigVar.shape[1]]
-            plotImage(sigVar, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
+            data2plot = (self._reduceData(np.array([data2plot]), sigROI).copy()).squeeze()
 
+            extent=[0,data2plot.shape[0],0,data2plot.shape[1]]
+            plotImage(data2plot, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self.plot_dirname, extent=extent, plotLog=plotLog)
+
+    #change this: do not use what typically contains ROI to pick slice, add explicit value.
+    def inspectCube(self, run=None, sig=None, sigIdx=None, plotWith=None):
+        if plotWith==None:
+            plotWith=self._plotWith
+            if plotWith=='matplotlib':
+                print 'only supported with bokeh'
+                return
             
+        runKey = None
+        if run is not None and isinstance(run, int):
+            runKey = 'Run%03d'%run
+        elif  run is not None and isinstance(run, basestring):
+            if run[:3]=='Run': 
+                runKey = run
+            else:
+                runKey = 'Run%03d'%int(run)
+        if runKey is None:
+            cubeDict = self._cubeSumDict
+        else:
+            cubeDict = self._cubeDict[runKey]
+
+        if sig is None:
+            if len(self.Keys(img=True))>1:
+                print 'we have the following cubed images: ',
+                for k in self.Keys(img=True):
+                    print k
+                sig = raw_input('Please select one:')
+            elif len(self.Keys(img=True))==1:
+                sig = self.Keys(img=True)[0]
+            else:
+                print 'have no 2d image, return'
+                return
+        
+        if isinstance(sig, list):
+            sigROI = sig[1] #this is not used yet...
+            sig = sig[0]
+        else:
+            sigROI=None
+        if sig not in cubeDict.variables:
+            print 'could not find sig, return'; return
+
+        bins = self._cubeSumDict['bins'].data
+        data2plot = cubeDict[sig].data
+        data2plot = self._reduceData(data2plot, sigROI).copy() #apply ROI
+        data2plot[np.isinf(data2plot)]=np.nan 
+        data2plot[np.isneginf(data2plot)]=np.nan 
+        data2plot[np.isnan(data2plot)]=0
+        data2plot #replace nan & inf for JavaScript
+        print 'data: ',data2plot.shape,' bins: ',bins
+        if sigIdx is not None:
+            if isinstance(sigIdx, int):
+                data2plot=data2plot[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
+                bins=bins[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
+            elif len(np.array(sigIdx)):
+                data2plot=data2plot[sigIdx[0]:sigIdx[1]]
+                bins=bins[sigIdx[0]:sigIdx[1]]
+                
+        layout,im,p,p1d=plot3d_img_time(data2plot=data2plot,cmaps=cmaps,coord=bins.tolist(),init_plot=bins[bins.shape[0]/2])
+        print 'dataIdx: ',data2plot.shape,' bins: ',bins
+        show(layout)
+        print 'done'
+        
