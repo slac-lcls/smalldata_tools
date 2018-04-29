@@ -12,10 +12,13 @@ import resource
 
 import bokeh
 import bokeh.plotting as bp
-from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
-from bokeh.models import WheelZoomTool, BoxZoomTool
-from bokeh.models import BoxSelectTool
+from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool
+from bokeh.models import WheelZoomTool, BoxZoomTool, BoxSelectTool
 from bokeh.models import ColumnDataSource
+try:
+    from bokeh.models import ResizeTool
+except:
+    pass
 
 from collections import deque
 from itertools import islice
@@ -26,7 +29,7 @@ import sys
 try:
     sys.path.append('/reg/neh/home/snelson/gitMaster_smalldata_tools/')
     import bokeh_utils
-    cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
+    cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
 except:
   print 'no bokeh utils'
   pass
@@ -37,7 +40,8 @@ def create_range_input_button(plotMin,plotMax,im):
         var plotMax = parseFloat(input_plotMax.value);
         im.glyph.color_mapper.high = plotMax;
         im.glyph.color_mapper.low = plotMin;
-        im.data_source.trigger('change');
+        //im.data_source.trigger('change');
+        im.data_source.change.emit();
     """
     callback_update = bokeh.models.CustomJS(code=JS_code_plotMin_plotMax)
     input_plotMin = bokeh.models.widgets.TextInput(value="%g"%plotMin,title="plotMin")
@@ -58,12 +62,21 @@ def create_range_slider(vabsmin,vabsmax,plotMin,plotMax,im,step=0.1):
         im.glyph.color_mapper.low = plotMin; 
         im.data_source.trigger('change');
     """
-    callback_slider = bokeh.models.CustomJS(args=dict( im=im),
-                                        code=JS_code_slider)
+    JS_code_slider_b0215 = """                                                                            
+        var plotMin = rslider.value[0];
+        var plotMax = rslider.value[1];
+        im.glyph.color_mapper.high = plotMax;
+        im.glyph.color_mapper.low = plotMin; 
+        im.data_source.change.emit();
+    """
 
     try:
+        callback_slider = bokeh.models.CustomJS(args=dict( im=im),
+                                                code=JS_code_slider)
         rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, range=[plotMin,plotMax],callback=callback_slider,orientation="horizontal")
     except:
+        callback_slider = bokeh.models.CustomJS(args=dict( im=im),
+                                                code=JS_code_slider_b0215)
         rslider = bokeh.models.RangeSlider(title="low/high limit",start=vabsmin,end=vabsmax,step=step, value=[plotMin,plotMax],callback=callback_slider,orientation="horizontal")
 
     callback_slider.args['rslider'] = rslider
@@ -90,7 +103,8 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
         }
         var selArr = newArr[cminIdx]
         im.data_source.data['image'][0] = selArr;  
-        im.data_source.trigger('change')
+        //im.data_source.trigger('change')
+        im.data_source.change.emit()
         p.title.text = "bin value: "+img_idx_val+", idx "+cminIdx
         p.update()
     """
@@ -125,7 +139,9 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
  
 def plotImageBokeh(data, **kwargs):
     """
-    class to plot images with bokeh
+    function to plot images with bokeh
+    plot will have colormap selection and scale selection
+    default bokeh tools include zoom.
     Input are data (2-d array)
 
     Parameters
@@ -228,7 +244,10 @@ def plotImageBokeh(data, **kwargs):
 
 def plot2d_from3d(data2plot, **kwargs):
     """
-    class to plot images with bokeh w. slider on 1st axis (for cube display)
+    class to plot images with bokeh w.
+    plot will have colormap selection and scale selection
+    another slider allows to select the image out of a 3-d cube
+    default bokeh tools include zoom.
     Input are data (3-d array)
 
     Parameters
@@ -286,7 +305,7 @@ def plot2d_from3d(data2plot, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if type(cmaps)==type(None):
-        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
+        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
 
     if plotLog:
         data2plot = np.log(data2plot)
@@ -777,7 +796,7 @@ def plot3d_img_time(data2plot, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if type(cmaps)==type(None):
-        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['cool','gray','jet','spectral'])
+        cmaps = bokeh_utils.get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
 
     if tools is None:
         pan=PanTool()
@@ -817,6 +836,7 @@ def plot3d_img_time(data2plot, **kwargs):
                 init_plot = 0
         else:
             init_plot = 0
+        print 'DEBUG: start w/ plot ',init_plot
         init_dat = data2plot[init_plot]
         
     if coord is None or (len(data2plot.shape)==3 and data2plot.shape[0]!=len(coord)):
@@ -846,9 +866,13 @@ def plot3d_img_time(data2plot, **kwargs):
             {'value': init_dat})
 
     data1d = data2plot.copy()
+    print 'DEBUG: data1d A ',data1d.shape
     while len(data1d.shape)>1:
-        data1d=data1d.mean(axis=1)
-    bin1d = np.arange(data1d.shape[0])+10
+        data1d=np.nanmean(data1d,axis=1)
+    print 'DEBUG: data1d B ',data1d.shape
+    bin1d = coord #np.arange(data1d.shape[0])
+    print 'DEBUG: data ',data1d
+    print 'DEBUG: bin  ',bin1d
 
     #create figure.
     p = bokeh.plotting.figure(x_range=(x0, x1), y_range=(y0, y1),x_axis_type=x_axis_type,
@@ -878,25 +902,34 @@ def plot3d_img_time(data2plot, **kwargs):
         var geometry = cb_data['geometry'];
         var arShp = sourceShp.data.imShp[1]*sourceShp.data.imShp[2]
         var d3data_flat = source.data.im3d
-        var newArr=[]
-        //newArr is a flattened array. 
         nPixROI = (Math.round(geometry['y1']) - Math.round(geometry['y0']))*(Math.round(geometry['x1']) - Math.round(geometry['x0']))
         ROIsums=[]
+
+        var ir = 0;
         for(var i = 0; i < d3data_flat.length; i += arShp) {
             loc_image = d3data_flat.slice(i, i + arShp)
-            newArr.push(loc_image);
-            var ir = 0;
-            for(var irc = 0; irc < newArr.length; irc += sourceShp.data.imShp[1]) {
-                thisSlice = loc_image.slice(irc+Math.round(geometry['y0']), irc+Math.round(geometry['y1']))
-                var sum = thisSlice.reduce(function(a, b) { return a + b; }, 0);
-                ROIsums.push(sum/nPixROI)
-            }
-        }
+            var sumTest = loc_image.reduce(function(a, b) { return a + b; }, 0);
 
+            ir = 0; //reset on each (flattened) image
+            var debug_ir_lastRow = -1
+            var local_ROIsum=0
+
+            for(var irc = 0; irc < loc_image.length; irc += sourceShp.data.imShp[1]) { //split flat ar into rows
+                if ( ( ir >= Math.round(geometry['y0'])) && (ir < Math.round(geometry['y1'])) ) { //select rows in ROI
+                    debug_ir_lastRow = ir
+                    thisSlice = loc_image.slice(irc+Math.round(geometry['x0']), irc+Math.round(geometry['x1']))
+                    var sum = thisSlice.reduce(function(a, b) { return a + b; }, 0);
+
+                    local_ROIsum += sum
+                }
+                ir = ir + 1
+ 
+            }
+            ROIsums.push(local_ROIsum/nPixROI)
+        }
         p1d.select(name='p0')[0].data_source.data['y'] = ROIsums
-        p1d.select(name='p0')[0].data_source.trigger('change')
-        p1d.title.text = "ROI: X "+Math.round(geometry['x0'])+":"+Math.round(geometry['x1'])+" Y "+Math.round(geometry['y0'])+":"+Math.round(geometry['y1'])
-        //p1d.title.text = "ROIsum: "+newArr.length+" "+sourceShp.data.imShp[1]+" "+nPixROI
+        p1d.select(name='p0')[0].data_source.change.emit()
+        p1d.title.text = "ROI: X \"+Math.round(geometry['x0'])+":"+Math.round(geometry['x1'])+" Y "+Math.round(geometry['y0'])+":"+Math.round(geometry['y1'])
         p1d.update()
         """)
 
