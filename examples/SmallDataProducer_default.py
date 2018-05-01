@@ -143,7 +143,7 @@ except:
 
 if ds.rank==0:
     version='unable to detect psana version'
-    for dirn in psana.__file__:
+    for dirn in psana.__file__.split('/'):
         if dirn.find('ana-')>=0:
             version=dirn
     print 'Using psana version ',version

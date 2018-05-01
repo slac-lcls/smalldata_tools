@@ -167,10 +167,11 @@ except:
 
 if ds.rank==0:
     version='unable to detect psana version'
-    for dirn in psana.__file__:
+    for dirn in psana.__file__.split('/'):
         if dirn.find('ana-')>=0:
             version=dirn
     print 'Using psana version ',version
+
 ########################################################## 
 ##
 ## User Input start --> 
@@ -231,10 +232,6 @@ if haveCspad:
             pass
     dets.append(cspad)
 
-##adding raw timetool traces:
-#defaultDets.append(ttRawDetector(env=ds.env()))
-##adding wave8 traces:
-#defaultDets.append(wave8Detector('Wave8WF'))
 ########################################################## 
 ##
 ## <-- User Input end
@@ -244,12 +241,17 @@ dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
+#adding raw timetool traces:
+defaultDets.append(ttRawDetector(env=ds.env()))
 if len(ttCalib)>0:
     setParameter(defaultDets, ttCalib)
 if len(aioParams)>0:
     setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 
 #add config data here
 userDataCfg={}
