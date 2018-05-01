@@ -26,8 +26,12 @@ from utilities import printR
 from utilities_plotting import plotImageBokeh, plotMarker, plotImage
 import bokeh
 import bokeh.plotting as bp
-from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool, ResizeTool
 from bokeh.models import WheelZoomTool, BoxZoomTool, Div
+from bokeh.models import PanTool, SaveTool, HoverTool, ResetTool
+try:
+    from bokeh.models import ResizeTool
+except:
+    pass
 from bokeh.layouts import column
 import sys
 
