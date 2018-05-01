@@ -14,6 +14,7 @@ class defaultDetector(object):
         self.name=name
         self.detname=detname
         self.det=psana.Detector(detname)
+        self._debug = False
     def inRun(self):
         dNames=[]
         for dn in psana.DetNames():
@@ -23,10 +24,11 @@ class defaultDetector(object):
         if self.detname in dNames:
             return True
         return False
+    def _setDebug(self, debug):
+        self._debug = debug
     @abc.abstractmethod
     def data(self,evt):
         """method that should return a dict of values from event"""
-        
 
 class lightStatus(defaultDetector):
     def __init__(self, detname='evr0', codes=[[162],[]]):
@@ -228,19 +230,6 @@ class adcDetector(defaultDetector):
             dl['ch%d'%ichn]=chv
         return dl
 
-class feeBldDetector(defaultDetector):
-    def __init__(self, detname, name=None):
-        if name is None:
-            self.name = detname
-        else:
-            self.name = name
-        defaultDetector.__init__(self, detname, name)
-
-    def data(self, evt):
-        dl={}
-        dl['hproj'] = self.det.get(evt).hproj()
-        return dl
-
 class ttDetector(defaultDetector):
     def __init__(self, name='tt', baseName='TTSPEC:'):
         self.name = name
@@ -420,7 +409,8 @@ class ttRawDetector(defaultDetector):
             ttData['tt_reference']=np.zeros(abs(self.ttROI_reference[1][1]-self.ttROI_reference[1][0]))
         for lOff in self.laserOff:
             if lOff in evtCodes:
-                print 'DEBUG ttRaw: laser off event!'
+                if self._debug:
+                    print 'ttRaw: laser off event!'
                 return ttData
             
         try:
