@@ -106,6 +106,14 @@ class CubeAna(object):
                 dimArr = ['axis0','axis1']
                 coords={'bins': self._bins,'axes':dimArr}
                 dims=('bins','axes')
+            elif key.find('acq')>=0: 
+                detname = key.split('__')[0]
+                if (detname in self._detConfig.keys()) and ('wfx' in self._detConfig[detname].keys()) and (self._detConfig[detname]['wfx'].shape[0] == dataShape[1]):
+                    dirArr =  self._detConfig[detname]['wfx']
+                else:
+                    dimArr = np.arange(0, dataShape[1])
+                coords={'bins': self._bins,'time':dimArr}
+                dims=('bins','time')                
             else: #currently save all 1-d data.
                 dimArr = np.arange(0, dataShape[1])
                 coords={'bins': self._bins,'dim0':dimArr}
@@ -113,11 +121,19 @@ class CubeAna(object):
         else:
             coords={'bins': self._bins}
             dims = ['bins']
-            for dim in range(len(dataShape)-1):
-                thisDim = np.arange(0, dataShape[dim+1])
-                dimStr = 'dim%d'%dim
-                coords[dimStr] = thisDim
-                dims.append(dimStr)
+            detname = key.split('__')[0].replace('/','')
+            if self._debug: print 'get dims&coords: ',key, key.split('__')[0], self._detConfig.keys()
+            if (detname in self._detConfig.keys()) and ('x' in self._detConfig[detname].keys()) and ('y' in self._detConfig[detname].keys()):
+                for idim,thisDimStr in enumerate( ['x','y']):
+                    thisDim = np.linspace(self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1])
+                    coords[thisDimStr] = thisDim
+                    dims.append(thisDimStr)
+            else:
+                for dim in range(len(dataShape)-1):
+                    thisDim = np.arange(0, dataShape[dim+1])
+                    dimStr = 'dim%d'%dim
+                    coords[dimStr] = thisDim
+                    dims.append(dimStr)
 
         return dataShape, coords, dims
 
@@ -129,22 +145,30 @@ class CubeAna(object):
         cubeTable=tables.open_file(fname,'r')
         self._bins = cubeTable.get_node('/binVar_bins').read()
         thisXrdata = xr.DataArray(self._bins, coords={'bins': self._bins}, dims=('bins'), name='Bins')
+        #first loop to fill _detConfig so that we can have meaningful dimensions where possible
         self._detConfig={}
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
-            #print 'lookin at key: ',key
-            if key == '/binVar_bins':
-                continue
-            tArrName = key[1:]
+            if self._debug: print 'DEBUG config: looking at key: ',key
             #make a dictionary with detector config data is present
             if key.find('Cfg')>=0:
                 detname = key.split('_')[1]
-                #print 'DEBUG: ',self._detConfig
+                #if self._debug: print 'DEBUG config: ',self._detConfig
                 if not (detname in self._detConfig.keys()):
                     self._detConfig[detname]={}
                 if key.split('_')[2] not in self._detConfig[detname].keys():
                     self._detConfig[detname][key.split('_')[2]] = cubeTable.get_node(key).read()
+        if self._debug: 
+            for key in self._detConfig.keys():
+                for kkey in self._detConfig[key].keys():
+                    print 'DEBUG: config for %s is %s '%(key, kkey)
+        #second loop for data.
+        for node in cubeTable.root._f_list_nodes():
+            key = node._v_pathname
+            if self._debug: print 'DEBUG: looking at key for data: ',key
+            if key == '/binVar_bins' or key.find('Cfg')>=0:
                 continue
+            tArrName = key[1:]
             dataShape = cubeTable.get_node(key).shape
             if dataShape[0]!=self._bins.shape[0]:
                 if self._debug:
@@ -244,7 +268,7 @@ class CubeAna(object):
         for ik,exShp in enumerate(extendShapes):
             extendShapes[ik] =  (len(runKeys),)+exShp
             extendDims[ik] = ('runs',)+extendDims[ik]
-            print 'ik coords ',ik,extendCoords[ik]
+            #print 'ik coords ',ik,extendCoords[ik]
             #DEBUG/FIX ME: how do I add additional coordinates
             #make coords from dims &add run using dict.
             extendCoords[ik]={'runs':extendRun}
@@ -366,7 +390,10 @@ class CubeAna(object):
                 return
         
         if isinstance(sig, list):
-            sigROI = sig[1] #this is not used yet...
+            if len(sig)>1:
+                sigROI = sig[1] 
+            else:
+                sigROI=None
             sig = sig[0]
         else:
             sigROI=None
@@ -440,11 +467,11 @@ class CubeAna(object):
         bins = self._cubeSumDict['bins'].data
         data2plot = cubeDict[sig].data
         data2plot = self._reduceData(data2plot, sigROI).copy() #apply ROI
+        #replace nan & inf for JavaScript
         data2plot[np.isinf(data2plot)]=np.nan 
         data2plot[np.isneginf(data2plot)]=np.nan 
         data2plot[np.isnan(data2plot)]=0
-        data2plot #replace nan & inf for JavaScript
-        print 'data: ',data2plot.shape,' bins: ',bins
+
         if sigIdx is not None:
             if isinstance(sigIdx, int):
                 data2plot=data2plot[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
@@ -458,3 +485,123 @@ class CubeAna(object):
         show(layout)
         print 'done'
         
+    def getReducedCube(self, aimShape=None, aimSize=4000000, runKey = None):
+        print 'make reduced data'
+        if runKey is None:
+            cubeDict = self._cubeSumDict
+        else:
+            cubeDict = self._cubeDict[runKey]
+
+        maxSize=0
+        maxVar=''
+        for thisVar in cubeDict.variables:
+            if cubeDict[thisVar].size> maxSize:
+                maxSize = cubeDict[thisVar].size
+            maxVar = thisVar
+
+        if maxSize <= aimSize:
+            return cubeDict
+            
+        #too big, figure out how/if to rebin the bin array rather than image    
+        if aimShape is None or aimShape[0]>cubeDict[thisVar].shape[0]:
+            aimShape = (cubeDict[maxVar].shape[0],)
+
+        binVar = cubeDict['nEntries'].bins
+        nentriesVar = cubeDict['nEntries'].data
+        if aimShape[0]<cubeDict[thisVar].shape[0]:
+            binVar = rebinShape(cubeDict['bins'].data, (aimShape[0],))
+            nentriesVar = rebinShape(cubeDict['nEntries'].data, (aimShape[0],))
+        newXr = xr.DataArray(nentriesVar, coords={'bins': binVar}, dims=('bins'),name='nEntries')
+
+        for thisVar in cubeDict.variables:
+            locShape = aimShape
+            coords={'bins': binVar}
+            dims = ['bins']
+            if thisVar=='nEntries' or thisVar=='bins':
+                continue
+            if cubeDict[thisVar].shape[0]!=cubeDict['nEntries'].shape[0]:
+                if self._debug: 'skip here as likely coordinate: ',thisVar
+                continue
+            thisVarData = cubeDict[thisVar].data
+            dataShape = thisVarData.shape
+            if cubeDict[thisVar].size<=aimSize and locShape[0]>=cubeDict[thisVar].shape[0]:
+                newXr = xr.merge([newXr, cubeDict[thisVar]]) #nothing changes.
+            else: #need reshaping.
+                if self._debug: print 'we need to reshape ',thisVar
+                if len(cubeDict[thisVar].shape)==2:
+                    locShape=(locShape[0], cubeDict[thisVar].shape[1])
+                elif len(cubeDict[thisVar].shape)==3:
+                    locShape=(locShape[0], cubeDict[thisVar].shape[1], cubeDict[thisVar].shape[2])
+                elif len(cubeDict[thisVar].shape)==4:
+                    locShape=(locShape[0], cubeDict[thisVar].shape[1], cubeDict[thisVar].shape[2], cubeDict[thisVar].shape[3])
+                #check if I need to make image smaller.
+                rebinFac=1.
+                if cubeDict[thisVar].size*locShape[0]/cubeDict[thisVar].shape[0]>aimSize:
+                    if self._debug:
+                        print 'make image smaller. deal with coordinates!'
+                    imgSize = maxSize/cubeDict[thisVar].shape[0]
+                    rebinFac = np.sqrt(1.*aimSize/locShape[0]/imgSize)
+                    locShape = (locShape[0], int(cubeDict[thisVar].shape[1]*rebinFac), int(cubeDict[thisVar].shape[2]*rebinFac))                
+                if self._debug: print 'rebin: ',cubeDict[thisVar].data.shape, '***',locShape
+                thisVarData = rebinShape(cubeDict[thisVar].data, locShape)
+                #
+                if len(cubeDict[thisVar].shape)>1:
+                    dataShape = thisVarData.shape
+
+                    for ic,imgCoord in enumerate(cubeDict[thisVar].coords.keys()):
+                        if imgCoord=='bins': continue
+                        thisDim = rebinShape(cubeDict[imgCoord].data, (locShape[ic],))
+                        dimStr = imgCoord
+
+                    #for dim in range(len(dataShape)-1):
+                    #    thisDim = np.arange(0, dataShape[dim+1])
+                    #    dimStr = '%s_dim%d'%(thisVar,dim)
+                        coords[dimStr] = thisDim
+                        dims.append(dimStr)
+                    newXr = xr.merge([newXr, xr.DataArray(thisVarData, coords=coords, dims=dims,name=thisVar)])
+                else:
+                    newXr = xr.merge([newXr, xr.DataArray(thisVarData, coords={'bins': binVar}, dims=('bins'),name=thisVar) ])       
+
+        return newXr
+
+
+    def plotReducedCube(self, sig=None, i0='nEntries', inCube=None, aimShape=None, aimSize=4000000, runKey = None):
+        if inCube is None:
+            inCube = self.getReducedCube(aimShape=aimShape, aimSize=aimSize, runKey=runkey)
+            
+        #now get possible images.
+        if sig is not None:
+            if not sig in inCube.keys():
+                print 'Variable %s is not in cube, check for all options.'%sig
+                sig = None
+        if sig is None:
+            imgList=[]
+            for key in inCube.variables:
+                if len(inCube[key].shape)>2:
+                    for k in self.Keys(img=True):
+                        imgList.append(k)
+            if len(imgList)==1:
+                sig = imgList[0]
+            else:
+                print 'we have the following cubed images: ',
+                for k in imgList: print k
+                sig = raw_input('Please select one:')
+            if not sig in inCube.variables:
+                print 'Well, this did not work. Likely we had no images or you made a typo. We give up for now'
+                return
+        
+        #get i0
+        sigData = inCube[sig].data
+        i0Data = inCube[i0].data
+        data2plot = np.divide(sigData.T,i0Data).T
+        #replace nan & inf for JavaScript
+        data2plot[np.isinf(data2plot)]=np.nan 
+        data2plot[np.isneginf(data2plot)]=np.nan 
+        data2plot[np.isnan(data2plot)]=0
+
+        #get bins
+        bins = inCube[sig].bins.data
+            
+        #plot stuff.
+        layout,im,p,p1d=plot3d_img_time(data2plot=data2plot,cmaps=cmaps,coord=bins.tolist(),init_plot=bins[bins.shape[0]/2])
+        show(layout)
