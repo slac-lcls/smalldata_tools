@@ -21,10 +21,6 @@ try:
 except:
     pass
 
-from collections import deque
-from itertools import islice
-from bisect import insort, bisect_left
- 
 import sys
 
 def valid_mpl_palettes():
