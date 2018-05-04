@@ -1692,6 +1692,7 @@ class SmallDataAna_psana(object):
                 elif (onoff==1):
                     outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
+                #ADD CNF STUFF HERE!
                 printR(rank, 'no big data, bin the data now....be patient')
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
                 printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
@@ -1731,9 +1732,23 @@ class SmallDataAna_psana(object):
                 print 'now write outputfile (only small data) to : ',outFileName
                 for key in cubeData.keys():
                     addToHdf5(fout, key, cubeData[key].values)
+                #ADD CONF STUFF HERE TOO
                 fout.close()
             return
 
+        #code to put cube config as attr to a dataset
+        if rank==0:
+            cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
+            sel = self.sda.Sels[cube.useFilter]
+            selString=''
+            for icut,cut in enumerate(sel.cuts):
+                selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
+            print 'DEBUG: ', selString
+            dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
+            dsetcnf.attrs['cubeSelection'] = selString
+            print 'added to hdf5'
+
+        #back to original code.
         if offEventsCube>0:
             self.sda.getOffVar('fiducials','xon',nNbr=offEventsCube, mean=False)
             self.sda.getOffVar('event_time','xon',nNbr=offEventsCube, mean=False)
@@ -1940,6 +1955,8 @@ class SmallDataAna_psana(object):
                 if np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
+        if rank==0:
+            #should this not be done in rank 0 only? Maybe push after barrier with writing cube setup to attribute.
             if det.rms is not None:
                 if not detDict.has_key('image'):
                     addToHdf5(fout, 'Cfg_'+detName+'_ped', det.ped)
@@ -1961,6 +1978,11 @@ class SmallDataAna_psana(object):
                         addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain))
                     addToHdf5(fout, 'Cfg_'+detName+'_mask', det.det.image(self.run,det.mask))
                     addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.det.image(self.run,det.cmask))
+                    if det.x is not None:
+                        addToHdf5(fout, 'Cfg_'+detName+'_x', det.x)
+                        addToHdf5(fout, 'Cfg_'+detName+'_y', det.y)
+
+
         comm.Barrier()
         printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
         fout.close()
