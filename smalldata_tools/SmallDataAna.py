@@ -2465,3 +2465,38 @@ class SmallDataAna(object):
 
         if returnData:
             return returnDict
+
+    def makeDataArray(self, varList=[], useFilter=None):
+        if useFilter is None:
+            arrayFilter = np.ones_like(self._tStamp).astype(bool)
+        else:
+            arrayFilter = self.getFilter(useFilter)
+        timeFiltered = self._tStamp[arrayFilter]
+        newXr = None
+        #newXr = xr.DataArray(timeFiltered, coords={'time': timeFiltered}, dims=('time'),name='time')
+        for tVar in varList:
+            if not (self.hasKey(tVar)):
+                continue
+            #printR(rank, 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape)
+            filteredVar = self.getVar(tVar,arrayFilter).squeeze()
+            tVar=tVar.replace('/','__')
+            if len(filteredVar.shape)==1:
+                if newXr is None:
+                    newXr = xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar)
+                else:
+                    newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
+            else:
+                coords={'time': timeFiltered}
+                dims = ['time']
+                dataShape = filteredVar.shape
+                for dim in range(len(dataShape)-1):
+                    thisDim = np.arange(0, dataShape[dim+1])
+                    dimStr = '%s_dim%d'%(tVar,dim)
+                    coords[dimStr] = thisDim
+                    dims.append(dimStr)
+                if newXr is None:
+                    newXr = xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)
+                else:
+                    newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
+
+        return newXr
