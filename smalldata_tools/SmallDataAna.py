@@ -34,6 +34,7 @@ except:
     pass
 from bokeh.layouts import column
 import sys
+from epicsarchive import EpicsArchive
 
 from pscache import client #works from ana-1.2.9 on
 
@@ -354,6 +355,7 @@ class SmallDataAna(object):
         import matplotlib as pltm
         colormap =cm.get_cmap("jet")
         self.bokehpalette = [pltm.colors.rgb2hex(m) for m in colormap(np.arange(colormap.N))]
+        self._epicsArchive=None
 
     def __del__(self):
         try:
@@ -2500,3 +2502,67 @@ class SmallDataAna(object):
                     newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
 
         return newXr
+
+
+    def addEpicsArchiveVar(self, PVname, name=None, returnRaw=False):
+        if self._epicsArchive is None:
+            try:
+                self._epicsArchive = EpicsArchive()
+            except:
+                print 'failed to create the EPICS archiver'
+                return None
+
+        #check if PV is present
+        PVlist = self._epicsArchive.search_pvs(PVname, do_print=False)
+        if len(PVlist)==0:
+            print 'PV %s is not in archiver'%PVname
+            return
+
+        #get start&stop time to ask the archiver for.
+        evtt = self.getVar('event_time')
+        tStart = evtt.min()
+        tStop = evtt.max()
+        tStart_sec = tStart >> 32
+        tStart_nsec = tStart - (tStart_sec << 32)
+        tStop_sec = tStop >> 32
+        tStop_nsec = tStop - (tStop_sec << 32)
+
+        #now get the data.
+        timePoints,valPoints = self._epicsArchive.get_points(PV=PVname, start=tStart_sec, end=tStop_sec, two_lists=True, raw=True)
+
+        #add to data
+        if name is None: name = PVname.replace(':','_')
+
+        #make a dataset with values * time points
+        tStamp_epics = np.array([np.datetime64(int(tsec), 's') for tsec in timePoints])
+        da_epics = xr.DataArray(valPoints, coords={'time': tStamp_epics}, dims=('time'),name=name)
+
+        #match with other dataset (event_time or fiducals: closest or interpolated values)
+        #da.resample() #need to look more at docs to find out how that shoudl be used.
+        binBoundaries = da_epics.time.copy()
+        #bb = np.append(binBoundaries[0]-1, binBoundaries)
+        #binBoundaries = np.append(bb, binBoundaries[-1]+1)
+        binnedData = self.xrData.fiducials.time.groupby_bins('time',binBoundaries, labels=(binBoundaries[:-1].astype(int)))
+        
+        newArray=np.array([])
+        for epicsTime, epicsValue in zip(np.array(da_epics.time), da_epics.data):
+            try:
+                nevents = len(binnedData.groups[epicsTime.astype(float)])
+                newArray = np.append(newArray,np.ones(nevents)*epicsValue)
+            except:
+                if (epicsTime.astype(float)<binnedData.groups.keys()[0]):
+                    nevents = len(self.xrData.fiducials.time.data[self.xrData.fiducials.time.data<epicsTime])
+                    newArray = np.append(np.ones(nevents)*da_epics.data[0], newArray)
+                elif (epicsTime.astype(float)>binnedData.groups.keys()[-1]):
+                    nevents = len(self.xrData.fiducials.time.data[self.xrData.fiducials.time.data>epicsTime])
+                    newArray = np.append(newArray, np.ones(nevents)*da_epics.data[-1])
+                else:
+                    print 'no group for time: ',epicsTime.astype(float)
+                pass
+                #print 'no data for key: ',epicsTime
+
+        da_epics_new = xr.DataArray(newArray, coords={'time': self.xrData.fiducials.time}, dims=('time'),name=name)
+        self.addVar(name, da_epics_new)
+                
+        if returnRaw:
+            return da_epics
