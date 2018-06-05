@@ -77,7 +77,6 @@ class Cube(object):
         self.addIdxVars = []
         self.dropletProc = {} #for droplet treatment in cube
 
-    #should be extended to a dict to > 2 binning variables.
     def add_BinVar(self, addBinVars):
         """
         add extra dimensions to bin the data in
@@ -409,7 +408,7 @@ class SmallDataAna(object):
             elif key=='/EvtID':
                 return dataShape, coords, dims
             elif tleaf_name=='channels':
-                dimArr = ['%d'%i for i in range(0,dataShape[1])]
+                dimArr = ['%02d'%i for i in range(0,dataShape[1])]
                 coords={'time': self._tStamp[:setNevt],'channels':dimArr}
                 dims=('time','channels')
             elif tleaf_name.find('AngPos')>=0:
@@ -1333,7 +1332,8 @@ class SmallDataAna(object):
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
             delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
-            if delays is None or (delays.mean()+delays.std()==0):
+            #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
+            if delays is None or delays.mean()==0 or delays.std()==0: 
                 return '',[]
             scan = delays
             if scanVarName == '': 
@@ -1917,6 +1917,12 @@ class SmallDataAna(object):
                         continue
                     dims.append(thisdim)
                     coords[thisdim]=cubeData[key].coords[thisdim].data
+                #do not reshape the coordinates!
+                isCoord=True
+                for thisdim in cubeData[key].dims:
+                    if thisdim=='binVar_bins':
+                        isCoord=False
+                if isCoord: continue
                 #now get data & create new data and new shape:
                 dataShp = cubeData[key].shape
                 newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
@@ -1944,6 +1950,12 @@ class SmallDataAna(object):
                         continue
                     dims.append(thisdim)
                     coords[thisdim]=cubeDataErr[key].coords[thisdim].data
+                #do not reshape the coordinates!
+                isCoord=True
+                for thisdim in cubeDataErr[key].dims:
+                    if thisdim=='binVar_bins':
+                        isCoord=False
+                if isCoord: continue
                 #now get data & create new data and new shape:
                 dataShp = cubeDataErr[key].shape
                 newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
