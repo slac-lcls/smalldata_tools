@@ -808,9 +808,10 @@ def plotImage(image, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if plotWith.find('matplotlib')>=0:
+        fig = None
         if 'fig' in kwargs.keys():
             fig = kwargs.pop("fig")
-        else:
+        if fig is None:
             if width_height is None: width_height = (8,5)
             plt.figure(figsize=width_height)
             fig = (gridspec.GridSpec(1,1)[0])

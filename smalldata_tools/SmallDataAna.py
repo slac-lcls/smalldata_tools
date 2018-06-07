@@ -1237,7 +1237,7 @@ class SmallDataAna(object):
                 hst = [vals, np.arange(0,vals.shape[0]+1)]
             elif len(vals.shape)==2:
                 if plotWith.find('matplotlib')>=0:
-                    plotImage(vals, ylim=[np.nanpercentile(vals,1),np.nanpercentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
+                    plotImage(vals, ylim=[np.nanpercentile(vals,1),np.nanpercentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel), fig=fig)
                     return
                 elif plotWith.find('bokeh')>=0:
                     plotImage(vals, xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
@@ -1317,7 +1317,7 @@ class SmallDataAna(object):
         iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
         extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
 
-        plotImage(iSig, extent=extent, ylim=[np.nanpercentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith)
+        plotImage(iSig, extent=extent, ylim=[np.nanpercentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, fig=fig)
 
         return iSig, extent
 
