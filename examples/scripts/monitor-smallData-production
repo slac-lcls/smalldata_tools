@@ -4,7 +4,13 @@ export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
 HUTCH=`get_hutch_name`
 THISEXP=`get_curr_exp`
 cd /reg/d/psdm/$HUTCH/$THISEXP/results/smalldata_tools
+#FIX ME
+#NEED TO CHECK THIS IS A NUMBER! 
 LASTRUN=`get_lastRun`
+while [[ $LASTRUN == 'no runs yet' ]]; do
+    sleep 60 
+    LASTRUN=`get_lastRun`
+done
 while true; do
 	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
 	EXP_RUN=`get_lastRun`
