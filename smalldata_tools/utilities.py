@@ -7,6 +7,7 @@ import h5py
 import tables
 from scipy import optimize
 from scipy import ndimage
+from scipy import signal
 from matplotlib import pyplot as plt
 import resource
 from itertools import izip, count
@@ -585,6 +586,30 @@ def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
     #for k in retDict.keys():
         #print 'fit Trace test: ',k,retDict[k]
 
+    return retDict
+
+###
+#simple peak finding in traces (double pulse acqiris data)
+###
+def findPeakSimple(trace, nMaxPeak=2, peakWid=20, peakOff=5):
+  
+    peakIdx = signal.find_peaks_cwt(trace, widths=[3])
+    maxIdx = [ x for _,x in sorted(zip(trace[peakind],peakIdx), key=lambda pair: pair[0], reverse=True)]
+    peakIdxS=[]
+    peakIdxV=[]
+    peakIdxSum=[]
+    for peak in maxIdx:
+        if len(peakIdxS)>=nMaxPeak:
+            break
+        for peakNear in np.arange(peak-peakWid/4, peak+peakWid/4):
+            if peakNear in peakIdxS:
+                continue
+        peakIdxS.append(peak)
+        peakIdxV.append(trace[peak])
+        peakIdxSum.append(trace[peak-peakWid/2+peakOff:peak+peakWid/2+peakOff].sum())
+    retDict={'peakIdx': np.array(peakIdxS)}
+    retDict['peakMax'] =  np.array(peakIdxV)
+    retDict['peakSum'] =  np.array(peakIdxSum)
     return retDict
 
 
