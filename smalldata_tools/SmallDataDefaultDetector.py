@@ -579,4 +579,22 @@ class xtcavDetector(defaultDetector):
         #dl['ragged_power']=ragged_power
         return dl
 
+#
+# detector classes for running in shared memory mode
+# mpiData fields are noy available here.
+#
 
+#cheap out and only store the one field we look at for now.
+class ebeamDetector(defaultDetector):
+    def __init__(self, detname, name=None):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        defaultDetector.__init__(self, detname, name)
+    def data(self, evt):
+        dl={}
+        ebeamData = self.det.get(evt)
+        if ebeamData is not None:
+            dl['L3Energy']=ebeamData.ebeamL3Energy()
+        return dl
