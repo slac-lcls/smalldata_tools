@@ -990,7 +990,7 @@ class SmallDataAna(object):
         selfids = [ (ifid,itime) for ifid,itime in zip(fids[Filter],times[Filter])]
         return selfids
         
-    def getVar(self, plotvar, Filter=None, addToXarray=True):
+    def getVar(self, plotvar, useFilter=None, addToXarray=True):
         #get the signal variable
         if isinstance(plotvar,list):
             plotvar = plotvar[0]
@@ -998,8 +998,10 @@ class SmallDataAna(object):
         else:
             sigROI=[]
 
-        if isinstance(Filter,basestring):
-            Filter = self.getFilter(Filter)
+        if isinstance(useFilter,basestring):
+            Filter = self.getFilter(useFilter)
+        else:
+            Filter = useFilter
 
         if plotvar in self._fields.keys():
             if self._fields[plotvar][1]=='inXr':
