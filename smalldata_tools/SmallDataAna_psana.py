@@ -71,9 +71,9 @@ class SmallDataAna_psana(object):
         else:
             xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
             haveXtc=False
-            for (dirpath, dirnames, filenames) in os.walk(xtcdirname):
+            for (dirpath, dirnames, filenames) in next(os.walk(xtcdirname)):
                 for fname in filenames:
-                    if fname.find('r%04d'%run)>=0:
+                    if fname.find('r%04d'%run)>=0 and fname[-3:]=='xtc':
                         haveXtc=True
             if not haveXtc:
                 printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run))
