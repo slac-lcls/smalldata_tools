@@ -1193,16 +1193,18 @@ class SmallDataAna(object):
             plotWith = self.plotWith
 
         if isinstance(plotvar,list):
-            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay'): 
+            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay' or plotvar[0]=='delay_noLxt'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
         else:
-            if not (self.hasKey(plotvar) or plotvar=='delay'): 
+            if not (self.hasKey(plotvar) or plotvar=='delay' or plotvar=='delay_noLxt'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
 
         if plotvar=='delay':
             vals = self.getDelay(use_ttCorr=True)
+        elif plotvar=='delay_noLxt':
+            vals = self.getDelay(use_ttCorr=True, addLxt=False)
         elif plotMultidimMean:
             vals = self.getRedVar(plotvar)
         elif len(plotvar)==1 and plotvar.find('droplets')>=0:
@@ -1270,6 +1272,8 @@ class SmallDataAna(object):
         for plotvar in plotvars:
             if plotvar == 'delay':
                 vals=self.getDelay(use_ttCorr=True)
+            elif plotvar=='delay_noLxt':
+                vals = self.getDelay(use_ttCorr=True, addLxt=False)
             #elif len(plotvar)==1 and plotvar.find('droplets')>=0:
             #    vals = self.fh5[plotvar].value
             else:   
@@ -1329,11 +1333,11 @@ class SmallDataAna(object):
                 return key.replace('/scan/','').replace('scan/','')
         return ''
 
-    def getScanValues(self,ttCorr=False,addEnc=False):
+    def getScanValues(self,ttCorr=False,addEnc=False,addLxt=True):
         #get the scan variable & time correct if desired
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
-            delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
+            delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc,addLxt=addLxt)
             #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
             if delays is None or delays.mean()==0 or delays.std()==0: 
                 return '',[]
@@ -1352,13 +1356,13 @@ class SmallDataAna(object):
         return scanVarName,scan
 
 
-    def getBins(self,bindef=[], debug=False):
+    def getBins(self,bindef=[], debug=False, addLxt=True):
         Bins = util_getBins(bindef, debug)
         if Bins is not None:
             return Bins
 
         #have no input at all, assume we have unique values in scan. If not, return empty list 
-        scanVarName, scan =  self.getScanValues(ttCorr=False,addEnc=False)
+        scanVarName, scan =  self.getScanValues(ttCorr=False,addEnc=False,addLxt=addLxt)
 
         if len(bindef)==0:
             if scanVarName=='':
@@ -1411,7 +1415,7 @@ class SmallDataAna(object):
     def getScan(self, ttCorr=False, sig='', i0='', Bins=100, useFilter=None):
         return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
 
-    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, addEnc=False, returnIdx=False, binVar=None, plotWith=None):
+    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, addEnc=False, addLxt=True, returnIdx=False, binVar=None, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1450,7 +1454,7 @@ class SmallDataAna(object):
                 if isinstance(binVar, basestring): binVar=[binVar]
                 binVal = self.get1dVar(binVar[0])
             else:
-                binVal=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc)
+                binVal=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc,addLxt=addLxt)
                 ttCorr = None; addEnc=None
             FilterOn = FilterOn & ~np.isnan(binVal)
             FilterOff = FilterOff & ~np.isnan(binVal)
@@ -1729,7 +1733,7 @@ class SmallDataAna(object):
 
     def prepCubeData(self, cubeName):
         cube = self.getCube(cubeName)
-        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay'):
+        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay' or cube.binVar == 'delay_noLxt'):
             print 'selection variable not in littleData, cannot make the data for this cube'
             return None
 
@@ -1743,7 +1747,10 @@ class SmallDataAna(object):
                 Bins = np.insert(Bins,0,Bins[0]-1e-5)
                 Bins = np.append(Bins,Bins[-1]+1e-5)
         else:
-            Bins = self.getBins(cube.bins)
+            if cube.binVar == 'delay_noLxt':
+                Bins = self.getBins(cube.bins, addLxt=False)
+            else:
+                Bins = self.getBins(cube.bins)
         cube.binBounds = Bins
 
         #now look through targetVars & split out ones not in xarray/hdf5
@@ -1822,6 +1829,9 @@ class SmallDataAna(object):
 
         if cube.binVar == 'delay':
             binVar = self.getDelay()
+        elif cube.binVar == 'delay_noLxt':
+            binVar = self.getDelay(addLxt=False)
+            self.addVar('delay_noLxt',binVar)
         else:
             binVar = self.get1dVar(cube.binVar)
                 
