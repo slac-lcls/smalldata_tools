@@ -71,10 +71,10 @@ class SmallDataAna_psana(object):
         else:
             xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
             haveXtc=False
-            for (dirpath, dirnames, filenames) in next(os.walk(xtcdirname)):
-                for fname in filenames:
-                    if fname.find('r%04d'%run)>=0 and fname[-3:]=='xtc':
-                        haveXtc=True
+            dirpath, dirnames, filenames = next(os.walk(xtcdirname))
+            for fname in filenames:
+                if fname.find('r%04d'%run)>=0 and fname[-3:]=='xtc':
+                    haveXtc=True
             if not haveXtc:
                 printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run))
                 return None
@@ -1736,17 +1736,14 @@ class SmallDataAna_psana(object):
                 fout.close()
             return
 
-        #code to put cube config as attr to a dataset
-        if rank==0:
-            cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
-            sel = self.sda.Sels[cube.useFilter]
-            selString=''
-            for icut,cut in enumerate(sel.cuts):
-                selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
-            print 'DEBUG: ', selString
-            dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
-            dsetcnf.attrs['cubeSelection'] = selString
-            print 'added to hdf5'
+        #configuration for cube making
+        cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
+        sel = self.sda.Sels[cube.useFilter]
+        selString=''
+        for icut,cut in enumerate(sel.cuts):
+            selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
+        dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
+        dsetcnf.attrs['cubeSelection'] = selString
 
         #back to original code.
         if offEventsCube>0:
@@ -1796,7 +1793,7 @@ class SmallDataAna_psana(object):
 
             nEvts_bin=0
             for ievt,evtfid, evttime in itertools.izip(itertools.count(),fids,evttimes):
-                if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin:
+                if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin-1:
                     break
                 nEvts_bin=nEvts_bin+1
 
@@ -1955,7 +1952,6 @@ class SmallDataAna_psana(object):
                 if np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
-        if rank==0:
             #should this not be done in rank 0 only? Maybe push after barrier with writing cube setup to attribute.
             if det.rms is not None:
                 if not detDict.has_key('image'):
@@ -1986,6 +1982,8 @@ class SmallDataAna_psana(object):
         comm.Barrier()
         printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
         fout.close()
+        comm.Barrier()
+        #print 'in rank now: ',rank
         if rank==0:
             print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
             os.rename(outFileName, outFileName.replace('.inprogress',''))
