@@ -50,8 +50,9 @@ def xppDetectors(beamCodes=[[162],[91]]):
     except:
         print 'did not find slow Adc detector'
     dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
-    #dets.append(ttDetector(baseName='TTSPEC:'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
+    dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
+    dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))
     dets.append(aiDetector('FEE-SPEC0','feeBld'))
     try:
         dets.append(encoderDetector('usbencoder','enc'))
@@ -79,14 +80,17 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     dets.append(ipmDetector('XCS-DIO-05','dio5'))
     dets.append(ipmDetector('XCS-IPM-mono','diodeMono'))
     dets.append(ipmDetector('XCS-IPM-gon','diodeGon'))
-    #dets.append(ipmDetector('XCS-IPM-lam','diodeLadm'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XCS-SND-DIO','snd_dio'))
+    dets.append(bmmonDetector('XCS-SB1-BMMON','ipm4'))
+    dets.append(bmmonDetector('XCS-SB2-BMMON','ipm5'))
+    dets.append(bmmonDetector('HFX-DG2-BMMON','ipm2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
     dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     try:
+        dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
         dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
     except:
         print 'did not add encoder detector'
@@ -95,25 +99,58 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def mfxDetectors():
-    return []
-
-def cxiDetectors():
-    return []
-
-def mecDetectors():
+def mfxDetectors(beamCodes=[[162],[]]):
     dets=[]
+    dets.append(lightStatus(codes=beamCodes))
+    dets.append(controlDetector())
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(aiDetector('MFX-AIN-01','ai')) 
+    dets.append(ttDetector(baseName='MFX:TTSPEC:'))
+    dets.append(bmmonDetector('MFX-DG1-BMMON','ipm_dg1'))
+    dets.append(bmmonDetector('MFX-DG2-BMMON','ipm_dg2'))
+    dets.append(damageDetector())
+    try:
+        dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
+        dets.append(encoderDetector('MFX-USB-ENCODER-01','enc'))
+    except:
+        pass
+    return dets
+
+def cxiDetectors(beamCodes=[[162],[]]):
+    dets=[]
+    dets.append(lightStatus(codes=beamCodes))
+    dets.append(controlDetector())
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
+    dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
+    dets.append(ttDetector(baseName='CXI:TTSPEC:'))
+    dets.append(damageDetector())
+    try:
+        dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
+        dets.append(encoderDetector('CXI-USB-ENCODER-01','enc'))
+    except:
+        pass
+    return dets
+
+def mecDetectors(beamCodes=[[162],[]]):
+    dets=[]
+    dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(ipmDetector('MEC-XT2-IPM-02','ipm2'))
     dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
-    dets.append(ipmDetector('MEC-XT2-PIM-02','pim2')) #needs a newer release
-    dets.append(ipmDetector('MEC-XT2-PIM-03','pim3')) #needs a newer release
+    dets.append(ipmDetector('MEC-XT2-PIM-02','pim2')) 
+    dets.append(ipmDetector('MEC-XT2-PIM-03','pim3')) 
     dets.append(ipmDetector('MEC-TCTR-DI-01','dio_tctr'))
-    dets.append(ipmDetector('MEC-LAS-EM-01','dio_las'))  #needs a newer release
+    dets.append(ipmDetector('MEC-LAS-EM-01','dio_las'))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
     dets.append(epicsDetector(PVlist=['belens z']))
+    dets.append(damageDetector())
+    try:
+        dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
+    except:
+        pass
     return dets
 
 
