@@ -241,8 +241,6 @@ dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#adding raw timetool traces:
-defaultDets.append(ttRawDetector(env=ds.env()))
 if len(ttCalib)>0:
     setParameter(defaultDets, ttCalib)
 if len(aioParams)>0:
@@ -252,6 +250,11 @@ if len(epicsPV)>0:
 
 ##adding wave8 traces:
 #defaultDets.append(wave8Detector('Wave8WF'))
+##adding raw timetool traces:
+#try:
+#    defaultDets.append(ttRawDetector(env=ds.env()))
+#except:
+#    pass
 
 #add config data here
 userDataCfg={}

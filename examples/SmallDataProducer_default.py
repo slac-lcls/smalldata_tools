@@ -152,8 +152,11 @@ defaultDets = defaultDetectors(hutch)
 epicsPV=[] #automatically read PVs from questionnaire/epicsArch file 
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-#adding raw timetool traces:
-defaultDets.append(ttRawDetector(env=ds.env()))
+##adding raw timetool traces:
+#try:
+#    defaultDets.append(ttRawDetector(env=ds.env()))
+#except:
+#    pass
 
 for eventNr,evt in enumerate(ds.events()):
     printMsg(eventNr, evt.run(), ds.rank, ds.size)
