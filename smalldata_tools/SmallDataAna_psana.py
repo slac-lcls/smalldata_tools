@@ -423,7 +423,7 @@ class SmallDataAna_psana(object):
                 continue
             if imgName is not None and key.find(imgName)<0:
                 continue
-            if key.find('AvImg')>=0:
+            if key.find('AvImg')==0:
                 if detname is not None and key.find(detname)>=0:
                     avImages.append(key)
                 elif detname is None:
@@ -528,7 +528,7 @@ class SmallDataAna_psana(object):
                 continue
             if detname is not None and key.find(detname)<0:
                 continue
-            if key.find('AvImg')>=0:
+            if key.find('AvImg')==0:
                 if detname is not None and key.find(detname)>=0:
                     avImages.append(key)
                 elif detname is None:
@@ -567,7 +567,7 @@ class SmallDataAna_psana(object):
     def SelectRegion(self,detname=None, limits=[5,99.5]):
         avImages=[]
         for key in self.__dict__.keys():
-            if key.find('AvImg')>=0:
+            if key.find('AvImg')==0:
                 if detname is not None and key.find(detname)>=0:
                     avImages.append(key)
                 elif detname is None:
@@ -1351,7 +1351,7 @@ class SmallDataAna_psana(object):
     def SelectRegionDroplet(self, detname=None, limits=[5,99.5]):
         avImages=[]
         for key in self.__dict__.keys():
-            if key.find('AvImg')>=0:
+            if key.find('AvImg')==0:
                 if detname is not None and key.find(detname)>=0:
                     avImages.append(key)
                 elif detname is None:
