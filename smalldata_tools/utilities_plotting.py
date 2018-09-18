@@ -290,8 +290,11 @@ def plotImageBokeh(data, **kwargs):
         print 'found unexpected parameters to plotMarker, will ignore', kwargs
 
     if plotLog: data = np.log(data)
-    data[np.isinf(data)]=np.nan 
-    data[np.isneginf(data)]=np.nan 
+    try:
+        data[np.isinf(data)]=np.nan 
+        data[np.isneginf(data)]=np.nan 
+    except:
+        print 'could not set inf data to nan. '
     if plotMin=="auto":
         plotMin = np.nanmin(data)
     if plotMax=="auto":
