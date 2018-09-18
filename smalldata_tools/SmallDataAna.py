@@ -145,7 +145,7 @@ class Cube(object):
         else:
             print 'addIdxVar need to be a string or list of strings, got: ',tVar
 
-    def printCube(self, Sel):
+    def printCube(self, Sel=None):
         """
         parameter: name of filter/selection
         prints the setting of this cube.
@@ -163,8 +163,9 @@ class Cube(object):
             print 'use step size of %g, determine boundaries from data'%self.bins[0]
         else:
             print '%s binned from %g to %g in %i bins'%(self.binVar,min(self.bins),max(self.bins),len(self.bins))
-        for icut,cut in enumerate(Sel.cuts):
-            print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
+        if Sel is not None:
+            for icut,cut in enumerate(Sel.cuts):
+                print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
         print 'we will bin: ',self.targetVars
 
 
@@ -884,6 +885,7 @@ class SmallDataAna(object):
         self.Sels[useFilter].removeCut(varName)
         Filter = self.getFilter(useFilter=useFilter)
         self.Sels[useFilter]._setFilter(Filter)
+
     def printSelections(self, selName=None, brief=True):
         """
         print the square cuts that currently define the selection/filter
@@ -1819,6 +1821,9 @@ class SmallDataAna(object):
 
     def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
+        nBins=cube.bins.shape[0]-1
+        for key in cube.addBinVars:
+            nBins*=cube.addBinVars[key].shape[0]-1
         if onoff == 2:
             onoff = cubeName_onoff
 
@@ -1836,8 +1841,9 @@ class SmallDataAna(object):
             binVar = self.get1dVar(cube.binVar)
                 
         if debug and rank==0:
-            cube.printCube(cubeName)
-            cube.printSelection(self.Sels[cube.useFilter])
+            cube.printCube()
+            #self.printSelections(self.Sels[cube.useFilter])
+            self.printSelections(cube.useFilter)
 
         cubeFilter = self.getFilter(cube.useFilter)
         [cubeOn, cubeOff] = self.getFilterLaser(cube.useFilter, ignoreVar=[])
@@ -1880,6 +1886,7 @@ class SmallDataAna(object):
                 binIdx.append(addBinIdx)
 
             #binShp & binIdx as tuple for use in ravel_multi_index. Append them to cube
+
             indMultiD = np.ravel_multi_index(tuple(binIdx),tuple(binShp))
             binVar = indMultiD
             orgBins = Bins
@@ -1895,7 +1902,8 @@ class SmallDataAna(object):
             filteredVar = self.getVar(tVar,cubeFilter).squeeze()
             tVar=tVar.replace('/','__')
             if len(filteredVar.shape)==1:
-                newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
+                #newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
+                newDar = xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar)
             else:
                 coords={'time': timeFiltered}
                 dims = ['time']
@@ -1905,8 +1913,10 @@ class SmallDataAna(object):
                     dimStr = '%s_dim%d'%(tVar,dim)
                     coords[dimStr] = thisDim
                     dims.append(dimStr)
-                newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
-                
+                newDar = xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)
+                #newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
+            newXr = xr.merge([newXr, newDar])
+
         #now we actually bin.
         cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).sum(dim='time')                  
         #could add error using the std of the values.
