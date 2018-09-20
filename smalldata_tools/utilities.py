@@ -657,3 +657,66 @@ def shapeFromKey_h5(fh5, thiskey):
     else:
         return fh5.get_node(thiskey).shape
 
+
+def rename_reduceRandomVar(outFileName):
+    print 'rename_reduceRandomVar ',outFileName
+    if outFileName.find('.inprogress')<0:
+        print 'filename does not end in inprogress, will quit'
+        sys.exit()
+    print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
+
+    #open file.
+    fin = h5py.File(outFileName,'r')
+    fout = h5py.File(outFileName.replace('.inprogress',''),'w')
+            
+    #groups (binning Variables)
+    randomNbins=1
+    for k in fin.keys():
+      #deal with groups first. 
+      if isinstance(fin[k],  h5py.Group):
+        if k!='random':
+          fin.copy(k, fout)
+        else:
+          for kk in fin[k]:
+            randomNbins*=fin[k][kk].shape[0]
+
+      #config & setup have no shape, just copy.
+      elif k.find('Cfg')==0 or k=='cubeSelection':
+        fin.copy(k, fout)
+
+    nEntryShape=fin['nEntries'].shape
+    nEntryBinsFlat=1.
+    for idc, idim in enumerate(nEntryShape): 
+      nEntryBinsFlat*=idim
+      if idim==randomNbins:randAxis=idc
+        
+    for k in fin.keys():
+      if isinstance(fin[k],  h5py.Group): continue
+      if k.find('Cfg')==0 or k=='cubeSelection': continue
+        
+      if len(fin[k].shape)>=len(nEntryShape):
+        kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
+
+      if kShape == nEntryShape:
+        if randomNbins>1 and randomNbins in nEntryShape:
+          data=fin[k].value.sum(axis=randAxis)
+          fout.create_dataset(k, data=data)
+        else:
+          fin.copy(k, fout)
+      else:
+        newShp=list(nEntryShape)
+        for iShp,shp in enumerate(fin[k].shape):
+          if iShp==0: continue
+          newShp.append(shp)
+        newShp=tuple(newShp)
+        newArray=fin[k].value.reshape(newShp)
+        if randomNbins>1 and randomNbins in newArray.shape:
+          data=newArray.sum(axis=randAxis)
+          fout.create_dataset(k, data=data)
+        else:
+          fout.create_dataset(k, data=newArray)
+
+    fout.close()
+    os.remove(outFileName)
+    #for now, rename org file as well.
+    #os.rename(outFileName, outFileName.replace('.inprogress',''))
