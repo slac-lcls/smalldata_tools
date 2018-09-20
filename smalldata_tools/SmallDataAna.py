@@ -358,13 +358,6 @@ class SmallDataAna(object):
         self._epicsArchive=None
 
     def __del__(self):
-        try:
-            from mpi4py import MPI
-        except:
-            self._writeNewData()
-            return
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
         if rank==0:
             self._writeNewData()
         return
@@ -646,20 +639,23 @@ class SmallDataAna(object):
         for (dirpath, dirnames, filenames) in walk(self.dirname):        
             for fname in filenames:
                 if fname.find('xr')==0 and fname.find('Run%03d'%self.run)>=0:
-                    add_xrDataSet = xr.open_dataset(self.dirname+'/'+fname,engine='h5netcdf')
-                    key = fname.replace('xr_','').replace('%s_Run%03d.nc'%(self.expname,self.run),'')
-                    if key[-1]=='_':key=key[:-1]
-                    if len(add_xrDataSet[key].shape)>2:
-                        continue
-                    if (len(add_xrDataSet[key].shape)==2 and add_xrDataSet[key].shape[1]<10):
-                        continue
-                    key = key.replace('__','/')
-                    self._fields[key]=[add_xrDataSet[key].shape, 'inXr', 'xrfile']
-                    values = add_xrDataSet[key].values
-                    self.addVar(key, values)
-                    #need to print this dataset, otherwise this does not work. Why #DEBUG ME
-                    print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
-                    add_xrDataSet.close()
+                    try:
+                        add_xrDataSet = xr.open_dataset(self.dirname+'/'+fname,engine='h5netcdf')
+                        key = fname.replace('xr_','').replace('%s_Run%03d.nc'%(self.expname,self.run),'')
+                        if key[-1]=='_':key=key[:-1]
+                        if len(add_xrDataSet[key].shape)>2:
+                            continue
+                        if (len(add_xrDataSet[key].shape)==2 and add_xrDataSet[key].shape[1]<10):
+                            continue
+                        key = key.replace('__','/')
+                        self._fields[key]=[add_xrDataSet[key].shape, 'inXr', 'xrfile']
+                        values = add_xrDataSet[key].values
+                        self.addVar(key, values)
+                        #need to print this dataset, otherwise this does not work. Why #DEBUG ME
+                        print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
+                        add_xrDataSet.close()
+                    except:
+                        print 'failed at xr.open_dataset for: ',self.dirname+'/'+fname
 
 ###
 # functions to add extra variables to smallData
@@ -916,7 +912,7 @@ class SmallDataAna(object):
         useFilterBase = useFilter.split('__')[0]
         return [self.getFilter(useFilter=useFilterBase+"__on", ignoreVar=ignoreVar).squeeze(),self.getFilter(useFilter=useFilterBase+"__off", ignoreVar=ignoreVar).squeeze()]
         
-    def getFilter(self, useFilter=None, ignoreVar=[]):
+    def getFilter(self, useFilter=None, ignoreVar=[], debug=False):
         if 'fiducials' in self._fields.keys():
             total_filter=np.ones_like(self.getVar('fiducials')).astype(bool)
         elif 'EvtID/fid' in self._fields.keys():
@@ -927,6 +923,9 @@ class SmallDataAna(object):
 
         useFilterBase = useFilter.split('__')[0]
         if useFilter==None or useFilterBase not in self.Sels.keys():
+            if debug and useFilterBase not in self.Sels.keys():
+                print 'Selection %s is not available, defined Selections are:'%useFilter
+                self.printSelections()
             return total_filter.squeeze()
 
         #if useFilter ends in __off, drop on requirements
@@ -962,6 +961,12 @@ class SmallDataAna(object):
                     filters.append((thisPlotvar > thiscut[1]) & (thisPlotvar < thiscut[2]))
                 else:
                     filters.append(thisPlotvar != thiscut[1])
+                if debug: 
+                    total_filter_test = total_filter.deep_copy()
+                    for ft in filters:
+                        total_filter_test&=ft     
+                    print 'getFilter: Cut %i: %f < %s < %f passes %d events of %d, total passes up to now: '%(icut, cut[1], cut[0],cut[2], filters[-1].sum, thisPlotvar.shape[0], total_filter_test.sum())
+
         for ft in filters:
             total_filter&=ft     
            
@@ -1824,16 +1829,12 @@ class SmallDataAna(object):
 
     def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
-        nBins=cube.bins.shape[0]-1
-        for key in cube.addBinVars:
-            nBins*=cube.addBinVars[key].shape[0]-1
         if onoff == 2:
             onoff = cubeName_onoff
 
         if cube is None:
             return 
         Bins = cube.binBounds
-        numBin=len(Bins)-1
 
         if cube.binVar == 'delay':
             binVar = self.getDelay()
@@ -1861,6 +1862,7 @@ class SmallDataAna(object):
         binVar = binVar[cubeFilter]
         if binVar.shape[0] == 0:
             printR(rank, 'did not select any event, quit now!')
+            ft=self.getFilter(cube.useFilter, debug=True)
             return
         if debug and rank==0:
             print 'bin boundaries: ',Bins
@@ -2004,7 +2006,7 @@ class SmallDataAna(object):
             elif toHdf5 == 'h5':
                 fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
                 h5Dict={}
-                for key in cubeData.keys():
+                for key in cubeData.variables:
                     h5Dict[key] = cubeData[key].values
                     dictToHdf5(fname, h5Dict)
             return cubeData
@@ -2022,6 +2024,7 @@ class SmallDataAna(object):
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
         evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+
         for thisIdxVar in cube.addIdxVars:
             varData = self.getVar(thisIdxVar,cubeFilter)
             coords={'time': timeFiltered}
@@ -2160,7 +2163,7 @@ class SmallDataAna(object):
                     cubeData = xr.merge([cubeData, dataArray])
 
         h5Dict={}
-        for key in cubeData.keys():
+        for key in cubeData.variables:
             h5Dict[key] = cubeData[key].values
 
         #write final file.
@@ -2169,7 +2172,7 @@ class SmallDataAna(object):
             cubeData.to_netcdf(fname,engine='h5netcdf')
         elif toHdf5 == 'h5':
             fname = '%s/Cube_%s_Run%03d_%s.h5'%(self.dirname,self.expname,self.run,cubeName)
-            for key in cubeData.keys():
+            for key in cubeData.variables:
                 h5Dict[key] = cubeData[key].values
                 dictToHdf5(fname, h5Dict)
             
