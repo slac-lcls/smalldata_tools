@@ -1668,6 +1668,7 @@ class SmallDataAna_psana(object):
                 detInData.append(k.alias())
 
         detNames=[]
+        targetVarsXtc=[]
         for idet,det in enumerate(myCube.targetVarsXtc):
             if isinstance(det, dict):
                 dName = det['source']
@@ -1675,10 +1676,10 @@ class SmallDataAna_psana(object):
                 dName = det
             if dName in detInData:
                 detNames.append(dName)
+                targetVarsXtc.append(det)
             else:
                 printR(rank, 'detector with alias %s not in data '%det)
-                myCube.targetVarsXtc.pop(idet)
-        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in myCube.targetVarsXtc]
+        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
 
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)
@@ -1727,16 +1728,6 @@ class SmallDataAna_psana(object):
                 elif (onoff==1):
                     outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
-                #compare the number of bins to mpi jobs.
-                nBins=myCube.bins.shape[0]-1
-                for key in myCube.addBinVars:
-                    nBins*=myCube.addBinVars[key].shape[0]-1
-                if nBins<size:
-                    if 'user/random' not in self.sda.Keys('random'):
-                        myrandom=np.random.rand(self.sda.xrData.time.shape)
-                        self.sda.addVar('user/random',myrandom)
-                    myCube.add_BinVar({'user/random':[0.,1.,int(size/nBins)+1]})
-
                 print 'bin the data now....be patient'
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
                 print 'now write outputfile (only small data) to : ',outFileName
