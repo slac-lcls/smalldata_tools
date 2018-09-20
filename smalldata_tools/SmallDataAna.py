@@ -1028,6 +1028,9 @@ class SmallDataAna(object):
             if Filter is None:
                 if not self._isRedis:
                     if len(plotvar.split('/'))>1:
+                        #this can fail when the data is too large. better debugging?
+                        #print 'DEBUG B ',('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1])
+                        #print 'node: ',self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1])
                         vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
                     else:
                         vals = self.fh5.get_node('/'+plotvar).read()
@@ -1714,7 +1717,7 @@ class SmallDataAna(object):
             else:
                 self.cubes[cubeName].addIdxVar(targetVariable)
         else:
-            print 'could not add variable %s to cube %s as this cuve was not found'%(targetVariable, cubeName)
+            print 'could not add variable %s to cube %s as this cube was not found'%(targetVariable, cubeName)
 
     def getCube(self, cubeName):
         if cubeName in self.cubes.keys():
@@ -1918,9 +1921,9 @@ class SmallDataAna(object):
             newXr = xr.merge([newXr, newDar])
 
         #now we actually bin.
-        cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).sum(dim='time')                  
+        cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).sum(dim='time')                  
         #could add error using the std of the values.
-        cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5).std(dim='time')
+        cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).std(dim='time')
             
         if len(cube.addBinVars.keys())>0:
             newXr = None
@@ -1983,8 +1986,6 @@ class SmallDataAna(object):
                 newShp = tuple(np.append(np.array(binShp), np.array(dataShp)[1:]))
                 data = cubeDataErr[key].data.reshape(newShp)
                 newKey = ('std_%s'%key)
-                #DEBUG?
-                printR(rank, 'key %s %s'%(key, newKey))
                 dataArray = xr.DataArray(data, coords=coords, dims=dims,name=newKey)
                 newXr = xr.merge([newXr, dataArray])
             cubeData = newXr
@@ -2045,7 +2046,7 @@ class SmallDataAna(object):
                 addArray = xr.DataArray(varData, coords=coords, dims=dims,name=thisVar)
                 evtIDXr = xr.merge([evtIDXr, addArray])
                 
-        cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5)
+        cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False)
         keys = cubeIdxData.groups.keys()
         keys.sort()
 
@@ -2576,7 +2577,7 @@ class SmallDataAna(object):
         binBoundaries = da_epics.time.copy()
         #bb = np.append(binBoundaries[0]-1, binBoundaries)
         #binBoundaries = np.append(bb, binBoundaries[-1]+1)
-        binnedData = self.xrData.fiducials.time.groupby_bins('time',binBoundaries, labels=(binBoundaries[:-1].astype(int)))
+        binnedData = self.xrData.fiducials.time.groupby_bins('time',binBoundaries, labels=(binBoundaries[:-1].astype(int)),include_lowest=True, right=False)
         
         newArray=np.array([])
         for epicsTime, epicsValue in zip(np.array(da_epics.time), da_epics.data):
