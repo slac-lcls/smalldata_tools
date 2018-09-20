@@ -21,6 +21,7 @@ from SmallDataUtils import getUserData
 from utilities import printR
 from utilities import addToHdf5
 from utilities import dropObject
+from utilities import rename_reduceRandomVar
 from utilities_plotting import plotImageBokeh
 import bokeh.plotting as bp
 import azimuthalBinning as ab
@@ -338,7 +339,7 @@ class SmallDataAna_psana(object):
             if numEvts==-1:
                 numEvts = len(evttsSel)-nSkip
                 if numEvts<0:
-                    print 'hve no events, quit'
+                    print 'have no events, quit'
                     return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
                 times.append(psana.EventTime(evtts[1],evtts[0]))
@@ -1030,7 +1031,7 @@ class SmallDataAna_psana(object):
                     countMask+=1
                 else:
                     totmask = totmask_nm1
-            print 'DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape
+            #print 'DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape
             print 'masked in this step: ',np.ones_like(x)[mask_r_nda.astype(bool)].sum()
             print 'masked up to this step: ',np.ones_like(x)[totmask_nm1].sum()
             print 'masked tot: ',np.ones_like(x)[totmask].sum()
@@ -1655,12 +1656,10 @@ class SmallDataAna_psana(object):
         if dirname=='':
             dirname=self.sda.dirname
 
-        #myCube = self.sda.cubes[cubeName]
-        #myCube = self.sda.prepCubeData(cubeName)
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
         if (rank==0):
-            print 'variables to be read from xtc: ',myCube.targetVarsXtc
+            print 'Variables to be read from xtc: ',myCube.targetVarsXtc
 
         detInData=[]
         for k in self.Keys():
@@ -1674,13 +1673,13 @@ class SmallDataAna_psana(object):
                 dName = det['source']
             else:
                 dName = det
+            #print 'DEBUG dName ',dName
             if dName in detInData:
                 detNames.append(dName)
                 targetVarsXtc.append(det)
             else:
-                printR(rank, 'detector with alias %s not in data '%det)
+                printR(rank, 'Detector with alias %s not in data '%det)
         myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
-
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)
 
@@ -1697,7 +1696,7 @@ class SmallDataAna_psana(object):
                 printR(rank, 'no big data, bin the data now....be patient')
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
                 printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
-                for key in cubeData.keys():
+                for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
                 fout.close()
             return
@@ -1711,7 +1710,9 @@ class SmallDataAna_psana(object):
             outFileName=outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
         try:
+            print 'DEBUG: open file %s in rank %d '%(outputFile, rank)
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
+            print 'DEBUG: opened file %s in rank %d '%(outputFile, rank)
         except:
             try:
                 fout = h5py.File('/tmp/%d'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
@@ -1728,10 +1729,11 @@ class SmallDataAna_psana(object):
                 elif (onoff==1):
                     outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
+
                 print 'bin the data now....be patient'
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
                 print 'now write outputfile (only small data) to : ',outFileName
-                for key in cubeData.keys():
+                for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
                 #ADD CONF STUFF HERE TOO
                 fout.close()
@@ -1739,6 +1741,19 @@ class SmallDataAna_psana(object):
 
         #configuration for cube making
         cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
+        #compare the number of bins to mpi jobs.
+        nBins=myCube.binBounds.shape[0]-1
+        for key in cube.addBinVars:
+            nBins*=cube.addBinVars[key].shape[0]-1
+        if nBins<size:
+            if 'random/random' not in self.sda.Keys('random'):
+                myrandom=np.random.rand(self.sda.xrData.time.shape)
+                self.sda.addVar('random/random',myrandom)
+            if isinstance(size/nBins, int):
+                cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)]})
+            else:
+                cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)+1]})
+
         sel = self.sda.Sels[cube.useFilter]
         selString=''
         for icut,cut in enumerate(sel.cuts):
@@ -1753,12 +1768,13 @@ class SmallDataAna_psana(object):
             addVars = [ 'offNbrs_event_time_xon_nNbr%02d'%offEventsCube,'offNbrs_fiducials_xon_nNbr%02d'%offEventsCube]
             self.sda.cubes[cubeName].addIdxVar(addVars)
         cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True,onoff=onoff)
+
         #add small data to hdf5
-        for key in cubeData.keys():
+        for key in cubeData.variables:
             addToHdf5(fout, key, cubeData[key].values)
 
         runIdx = self.dsIdxRun
-        numBin = cubeData.nEntries.shape[0]
+        numBin = np.array(cubeData.nEntries).flatten().shape[0]
         bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
 
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
@@ -1774,6 +1790,7 @@ class SmallDataAna_psana(object):
                 detShape = (self.__dict__[thisdetName].ped[0]).shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
+            #print 'DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape
             det_arrayBin=np.zeros(csShape)
             detArrays.append(det_arrayBin)
             detSArrays.append(det_arrayBin)
@@ -1782,6 +1799,7 @@ class SmallDataAna_psana(object):
             detIArrays.append(det_arrayBin)
             if rank==0:
                 print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
+            #print 'DEBUG -- for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
 
         ###
         #nominal cube
@@ -1891,18 +1909,23 @@ class SmallDataAna_psana(object):
             imgSArray=[]
             imgMArray=[]
             imgIArray=[]
-            for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,cubeData['nEntries'].values):
-                #now divide mean & std sums to be correct.
-                binSData = np.sqrt(binSData/(nent-1))
-                binMData = binMData/nent
+
+            nEntries = cubeData['nEntries'].values
+            if len(nEntries.shape)>1:
+                print 'DEBUG reshape rank %d '%(rank),' nEntries shape ',nEntries.shape
+                nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job], ' -- ',nEntries
+            #this goes wrong for bins w/o entries. Split this?
+            for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
+                if nent!=0:
+                    #now divide mean & std sums to be correct.
+                    binSData = np.sqrt(binSData/(nent-1))
+                    binMData = binMData/nent
                 if  detDict.has_key('image'):
-                    #print 'DEBUG: make image shape ',binData.shape
                     thisImg = det.det.image(self.run, binData)
                     thisImgO = det.det.image(self.run, binOData)
                     thisImgS = det.det.image(self.run, binSData)
                     thisImgM = det.det.image(self.run, binMData)
                     thisImgI = det.det.image(self.run, binIData)
-                    #print 'made image ',thisImg.shape
                 else:
                     thisImg = binData
                     thisImgO = binOData
@@ -1924,7 +1947,7 @@ class SmallDataAna_psana(object):
                     imgSArray.append(thisImgS)
                     imgMArray.append(thisImgM)
                     imgIArray.append(thisImgI)
-
+                
             #write hdf5 file w/ mpi for big array
             arShape=(numBin,)
             for i in range(0,len(imgArray[0].shape)):
@@ -1953,7 +1976,6 @@ class SmallDataAna_psana(object):
                 if np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
-            #should this not be done in rank 0 only? Maybe push after barrier with writing cube setup to attribute.
             if det.rms is not None:
                 if not detDict.has_key('image'):
                     addToHdf5(fout, 'Cfg_'+detName+'_ped', det.ped)
@@ -1986,7 +2008,5 @@ class SmallDataAna_psana(object):
         comm.Barrier()
         #print 'in rank now: ',rank
         if rank==0:
-            print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
-            os.rename(outFileName, outFileName.replace('.inprogress',''))
-
-        return outFileName
+            print 'renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress',''))
+            rename_reduceRandomVar(outFileName)
