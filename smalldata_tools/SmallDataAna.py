@@ -1994,7 +1994,7 @@ class SmallDataAna(object):
                 if key.replace('std_','').replace('__','/') in cube.targetVars:
                     cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
             for key in cubeDataErr.variables:
-                if key not in cubeData.keys():
+                if key not in cubeData.variables:
                     cubeData = xr.merge([cubeData, cubeDataErr[key]])
 
         if not returnIdx and len(cube.addIdxVars)==0 and len(cube.dropletProc.keys())==0:
