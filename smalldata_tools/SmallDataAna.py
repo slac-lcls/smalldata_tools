@@ -962,10 +962,12 @@ class SmallDataAna(object):
                 else:
                     filters.append(thisPlotvar != thiscut[1])
                 if debug: 
-                    total_filter_test = total_filter.deep_copy()
+                    total_filter_test = np.empty_like(total_filter)
+                    total_filter_test[:] = total_filter
                     for ft in filters:
                         total_filter_test&=ft     
-                    print 'getFilter: Cut %i: %f < %s < %f passes %d events of %d, total passes up to now: '%(icut, cut[1], cut[0],cut[2], filters[-1].sum, thisPlotvar.shape[0], total_filter_test.sum())
+                        
+                    print 'getFilter: Cut %f < %s < %f passes %d events of %d, total passes up to now: %d '%(thiscut[1], thiscut[0], thiscut[2], filters[-1].sum(), thisPlotvar.shape[0], total_filter_test.sum())
 
         for ft in filters:
             total_filter&=ft     
@@ -1159,7 +1161,10 @@ class SmallDataAna(object):
                 nomDelay=nomDelay.copy()+self.getVar('enc/lasDelay')
 
         if addLxt:
-            nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
+            try:
+                nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
+            except:
+                pass
 
         if use_ttCorr:
             #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()

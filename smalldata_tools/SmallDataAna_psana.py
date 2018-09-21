@@ -1710,15 +1710,22 @@ class SmallDataAna_psana(object):
             outFileName=outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
         try:
-            print 'DEBUG: open file %s in rank %d '%(outputFile, rank)
+            #print 'DEBUG: open file %s in rank %d '%(outFileName, rank)
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
-            print 'DEBUG: opened file %s in rank %d '%(outputFile, rank)
+            #print 'DEBUG: opened file %s in rank %d '%(outFileName, rank)
         except:
             try:
-                fout = h5py.File('/tmp/%d'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
+                fout2 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
                 printR(rank, 'could not open the desired file for MPI writing. Likely a permission issue:')
-                import pwd
-                printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
+                fout2.close()
+                try:
+                    import pwd
+                    print 'A: ',oct(os.stat(outFileName).st_mode)[-3:]
+                    print 'B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name
+                    print 'C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos
+                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
+                except:
+                    printR(rank, 'failed at printing info about file')
             except:
                 printR(rank, 'you will need an analysis release < ana.1.3.21 or >= ana-1.3.42 for the cube to work. Solution in progress...')
             printR(rank, 'we will save the small cubed data only and return')
@@ -1747,7 +1754,7 @@ class SmallDataAna_psana(object):
             nBins*=cube.addBinVars[key].shape[0]-1
         if nBins<size:
             if 'random/random' not in self.sda.Keys('random'):
-                myrandom=np.random.rand(self.sda.xrData.time.shape)
+                myrandom=np.random.rand(self.sda.xrData.time.shape[0])
                 self.sda.addVar('random/random',myrandom)
             if isinstance(size/nBins, int):
                 cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)]})
