@@ -35,9 +35,11 @@ class ROIObject(dropObject):
     self.writeArea = writeArea
     self.rebin = False
     if rms is not None:
-      #print 'DEBUG: ',rms.shape, self.bound.shape, self.bound
+      if rms.ndim==4:
+        rms = rms[0].squeeze()
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
+    array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
     if array.ndim < self.bound.ndim:
       print 'array has fewer dimensions that bound: ',array.ndim,' ',len(self.bound)
       return array
@@ -90,7 +92,7 @@ class ROIObject(dropObject):
     mean=params[2]
     cutADU=params[3]
     cutRms=params[4]
-    array = arrayIn.copy()
+    array = arrayIn.copy().squeeze()
     array.data[array.data<cutADU]=0
     if 'rms' in self.__dict__.keys() and self.rms is not None:
       array.data[array.data<cutRms*self.rms]=0
