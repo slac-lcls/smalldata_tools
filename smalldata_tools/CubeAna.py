@@ -168,6 +168,8 @@ class CubeAna(object):
             if self._debug: print 'DEBUG: looking at key for data: ',key
             if key == '/binVar_bins' or key.find('Cfg')>=0:
                 continue
+            if isinstance(node, tables.group.Group): #skip for now, should become loop over keys of group
+                continue
             tArrName = key[1:]
             dataShape = cubeTable.get_node(key).shape
             if dataShape[0]!=self._bins.shape[0]:
@@ -567,7 +569,7 @@ class CubeAna(object):
 
     def plotReducedCube(self, sig=None, i0='nEntries', inCube=None, aimShape=None, aimSize=4000000, runKey = None):
         if inCube is None:
-            inCube = self.getReducedCube(aimShape=aimShape, aimSize=aimSize, runKey=runkey)
+            inCube = self.getReducedCube(aimShape=aimShape, aimSize=aimSize, runKey=runKey)
             
         #now get possible images.
         if sig is not None:
