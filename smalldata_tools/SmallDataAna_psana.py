@@ -1987,7 +1987,8 @@ class SmallDataAna_psana(object):
                 if not detDict.has_key('image'):
                     addToHdf5(fout, 'Cfg_'+detName+'_ped', det.ped)
                     addToHdf5(fout, 'Cfg_'+detName+'_rms', det.rms)
-                    addToHdf5(fout, 'Cfg_'+detName+'_gain', det.gain)
+                    if det.gain is not None:
+                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.gain)
                     addToHdf5(fout, 'Cfg_'+detName+'_mask', det.mask)
                     addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.cmask)
                     if det.x is not None:
