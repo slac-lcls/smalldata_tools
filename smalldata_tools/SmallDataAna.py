@@ -350,6 +350,9 @@ class SmallDataAna(object):
         if not self._isRedis:
             self._readXarrayData()
 
+        self._delay_ttCorr=None
+        self._delay_addLxt=None
+        self._delay_addEnc=None
         #define bokeh palette based on matplotlib job for consistency of matplotlib & bokeh image plots
         import matplotlib.cm as cm
         import matplotlib as pltm
@@ -606,6 +609,11 @@ class SmallDataAna(object):
             return
         print 'save derived data to be loaded next time:'
         for key in self._fields.keys():
+            #delay is special: make sure it gets redefined on each new SmallDataAna creation 
+            #to allow to use different definitions. getDelay will be called internally w/ default params 
+            #so it needs to return the current defined variable first if applicable
+            #saving does not help performace this is a cheap calculation.
+            if key=='delay': continue 
             if self._fields[key][2] == 'mem':
                 print 'saving data for field: ',key, self._fields[key]
                 data = self.getVar(key)
@@ -654,6 +662,7 @@ class SmallDataAna(object):
                         #need to print this dataset, otherwise this does not work. Why #DEBUG ME
                         print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
                         add_xrDataSet.close()
+                        print 'closed the xarray file '
                     except:
                         print 'failed at xr.open_dataset for: ',self.dirname+'/'+fname
 
@@ -1103,15 +1112,26 @@ class SmallDataAna(object):
             vals = np.nansum(vals,axis=1)
         return vals
 
+    def setDelay(self, use_ttCorr=True, addEnc=False, addLxt=True, reset=False):
+        delay=self.getDelay(use_ttCorr=use_ttCorr, addEnc=addEnc, addLxt=addLxt, reset=reset)
+
     #make delay another Xarray variable.
-    def getDelay(self, use_ttCorr=True, addEnc=False, addLxt=True):
+    def getDelay(self, use_ttCorr=True, addEnc=False, addLxt=True, reset=False):
         """
         function to get the xray-laser delay from the data
         usage:
         getDelay(): get the delay from lxt and/or encoder stage, add the timetool correction
         getDelay(use_ttCorr=False): get the delay from lxt and/or encoder stage, NO timetool correction
         getDelay(addEnc=True): get the delay from lxt, add encoder stage and timetool correction
+        return previously define delay unless reset=True
         """
+        if 'delay' in self._fields.keys() and not reset:
+            return self.xrData['delay']
+        
+        self._delay_ttCorr=use_ttCorr
+        self._delay_addLxt=addLxt
+        self._delay_addEnc=addEnc
+
         ttCorrStr, ttBaseStr = self._getTTstr()
         ttCorr = np.zeros_like(self.xrData.fiducials)
         if self.ttCorr is not None:
@@ -1208,20 +1228,16 @@ class SmallDataAna(object):
             plotWith = self.plotWith
 
         if isinstance(plotvar,list):
-            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay' or plotvar[0]=='delay_noLxt' or plotvar[0]=='delay_steps'): 
+            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
         else:
-            if not (self.hasKey(plotvar) or plotvar=='delay' or plotvar=='delay_noLxt'  or plotvar=='delay_steps'): 
+            if not (self.hasKey(plotvar) or plotvar=='delay'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
 
         if plotvar=='delay':
-            vals = self.getDelay(use_ttCorr=True)
-        elif plotvar=='delay_noLxt':
-            vals = self.getDelay(use_ttCorr=True, addLxt=False)
-        elif plotvar=='delay_steps':
-            vals = self.getDelay(use_ttCorr=False, addLxt=False)
+            vals = self.getDelay()
         elif plotMultidimMean:
             vals = self.getRedVar(plotvar)
         elif len(plotvar)==1 and plotvar.find('droplets')>=0:
@@ -1288,11 +1304,7 @@ class SmallDataAna(object):
         vals=[]
         for plotvar in plotvars:
             if plotvar == 'delay':
-                vals=self.getDelay(use_ttCorr=True)
-            elif plotvar=='delay_noLxt':
-                vals = self.getDelay(use_ttCorr=True, addLxt=False)
-            elif plotvar=='delay_steps':
-                vals = self.getDelay(use_ttCorr=False, addLxt=False)
+                vals=self.getDelay()
             #elif len(plotvar)==1 and plotvar.find('droplets')>=0:
             #    vals = self.fh5[plotvar].value
             else:   
@@ -1352,17 +1364,17 @@ class SmallDataAna(object):
                 return key.replace('/scan/','').replace('scan/','')
         return ''
 
-    def getScanValues(self,ttCorr=False,addEnc=False,addLxt=True):
+    def getScanValues(self):
         #get the scan variable & time correct if desired
         scanVarName = self.getScanName()
         if scanVarName.find('lxt')>=0 or scanVarName=='':
-            delays=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc,addLxt=addLxt)
+            delays=self.getDelay()
             #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
             if delays is None or delays.mean()==0 or delays.std()==0: 
                 return '',[]
             scan = delays
             if scanVarName == '': 
-                if ttCorr:
+                if self._delay_ttCorr:
                     scanVarName='delay (tt corrected) [fs]'
                 else:
                     scanVarName='delay [fs]'
@@ -1375,13 +1387,13 @@ class SmallDataAna(object):
         return scanVarName,scan
 
 
-    def getBins(self,bindef=[], debug=False, addLxt=True):
+    def getBins(self,bindef=[], debug=False):
         Bins = util_getBins(bindef, debug)
         if Bins is not None:
             return Bins
 
         #have no input at all, assume we have unique values in scan. If not, return empty list 
-        scanVarName, scan =  self.getScanValues(ttCorr=False,addEnc=False,addLxt=addLxt)
+        scanVarName, scan =  self.getScanValues()
 
         if len(bindef)==0:
             if scanVarName=='':
@@ -1431,10 +1443,10 @@ class SmallDataAna(object):
           print 'you passed only one number and the this does not look like a new delay scan or a normal scan'
           return []
 
-    def getScan(self, ttCorr=False, sig='', i0='', Bins=100, useFilter=None):
-        return self.plotScan(ttCorr=ttCorr, sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
+    def getScan(self, sig='', i0='', Bins=100, useFilter=None):
+        return self.plotScan(sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
 
-    def plotScan(self, ttCorr=False, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, addEnc=False, addLxt=True, returnIdx=False, binVar=None, plotWith=None):
+    def plotScan(self, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, returnIdx=False, binVar=None, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1473,20 +1485,18 @@ class SmallDataAna(object):
                 if isinstance(binVar, basestring): binVar=[binVar]
                 binVal = self.get1dVar(binVar[0])
             else:
-                binVal=self.getDelay(use_ttCorr=ttCorr,addEnc=addEnc,addLxt=addLxt)
-                ttCorr = None; addEnc=None
+                binVal=self.getDelay()
             FilterOn = FilterOn & ~np.isnan(binVal)
             FilterOff = FilterOff & ~np.isnan(binVal)
 
         print 'from %i events keep %i (%i off events)'%(np.ones_like(i0Val).sum(),np.ones_like(i0Val[FilterOn]).sum(), np.ones_like(i0Val[FilterOff]).sum() )
 
         #get the scan variable & time correct if desired
-        scanVarName,scan =  self.getScanValues(ttCorr, addEnc)
+        scanVarName,scan =  self.getScanValues()
             
-        #print 'DEBUG plotScan ',scanVarName, ttCorr, addEnc
         usedDigitize = 0
         # create energy bins for plot: here no need to bin!
-        if (not ttCorr) and (not addEnc):
+        if (not self._delay_ttCorr) and (not self._delay_addEnc):
             scanPoints, scanOnIdx = np.unique(scan[FilterOn], return_inverse=True)
         else:
             if isinstance(Bins, int) or isinstance(Bins, float):
@@ -1752,7 +1762,7 @@ class SmallDataAna(object):
 
     def prepCubeData(self, cubeName):
         cube = self.getCube(cubeName)
-        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay' or cube.binVar == 'delay_noLxt' or cube.binVar == 'delay_steps'):
+        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay'):
             print 'selection variable not in littleData, cannot make the data for this cube'
             return None
 
@@ -1766,13 +1776,7 @@ class SmallDataAna(object):
                 Bins = np.insert(Bins,0,Bins[0]-1e-5)
                 Bins = np.append(Bins,Bins[-1]+1e-5)
         else:
-            if cube.binVar == 'delay_noLxt':
-                Bins = self.getBins(cube.bins, addLxt=False)
-                #FIX ME
-            #elif cube.binVar == 'delay_steps':
-            #    Bins = self.getBins(cube.bins, addLxt=False)
-            else:
-                Bins = self.getBins(cube.bins)
+            Bins = self.getBins(cube.bins)
         cube.binBounds = Bins
 
         #now look through targetVars & split out ones not in xarray/hdf5
@@ -1852,12 +1856,6 @@ class SmallDataAna(object):
 
         if cube.binVar == 'delay':
             binVar = self.getDelay()
-        elif cube.binVar == 'delay_noLxt':
-            binVar = self.getDelay(addLxt=False)
-            self.addVar('delay_noLxt',binVar)
-        elif cube.binVar == 'delay_steps':
-            binVar = self.getDelay(use_ttCorr=False, addLxt=False)
-            self.addVar('delay_steps',binVar)
         else:
             binVar = self.get1dVar(cube.binVar)
                 
