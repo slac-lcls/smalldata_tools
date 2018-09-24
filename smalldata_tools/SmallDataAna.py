@@ -1160,7 +1160,7 @@ class SmallDataAna(object):
             if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
                 nomDelay=nomDelay.copy()+self.getVar('enc/lasDelay')
 
-        if addLxt:
+        if addLxt and scanVar!='lxt':
             try:
                 nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
             except:
@@ -1208,11 +1208,11 @@ class SmallDataAna(object):
             plotWith = self.plotWith
 
         if isinstance(plotvar,list):
-            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay' or plotvar[0]=='delay_noLxt'): 
+            if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay' or plotvar[0]=='delay_noLxt' or plotvar[0]=='delay_steps'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
         else:
-            if not (self.hasKey(plotvar) or plotvar=='delay' or plotvar=='delay_noLxt'): 
+            if not (self.hasKey(plotvar) or plotvar=='delay' or plotvar=='delay_noLxt'  or plotvar=='delay_steps'): 
                 print 'request variable %s not in smallData file'%plotvar
                 return
 
@@ -1220,6 +1220,8 @@ class SmallDataAna(object):
             vals = self.getDelay(use_ttCorr=True)
         elif plotvar=='delay_noLxt':
             vals = self.getDelay(use_ttCorr=True, addLxt=False)
+        elif plotvar=='delay_steps':
+            vals = self.getDelay(use_ttCorr=False, addLxt=False)
         elif plotMultidimMean:
             vals = self.getRedVar(plotvar)
         elif len(plotvar)==1 and plotvar.find('droplets')>=0:
@@ -1289,6 +1291,8 @@ class SmallDataAna(object):
                 vals=self.getDelay(use_ttCorr=True)
             elif plotvar=='delay_noLxt':
                 vals = self.getDelay(use_ttCorr=True, addLxt=False)
+            elif plotvar=='delay_steps':
+                vals = self.getDelay(use_ttCorr=False, addLxt=False)
             #elif len(plotvar)==1 and plotvar.find('droplets')>=0:
             #    vals = self.fh5[plotvar].value
             else:   
@@ -1748,7 +1752,7 @@ class SmallDataAna(object):
 
     def prepCubeData(self, cubeName):
         cube = self.getCube(cubeName)
-        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay' or cube.binVar == 'delay_noLxt'):
+        if not (self.hasKey(cube.binVar) or cube.binVar == 'delay' or cube.binVar == 'delay_noLxt' or cube.binVar == 'delay_steps'):
             print 'selection variable not in littleData, cannot make the data for this cube'
             return None
 
@@ -1764,6 +1768,9 @@ class SmallDataAna(object):
         else:
             if cube.binVar == 'delay_noLxt':
                 Bins = self.getBins(cube.bins, addLxt=False)
+                #FIX ME
+            #elif cube.binVar == 'delay_steps':
+            #    Bins = self.getBins(cube.bins, addLxt=False)
             else:
                 Bins = self.getBins(cube.bins)
         cube.binBounds = Bins
@@ -1808,6 +1815,8 @@ class SmallDataAna(object):
         if cube.useFilter.find(cube.cubeName)!=0 and '%s_%s'%(cube.cubeName,useFilterBase) not in self.Sels.keys():
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)] = Selection()
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].add(self.Sels[useFilterBase])
+            #if cube.binVar.find('lxt')>=0:
+            #    Bins/=1e12
             self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].addCut(cube.binVar, min(Bins), max(Bins) )
             for addVar in cube.addBinVars.keys():
                 self.Sels['%s_%s'%(cube.cubeName,useFilterBase)].addCut(addVar, min(cube.addBinVars[addVar]), max(cube.addBinVars[addVar]) )
@@ -1846,9 +1855,24 @@ class SmallDataAna(object):
         elif cube.binVar == 'delay_noLxt':
             binVar = self.getDelay(addLxt=False)
             self.addVar('delay_noLxt',binVar)
+        elif cube.binVar == 'delay_steps':
+            binVar = self.getDelay(use_ttCorr=False, addLxt=False)
+            self.addVar('delay_steps',binVar)
         else:
             binVar = self.get1dVar(cube.binVar)
                 
+        #floating point error really mess this up otherwise....
+        if abs(max(Bins))<1e-9:
+            #XXX
+            print 'Bins: ',Bins
+            testIdx=np.digitize(binVar, Bins)
+            print 'DEBUG: ',np.bincount(testIdx)
+            testIdx=np.digitize(binVar*1e12, Bins*1e12)
+            print 'DEBUG2: ',np.bincount(testIdx)
+            
+            binVar*=1e12
+            Bins*=1e12
+
         if debug and rank==0:
             cube.printCube()
             #self.printSelections(self.Sels[cube.useFilter])
@@ -1905,6 +1929,7 @@ class SmallDataAna(object):
         timeFiltered = self._tStamp[cubeFilter]
         newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
         newXr = xr.merge([newXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+        
         for tVar in cube.targetVars:
             if not self.hasKey(tVar):                
                 continue
