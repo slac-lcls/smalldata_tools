@@ -1985,29 +1985,29 @@ class SmallDataAna_psana(object):
 
             if det.rms is not None:
                 if not detDict.has_key('image'):
-                    addToHdf5(fout, 'Cfg_'+detName+'_ped', det.ped)
-                    addToHdf5(fout, 'Cfg_'+detName+'_rms', det.rms)
+                    addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
+                    addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
                     if det.gain is not None:
-                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.gain)
-                    addToHdf5(fout, 'Cfg_'+detName+'_mask', det.mask)
-                    addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.cmask)
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
+                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
+                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
                     if det.x is not None:
-                        addToHdf5(fout, 'Cfg_'+detName+'_x', det.x)
-                        addToHdf5(fout, 'Cfg_'+detName+'_y', det.y)
+                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
                 else:
                     if det.det.dettype==26:
-                        addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped[0]))
-                        addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms[0]))
-                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain[0]))
+                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
+                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
                     else:
-                        addToHdf5(fout, 'Cfg_'+detName+'_ped', det.det.image(self.run,det.ped))
-                        addToHdf5(fout, 'Cfg_'+detName+'_rms', det.det.image(self.run,det.rms))
-                        addToHdf5(fout, 'Cfg_'+detName+'_gain', det.det.image(self.run,det.gain))
-                    addToHdf5(fout, 'Cfg_'+detName+'_mask', det.det.image(self.run,det.mask))
-                    addToHdf5(fout, 'Cfg_'+detName+'_calib_mask', det.det.image(self.run,det.cmask))
+                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
+                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
+                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
+                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
                     if det.x is not None:
-                        addToHdf5(fout, 'Cfg_'+detName+'_x', det.x)
-                        addToHdf5(fout, 'Cfg_'+detName+'_y', det.y)
+                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
 
 
         comm.Barrier()
