@@ -2,6 +2,12 @@
 Created on Tue Dec  8 21:31:56 2015
 
 @author: snelson
+
+add plotFavorites():
+only if using bokeh!
+plot as in live feedback where you can select the x&y axis. Scatter plot, optional with hextiles.
+favorite list/hutch.
+addToFavoriteList function that will add self created vars (or maybe add any ROI_sum, azav, nDroplet variables)
 """
 from os import makedirs
 from os import path
@@ -1808,6 +1814,8 @@ class SmallDataAna(object):
                     targetVarsLocal.append(tVar)
             else:
                 cube.targetVarsXtc.append(tVar)
+                
+        if cube.binVar not in targetVarsLocal: targetVarsLocal.append(cube.binVar)
         cube.targetVars = targetVarsLocal
 
         #now get the filter & create a new one taking bins & detector damage into account.
