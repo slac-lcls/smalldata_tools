@@ -142,10 +142,14 @@ class CubeAna(object):
         return dataShape, coords, dims
 
     def _filenameFromRun(self, run, offEvents=False):
+        fonName = '%s/Cube_%s_Run%03d_%s.h5'%(self._dirname,self._expname,run, self._cubeName)
         if offEvents:
-            return '%s/Cube_%s_Run%03d_%s%s.h5'%(self._dirname,self._expname,run, self._cubeName, self._offStr)
+            if fonName.find('_on.h5'):
+                return fonName.replace('_on','_off')
+            else:
+                return fonName.replace('.h5','_off.h5')
         else:
-            return '%s/Cube_%s_Run%03d_%s.h5'%(self._dirname,self._expname,run, self._cubeName)
+            return fonName
 
     def _xrFromRun(self, run):
         fname = self._filenameFromRun(run)
