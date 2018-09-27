@@ -193,6 +193,9 @@ class DetObject(dropObject):
           if self.ped is None:
             self.ped = np.zeros([zylaCfg.numPixelsY(), zylaCfg.numPixelsX()])
           if self.imgShape != self.ped.shape:            
+            print 'Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run)
+            if self.common_mode != -1:
+              print 'We will use the raw data for Detector %s in run %s'%(self._name,run)
             self.common_mode = -1
         elif self.det.dettype == 28:
           camrecCfg = env.configStore().get(psana.Camera.ControlsCameraConfigV1, psana.Source(srcName))
