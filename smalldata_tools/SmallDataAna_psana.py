@@ -1919,14 +1919,15 @@ class SmallDataAna_psana(object):
 
             nEntries = cubeData['nEntries'].values
             if len(nEntries.shape)>1:
-                print 'DEBUG reshape rank %d '%(rank),' nEntries shape ',nEntries.shape
-                nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job], ' -- ',nEntries
+                #print 'DEBUG reshape rank %d '%(rank),' nEntries shape ',nEntries.shape
+                nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job]#, ' -- ',nEntries
             #this goes wrong for bins w/o entries. Split this?
             for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
-                if nent!=0:
-                    #now divide mean & std sums to be correct.
-                    binSData = np.sqrt(binSData/(nent-1))
+                #now divide mean & std sums to be correct.
+                if (isinstance(nent, int) and nent!=0) or not isinstance(nent, int):
                     binMData = binMData/nent
+                if (isinstance(nent, int) and nent!=1) or not isinstance(nent, int):
+                    binSData = np.sqrt(binSData/(nent-1))
                 if  detDict.has_key('image'):
                     thisImg = det.det.image(self.run, binData)
                     thisImgO = det.det.image(self.run, binOData)
