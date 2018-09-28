@@ -1742,7 +1742,14 @@ class SmallDataAna_psana(object):
                 print 'now write outputfile (only small data) to : ',outFileName
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
-                #ADD CONF STUFF HERE TOO
+                #FIX ME: TEST THIS!!!!
+                sel = self.sda.Sels[cube.useFilter]
+                selString=''
+                for icut,cut in enumerate(sel.cuts):
+                    selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
+                dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
+                dsetcnf.attrs['cubeSelection'] = selString
+
                 fout.close()
             return
 
@@ -1783,6 +1790,8 @@ class SmallDataAna_psana(object):
         runIdx = self.dsIdxRun
         numBin = np.array(cubeData.nEntries).flatten().shape[0]
         bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
+        #this is the done correctly....
+        #print 'bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
 
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
         detShapes=[]
@@ -1790,7 +1799,7 @@ class SmallDataAna_psana(object):
         detSArrays=[] #for error calculation
         detMArrays=[] #for error calculation
         detOffArrays=[]
-        detIArrays=[]
+        detIArrays=[]#for photon image
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
             detShape = self.__dict__[thisdetName].ped.shape
             if self.__dict__[thisdetName].det.dettype==26:
@@ -1841,8 +1850,8 @@ class SmallDataAna_psana(object):
                             elif thisdetDict.has_key('thresRms'):
                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
                             dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-                        else:
-                            dIArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                        else: #if key.find('photon_img')
+                            dIArray[ib%bins_per_job]=dIArray[ib%bins_per_job]+thisDetDataDict[key]
 
                         x = thisDetDataDict[key]
                         oldM = dMArray
@@ -1919,7 +1928,7 @@ class SmallDataAna_psana(object):
 
             nEntries = cubeData['nEntries'].values
             if len(nEntries.shape)>1:
-                #print 'DEBUG reshape rank %d '%(rank),' nEntries shape ',nEntries.shape
+                #print 'DEBUG reshape rank %d '%(rank),' nEntries shape/rank ',nEntries.shape, rank*bins_per_job,(rank+1)*bins_per_job
                 nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job]#, ' -- ',nEntries
             #this goes wrong for bins w/o entries. Split this?
             for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
@@ -1955,33 +1964,45 @@ class SmallDataAna_psana(object):
                     imgSArray.append(thisImgS)
                     imgMArray.append(thisImgM)
                     imgIArray.append(thisImgI)
+                #print 'imgArray length: rank %d '%rank,len(imgArray)
                 
+            if rank==0:
+                imgArrayShape=imgArray[0].shape
+            else:
+                imgArrayShape=None
+            imgArrayShape=comm.bcast(imgArrayShape, root=0)
+
             #write hdf5 file w/ mpi for big array
             arShape=(numBin,)
-            for i in range(0,len(imgArray[0].shape)):
-                arShape+=(imgArray[0].shape[i],)
+            for i in range(0,len(imgArrayShape)):
+                arShape+=(imgArrayShape[i],)
 #            if rank==0:
-#                print 'print array shape before saving: ',arShape
+#            print 'print array shape before saving: ',arShape
+
             cubeBigData = fout.create_dataset('%s'%detName,arShape)
             if storeMeanStd:
                 cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
                 cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
             if offEventsCube>0:
                 cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
-            if (np.array(imgIArray).sum()>0):
+            hasPhoton=False
+            for k in detDict.keys():
+                if k.find('photon'): hasPhoton=True
+            if hasPhoton:
                 cubeBigIData = fout.create_dataset('%s_photon'%detName,arShape)
 
             for iSlice,Slice,SliceO, SliceS,SliceM,SliceI in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray,imgIArray):
                 if np.nansum(Slice)!=0:
                     cubeBigData[rank*bins_per_job+iSlice,:] = Slice
                     print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
+
                 if offEventsCube>0 and np.nansum(SliceO)>0:
                     cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
                 if storeMeanStd and np.nansum(SliceS)>0:
                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
                 if storeMeanStd and np.nansum(SliceM)>0:
                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
-                if np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
+                if hasPhoton and np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
             if det.rms is not None:
