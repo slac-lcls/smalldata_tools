@@ -1781,8 +1781,12 @@ class SmallDataAna(object):
                 Bins = np.unique(scanValues[1])
                 Bins = np.insert(Bins,0,Bins[0]-1e-5)
                 Bins = np.append(Bins,Bins[-1]+1e-5)
+            else:
+                print 'prepCube could not prepare Bins: ',scanValues[0]!='' , len(scanValues[1])
         else:
             Bins = self.getBins(cube.bins)
+        if not isinstance(Bins, np.ndarray):
+            Bins = np.array(Bins)
         cube.binBounds = Bins
 
         #now look through targetVars & split out ones not in xarray/hdf5
