@@ -67,6 +67,7 @@ class Cube(object):
             else:
                 nbins=len(np.arange(min(bins[0],bins[1]),max(bins[0],bins[1]),bins[2]))
 
+        self.addBinVars={}
         self.add_BinVar(addBinVars)
 
         if cubeName is not None:
@@ -91,7 +92,7 @@ class Cube(object):
                     dict: {varname: bins}
         """
         if addBinVars is None:
-            addBinVars={}
+            return
         if isinstance(addBinVars,list):
             if isinstance(addBinVars[1], list):
                 inputBins = addBinVars[1]
@@ -101,7 +102,7 @@ class Cube(object):
             if addbins is None:
                 print 'Could not define bin boundaries for addBinVars:',inputBins
                 print 'automatic detection only works for primary binning axis'
-            addBinVars = { addBinVars[0]: addbins}
+            addBinVars[addBinVars[0]] = addbins
         elif isinstance(addBinVars,dict):
             for addVar in addBinVars.keys():
                 addbins = util_getBins(addBinVars[addVar])
@@ -111,8 +112,9 @@ class Cube(object):
                 addBinVars[addVar] = addbins
         else:
             print 'please pass addBinVar as list: [ varName, bins ]'
-
-        self.addBinVars = addBinVars
+            
+        for k in addBinVars:
+            self.addBinVars[k] = addBinVars[k]
         return
 
     def addVar(self, tVar):
@@ -1873,13 +1875,7 @@ class SmallDataAna(object):
                 
         #floating point error really mess this up otherwise....
         if abs(max(Bins))<1e-9:
-            #XXX
-            print 'Bins: ',Bins
-            testIdx=np.digitize(binVar, Bins)
-            print 'DEBUG: ',np.bincount(testIdx)
-            testIdx=np.digitize(binVar*1e12, Bins*1e12)
-            print 'DEBUG2: ',np.bincount(testIdx)
-            
+            print 'I think this should go!!! WARNING!!!'
             binVar*=1e12
             Bins*=1e12
 
@@ -1930,7 +1926,6 @@ class SmallDataAna(object):
                 binIdx.append(addBinIdx)
 
             #binShp & binIdx as tuple for use in ravel_multi_index. Append them to cube
-
             indMultiD = np.ravel_multi_index(tuple(binIdx),tuple(binShp))
             binVar = indMultiD
             orgBins = Bins
