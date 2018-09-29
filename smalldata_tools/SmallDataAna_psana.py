@@ -1763,10 +1763,8 @@ class SmallDataAna_psana(object):
             if 'random/random' not in self.sda.Keys('random'):
                 myrandom=np.random.rand(self.sda.xrData.time.shape[0])
                 self.sda.addVar('random/random',myrandom)
-            if isinstance(size/nBins, int):
+            if size/nBins > 1:
                 cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)]})
-            else:
-                cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)+1]})
 
         sel = self.sda.Sels[cube.useFilter]
         selString=''
@@ -1782,7 +1780,7 @@ class SmallDataAna_psana(object):
             addVars = [ 'offNbrs_event_time_xon_nNbr%02d'%offEventsCube,'offNbrs_fiducials_xon_nNbr%02d'%offEventsCube]
             self.sda.cubes[cubeName].addIdxVar(addVars)
         cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True,onoff=onoff)
-
+        
         #add small data to hdf5
         for key in cubeData.variables:
             addToHdf5(fout, key, cubeData[key].values)
@@ -1791,7 +1789,7 @@ class SmallDataAna_psana(object):
         numBin = np.array(cubeData.nEntries).flatten().shape[0]
         bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
         #this is the done correctly....
-        #print 'bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
+        #print 'DEBUG: bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
 
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
         detShapes=[]
@@ -1815,7 +1813,6 @@ class SmallDataAna_psana(object):
             detIArrays.append(det_arrayBin)
             if rank==0:
                 print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
-            #print 'DEBUG -- for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
 
         ###
         #nominal cube
@@ -1977,7 +1974,7 @@ class SmallDataAna_psana(object):
             for i in range(0,len(imgArrayShape)):
                 arShape+=(imgArrayShape[i],)
 #            if rank==0:
-#            print 'print array shape before saving: ',arShape
+            #print 'DEBUG: print array shape before saving: ',arShape,' rank ',rank
 
             cubeBigData = fout.create_dataset('%s'%detName,arShape)
             if storeMeanStd:
@@ -1987,7 +1984,7 @@ class SmallDataAna_psana(object):
                 cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
             hasPhoton=False
             for k in detDict.keys():
-                if k.find('photon'): hasPhoton=True
+                if k.find('photon')>=0: hasPhoton=True
             if hasPhoton:
                 cubeBigIData = fout.create_dataset('%s_photon'%detName,arShape)
 
@@ -2034,6 +2031,7 @@ class SmallDataAna_psana(object):
 
         comm.Barrier()
         printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
+
         fout.close()
         comm.Barrier()
         #print 'in rank now: ',rank
