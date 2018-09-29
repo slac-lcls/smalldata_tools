@@ -150,9 +150,11 @@ class DetObject(dropObject):
       if srcName.find('ayon')>=0:
         binning=env.configStore().get(psana.Rayonix.ConfigV2,psana.Source('rayonix')).binning_s()
         self.pixelsize=[170e-3/3840*binning]
-      if srcName.find('jungfrau')>=0:
+      if srcName.find('ungfrau')>=0:
         self.pixelsize=[75e-6]
-      if srcName.find('epix')>=0:
+      if srcName.find('icarus')>=0:
+        self.pixelsize=[25e-6]
+      if srcName.find('pix')>=0:
         self.pixelsize=[50e-6]
         epixCfg = env.configStore().get(psana.Epix.Config100aV2, self.det.source)
         self.carrierId0 = epixCfg.carrierId0()
@@ -227,23 +229,36 @@ class DetObject(dropObject):
         try:
           self.statusMask = self.det.mask(run, status=True)
           self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True)
-          if rank==0:
+          if rank==0 and self.mask is not None:
             print 'masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum())
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
-          if self.cmask.sum()!=self.mask.sum() and rank==0:
+          if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          if len(self.mask.shape)==2 and self.mask.shape!=self.imgShape and self.mask.shape!=self.ped.shape:
-            print 'mask is not of same shape as image, will set mask to all ones.'
+          if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape and self.mask.shape!=self.ped.shape:
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
+          else:
+            self.mask = np.ones(self.ped.shape)
+            self.cmask = np.ones(self.ped.shape)
         except:
-          self.mask = None
-          self.cmask = None
+          try:
+            if self.dettype==30:
+              self.mask = np.ones(self.ped.shape)
+              self.cmask = np.ones(self.ped.shape)
+            else:
+              self.mask = np.ones(self.imgShape)
+              self.cmask = np.ones(self.imgShape)
+          except:
+            self.mask = None
+            self.cmask = None
         #geometry
         try:
           self.x = self.det.coords_x(run)
           self.y = self.det.coords_y(run)
         except:
+          self.x = None
+          self.y = None
+        if self.x is None:
           if self.det.dettype == 19:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -260,6 +275,12 @@ class DetObject(dropObject):
             self.x = np.arange(0,self.ped.shape[2]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[3]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
+          elif self.det.dettype == 30:
+            self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.x, self.y = np.meshgrid(self.x, self.y)
+            self.x=np.array([self.x for i in range(self.ped.shape[0])])
+            self.y=np.array([self.y for i in range(self.ped.shape[0])])
           else:
             if (rank == 0):
               print 'detector of type ',self.det.dettype,' has no fallback for x/y coords!'
