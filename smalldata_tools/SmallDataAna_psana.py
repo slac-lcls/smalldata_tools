@@ -278,7 +278,7 @@ class SmallDataAna_psana(object):
         return detname
 
     def _getDetName(self, detname=None):
-        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera']
+        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera','icarus']
         #look for detector
         aliases=[]
         for key in self.Keys():
@@ -490,7 +490,14 @@ class SmallDataAna_psana(object):
         if len(img.shape)>2:
             image = self.__dict__[detname].det.image(self.run, img)
             if image is None:
-                image = img.squeeze()
+                if self.__dict__[detname].det.dettype != 30:
+                    image = img.squeeze()
+                else:
+                    imgNew = img[0]
+                    for iFrame, frame in enumerate(img):
+                        if iFrame>0:
+                            imgNew = np.append(imgNew, frame, axis=1)
+                    image = imgNew
         else:
             image = img
 
@@ -1462,16 +1469,15 @@ class SmallDataAna_psana(object):
             needsGeo=True
 
         np.seterr(divide='ignore', invalid='ignore')
-        if det.dettype==26:
-            hstPed = np.histogram(pedestals[0].flatten(), np.arange(0, pedestals.max()*1.05))
-            hstRms = np.histogram(rms[0].flatten(), np.arange(0, rms.max()*1.05,0.05))
-            hstPed1 = np.histogram(pedestals[1].flatten(), np.arange(0, pedestals.max()*1.05))
-            hstRms1 = np.histogram(rms[1].flatten(), np.arange(0, rms.max()*1.05,0.05))
-            hstPed2 = np.histogram(pedestals[2].flatten(), np.arange(0, pedestals.max()*1.05))
-            hstRms2 = np.histogram(rms[2].flatten(), np.arange(0, rms.max()*1.05,0.05))
+        hstPed=[]
+        hstRms=[]
+        if det.dettype==26 or det.dettype==30:
+            for ped,frms in zip(pedestals, rms):
+                hstPed.append(np.histogram(ped.flatten(), np.arange(0, pedestals.max()*1.05)))
+                hstRms.append(np.histogram(frms.flatten(), np.arange(0, rms.max()*1.05,0.05)))
         else:
-            hstPed = np.histogram(pedestals.flatten(), np.arange(0, pedestals.max()*1.05))
-            hstRms = np.histogram(rms.flatten(), np.arange(0, rms.max()*1.05,0.05))
+            hstPed.append(np.histogram(pedestals.flatten(), np.arange(0, pedestals.max()*1.05)))
+            hstRms.append(np.histogram(rms.flatten(), np.arange(0, rms.max()*1.05,0.05)))
 
         if needsGeo:
             if det.dettype==26:
@@ -1480,6 +1486,12 @@ class SmallDataAna_psana(object):
                 if pedImg is None and pedestals.shape[1]==1:
                     pedImg = pedestals[0].squeeze()
                     rmsImg = rms[0].squeeze()
+            elif det.dettype==30:
+                pedImg = pedestals[0]; rmsImg = rms[0]
+                for iFrame, pedf, rmsf in zip(itertools.count(), pedestals, rms):
+                    if iFrame>0:
+                        pedImg = np.append(pedImg, pedf, axis=1)
+                        rmsImg = np.append(rmsImg, rmsf, axis=1)
             else:
                 pedImg = det.image(self.run,pedestals)
                 rmsImg = det.image(self.run,rms)
@@ -1489,14 +1501,10 @@ class SmallDataAna_psana(object):
 
         figDark=plt.figure(figsize=(11,6))
         gsPed=gridspec.GridSpec(2,2,width_ratios=[1,1])
-        plt.subplot(gsPed[1]).plot(hstPed[1][:-1],np.log(hstPed[0]),'o')
-        plt.subplot(gsPed[3]).plot(hstRms[1][:-1],np.log(hstRms[0]),'o')
+        for i in range(pedestals.shape[0]):
+            plt.subplot(gsPed[1]).plot(hstPed[i][1][:-1],np.log(hstPed[i][0]),'o')
+            plt.subplot(gsPed[3]).plot(hstRms[i][1][:-1],np.log(hstRms[i][0]),'o')
         if det.dettype==26:
-            plt.subplot(gsPed[1]).plot(hstPed1[1][:-1],np.log(hstPed1[0]),'o')
-            plt.subplot(gsPed[1]).plot(hstPed2[1][:-1],np.log(hstPed2[0]),'o')
-            plt.subplot(gsPed[3]).plot(hstRms1[1][:-1],np.log(hstRms1[0]),'o')
-            plt.subplot(gsPed[3]).plot(hstRms2[1][:-1],np.log(hstRms2[0]),'o')
-
             im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals[0],1),np.percentile(pedestals[0],99)])
             cbar0 = plt.colorbar(im0)
             im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms[0],1),np.percentile(rms[0],99)])
