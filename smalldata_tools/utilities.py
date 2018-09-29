@@ -663,7 +663,7 @@ def rename_reduceRandomVar(outFileName):
     if outFileName.find('.inprogress')<0:
         print 'filename does not end in inprogress, will quit'
         sys.exit()
-    print 'renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
+    print 'Renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
 
     #open file.
     fin = h5py.File(outFileName,'r')
@@ -709,6 +709,7 @@ def rename_reduceRandomVar(outFileName):
           if iShp==0: continue
           newShp.append(shp)
         newShp=tuple(newShp)
+        print 'I am reshaping ',k,' -- ',kShape,' -- ',newShp
         newArray=fin[k].value.reshape(newShp)
         if randomNbins>1 and randomNbins in newArray.shape:
           data=newArray.sum(axis=randAxis)
