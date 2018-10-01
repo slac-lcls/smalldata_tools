@@ -9,6 +9,7 @@ from utilities import E2lam
 from utilities import cm_epix
 from utilities import rebin
 from utilities import dropObject
+from utilities import getCMpeak
 import azimuthalBinning as ab
 import droplet as droplet
 import acf
@@ -245,6 +246,9 @@ class DetObject(dropObject):
           else:
             self.mask = np.ones(self.ped.shape)
             self.cmask = np.ones(self.ped.shape)
+          if self.det.dettype==26:
+            self.mask = self.mask.sum(axis=0)
+            self.cmask = self.cmask.sum(axis=0)
         except:
           try:
             if self.dettype==30:
@@ -575,7 +579,8 @@ class DetObject(dropObject):
       rms = self.rms
       if self.det.dettype==26:
         rms = self.rms[0]
-      if len(mask.shape)>2:
+        mask = self.mask.sum(axis=0)
+      elif len(mask.shape)>2:
         mask = self.det.image(self.run, mask)
         rms = self.det.image(self.run, rms)
       self.__dict__[name] = droplet.droplet(threshold=threshold, thresholdLow=thresholdLow, thresADU=thresADU, rms=rms, mask=mask, name=name,useRms=useRms,relabel=relabel)
@@ -707,10 +712,32 @@ class DetObject(dropObject):
         data_diff[(data_def-data)!=0]=0
         self.evt.dat = data_def + data_diff
         #tileAvs = [ tile[tile!=0].flatten().mean() for tile in data]
-      #IMPLEMENT ME!
-      elif common_mode == 99:
-        print 'put code for unbonded pixels CM (single#) for uxi'
-        print 'put code for unbonded pixels CM (single#)'
+      elif self.common_mode >= 98 and self.common_mode < 100:
+        self.evt.dat = self.det.raw_data(evt)-self.ped
+        mask_unb = np.zeros([1024,512]); mask_unb[:,255:257]=1; mask_unb=mask_unb.astype(bool)
+        cmVals=[]
+        for tile in self.evt.dat:
+          cmVals.append(np.nanmedian(tile[mask_unb>0]))
+          if self.common_mode==99:
+            tile-=cmVals[-1] #apply the common mode.
+        self.evt.__dict__['write_cmUnb'] = cmVals
+
+        for tile in self.evt.dat:
+          peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=150, ADUmin=-100, ADUmax=200, step=1)
+          for k in peakDict.keys():
+            self.evt.__dict__['write_cmPk150_%s'%k] = peakDict[k]
+          peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=1000, ADUmin=-100, ADUmax=200, step=1)
+          for k in peakDict.keys():
+            self.evt.__dict__['write_cmPk1000_%s'%k] = peakDict[k]
+          peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=10000, ADUmin=-100, ADUmax=200, step=1)
+          for k in peakDict.keys():
+            self.evt.__dict__['write_cmPk10000_%s'%k] = peakDict[k]
+
+        #apply mask if requested
+        if self.applyMask==1:
+          self.evt.dat[self.mask==0]=0
+        if self.applyMask==2:
+          self.evt.dat[self.cmask==0]=0
         
       else:
         self.evt.dat = self.det.calib(evt, mbits=mbits)
