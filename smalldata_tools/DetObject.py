@@ -14,6 +14,7 @@ import droplet as droplet
 import acf
 import fitCenter
 import photons
+import templatePeakFit
 
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -40,18 +41,22 @@ class ROIObject(dropObject):
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
     array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
+    self.bound = np.array(self.bound)
+    self.bound = self.bound.squeeze()
     if array.ndim < self.bound.ndim:
       print 'array has fewer dimensions that bound: ',array.ndim,' ',len(self.bound)
       return array
     #ideally would check this from FrameFexConfig and not on every events
-    self.bound = np.array(self.bound)
     if array.ndim == self.bound.ndim:
       new_bound=[]
-      for dim,arsz in zip(self.bound, array.shape):
-        if max(dim) > arsz:
-          new_bound.append([min(dim), arsz])
-        else:
-          new_bound.append([min(dim), max(dim)])
+      if array.ndim==1:
+        new_bound=[max(min(self.bound), 0), min(max(self.bound), array.shape[0])]
+      else:
+        for dim,arsz in zip(self.bound, array.shape):
+          if max(dim) > arsz:
+            new_bound.append([min(dim), arsz])
+          else:
+            new_bound.append([min(dim), max(dim)])
       self.bound = np.array(new_bound)
     elif self.bound.ndim==1:
       self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])])
@@ -402,6 +407,15 @@ class DetObject(dropObject):
         for key in return_vals.keys():
           self.evt.__dict__['write_%s_%s'%(acf.name,key)] = return_vals[key]
 
+    def getTemplatePeakFits(self):
+      return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], templatePeakFit.templatePeakFit) ]
+
+    def processTemplatePeakFits(self):
+      for peakFit in self.getTemplatePeakFits():
+        return_vals = peakFit.fitTemplateLeastsq(np.squeeze(np.array(self.evt.dat)))
+        for key in return_vals:
+          self.evt.__dict__['write_%s_%s'%(peakFit.name, key)] = return_vals[key]
+
     def getFitCenters(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], fitCenter.fitCenter) ]
 
@@ -464,6 +478,7 @@ class DetObject(dropObject):
       self.processPhotons()
       self.processPhotons2()
       self.processPhotons3()
+      self.processTemplatePeakFits()
       self.processEnvironment()
       # calculate azimuthal average if requested
       for thisAzavName,thisAzav in zip(self.getAzAvKeys(),self.getAzAvs()):
@@ -584,6 +599,13 @@ class DetObject(dropObject):
       self.fitCenter_threshold = threshold
       self.fitCenter_maskName = maskName
 
+    def addPeakFit(self, templateWaveform, nPeaks=2, fitMethod='pah_trf', name=''):
+      if rank==0:
+        print 'define peak fitting for waveforms'
+      self.peakFit = templatePeakFit.templatePeakFit(templateWaveform=templateWaveform, nPeaks=nPeaks, name=name , fitMethod=fitMethod)
+      self.peakFit_nPeak = nPeaks
+      self.peakFit_fitMethod = fitMethod
+
     def addPhotons(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, retImg=0, nphotRet=100, thresADU=0.9, ROI=None):
       if name.find('ph')<0:
         name='ph_%s'%name
@@ -685,8 +707,14 @@ class DetObject(dropObject):
         data_diff[(data_def-data)!=0]=0
         self.evt.dat = data_def + data_diff
         #tileAvs = [ tile[tile!=0].flatten().mean() for tile in data]
+      #IMPLEMENT ME!
+      elif common_mode == 99:
+        print 'put code for unbonded pixels CM (single#) for uxi'
+        print 'put code for unbonded pixels CM (single#)'
+        
       else:
         self.evt.dat = self.det.calib(evt, mbits=mbits)
+        
 
       #store environmental row if desired.
       if self.storeEnv:
