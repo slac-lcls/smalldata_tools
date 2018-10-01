@@ -721,3 +721,32 @@ def rename_reduceRandomVar(outFileName):
     os.remove(outFileName)
     #for now, rename org file as well.
     #os.rename(outFileName, outFileName.replace('.inprogress',''))
+
+def getCMpeak(img, nPeakSel=4, minPeakNum=100, ADUmin=-100, ADUmax=200, step=0.5):
+    his = np.histogram(img, np.arange(ADUmin, ADUmax, step))
+    retDict = {}
+    retDict['sumHis']=his[0].sum()
+    retDict['his']=his[0]
+    #return retDict
+    #have problems with this, run 50 is fine, high runs are not ok.
+    peakIdx = signal.find_peaks_cwt(his[0], widths=[3])
+    maxIdx = [ x for _,x in sorted(zip(his[0][peakIdx],peakIdx), key=lambda pair: pair[0], reverse=True)]
+    maxIdxFilter = [ x for x in maxIdx if his[0][max(0, x-2): min(x+3, his[0].shape[0])].sum()>minPeakNum ]
+    if len(maxIdxFilter)==0:
+        retDict['peak']=0
+        retDict['peakCom']=0
+        retDict['zeroPeak']=0
+        return retDict
+
+    leftPeak = min(maxIdxFilter[:nPeakSel])
+    com=0.
+    vals=0.
+    for ibin in np.arange(leftPeak-2, leftPeak+3,1):
+        com += his[0][ibin] * (his[1][ibin]+0.5*step)
+        vals += his[0][ibin]
+
+    retDict['peak']=his[1][leftPeak]+step*0.5
+    retDict['peakCom']=com/vals
+    retDict['zeroPeak']=his[0][leftPeak]
+
+    return retDict
