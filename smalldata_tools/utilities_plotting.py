@@ -21,6 +21,9 @@ try:
 except:
     pass
 
+import holoviews as hv
+from functools import partial
+
 import sys
 
 def valid_mpl_palettes():
@@ -1082,3 +1085,221 @@ def plot3d_img_time(data2plot, **kwargs):
         return layout, p,im,p1d,imquad
     else:
         return layout, p,im,p1d
+
+
+def hv_image(data2plot, **kwargs):
+    """
+    function to plot images with holoviews
+    Input are data (2-d array)
+
+    Parameters
+    ----------
+    plotLog: color scale relating to log of Z-values, default False
+    width: plot width, default is 600
+    height: plot height, default is width*0.8
+    cmap: colormap, default is 'viridis'
+    clipping: colors for special values: default  {'min': 'red', 'max': 'green', 'NaN': 'gray'}
+    imgLow: low value of color scale, default 0.5%
+    imgHigh: high value of color scale, default 99.8%
+    """
+    plotLog = kwargs.pop("plotLog",False)
+    width = kwargs.pop("width",600)
+    height = kwargs.pop("height",int(width*0.8))
+    cmap = kwargs.pop("cmap",'viridis')
+    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+    imgLow = kwargs.pop("imgLow",None)
+    imgHigh = kwargs.pop("imgHigh",None)
+
+    if not isinstance(data2plot, np.ndarray):
+        try:
+            data2plot = np.array(data2plot)
+        except:
+            print 'input data was no array and could not be cast to one either'
+            return
+    if len(data2plot.shape)>2:
+        print 'this function only spports 2-d data'
+        return
+
+    if plotLog:
+        data2plot_log = np.log(data2plot)
+        data2plot_log[np.isneginf(data2plot_log)]=0. #set negative vaues to zero (likely noise....)
+        data2plot_log[np.isinf(data2plot_log)]=np.nan
+        data2plot = data2plot_log
+
+    if imgLow is None:
+        imgLow = np.nanpercentile(data2plot,0.5)
+    if imgHigh is None:
+        imgHigh = np.nanpercentile(data2plot,99.8) 
+
+    #print 'percentiles: ', imgLow, imgHigh, imgMin, imgMax
+    image = hv.Image(data2plot, vdims=hv.Dimension('z', range=(imgLow, imgHigh))).\
+            options(colorbar=True, width=width, height=height, \
+                    cmap=cmap, clipping_colors=clipping)
+    return image
+
+def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
+    """
+    function to plot images with holoviews
+    Input are data (2-d array)
+
+    Parameters
+    ----------
+    plotLog: color scale relating to log of Z-values, default False
+    width: plot width, default is 600
+    height: plot height, default is width*0.8
+    clipping: colors for special values: default  {'min': 'red', 'max': 'green', 'NaN': 'gray'}
+    """
+    plotLog = kwargs.pop("plotLog",False)
+    width = kwargs.pop("width",600)
+    height = kwargs.pop("height",int(width*0.8))
+    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+
+    if not isinstance(data2plot, np.ndarray):
+        try:
+            data2plot = np.array(data2plot)
+        except:
+            print 'input data was no array and could not be cast to one either'
+            return
+    if len(data2plot.shape)>2:
+        print 'this function only spports 2-d data'
+        return
+
+    if plotLog:
+        data2plot_log = np.log(data2plot)
+        data2plot_log[np.isneginf(data2plot_log)]=0. #set negative vaues to zero (likely noise....)
+        data2plot_log[np.isinf(data2plot_log)]=np.nan
+        data2plot = data2plot_log
+
+    image = hv.Image(data2plot, vdims=hv.Dimension('z', range=(imgLow, imgHigh))).\
+            options(colorbar=True, width=width, height=height, \
+                    cmap=cmap, clipping_colors=clipping)
+    return image
+
+def hv_image_ctl(data2plot, **kwargs):
+    """
+    function to plot images with holoviews
+    Input are data (2-d array)
+
+    Parameters
+    ----------
+    plotLog: color scale relating to log of Z-values, default False
+    width: plot width, default is 600
+    height: plot height, default is width*0.8
+    clipping: colors for special values: default  {'min': 'red', 'max': 'green', 'NaN': 'gray'}
+    """
+    plotLog = kwargs.pop("plotLog",False)
+    width = kwargs.pop("width",600)
+    height = kwargs.pop("height",int(width*0.8))
+    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+
+    if not isinstance(data2plot, np.ndarray):
+        try:
+            data2plot = np.array(data2plot)
+        except:
+            print 'input data was no array and could not be cast to one either'
+            return
+    if len(data2plot.shape)>2:
+        print 'this function only spports 2-d data'
+        return
+
+    if plotLog:
+        data2plot_log = np.log(data2plot)
+        data2plot_log[np.isneginf(data2plot_log)]=0. #set negative vaues to zero (likely noise....)
+        data2plot_log[np.isinf(data2plot_log)]=np.nan
+        data2plot = data2plot_log
+
+    imgMax = np.nanmax(data2plot)
+    imgMin = np.nanmin(data2plot)
+
+    #try to get decent color scale limits from middle image, go towards later images if necessary
+    imgLimIdx=int(data2plot.shape[0]/2)
+    while (np.nanstd(data2plot[imgLimIdx])==0 and imgLimIdx<data2plot.shape[0]):
+        imgLimIdx+=1
+    imgMin = np.nanmin(data2plot[imgLimIdx])
+    imgMax = np.nanmax(data2plot[imgLimIdx])
+    imgPLow = np.nanpercentile(data2plot[imgLimIdx],5)
+    imgPHigh = np.nanpercentile(data2plot[imgLimIdx],99.9)
+    imgP10 = np.nanpercentile(data2plot[imgLimIdx],10)
+    imgP90 = np.nanpercentile(data2plot[imgLimIdx],90)
+    
+    dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
+    dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
+    dimCol = hv.Dimension('cmap', values=['viridis','fire','seismic','gray','rainbow','jet','nipy_spectral'])
+    #def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
+    plotFunc = partial(_hv_image,data2plot=data2plot, kwargs=kwargs)
+    dmap = hv.DynamicMap(plotFunc, kdims=[dimColLow, dimColHigh, dimCol])
+    return dmap
+
+def hv_imageFromIndex(index, cmap, imgLow, imgHigh, data2plot, **kwargs):
+    """
+    function to plot a single slice from a cube
+    default bokeh tools include zoom.
+    Input are data (3-d array)
+
+    Parameters
+    ----------
+    plotTitle: title to show on plot, default ''
+    plotLog: color scale relating to log of Z-values, default False
+    """
+    if not isinstance(data2plot, np.ndarray):
+        try:
+            data2plot = np.array(data2plot)
+        except:
+            print 'input data was no array and could not be cast to one either'
+            return
+    if len(data2plot.shape)!=3:
+        print 'this function only spports 3-d data, data has shape: ', data2plot.shape
+        return
+
+    data2plot_2d = data2plot[index]
+    return hv_image(data2plot_2d, cmap=cmap, imgLow=imgLow, imgHigh=imgHigh, kwargs=kwargs)
+
+def hv_3dimage(data2plot, **kwargs):
+    """
+    function to plot images with holoviews
+    Input are data (2-d array)
+
+    Parameters
+    ----------
+    plotLog: color scale relating to log of Z-values, default False
+    width: plot width, default is 600
+    height: plot height, default is width*0.8
+    clipping: colors for special values: default  {'min': 'red', 'max': 'green', 'NaN': 'gray'}
+    """
+    plotLog = kwargs.pop("plotLog",False)
+    width = kwargs.pop("width",600)
+    height = kwargs.pop("height",int(width*0.8))
+    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+
+    #dump = kwargs.pop("cmap",None)
+    #dump = kwargs.pop("imgLow",None)
+    #dump = kwargs.pop("imgHigh",None)
+
+    if not isinstance(data2plot, np.ndarray):
+        try:
+            data2plot = np.array(data2plot)
+        except:
+            print 'input data was no array and could not be cast to one either'
+            return
+    if len(data2plot.shape)!=3:
+        print 'this function only spports 3-d data, data has shape: ', data2plot.shape
+        return
+    
+    dimIdx = hv.Dimension('index', range=(0,data2plot.shape[0]-1))
+    dimCol = hv.Dimension('cmap', values=['viridis','fire','seismic','gray','rainbow','jet','nipy_spectral'])
+    
+    #try to get decent color scale limits from middle image, go towards later images if necessary
+    imgLimIdx=int(data2plot.shape[0]/2)
+    while (np.nanstd(data2plot[imgLimIdx])==0 and imgLimIdx<shp[0]):
+        imgLimIdx+=1
+    imgMin = np.nanmin(data2plot[imgLimIdx])
+    imgMax = np.nanmax(data2plot[imgLimIdx])
+    imgPLow = np.nanpercentile(data2plot[imgLimIdx],5)
+    imgPHigh = np.nanpercentile(data2plot[imgLimIdx],99.9)
+    
+    dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
+    dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
+
+    plotFunc = partial(hv_imageFromIndex,data2plot=data2plot, kwargs=kwargs)
+    dmap = hv.DynamicMap(plotFunc, kdims=[dimIdx, dimColLow, dimColHigh, dimCol])
+    return dmap
