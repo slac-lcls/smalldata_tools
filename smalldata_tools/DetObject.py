@@ -272,22 +272,14 @@ class DetObject(dropObject):
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
-          elif self.det.dettype == 6 or self.det.dettype == 27:
-            self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.x, self.y = np.meshgrid(self.x, self.y)
-          elif self.det.dettype == 28:
-            self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.y = np.arange(0,self.ped.shape[1]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.x, self.y = np.meshgrid(self.x, self.y)
-          elif self.det.dettype == 26:
-            self.x = np.arange(0,self.ped.shape[2]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.y = np.arange(0,self.ped.shape[3]*self.pixelsize[0], self.pixelsize[0])*1e6
+          elif self.det.dettype == 6 or self.det.dettype == 27 or self.det.dettype == 28 or self.det.dettype == 26:
+            self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
+            self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.x, self.y = np.meshgrid(self.x, self.y)
           elif self.det.dettype == 30:
             self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
-            self.x, self.y = np.meshgrid(self.x, self.y)
+            self.y, self.x = np.meshgrid(self.y, self.x)
             self.x=np.array([self.x for i in range(self.ped.shape[0])])
             self.y=np.array([self.y for i in range(self.ped.shape[0])])
           else:
@@ -416,9 +408,12 @@ class DetObject(dropObject):
 
     def processTemplatePeakFits(self):
       for peakFit in self.getTemplatePeakFits():
-        return_vals = peakFit.fitTemplateLeastsq(np.squeeze(np.array(self.evt.dat)))
-        for key in return_vals:
-          self.evt.__dict__['write_%s_%s'%(peakFit.name, key)] = return_vals[key]
+        try:
+          return_vals = peakFit.fitTemplateLeastsq(np.squeeze(np.array(self.evt.dat)))
+          for key in return_vals:
+            self.evt.__dict__['write_%s_%s'%(peakFit.name, key)] = return_vals[key]
+        except:
+          pass
 
     def getFitCenters(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], fitCenter.fitCenter) ]
@@ -722,16 +717,16 @@ class DetObject(dropObject):
             tile-=cmVals[-1] #apply the common mode.
         self.evt.__dict__['write_cmUnb'] = cmVals
 
-        for tile in self.evt.dat:
+        for itile,tile in enumerate(self.evt.dat):
           peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=150, ADUmin=-100, ADUmax=200, step=1)
           for k in peakDict.keys():
-            self.evt.__dict__['write_cmPk150_%s'%k] = peakDict[k]
+            self.evt.__dict__['write_cmPk150_%s_%d'%(k,itile)] = peakDict[k]
           peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=1000, ADUmin=-100, ADUmax=200, step=1)
           for k in peakDict.keys():
-            self.evt.__dict__['write_cmPk1000_%s'%k] = peakDict[k]
+            self.evt.__dict__['write_cmPk1000_%s_%d'%(k,itile)] = peakDict[k]
           peakDict = getCMpeak(tile, nPeakSel=4, minPeakNum=10000, ADUmin=-100, ADUmax=200, step=1)
           for k in peakDict.keys():
-            self.evt.__dict__['write_cmPk10000_%s'%k] = peakDict[k]
+            self.evt.__dict__['write_cmPk10000_%s_%d'%(k,itile)] = peakDict[k]
 
         #apply mask if requested
         if self.applyMask==1:
