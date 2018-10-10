@@ -23,6 +23,10 @@ from utilities import addToHdf5
 from utilities import dropObject
 from utilities import rename_reduceRandomVar
 from utilities_plotting import plotImageBokeh
+from utilities_plotting import hv_image
+from utilities_plotting import hv_image_ctl
+from utilities_plotting import hv_3dimage
+import holoviews as hv
 import bokeh.plotting as bp
 import azimuthalBinning as ab
 from matplotlib import gridspec
@@ -36,10 +40,11 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class SmallDataAna_psana(object):
-    def __init__(self, expname='', run=-1,dirname='', filename=''):
+    def __init__(self, expname='', run=-1,dirname='', filename='', plotWith='matplotlib'):
         self.run=run
         self.expname=expname
         self.hutch=expname[0:3]
+        self.plotWith=plotWith
         currExpname = RegDB.experiment_info.active_experiment(self.hutch.upper())[1]
         if expname==currExpname:
             lastRun = RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['num']
@@ -110,7 +115,7 @@ class SmallDataAna_psana(object):
         printR(rank, 'try to make SmallDataAna using dirname %s, for exp %s and run %s'%(dirname,expname,run))
         try:
             printR(rank, 'setting up SmallData ana from anaps ')
-            self.sda = sda.SmallDataAna(expname,run,dirname=dirname, filename=filename)
+            self.sda = sda.SmallDataAna(expname,run,dirname=dirname, filename=filename,plotWith=plotWith)
         except:
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
@@ -476,7 +481,7 @@ class SmallDataAna_psana(object):
             detname = detname[:-1]
         return detname
 
-    def plotAvImage(self,detname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith='',debugPlot=-1):
+    def plotAvImage(self,detname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
         detname, img, avImage = self.getAvImage(detname=None)
 
         if use_mask:
@@ -502,6 +507,8 @@ class SmallDataAna_psana(object):
             image = img
 
         #have issues with Jupyter notebook io size.
+        if plotWith is None:
+            plotWith=self.plotWith
         if plotWith=='bokeh_notebook':
             plot_title="%s in Run %d"%(avImage, self.run)
             if debugPlot>0:
@@ -731,16 +738,45 @@ class SmallDataAna_psana(object):
         print 'center Final ',combRes['xCen'],combRes['yCen']
         return combRes
  
-    def FitCircleMouse(self, detname=None, use_mask=False, limits=[5,99.5]):
-        self.FitCircle(detname=None, use_mouse=True, use_mask=False, use_mask_local=False, limits=[5,99.5])
+    def FitCircleMouse(self, detname=None, use_mask=False, limits=[5,99.5], use_mask_local=False):
+        self.FitCircle(detname=detname, use_mouse=True, use_mask=use_mask, use_mask_local=use_mask_local, limits=[5,99.5])
 
-    def FitCircleThreshold(self, detname=None, use_mask=False, limits=[5,99.5],plotIt=False, thresIn=None):
-        self.FitCircle(detname=None, use_mouse=False, use_mask=False, use_mask_local=True, limits=[5,99.5], thresIn=thresIn, plotIt=plotIt)
+    def FitCircleThreshold(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5],plotIt=False, thresIn=None):
+        self.FitCircle(detname=detname, use_mouse=False, use_mask=use_mask, use_mask_local=use_mask_local, limits=[5,99.5], thresIn=thresIn, plotIt=plotIt)
 
-    def FitCircle(self, detname=None, use_mouse=None, use_mask=False, use_mask_local=False, limits=[5,99.5], plotIt=True, thresIn=None):
-        detname, img, avImage = self.getAvImage(detname=None)
+    def FitCircle(self, **kwargs):
+        """
+        function to fit (single) circles in images
+        options are to fit point selected by mouse or by threshold
+        
+        Parameters
+        ----------
+        detname: name of detector we have created an average image for
+        use_mouse: select points to be fitted by mouse (if false, use threshold)
+        use_mask: use the mask of detector as saved in calibration data, default is False
+        use_mask_local: use a locally defined mask, default is False
+        limits: range of z-axisof plot in percent of image data, default is [5, 99.5]
+        plotIt: show plots of results & for selection of parameters. Default is True. Turn off for running this in batch
+        thresIn: supply a minimum threshold for points selected for fit in percentile of image values
+        singleTile: select a single tile of image (e.g. useful for Icarus detector), default -1 (use whole detector)
+        """
+        detname = kwargs.pop("detname",None)
+        use_mouse = kwargs.pop("use_mouse",None)
+        use_mask = kwargs.pop("use_mask",False)
+        use_mask_local = kwargs.pop("use_mask_local",False)
+        plotIt = kwargs.pop("plotIt",True)
+        thresIn = kwargs.pop("thresIn",None)
+        limits = kwargs.pop("limits",[5, 99.5])
+        singleTile = kwargs.pop("singleTile",-1)
+
+        try: 
+            detname, img, avImage = self.getAvImage(detname=detname)
+        except:
+            detname, img, avImage = self.getAvImage(detname=None)
 
         if use_mouse is None or (not isinstance(use_mouse, bool) and not isinstance(use_mouse, basestring)):
+            #set pplotting to yes
+            plotIt=True
             if raw_input("Select Circle Points by Mouse?:\n") in ["y","Y"]:
                 use_mouse = True
             else:
@@ -773,11 +809,6 @@ class SmallDataAna_psana(object):
         if self.__dict__[detname].ped is not None and self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
             needsGeo=True
 
-        if needsGeo:
-            image = self.__dict__[detname].det.image(self.run, img)
-        else:
-            image = img
-
         x = self.__dict__[detname+'_x']
         y = self.__dict__[detname+'_y']
         if x is None:
@@ -785,6 +816,25 @@ class SmallDataAna_psana(object):
             y = np.arange(0, image.shape[0])
             x,y = np.meshgrid(x,y)
         extent=[x.min(), x.max(), y.min(), y.max()]
+
+        if needsGeo:
+            if self.__dict__[detname].det.dettype==30:
+                if singleTile<0:
+                    print 'we need to select a tile for the icarus'
+                    return
+                elif singleTile>=img.shape[0]:
+                    print 'requested tile %d, detector %s only has %d tiles'%(singleTile, detname, image.shape[0])
+                    return
+                    
+                image = img[singleTile]
+                x = x[singleTile]
+                y = y[singleTile]
+                extent=[x.min(), x.max(), y.min(), y.max()]
+                print 'icarus image: ',img.shape, image.shape, extent
+            else:
+                image = self.__dict__[detname].det.image(self.run, img)
+        else:
+            image = img
 
         happy = False
         if use_mouse:
@@ -796,6 +846,10 @@ class SmallDataAna_psana(object):
                     plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                 points=ginput(n=0)
                 parr=np.array(points)
+                if parr.shape[0]==1:
+                    print '[x,y]: [%f, %f]'%(parr[0][0],parr[0][1])
+                    happy=True
+                    break
                 res = fitCircle(parr[:,0],parr[:,1])
                 #draw the circle. now need to redraw the whole image thanks to the conda matplotlib
                 fig=plt.figure(figsize=(10,10))
@@ -807,34 +861,47 @@ class SmallDataAna_psana(object):
                 plt.gca().add_artist(circle)
                 plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
-                print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
+                print '[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.)
                 if raw_input("Happy with this selection:\n") in ["y","Y"]:
                     happy = True
 
         else:
             while not happy:
-                if plotIt:
-                    fig=plt.figure(figsize=(10,10))
-                    plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
-                if thresIn is None:
-                    thres = float(raw_input("min percentile % of selected points:\n"))
-                else:
+                if thresIn is not None:
                     thres = thresIn
+                    thresP = np.percentile(img[img!=0], thres)
                     happy = True
-                thresP = np.percentile(img[img!=0], thres)
-                print 'thresP',thresP
-                imageThres=image.copy()
-                imageThres[image>thresP]=1
-                imageThres[image<thresP]=0
-                if plotIt:
+                else:                    
+                    if not plotIt:
+                        print 'this is not going to work, you either need to specify a threshold or require plots'
+                        return
+                    fig=plt.figure(figsize=(10,10))
+                    if needsGeo:
+                        plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                    else:
+                        plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
+                    thres = float(raw_input("min percentile % of selected points:\n"))
+
+                    thresP = np.percentile(img[img!=0], thres)
+                    print 'thresP',thresP
+                    imageThres=image.copy()
+                    imageThres[image>thresP]=1
+                    imageThres[image<thresP]=0
+
                     fig=plt.figure(figsize=(5,5))
                     plt.imshow(imageThres,clim=[-0.1,1.1])
                     if raw_input("Happy with this threshold (y/n):\n") in ["y","Y"]:
                         happy=True
 
-            res = fitCircle(x.flatten()[img.flatten()>thresP],y.flatten()[img.flatten()>thresP])
+            if singleTile<0:
+                res = fitCircle(x.flatten()[img.flatten()>thresP],y.flatten()[img.flatten()>thresP])
+            else:
+                if len(x.shape)==len(img.shape) and len(x.shape)>2:
+                    res = fitCircle(x[singleTile].flatten()[img[singleTile].flatten()>thresP],y[singleTile].flatten()[img[singleTile].flatten()>thresP])
+                else:
+                    res = fitCircle(x.flatten()[img[singleTile].flatten()>thresP],y.flatten()[img[singleTile].flatten()>thresP])
             circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
-            print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
+            print '[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.)
             if plotIt:
                 fig=plt.figure(figsize=(10,10))
                 if needsGeo:
@@ -846,7 +913,7 @@ class SmallDataAna_psana(object):
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
                 plt.show()
 
-    def MakeMask(self, detname=None, limits=[5,99.5]):
+    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
         detname, img, avImage = self.getAvImage(detname=None)
 
         plotMax = np.percentile(img, limits[1])
@@ -857,7 +924,13 @@ class SmallDataAna_psana(object):
         if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
             needsGeo=True
 
-        if needsGeo:
+        if self.__dict__[detname].det.dettype==30:
+            needsGeo=False
+            if singleTile<0 or singleTile>= img.shape[0]:
+                image = img.sum(axis=0)
+            else:
+                image = img[singleTile]
+        elif needsGeo:
             image = self.__dict__[detname].det.image(self.run, img)
             if image is None and self.__dict__[detname].ped.shape[1]==1:
                 image = img.squeeze()
@@ -871,10 +944,19 @@ class SmallDataAna_psana(object):
             xVec = np.arange(0, image.shape[1])
             yVec = np.arange(0, image.shape[0])
             x, y = np.meshgrid(xVec, yVec)
+            self.__dict__[detname+'_x'] = x
+            self.__dict__[detname+'_y'] = y
         iX = self.__dict__[detname+'_iX']
         iY = self.__dict__[detname+'_iY']
         extent=[x.min(), x.max(), y.min(), y.max()]
         #print 'DEBUG: extent(x,y min,max)',extent
+        if self.__dict__[detname].det.dettype==30:
+            if singleTile<0 or singleTile>= img.shape[0]:
+                x=x[0]
+                y=y[0]
+            else:
+                x=x[singleTile]
+                y=y[singleTile]
         
         mask=[]
         mask_r_nda=None
@@ -883,6 +965,7 @@ class SmallDataAna_psana(object):
             fig=plt.figure(figsize=(12,10))
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
             #print "rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:"
+            #needs to be pixel coordinates for rectable selection to work.
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
             shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
@@ -899,6 +982,9 @@ class SmallDataAna_psana(object):
                 else:
                     mask_r_nda = mask_roi
                     plt.subplot(gs[1]).imshow(mask_r_nda)
+                    if self.__dict__[detname].det.dettype==30:
+                        maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
+                        mask_r_nda = np.array(maskTuple)
                 print 'mask from rectangle (shape):',mask_r_nda.shape
             elif shape=='R':
                 print 'coordinates to select: '
@@ -916,7 +1002,10 @@ class SmallDataAna_psana(object):
             elif shape=='c':
                 fig=plt.figure(figsize=(12,10))
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
-                plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
+                if det.dettype==30:
+                    plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None',extent=(y.min(),y.max(),x.min(),x.max()))
+                else:
+                    plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 if raw_input("Select center by mouse?\n") in ["y","Y"]:
                     c=ginput(1)
                     cx=c[0][0];cy=c[0][1]
@@ -927,10 +1016,12 @@ class SmallDataAna_psana(object):
                 if raw_input("Select outer radius by mouse?\n") in ["y","Y"]: 
                     r=ginput(1)
                     rox=r[0][0];roy=r[0][1]
+                    print 'outer radius point: ',r[0]
                     ro=np.sqrt((rox-cx)**2+(roy-cy)**2)
                     if raw_input("Select inner radius by mouse (for donut-shaped mask)?\n") in ["y","Y"]:
                         r=ginput(1)
                         rix=r[0][0];riy=r[0][1]
+                        print 'inner radius point: ',r[0]
                         ri=np.sqrt((rix-cx)**2+(riy-cy)**2)
                     else:
                         ri=0
@@ -956,6 +1047,8 @@ class SmallDataAna_psana(object):
                 elif det.dettype==19:
                     #plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                     plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
+                elif det.dettype==30:
+                    plt.subplot(gs[0]).imshow(np.rot90(image),clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 else:
                     plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 nPoints = int(raw_input("Number of Points (-1 until middle mouse click)?\n"))
@@ -968,8 +1061,10 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
                     plt.subplot(gs[1]).imshow(mask_r_nda)
+                if self.__dict__[detname].det.dettype==30:
+                    maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
+                    mask_r_nda = np.array(maskTuple)
                 print 'mask from polygon (shape):',mask_r_nda.shape
-                print 'not implemented yet....'
             elif shape=='d' or shape=='n':
                 figDark=plt.figure(figsize=(12,10))
                 gsPed=gridspec.GridSpec(1,2,width_ratios=[1,1])
@@ -1039,9 +1134,9 @@ class SmallDataAna_psana(object):
                 else:
                     totmask = totmask_nm1
             #print 'DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape
-            print 'masked in this step: ',np.ones_like(x)[mask_r_nda.astype(bool)].sum()
-            print 'masked up to this step: ',np.ones_like(x)[totmask_nm1].sum()
-            print 'masked tot: ',np.ones_like(x)[totmask].sum()
+            print 'masked in this step: ',np.ones_like(self.__dict__[detname].x)[mask_r_nda.astype(bool)].sum()
+            print 'masked up to this step: ',np.ones_like(self.__dict__[detname].x)[totmask_nm1].sum()
+            print 'masked tot: ',np.ones_like(self.__dict__[detname].x)[totmask].sum()
 
             if len(mask)>1:
                 fig=plt.figure(figsize=(15,9))
@@ -1062,7 +1157,14 @@ class SmallDataAna_psana(object):
                 if needsGeo:
                     plt.imshow(det.image(self.run,image_mask),clim=[plotMin,plotMax])
                 else:
-                    plt.imshow(image_mask,clim=[plotMin,plotMax])
+                    if (self.__dict__[detname].det.dettype==30):
+                        if singleTile<0 or singleTile>= img.shape[0]:
+                            image = image_mask.sum(axis=0)
+                        else:
+                            image = [singleTile]
+                        plt.imshow(image,clim=[plotMin,plotMax])
+                    else:
+                        plt.imshow(image_mask,clim=[plotMin,plotMax])
                 
 
             if raw_input("Add this mask?\n") in ["n","N"]:
@@ -1455,7 +1557,7 @@ class SmallDataAna_psana(object):
             np.savetxt('%s_mask_run%s.data'%(self.sda.expname,self.run),mask)
         return mask
          
-    def plotCalib(self, detname='None',common_mode=0):
+    def plotCalib(self, detname='None',common_mode=0, plotWith=None):
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
             detname = self.addDetInfo(detname=detname, common_mode=common_mode)
             if detname == 'None':
@@ -1499,9 +1601,31 @@ class SmallDataAna_psana(object):
             pedImg = pedestals
             rmsImg = rms
 
+        if plotWith is None:
+            plotWith=self.plotWith
+        if plotWith.find('bokeh')>=0:
+            #return hstPed, hstRms, pedImg, rmsImg
+            xmin=self.__dict__[detname+'_x'].min()
+            xmax=self.__dict__[detname+'_x'].max()
+            ymin=self.__dict__[detname+'_y'].min()
+            ymax=self.__dict__[detname+'_y'].max()
+            bounds = (xmin, ymin, xmax, ymax)
+            plotwidth=400
+            zPed=(np.percentile(pedImg,5), np.percentile(pedImg,99.5))
+            zRms=(np.percentile(rmsImg,5), np.percentile(rmsImg,99.5))
+            hstPedO = hv.Overlay([hv.Scatter((0.5*(hst[1][:-1]+hst[1][1:]), np.log(hst[0])),'pedestal','log(nEntries)') for hst in hstPed]).options(width=plotwidth)
+            hstRmsO = hv.Overlay([hv.Scatter((0.5*(hst[1][:-1]+hst[1][1:]), np.log(hst[0])),'rms','log(nEntries)') for hst in hstRms]).options(width=plotwidth)
+            
+            #need to invert the y-axis.
+            imgPed = hv.Image(pedImg.T, bounds=bounds, vdims=[hv.Dimension('pedData', range=zPed)]).options( cmap='viridis',colorbar=True, invert_yaxis=True, width=plotwidth)
+            imgRms = hv.Image(rmsImg.T, bounds=bounds, vdims=[hv.Dimension('rmsData', range=zRms)]).options( cmap='viridis',colorbar=True, invert_yaxis=True, width=plotwidth) 
+            layout = (imgPed + hstPedO + imgRms + hstRmsO).cols(2)
+            return layout
+
+        #now for the matplotlib version.
         figDark=plt.figure(figsize=(11,6))
         gsPed=gridspec.GridSpec(2,2,width_ratios=[1,1])
-        for i in range(pedestals.shape[0]):
+        for i in range(len(hstPed)):
             plt.subplot(gsPed[1]).plot(hstPed[i][1][:-1],np.log(hstPed[i][0]),'o')
             plt.subplot(gsPed[3]).plot(hstRms[i][1][:-1],np.log(hstRms[i][0]),'o')
         if det.dettype==26:
@@ -1514,7 +1638,7 @@ class SmallDataAna_psana(object):
             im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms,1),np.percentile(rms,99)])
         cbar2 = plt.colorbar(im2)
 
-    def calibHisto(self, detname='None', common_mode=0, printVal=[-1]):
+    def calibHisto(self, detname='None', common_mode=0, printVal=[-1], plotWith=None, showPlot=None):
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
             detname = self.addDetInfo(detname=detname, common_mode=common_mode)
             if detname == 'None':
@@ -1556,11 +1680,16 @@ class SmallDataAna_psana(object):
             allPeds.append(det.pedestals(pedRun))
             allRms.append(det.rms(pedRun))
             if needsGeo:
-                allPedsImg.append(allPeds[-1])
-                allRmsImg.append(allRms[-1])
+                try:
+                    allPedsImg.append(det.image(self.run, allPeds[-1]).tolist())
+                    allRmsImg.append(det.image(self.run, allRms[-1]).tolist())
+                except:
+                    #get the first tile/gain/timepoint/...
+                    allPedsImg.append(allPeds[-1][0].tolist())
+                    allRmsImg.append(allRms[-1][0].tolist())
             else:
-                allPedsImg.append(allPeds[-1])
-                allRmsImg.append(allRms[-1])
+                allPedsImg.append(allPeds[-1].tolist())
+                allRmsImg.append(allRms[-1].tolist())
             if len(printVal)<2:
                 print 'getting pedestal from run ',pedRun
             elif len(printVal)>=4:
@@ -1573,8 +1702,8 @@ class SmallDataAna_psana(object):
         print 'maxmin peds ',allPeds[icurrRun].shape, allPeds[icurrRun].max()  , allPeds[icurrRun].min() ,np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5)
         for thisPed,thisRms in zip(allPeds,allRms):
             #ped2d.append(np.histogram(thisPed.flatten(), np.arange(np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5)))[0],10)
-            ped2d.append(np.histogram(thisPed.flatten(), np.arange(0, np.percentile(allPeds[icurrRun],99.5)*1.2,10))[0])
-            rms2d.append(np.histogram(thisRms.flatten(), np.arange(0, allRms[icurrRun].max()*1.05,0.1))[0])
+            ped2d.append(np.histogram(thisPed.flatten(), np.arange(0, np.percentile(allPeds[icurrRun],99.5)*1.2,10))[0].tolist())
+            rms2d.append(np.histogram(thisRms.flatten(), np.arange(0, allRms[icurrRun].max()*1.05,0.1))[0].tolist())
         ped2dNorm=[] 
         rms2dNorm=[] 
         for thisPed,thisRms in zip(ped2d,rms2d):
@@ -1588,6 +1717,38 @@ class SmallDataAna_psana(object):
         self.__dict__['pedHisto_'+detname] = np.array(ped2d)
         self.__dict__['rmsHisto_'+detname] = np.array(rms2d)
 
+        ped2d = np.array(ped2d)
+        ped2dNorm = np.array(ped2dNorm)
+        rms2d = np.array(rms2d)
+        rms2dNorm = np.array(rms2dNorm)
+
+        if plotWith is None:
+            plotWith=self.plotWith
+
+        if plotWith=='bokeh_notebook':
+            plotwidth=400
+            boundsPed = (0, np.array(pedRuns).min(),  allPeds[icurrRun].max(), np.array(pedRuns).max())
+            pedZ = (np.percentile(ped2d,1),np.percentile(ped2d,99.5))
+            pedZNorm = (np.percentile(ped2dNorm,1),np.percentile(ped2dNorm,99.5))
+            boundsRms = (0, np.array(pedRuns).min(),  allRms[icurrRun].max(), np.array(pedRuns).max())
+            rmsZ = (np.percentile(rms2d,1),np.percentile(rms2d,99.5))
+            rmsZNorm = (np.percentile(rms2dNorm,1),np.percentile(rms2dNorm,99.5))
+            runDim=hv.Dimension('run')
+
+            if showPlot is None:
+                return (hv.Image(ped2d, kdims=[hv.Dimension('pedestal'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedVals', range=pedZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(ped2dNorm, kdims=[hv.Dimension('pedestal/ref'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedValsNorm', range=pedZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(rms2d, kdims=[hv.Dimension('rmsestal'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsVals', range=rmsZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(rms2dNorm, kdims=[hv.Dimension('rmsestal/ref'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsValsNorm', range=rmsZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) ).cols(2)
+            elif showPlot == 'ped3d':
+                return hv_3dimage(allPedsImg)
+            elif showPlot == 'rms3d':
+                return hv_3dimage(allRmsImg)
+            else:
+                print 'this is not a defined option'
+                return
+
+        #fallback to matplotlib
         figDark=plt.figure(figsize=(11,10))
         gsPed=gridspec.GridSpec(2,2)
         im0 = plt.subplot(gsPed[0]).imshow(ped2d,clim=[np.percentile(ped2d,1),np.percentile(ped2d,99)],interpolation='none',aspect='auto')
@@ -1603,7 +1764,7 @@ class SmallDataAna_psana(object):
         cbar21 = plt.colorbar(im21)
 
 
-    def compareCommonMode(self, detname='None',common_modes=[], numEvts=100, thresADU=0., thresRms=0.):
+    def compareCommonMode(self, detname='None',common_modes=[], numEvts=100, thresADU=0., thresRms=0., plotWith=None):
         if detname is 'None':
             detname = self.addDetInfo(detname=detname)
             if detname == 'None':
@@ -1644,6 +1805,12 @@ class SmallDataAna_psana(object):
         #print imgNames
         #for img in imgs:
         #    print img.shape
+
+        if plotWith is None:
+            plotWith=self.plotWith
+
+        if plotWith=='bokeh_notebook':
+            return hv_3dimage(imgs)
 
         fig=plt.figure(figsize=(15,10))
         gsCM=gridspec.GridSpec(len(common_modes),2)
