@@ -692,10 +692,13 @@ def rename_reduceRandomVar(outFileName):
         
     for k in fin.keys():
       if isinstance(fin[k],  h5py.Group): continue
-      if k.find('Cfg')==0 or k=='cubeSelection': continue
+      if k.find('Cfg')==0 or k=='cubeSelection' or k.find('dim')>=0: continue
         
       if len(fin[k].shape)>=len(nEntryShape):
         kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
+      else:
+        print 'cannot determine shape for reshaping: ',fin[k].shape), len(nEntryShape)
+        continue
 
       if kShape == nEntryShape:
         if randomNbins>1 and randomNbins in nEntryShape:
