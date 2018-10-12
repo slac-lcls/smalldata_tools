@@ -1097,7 +1097,7 @@ def hv_image(data2plot, **kwargs):
     plotLog: color scale relating to log of Z-values, default False
     width: plot width, default is 600
     height: plot height, default is width*0.8
-    cmap: colormap, default is 'viridis'
+    cmap: colormap, default is 'nipy_spectral'
     clipping: colors for special values: default  {'min': 'red', 'max': 'green', 'NaN': 'gray'}
     imgLow: low value of color scale, default 0.5%
     imgHigh: high value of color scale, default 99.8%
@@ -1105,7 +1105,7 @@ def hv_image(data2plot, **kwargs):
     plotLog = kwargs.pop("plotLog",False)
     width = kwargs.pop("width",600)
     height = kwargs.pop("height",int(width*0.8))
-    cmap = kwargs.pop("cmap",'viridis')
+    cmap = kwargs.pop("cmap",'nipy_spectral')
     clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
     imgLow = kwargs.pop("imgLow",None)
     imgHigh = kwargs.pop("imgHigh",None)
@@ -1212,15 +1212,12 @@ def hv_image_ctl(data2plot, **kwargs):
     imgMin = np.nanmin(data2plot)
 
     #try to get decent color scale limits from middle image, go towards later images if necessary
-    imgLimIdx=int(data2plot.shape[0]/2)
-    while (np.nanstd(data2plot[imgLimIdx])==0 and imgLimIdx<data2plot.shape[0]):
-        imgLimIdx+=1
-    imgMin = np.nanmin(data2plot[imgLimIdx])
-    imgMax = np.nanmax(data2plot[imgLimIdx])
-    imgPLow = np.nanpercentile(data2plot[imgLimIdx],5)
-    imgPHigh = np.nanpercentile(data2plot[imgLimIdx],99.9)
-    imgP10 = np.nanpercentile(data2plot[imgLimIdx],10)
-    imgP90 = np.nanpercentile(data2plot[imgLimIdx],90)
+    imgMin = np.nanmin(data2plot)
+    imgMax = np.nanmax(data2plot)
+    imgPLow = np.nanpercentile(data2plot,5)
+    imgPHigh = np.nanpercentile(data2plot,99.9)
+    imgP10 = np.nanpercentile(data2plot,10)
+    imgP90 = np.nanpercentile(data2plot,90)
     
     dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
     dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
