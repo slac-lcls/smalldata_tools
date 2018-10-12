@@ -18,6 +18,7 @@ from collections import deque
 from itertools import islice
 from bisect import insort, bisect_left
  
+import xarray as xr
 from numba import jit
 
 import sys
@@ -470,10 +471,20 @@ def hist2d(ar1, ar2,limits=[1,99.5],numBins=[100,100],histLims=[np.nan,np.nan, n
 ###
 def dictToHdf5(filename, indict):
   f = h5py.File(filename,'w')
-  for key in indict.keys():
-    npAr = np.array(indict[key])
-    dset = f.create_dataset(key, npAr.shape, dtype='f')
-    dset[...] = npAr
+  if isinstance(indict, dict):
+    for key in indict.keys():
+      npAr = np.array(indict[key])
+      dset = f.create_dataset(key, npAr.shape, dtype='f')
+      dset[...] = npAr
+  elif isinstance(indict, xr.Dataset):
+    for key in indict.variables:
+      npAr = np.array(indict[key].data)
+      try:
+        dset = f.create_dataset(key, npAr.shape, dtype='f')
+        dset[...] = npAr
+      except:
+        print 'failed to write key: ',key, npAr
+        pass
   f.close()
 
 #
@@ -697,7 +708,7 @@ def rename_reduceRandomVar(outFileName):
       if len(fin[k].shape)>=len(nEntryShape):
         kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
       else:
-        print 'cannot determine shape for reshaping: ',fin[k].shape), len(nEntryShape)
+        print 'cannot determine shape for reshaping: ',fin[k].shape, len(nEntryShape)
         continue
 
       if kShape == nEntryShape:
