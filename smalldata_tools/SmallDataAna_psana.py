@@ -1652,7 +1652,11 @@ class SmallDataAna_psana(object):
             needsGeo=True
         #now look at directory and get filenames of darks. Hmm. extra function?
         detNameStr = det.name.__str__()
-        if detNameStr.find('Epix')>=0:
+        if detNameStr.find('Epix')>=0 or detNameStr.find('epix')>=0:
+            detTypeStr='Epix100a::CalibV1'
+        elif detNameStr.find('ungfrau')>=0:
+            detTypeStr='Jungfrau::CalibV1'
+        elif detNameStr.find('Epix')>=0:
             detTypeStr='Epix100a::CalibV1'
         elif  detNameStr.find('2x2')>=0:
             detTypeStr='CsPad2x2::CalibV1'
@@ -1681,8 +1685,12 @@ class SmallDataAna_psana(object):
             allRms.append(det.rms(pedRun))
             if needsGeo:
                 try:
-                    allPedsImg.append(det.image(self.run, allPeds[-1]).tolist())
-                    allRmsImg.append(det.image(self.run, allRms[-1]).tolist())
+                    if detTypeStr=='Jungfrau::CalibV1':
+                        allPedsImg.append(det.image(self.run, allPeds[-1][0]).tolist())
+                        allRmsImg.append(det.image(self.run, allRms[-1][0]).tolist())
+                    else:
+                        allPedsImg.append(det.image(self.run, allPeds[-1]).tolist())
+                        allRmsImg.append(det.image(self.run, allRms[-1]).tolist())
                 except:
                     #get the first tile/gain/timepoint/...
                     allPedsImg.append(allPeds[-1][0].tolist())
