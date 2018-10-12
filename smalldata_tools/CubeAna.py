@@ -5,6 +5,9 @@ import numpy as np
 from utilities import rebinShape
 from utilities_plotting import plotMarker, plotImage
 from utilities_plotting import plot2d_from3d, plot3d_img_time
+from utilities import E2lam
+from utilities import dictToHdf5
+import azimuthalBinning as ab
 import xarray as xr
 from bokeh.io import show
 import holoviews as hv
@@ -69,7 +72,7 @@ class CubeAna(object):
             self._bins = thisDict['binVar_bins']
             thisXrdata = xr.DataArray(self._bins, coords={'bins': self._bins}, dms=('bins'), name='Bins')
             for dkey in thisDict.keys():
-                print 'DEBUG -- fromm dict: ',dkey, bins.shape, thisDict[dkey].shape[0]
+                print 'DEBUG -- from dict: ',dkey, bins.shape, thisDict[dkey].shape[0]
                 if thisDict[dkey].shape[0] != bins.shape[0]:
                     print '%s not same shape in as bin variables'%(dkay)
                     continue
@@ -121,18 +124,31 @@ class CubeAna(object):
                 coords={'bins': self._bins,'dim0':dimArr}
                 dims=('bins','dim0')
         else:
+            #FIX ME: this code only works for 3-d cubes. Need to think about higher dimensions...
             coords={'bins': self._bins}
             dims = ['bins']
             detname = key.split('__')[0].replace('/','')
             if self._debug: print 'get dims&coords: ',key, key.split('__')[0], self._detConfig.keys()
             if (detname in self._detConfig.keys()) and ('x' in self._detConfig[detname].keys()) and ('y' in self._detConfig[detname].keys()):
-                for idim,thisDimStr in enumerate( ['x','y']):
-                    thisDim = np.linspace(self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1])
-                    dimStr='%s_%s'%(detname,thisDimStr)
-                    coords[dimStr] = thisDim
-                    dims.append(dimStr)
-            else:
-                for dim in range(len(dataShape)-1):
+                #this only works for detectors in image shape, NOT in raw shape......
+                if len(self._detConfig[detname]['x'].shape)==2:
+                    for idim,thisDimStr in enumerate( ['x','y']):
+                        print 'use X&y array for dim: ',thisDimStr, self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1]
+                        thisDim = np.linspace(self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1])
+                        dimStr='%s_%s'%(detname,thisDimStr)
+                        coords[dimStr] = thisDim
+                        dims.append(dimStr)
+                    return dataShape, coords, dims
+                elif len(self._detConfig[detname]['x'].shape)==3:
+                    detname = key.split('__')[0].replace('/','')
+                    dimStrs=['tile','x','y']
+                    for dim,dimStr in zip(range(len(dataShape)-1), dimStrs):
+                        thisDim = np.arange(0, dataShape[dim+1])
+                        coords[dimStr] = thisDim
+                        dims.append(dimStr)                    
+                    return dataShape, coords, dims
+            #no X,Y arrays.        
+            for dim in range(len(dataShape)-1):
                     thisDim = np.arange(0, dataShape[dim+1])
                     detname = key.split('__')[0].replace('/','')
                     dimStr = '%s_dim%d'%(detname,dim)
@@ -160,7 +176,7 @@ class CubeAna(object):
         self._detConfig={}
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
-            if self._debug: print 'DEBUG config: looking at key: ',key
+            if self._debug: print '_xrFromRun config: looking at key: ',key
             #make a dictionary with detector config data is present
             if key.find('Cfg')>=0:
                 detname = key.split('__')[1]
@@ -172,25 +188,25 @@ class CubeAna(object):
         if self._debug: 
             for key in self._detConfig.keys():
                 for kkey in self._detConfig[key].keys():
-                    print 'DEBUG: config for %s is %s '%(key, kkey)
+                    print '_xrFromRun -: config for %s is %s '%(key, kkey)
         #second loop for data.
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
-            if self._debug: print 'DEBUG: looking at key for data: ',key
+            if self._debug: print '_xrFromRun -: looking at key for data: ',key
             if key == '/binVar_bins' or key.find('Cfg')>=0:
                 continue
             if isinstance(node, tables.group.Group): #skip for now, should become loop over keys of group
-                if self._debug: print 'DEBUG: skipped node: ',node
+                if self._debug: print '_xrFromRun - skipped node: ',node
                 continue
             tArrName = key[1:]
             dataShape = cubeTable.get_node(key).shape
             if dataShape[0]!=self._bins.shape[0]:
                 if self._debug:
-                    print 'data for %s is not of the right shape: '%(key), dataShape
+                    print '_xrFromRun - data for %s is not of the right shape: '%(key), dataShape
                 continue
-            if self._debug: print 'getDims: ',key, dataShape
+            if self._debug: print '_xrFromRun - getDims: ',key, dataShape
             dataShape,coords, dims = self._getXarrayDims(key, dataShape)
-            if self._debug: print 'gotDims: ',key, dataShape, coords, dims 
+            if self._debug: print '_xrFromRun - gotDims: ',key, dataShape, coords, dims 
             thisXrdata = xr.merge([thisXrdata, xr.DataArray(cubeTable.get_node(key).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
             #print 'data has been added for ',key, dataShape
         return thisXrdata
@@ -222,6 +238,102 @@ class CubeAna(object):
             print 'this dimension is not yet implemented:',len(sig.shape)
         return inArray
         
+    def addAzInt(self, detname=None, phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None, tx=0, ty=0):
+      if detname is None:
+        if len(self._detConfig.keys())==0:
+          detname = self._detConfig.keys()[0]
+        else:
+          detname = raw_input('Which detector do we want to azimuthally average? ',self._detConfig.keys())
+
+      cmask = self._detConfig[detname]['calib_mask']
+      smask = self._detConfig[detname]['mask']
+      azavMask = ~(cmask.astype(bool)&smask.astype(bool))
+      if userMask is not None and userMask.shape == self.mask.shape:
+        azavMask = ~(cmask.astype(bool)&smask.astype(bool)&userMask.astype(bool))
+
+      print 'mask %d pixel for azimuthal integration'%azavMask.sum()
+
+      x = self._detConfig[detname]['x']
+      y = self._detConfig[detname]['y']
+      self.__dict__[azavName] = ab.azimuthalBinning(x=x.flatten()/1e3,y=y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin,tx=tx, ty=ty)
+      self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
+      self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
+      self.__dict__[azavName+'_norm'] = self.__dict__[azavName].norm
+      self.__dict__[azavName+'_normPhi'] = self.__dict__[azavName].Cake_norm
+      self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
+      self.__dict__[azavName+'_Pplane'] = Pplane
+      self.__dict__[azavName+'_tx'] = tx
+      self.__dict__[azavName+'_ty'] = ty
+      self.__dict__[azavName+'_detname'] = detname
+
+    #XXX
+    def applyAzav(self, azavName='azav'):        
+        if azavName not in self.__dict__.keys():
+            print 'azimuthal average %s is not defined: '%azavName
+            return
+
+        detname = self.__dict__[azavName+'_detname']
+
+        #now find images
+        for k in self._cubeSumDict.variables.keys():
+            if k.find(detname)>=0:
+                shpMatch=True
+                for shpX,shpD in zip(reversed(self._detConfig[detname]['x'].shape), reversed(getattr(self._cubeSumDict, k).shape)):
+                    if shpX!=shpD:
+                        shpMatch=False
+                if self._debug: print 'applyAzAv: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, shpMatch
+                #this should test the slices of the detector: the last part of the tuple shall be == x-shape!
+                #similar to rebin code.
+                if shpMatch:
+                    data = getattr(self._cubeSumDict, k).data
+                    binShp = data.shape[:-len(self._detConfig[detname]['x'].shape)]
+                    totBins = 1
+                    for dim in binShp: totBins*=dim
+                    if self._debug: print 'applyAzAv: k ',k,binShp, totBins
+                    if len(binShp)>1:
+                        flatShp=[totBins]
+                        for dim in self._detConfig[detname]['x'].shape:
+                            flatShp.append(dim)
+                        flatShp = tuple(flatShp)
+                        data = data.reshape(flatShp)
+                    azData=[]
+                    for image in data:
+                        azData.append(self.__dict__[azavName].doCake(image))
+                    if self._debug: print 'applyAzAv: azData ',len(azData), np.array(azData[0]).shape
+                    if len(binShp)>1:
+                        newShp=list(binShp)
+                        for dim in np.array(azData[0]).shape:
+                            newShp.append(dim)
+                        newShp=tuple(newShp)
+                        if self._debug: print 'applyAzAv: azData ',azData.shape
+                        azData = np.array(azData).reshape(newShp).squeeze()
+                    else:
+                        azData = np.array(azData).squeeze()
+                    if self._debug: print 'applyAzAv: azData ',azData.shape
+                    #need 
+                    dsetName = (detname+'_'+azavName+'_azavData')
+                    if self._debug: print 'applyAzAv: detsetName ',dsetName
+                    coords={'bins': self._bins}
+                    dims=['bins']
+                    if len(azData.shape)==3:
+                        dims.append('phiBins')
+                        coords['phiBins']=self.__dict__[azavName+'_phi']
+                    dims.append('qBins')
+                    coords['qBins']=self.__dict__[azavName+'_q']
+                    dims=tuple(dims)
+                    if self._debug: print 'applyAzAv: dshapes. ',dims
+                    if self._debug: print 'applyAzAv: dshapes. ',coords
+                    newDataArray = xr.DataArray(azData,coords=coords, dims=dims,name=dsetName)
+                    self._cubeSumDict = xr.merge([self._cubeSumDict, newDataArray])
+
+    def cubeSumToHdf5(self):
+        runs=np.array([int(k.replace('Run','')) for k in self._cubeDict.keys()])
+        runStart=runs.min()
+        runEnd=runs.max()
+        fName = '%s/CubeSummed_%s_%s_Run%03d_to_%03d.h5'%(self._dirname,self._expname, self._cubeName, runStart, runEnd)
+        if self._debug: 'cubeSumToHdf5: fname: ',fName
+        dictToHdf5(fName, self._cubeSumDict)
+
     def setPlottingTool(self, plotWith):
         self._plotWith=plotWith
 
