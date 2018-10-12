@@ -83,7 +83,7 @@ class bmmonDetector(defaultDetector):
         dl={}
         data = self.det.get(evt)
         dl['sum']=data.TotalIntensity()
-        dl['channels']=data.peakA()
+        dl['peaks']=data.peakA()
         if self.name=='snd_dio':
             dl['dcc']=dl['channels'][8]
             dl['dco']=dl['channels'][9]

@@ -416,6 +416,10 @@ class SmallDataAna(object):
                 dimArr = ['%02d'%i for i in range(0,dataShape[1])]
                 coords={'time': self._tStamp[:setNevt],'channels':dimArr}
                 dims=('time','channels')
+            elif tleaf_name=='peaks':
+                dimArr = ['%02d'%i for i in range(0,dataShape[1])]
+                coords={'time': self._tStamp[:setNevt],'peaks':dimArr}
+                dims=('time','peaks')
             elif tleaf_name.find('AngPos')>=0:
                 dimArr = ['AngX','AngY','PosX','PosY']
                 coords={'time': self._tStamp[:setNevt],'AngPos':dimArr}
@@ -1993,7 +1997,8 @@ class SmallDataAna(object):
                 if newXr is None:
                     newXr = dataArray
                 else:
-                    newXr = xr.merge([newXr, dataArray])
+                    if key not in newXr.coords.keys():
+                        newXr = xr.merge([newXr, dataArray])
 
             for key in cubeDataErr.variables:
                 ##treat only actual data
