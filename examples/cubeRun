@@ -91,10 +91,6 @@ if [ $EXP == 'xxx' ]; then
     fi
 fi    
 
-if [ $QUEUEREQ != 'xxx' ]; then
-    QUEUE=$QUEUEREQ
-fi
-
 if [ $RUN -le 0 ]; then
     echo 'we need a run as input, use -r option'
     exit
@@ -137,11 +133,17 @@ else
     fi
 fi
 
+if [ $QUEUEREQ != 'xxx' ]; then
+    QUEUE=$QUEUEREQ
+fi
+
 if [ $QUEUE == 'psanaq' ]; then
     if [ $NJOBS -eq 16 ]; then
 	NJOBS=12
     fi
 fi
+
+echo 'will use queue: ' $QUEUE
 
 BASEDIR=/reg/d/psdm/$HUTCH/$EXP/results
 if [ ! -d  $BASEDIR ]; then
@@ -177,7 +179,7 @@ unset DISPLAY
 
 if [ $SINGLEJOB -eq 1 ]; then
     echo 'so I will run a new job for run ' $RUN
-    if [ $NJOBS -le 11 ]; then
+    if [ $NJOBS -le 12 ]; then
 	CMD=`echo mpirun -n $NJOBS python $PYTHON_EXE \
 	$ARGSTR \
         --run $RUN`
