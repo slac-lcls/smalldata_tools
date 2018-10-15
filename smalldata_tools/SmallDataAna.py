@@ -78,6 +78,7 @@ class Cube(object):
             else:
                 self.cubeName = '%s_%i'%(binVar, nbins)
         self.targetVars=[]
+        self.targetVarsCfg=[]
         #convenience variables
         self.binBounds = None   #bin boundary array (could be same as bins, but does not need to)
         self.targetVarsXtc = [] #split out the detectors that are not in the smallData
@@ -1821,7 +1822,10 @@ class SmallDataAna(object):
                 elif tVar not in self._fields.keys():
                     cube.targetVarsXtc.append(tVar)
                 else:
-                    targetVarsLocal.append(tVar)
+                    if tVar.find('UserDataCfg')==0:
+                        cube.targetVarsCfg.append(tVar)
+                    else:
+                        targetVarsLocal.append(tVar)
             else:
                 cube.targetVarsXtc.append(tVar)
                 

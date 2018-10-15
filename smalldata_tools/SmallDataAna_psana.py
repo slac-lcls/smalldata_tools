@@ -1881,6 +1881,11 @@ class SmallDataAna_psana(object):
                 printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
+
+                for cfgVar in myCube.targetVarsCfg:
+                    addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
+                    print 'add cfgVar to hdf5', cfgVar.replace('/','_')
+
                 fout.close()
             return
 
@@ -1932,6 +1937,10 @@ class SmallDataAna_psana(object):
                     selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
                 dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
                 dsetcnf.attrs['cubeSelection'] = selString
+
+                for cfgVar in myCube.targetVarsCfg:
+                    addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
+                    print 'add cfgVar to hdf5', cfgVar.replace('/','_')
 
                 fout.close()
             return
@@ -2214,6 +2223,10 @@ class SmallDataAna_psana(object):
 
         comm.Barrier()
         printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
+
+        for cfgVar in myCube.targetVarsCfg:
+            addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
+            print 'add cfgVar to hdf5', cfgVar.replace('/','_')
 
         fout.close()
         comm.Barrier()
