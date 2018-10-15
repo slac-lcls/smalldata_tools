@@ -340,6 +340,7 @@ class DetObject(dropObject):
     def getAzAvs(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], ab.azimuthalBinning) ]
     def getAzAvKeys(self):
+      #print 'getazavkeys: ',self.__dict__.keys() 
       return [ key for key in self.__dict__.keys() if isinstance(self[key], ab.azimuthalBinning) ]
     def saveFull(self):
       self.__dict__['full']=ROIObject([0,1e6], name='full', writeArea=True, rms=self.rms)
@@ -483,7 +484,14 @@ class DetObject(dropObject):
       # calculate azimuthal average if requested
       for thisAzavName,thisAzav in zip(self.getAzAvKeys(),self.getAzAvs()):
         if self.evt.dat is not None:
-          self.evt.__dict__['write_%s'%thisAzavName] = thisAzav.doCake(self.evt.dat)
+          data=self.evt.dat.copy()
+          if self.__dict__[thisAzavName+'_thresADU'] is not None:
+            data[data<self.__dict__[thisAzavName+'_thresADU']]=0.
+          if self.__dict__[thisAzavName+'_thresADUhigh'] is not None:
+            data[data>self.__dict__[thisAzavName+'_thresADUhigh']]=0.
+          if self.__dict__[thisAzavName+'_thresRms'] is not None:
+            data[data<self.__dict__[thisAzavName+'_thresRms']*self.rms]=0.
+          self.evt.__dict__['write_%s'%thisAzavName] = thisAzav.doCake(data)
         else:
           #now let mpiDataSource take care of this.
           continue
@@ -560,7 +568,11 @@ class DetObject(dropObject):
       ty = kwargs.pop("ty",None)
       center = kwargs.pop("center",None)
       azavName = kwargs.pop("azavName",'azav')
-      self.debug = kwargs.pop("debug",False)
+      debug = kwargs.pop("debug",False)
+      thresRms =  kwargs.pop("thresRms",None)
+      thresADU =  kwargs.pop("thresADU",None)
+      thresADUhigh =  kwargs.pop("thresADUhigh",None)
+      print 'adding azav: ',azavName
 
       azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
       if userMask is not None and userMask.shape == self.mask.shape:
@@ -593,7 +605,10 @@ class DetObject(dropObject):
       self.__dict__[azavName+'_Pplane'] = Pplane
       self.__dict__[azavName+'_tx'] = tx
       self.__dict__[azavName+'_ty'] = ty
-      #self.__dict__[azavName+'_thresRms'] = thresRms
+      self.__dict__[azavName+'_thresRms'] = thresRms
+      self.__dict__[azavName+'_thresADU'] = thresADU
+      self.__dict__[azavName+'_thresADUhigh'] = thresADUhigh
+      print 'added azav: ',azavName
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
       if len(ROI)>0:
