@@ -240,12 +240,13 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
           if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape and self.mask.shape!=self.ped.shape:
+          #this is e.g. for the zyla or OPAL when a pedestal with a different ROI is present.
+          if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
-          else:
-            self.mask = np.ones(self.ped.shape)
-            self.cmask = np.ones(self.ped.shape)
+            if self.dettype==30: #this might not only have been here for the icarus, but I cannot remember
+              self.mask = np.ones(self.ped.shape)
+              self.cmask = np.ones(self.ped.shape)
           if self.det.dettype==26:
             self.mask = self.mask.sum(axis=0)
             self.cmask = self.cmask.sum(axis=0)
@@ -532,7 +533,35 @@ class DetObject(dropObject):
       self.binnedImgShp = shape
       self.orgImgShp = None
 
-    def addAzAv(self,phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None, tx=None, ty=None):
+    def addAzAv(self, **kwargs):
+      """ 
+      This function azumithally averages images into q & phi bins
+      it applies geometrical & (X-ray) polarization corrections
+      correctedImage = (Image-darkImg)/gainImg/geom_correction/pol_correction
+      
+      Parameters
+      ----------
+      center  = center beam position [xcen, ycen]
+      dis_to_same = distance of center of detector to sample (in mm)
+      qBin    = rebinning q (def 0.01)
+      phiBins = bin in azimuthal angle (def: one bin, integer: # bins or list of boundaries)
+      Pplane  = Polarization (1 = horizontal, 0 = vertical)
+      eBeam   = beam energy for wavelength calculation
+      tx,ty   = angle of detector normal with respect to incoming beam (in deg)
+                zeros are for perpendicular configuration
+      """
+      userMask = kwargs.pop("userMask",None)
+      dis_to_sam = kwargs.pop("dis_to_sam",None)
+      phiBins = kwargs.pop("phiBins",1)
+      qBin = kwargs.pop("qBin",1e-2)
+      Pplane = kwargs.pop("Pplane",1)
+      eBeam = kwargs.pop("eBeam",None)
+      tx = kwargs.pop("tx",None)
+      ty = kwargs.pop("ty",None)
+      center = kwargs.pop("center",None)
+      azavName = kwargs.pop("azavName",'azav')
+      self.debug = kwargs.pop("debug",False)
+
       azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
       if userMask is not None and userMask.shape == self.mask.shape:
         azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool)&userMask.astype(bool))
@@ -564,6 +593,7 @@ class DetObject(dropObject):
       self.__dict__[azavName+'_Pplane'] = Pplane
       self.__dict__[azavName+'_tx'] = tx
       self.__dict__[azavName+'_ty'] = ty
+      #self.__dict__[azavName+'_thresRms'] = thresRms
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
       if len(ROI)>0:

@@ -18,49 +18,62 @@ def displayimg(img,**kwargs):
   plt.imshow(img.transpose(),origin="lower",**kwargs)
 
 class azimuthalBinning:
-  def __init__(self,x,y,xcen,ycen,d=100e-3,mask=None, qbin=5e-3,lam=1,Pplane=0,phibin=0.1,phiBins=1,\
-        ADU_per_photon = 1.,tx=0,ty=0, img=None,verbose=0,gainImg=None,darkImg=None,report_file=None):
+  def __init__(self, x, y, xcen, ycen, img=None, **kwargs):
   #new are: ADU/photon, gainImg. darkImg,phiBins
     """ 
-        correctedImage = (Image-darkImg)/gainImg/geom_correction/pol_correction
-        x,y      = pixel coordinate (1D array each); note: they should be the center of the pixels
-        xcen,ycen = center beam position
-        tx,ty = angle of detector normal with respect to incoming beam (in deg)
-                zeros are for perpendicular configuration
-        darkImg  = darkImage to subbract
-        ADU_per_photon : used to estimate errors
-        qbin = rebinning q 
-        phibin = bin in azimuthal angle (used for polar plot
-        Pplane = Polarization (1 = horizontal, 0 = vertical)
-        d     = distance of center of detector to sample (in m)
-        lam   = wavelength in Ang
-        img is used only for displaying corrections
+    This function azumithally averages images into q & phi bins
+    it applies geometrical & (X-ray) polarization corrections
+    correctedImage = (Image-darkImg)/gainImg/geom_correction/pol_correction
+
+    Parameters
+    ----------
+    x,y      = pixel coordinate (1D array each); note: they should be the center of the pixels
+    xcen,ycen = center beam position
+    tx,ty = angle of detector normal with respect to incoming beam (in deg)
+            zeros are for perpendicular configuration
+    darkImg  = darkImage to subtract, by default input is pedestal subtracted.
+    ADU_per_photon : used to estimate errors
+    qbin = rebinning q (def 0.01)
+    phiBins = bin in azimuthal angle (def: one bin)
+    Pplane = Polarization (1 = horizontal, 0 = vertical)
+    d     = distance of center of detector to sample (in m)
+    lam   = wavelength in Ang
+    img is used only for displaying corrections
     """
     # save parameters for later use
-    self.gainImg=gainImg
-    self.darkImg=darkImg
-    if mask is not None: mask = np.asarray(mask,dtype=np.bool)
-    self.mask=mask
-    if rank==0:
-      print 'initialize azimuthal binning, mask %d pixel for azimuthal integration'%self.mask.sum()
+    self.mask = kwargs.pop("mask",None)
+    self.gainImg = kwargs.pop("gainImg",None)
+    self.darkImg = kwargs.pop("darkImg",None)
+    self.debug = kwargs.pop("debug",False)
+    self.ADU_per_photon = kwargs.pop("ADU_per_Photon",1.)
+    self.d = kwargs.pop("d",100e-3)
+    phiBins = kwargs.pop("phiBins",1)
+    lam = kwargs.pop("lam",1.)
+    Pplane = kwargs.pop("Pplane",0)
+    tx = kwargs.pop("tx",0.)
+    ty = kwargs.pop("ty",0.)
+    qbin = kwargs.pop("qbin",5e-3)
+    self.xcen = xcen
+    self.ycen = ycen
 
-    self.verbose=verbose
-    self.ADU_per_photon=ADU_per_photon
+    if self.mask is not None: self.mask = np.asarray(self.mask,dtype=np.bool)
+    if rank==0:
+      if self.mask is not None: 
+        print 'initialize azimuthal binning, mask %d pixel for azimuthal integration'%self.mask.sum()
+      else:
+        print 'no mask has been passed, will return None'
+        return None
 
     tx = np.deg2rad(tx)
     ty = np.deg2rad(ty)
-    xcen = float(xcen)
-    ycen = float(ycen)
+    self.xcen = float(self.xcen)
+    self.ycen = float(self.ycen)
     # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
     (A,B,C) = (-np.sin(ty)*np.cos(tx),-np.sin(tx),-np.cos(ty)*np.cos(tx))
-    (a,b,c) = (xcen+d*np.tan(ty),float(ycen)-d*np.tan(tx),d)
-    self.xcen = xcen
-    self.ycen = ycen
-    #mshape = x.shape
+    (a,b,c) = (self.xcen+self.d*np.tan(ty),float(self.ycen)-self.d*np.tan(tx),self.d)
 
     r  = np.sqrt( (x-a)**2+(y-b)**2+c**2)
     self.r = r
-    self.d = d
     
     self.msg("calculating theta...",cr=0)
     matrix_theta = np.arccos( (A*(x-a)+B*(y-b)-C*c )/r )
@@ -70,11 +83,11 @@ class azimuthalBinning:
     self.msg("calculating phi...",cr=0)
     matrix_phi   = np.arccos( ((A**2+C**2)*(y-b)-A*B*(x-a)+B*C*c )/ \
         np.sqrt((A**2+C**2)*(r**2-(A*(x-a)+B*(y-b)-C*c)**2)))
-    idx = (y>ycen) & (np.isnan(matrix_phi))
+    idx = (y>self.ycen) & (np.isnan(matrix_phi))
     matrix_phi[idx] = 0
-    idx = (y<ycen) & (np.isnan(matrix_phi))
+    idx = (y<self.ycen) & (np.isnan(matrix_phi))
     matrix_phi[idx] = np.pi
-    idx = (x<xcen)
+    idx = (x<self.xcen)
     matrix_phi[idx] = (np.pi-matrix_phi[idx])+np.pi
 #    matrix_phi[idx] = temp+n.pi
     self.matrix_phi = matrix_phi
@@ -87,7 +100,7 @@ class azimuthalBinning:
 
     self.msg("... done")
     self.pol=pol
-    theta_max = np.nanmax(matrix_theta[~mask])
+    theta_max = np.nanmax(matrix_theta[~self.mask])
 
     self.msg("calculating digitize")
     if isinstance(phiBins, list):
@@ -109,7 +122,7 @@ class azimuthalBinning:
 
     self.idxphi = np.digitize(pbm.ravel(),self.phiVec)-1
     self.matrix_q = 4*np.pi/lam*np.sin(self.matrix_theta/2)
-    q_max = np.nanmax(self.matrix_q[~mask])
+    q_max = np.nanmax(self.matrix_q[~self.mask])
     qbin = np.array(qbin)
     if qbin.size==1:
       if rank==0:
@@ -122,18 +135,17 @@ class azimuthalBinning:
     self.nq = self.q.size
     self.idxq  = np.digitize(self.matrix_q.ravel(),self.qbins)-1
     last_idx = self.idxq.max()
-    self.idxq[mask.ravel()] = 0; # send the masked ones in the first bin
+    self.idxq[self.mask.ravel()] = 0; # send the masked ones in the first bin
 
     # 2D binning!
     self.Cake_idxs = np.ravel_multi_index((self.idxphi,self.idxq),(self.nphi,self.nq))
-    self.Cake_idxs[mask.ravel()] = 0; # send the masked ones in the first bin
+    self.Cake_idxs[self.mask.ravel()] = 0; # send the masked ones in the first bin
     
     #print "last index",last_idx
     self.msg("...done")
-    self.phi  = np.arange(0,2*np.pi+phibin,phibin)+phibin/2
     # include geometrical corrections
-    geom  = (d/r) ; # pixels are not perpendicular to scattered beam
-    geom *= (d/r**2); # scattered radiation is proportional to 1/r^2
+    geom  = (self.d/r) ; # pixels are not perpendicular to scattered beam
+    geom *= (self.d/r**2); # scattered radiation is proportional to 1/r^2
     self.msg("calculating normalization...",cr=0)
     self.geom = geom
     self.geom /= self.geom.max()
@@ -145,60 +157,22 @@ class azimuthalBinning:
     self.Cake_norm=np.reshape(self.Cake_Npixel,(self.nphi,self.nq));#/self.correction1D
     #self.correction1D  =self.correction1D[:self.nq]/self.Npixel
     self.header  = "# Parameters for data reduction\n"
-    self.header += "# xcen,ycen = %.2f m %.2f m\n" % (xcen,ycen)
-    self.header += "# sample det distance = %.4f m\n" % (d)
+    self.header += "# xcen, ycen = %.2f m %.2f m\n" % (self.xcen,self.ycen)
+    self.header += "# sample det distance = %.4f m\n" % (self.d)
     self.header += "# wavelength = %.4f Ang\n" % (lam)
     self.header += "# detector angles x,y = %.3f,%.3f deg\n" % (np.rad2deg(tx),np.rad2deg(ty))
     self.header += "# fraction of inplane pol %.3f\n" % (Pplane)
     if isinstance(qbin,float):
       self.header += "# q binning : %.3f Ang-1\n" % (qbin)
     return 
-    if report_file is None:
-      return
-    else:
-      # prepare report
-      if (img is None): img=np.ones_like(mask)
-      plt.interactive(0)
-      plt.figure(figsize=(8*2, 6*2),dpi=150)
-      plt.subplot("231",title="Polarization")
-      plt.imshow(self.pol)
-      plt.colorbar()
-      plt.subplot("232",title="Geometrical")
-      plt.imshow(self.geom)
-      plt.colorbar()
-      plt.subplot("233",title="Geometrical+Pol")
-      plt.imshow(self.correction)
-      plt.colorbar()
-      plt.subplot("234",title="Raw image")
-      plt.imshow(img*mask)
-      plt.colorbar()
-      plt.subplot("235",title="Corrected image")
-      plt.imshow(img/self.correction*mask)
-      plt.colorbar()
-#      plt.show()
-      if (report_file == "auto"):
-        report_file="azimuthal_averaging_info.png"
-      plt.savefig(report_file)
-    self.msg("...done")
 
   def msg(self,s,cr=True):
-    if (self.verbose):
+    if (self.debug):
       if (cr):
         print s 
       else:
         print s,
     sys.stdout.flush()
-
-  def displayCake(self,img,applyCorrection=True):
-    ii =  self.doCake(img,applyCorrection=applyCorrection)
-    plt.subplot("221")
-    plt.imshow(ii)
-    plt.axis('tight')
-    plt.colorbar()
-    plt.subplot("222")
-    plt.plot(self.phi,ii[300,:])
-    plt.show()
-    return ii
 
   def doAzimuthalAveraging(self,img,applyCorrection=True):
     if self.darkImg is not None: img-=self.darkImg
@@ -234,7 +208,7 @@ class azimuthalBinning:
 
 def test():
   mask=np.ones( (2000,2000) )
-  az=azimuthal_averaging(mask,-80,1161,pixelsize=82e-6,d=4.7e-2,tx=0,ty=90-28.,thetabin=1e-1,lam=1,verbose=1)
+  az=azimuthal_averaging(mask,-80,1161,pixelsize=82e-6,d=4.7e-2,tx=0,ty=90-28.,thetabin=1e-1,lam=1,debug=1)
   plt.subplot("121")
   displayimg(np.rad2deg(az.matrix_theta))
   print az.matrix_theta.min()
