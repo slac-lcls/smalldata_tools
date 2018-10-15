@@ -278,6 +278,7 @@ class SmallDataAna_psana(object):
                             thres=float(key.split('_')[1].replace('p','.'))
                         except:
                             pass
+                    print 'DEBUG: adding photonizing: ',key, thres
                     self.__dict__[detname].addPhotons(ADU_per_photon=detnameDict[key], thresADU=thres, retImg=2)
 
         return detname
@@ -2191,7 +2192,7 @@ class SmallDataAna_psana(object):
                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
                 if storeMeanStd and np.nansum(SliceM)>0:
                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
-                if hasPhoton and np.nansum(SliceI)!=0 and (np.array(imgIArray).sum()>0):
+                if hasPhoton and np.nansum(SliceI)!=0 and np.nansum(np.array(imgIArray))>0:
                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
             if det.rms is not None:
