@@ -8,6 +8,7 @@ import tables
 from scipy import optimize
 from scipy import ndimage
 from scipy import signal
+from scipy import sparse
 from matplotlib import pyplot as plt
 import resource
 from itertools import izip, count
@@ -764,3 +765,36 @@ def getCMpeak(img, nPeakSel=4, minPeakNum=100, ADUmin=-100, ADUmax=200, step=0.5
     retDict['zeroPeak']=his[0][leftPeak]
 
     return retDict
+
+def image_from_dxy(d,x,y):
+  if np.array(x).shape!=np.array(y).shape or  np.array(d).shape!=np.array(y).shape:
+    print 'shapes of data or x/y do not match ',np.array(d).shape, np.array(x).shape, np.array(y).shape
+  if (x.flatten()[0]-int(x.flatten()[0]))!=0:
+    #cspad
+    if x.shape==(32,185,388): imgShape=[1689,1689]
+    #cs140k
+    elif x.shape==(2,185,388): imgShape=[391,371] #at least for one geometry
+    #epix100a
+    elif x.shape==(704,768): imgShape=[709,773]
+    #jungfrau512k
+    elif x.shape==(1,512,1024): imgShape=[514,1030]
+    elif x.shape==(512,1024): imgShape=[514,1030]
+    #jungfrau1M
+    elif x.shape==(2,512,1024): imgShape=[1064,1030]
+    elif len(x.shape)==2:#is already image (and not special detector)
+      return d
+    else:
+      print 'do not know which detector this is, cannot decide shape of iamge'
+      return
+    ix = x.copy()
+    ix = ix - np.min(ix)
+    ix = (ix/np.max(ix)*imgShape[0]).astype(int)
+    iy = y.copy()
+    iy = iy - np.min(iy)
+    iy = (iy/np.max(iy)*imgShape[1]).astype(int)
+  else:
+    ix=x.astype(int)
+    iy=y.astype(int)
+
+  img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=(np.max(ix)+1, np.max(iy)+1)).todense()
+  return img
