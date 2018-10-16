@@ -278,7 +278,6 @@ class SmallDataAna_psana(object):
                             thres=float(key.split('_')[1].replace('p','.'))
                         except:
                             pass
-                    print 'DEBUG: adding photonizing: ',key, thres
                     self.__dict__[detname].addPhotons(ADU_per_photon=detnameDict[key], thresADU=thres, retImg=2)
 
         return detname
@@ -1999,11 +1998,11 @@ class SmallDataAna_psana(object):
             detShapes.append(csShape)
             #print 'DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape
             det_arrayBin=np.zeros(csShape)
-            detArrays.append(det_arrayBin)
-            detSArrays.append(det_arrayBin)
-            detMArrays.append(det_arrayBin)
-            detOffArrays.append(det_arrayBin)
-            detIArrays.append(det_arrayBin)
+            detArrays.append(np.zeros(csShape))#det_arrayBin)
+            detSArrays.append(np.zeros(csShape))#det_arrayBin)
+            detMArrays.append(np.zeros(csShape))#det_arrayBin)
+            detOffArrays.append(np.zeros(csShape))#det_arrayBin)
+            detIArrays.append(np.zeros(csShape))#det_arrayBin)
             if rank==0:
                 print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
 
@@ -2047,7 +2046,7 @@ class SmallDataAna_psana(object):
                         oldM = dMArray
                         dMArray = dMArray + (x-dMArray)/(ievt+1)
                         dSArray = dSArray + (x-dMArray)*(x-oldM)
-                        
+            
         ###
         #off events cube
         ###
@@ -2154,6 +2153,8 @@ class SmallDataAna_psana(object):
                     imgSArray.append(thisImgS)
                     imgMArray.append(thisImgM)
                     imgIArray.append(thisImgI)
+                    #print 'DEBUG append images here  : ',thisImg[0][11]
+                    #print 'DEBUG append images photon: ',thisImgI[0][11]
                 #print 'imgArray length: rank %d '%rank,len(imgArray)
                 
             if rank==0:
