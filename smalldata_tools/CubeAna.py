@@ -179,6 +179,9 @@ class CubeAna(object):
             if self._debug: print '_xrFromRun config: looking at key: ',key
             #make a dictionary with detector config data is present
             if key.find('Cfg')>=0:
+                if key.find('UserDataCfg')>=0:
+                    print 'skip key ',key,' for now.'
+                    continue
                 detname = key.split('__')[1]
                 #if self._debug: print 'DEBUG config: ',self._detConfig
                 if not (detname in self._detConfig.keys()):
@@ -277,14 +280,14 @@ class CubeAna(object):
         #now find images
         for k in self._cubeSumDict.variables.keys():
             if k.find(detname)>=0:
-                shpMatch=True
+                nshpMatch=len(self._detConfig[detname]['x'].shape)
                 for shpX,shpD in zip(reversed(self._detConfig[detname]['x'].shape), reversed(getattr(self._cubeSumDict, k).shape)):
-                    if shpX!=shpD:
-                        shpMatch=False
-                if self._debug: print 'applyAzAv: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, shpMatch
+                    if shpX==shpD:
+                        nshpMatch-=1
+                if self._debug: print 'applyAzAv: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch
                 #this should test the slices of the detector: the last part of the tuple shall be == x-shape!
                 #similar to rebin code.
-                if shpMatch:
+                if nshpMatch==0:
                     data = getattr(self._cubeSumDict, k).data
                     binShp = data.shape[:-len(self._detConfig[detname]['x'].shape)]
                     totBins = 1
@@ -312,7 +315,9 @@ class CubeAna(object):
                     if self._debug: print 'applyAzAv: azData ',azData.shape
                     #need 
                     dsetName = (detname+'_'+azavName+'_azavData')
-                    if self._debug: print 'applyAzAv: detsetName ',dsetName
+                    if k.replace(detname,'').replace('_','')!='':
+                        dsetName = dsetName.replace('azavData','%s_azavData'%k.replace(detname,'').replace('_',''))
+                    if self._debug: print 'applyAzAv: dsetName ',dsetName
                     coords={'bins': self._bins}
                     dims=['bins']
                     if len(azData.shape)==3:
