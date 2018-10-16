@@ -2,11 +2,13 @@ import glob
 from os import path
 import tables
 import numpy as np
+from scipy import sparse
 from utilities import rebinShape
 from utilities_plotting import plotMarker, plotImage
 from utilities_plotting import plot2d_from3d, plot3d_img_time
 from utilities import E2lam
 from utilities import dictToHdf5
+from utilities import image_from_dxy
 import azimuthalBinning as ab
 import xarray as xr
 from bokeh.io import show
@@ -188,6 +190,7 @@ class CubeAna(object):
                     self._detConfig[detname]={}
                 if key.split('__')[2] not in self._detConfig[detname].keys():
                     self._detConfig[detname][key.split('__')[2]] = cubeTable.get_node(key).read()
+            
         if self._debug: 
             for key in self._detConfig.keys():
                 for kkey in self._detConfig[key].keys():
@@ -269,7 +272,45 @@ class CubeAna(object):
       self.__dict__[azavName+'_ty'] = ty
       self.__dict__[azavName+'_detname'] = detname
 
-    #XXX
+    def makeImg(self, detname=None):        
+        if detname is None:
+            if len(self._detConfig.keys())==0:
+                print 'I could not find a detector with its calib info'
+                return
+            elif len(self._detConfig.keys())==1:
+                detname = self._detConfig.keys()[0]
+            else:
+                detname=raw_input('Please select detector from: %s'%self._detConfig.keys()[0])
+
+        for k in self._cubeSumDict.variables.keys():
+            if k.find(detname)>=0:                
+                nshpMatch=len(self._detConfig[detname]['x'].shape)
+                for shpX,shpD in zip(reversed(self._detConfig[detname]['x'].shape), reversed(getattr(self._cubeSumDict, k).shape)):
+                    if shpX==shpD:
+                        nshpMatch-=1
+                if self._debug: print 'makeImg: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch
+                #this should test the slices of the detector: the last part of the tuple shall be == x-shape!
+                #similar to rebin code.
+                if nshpMatch>0:
+                    continue
+                data = getattr(self._cubeSumDict, k).data
+                imgs=[]
+                for dslice in data:
+                    imgs.append(image_from_dxy(dslice, self._detConfig[detname]['x'], self._detConfig[detname]['y']))
+                ##rewrite this for image
+                coords={'bins': self._bins}
+                dims=['bins','ix','iy']
+                coords['ix']=np.arange(imgs[-1].shape[0])
+                coords['iy']=np.arange(imgs[-1].shape[1])
+                dims=tuple(dims)
+                if self._debug: print 'makeImg: dshapes. ',dims
+                dsetName = (detname+'_image')
+                if k.replace(detname,'').replace('_','')!='':
+                    dsetName = dsetName.replace('image','%s_image'%k.replace(detname,'').replace('_',''))
+                newDataArray = xr.DataArray(imgs,coords=coords, dims=dims,name=dsetName)
+                self._cubeSumDict = xr.merge([self._cubeSumDict, newDataArray])
+        if self._debug: print 'makeImg: made images for detector ',detname
+
     def applyAzav(self, azavName='azav'):        
         if azavName not in self.__dict__.keys():
             print 'azimuthal average %s is not defined: '%azavName
@@ -332,6 +373,7 @@ class CubeAna(object):
                     self._cubeSumDict = xr.merge([self._cubeSumDict, newDataArray])
 
     def cubeSumToHdf5(self):
+        if self._debug: 'cubeSumToHdf5: start'
         runs=np.array([int(k.replace('Run','')) for k in self._cubeDict.keys()])
         runStart=runs.min()
         runEnd=runs.max()
