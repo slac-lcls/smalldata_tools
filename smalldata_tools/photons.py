@@ -98,9 +98,10 @@ class photon:
                 ret_dict['col']=(np.append(col[:self.nphotRet], np.zeros(self.nphotRet-len(col)))).astype(int)
                 ret_dict['tile']=(np.append(tile[:self.nphotRet], np.zeros(self.nphotRet-len(tile)))).astype(int)
 
-            if ret_dict['data'].shape[0]!=nphotRet or  ret_dict['row'].shape[0]!=nphotRet or  ret_dict['col'].shape[0]!=nphotRet or  ret_dict['tile'].shape[0]!=nphotRet:
+            if ret_dict['data'].shape[0]!=self.nphotRet or  ret_dict['row'].shape[0]!=self.nphotRet or  ret_dict['col'].shape[0]!=self.nphotRet or  ret_dict['tile'].shape[0]!=self.nphotRet:
                 print 'shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape,ret_dict['tile'].shape
-            return ret_dict
+
+        return ret_dict
 
 #
 #

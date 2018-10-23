@@ -242,17 +242,18 @@ class DetObject(dropObject):
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
           #this is e.g. for the zyla or OPAL when a pedestal with a different ROI is present.
           if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
-            self.mask = np.ones(self.imgShape)
-            self.cmask = np.ones(self.imgShape)
-            if self.dettype==30: #this might not only have been here for the icarus, but I cannot remember
+            if self.det.dettype==30: #this might not only have been here for the icarus, but I cannot remember
               self.mask = np.ones(self.ped.shape)
               self.cmask = np.ones(self.ped.shape)
+            elif self.mask.shape!=self.ped.shape:
+              self.mask = np.ones(self.imgShape)
+              self.cmask = np.ones(self.imgShape)
           if self.det.dettype==26:
             self.mask = self.mask.sum(axis=0)
             self.cmask = self.cmask.sum(axis=0)
         except:
           try:
-            if self.dettype==30:
+            if self.det.dettype==30:
               self.mask = np.ones(self.ped.shape)
               self.cmask = np.ones(self.ped.shape)
             else:
