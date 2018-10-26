@@ -25,9 +25,11 @@ class aduHist:
                         self.bins=np.arange(aduHist[0], aduHist[1])
                 elif len(aduHist)==3:
                         if isinstance(aduHist[2], int):
-                                self.bins=np.linspace(aduHist[0], aduHist[1], aduHist[2])
+                                self.bins=np.linspace(aduHist[0], aduHist[1], max(2,aduHist[2]))
                         if isinstance(aduHist[2], float):
                                 self.bins=np.arange(aduHist[0], aduHist[1], aduHist[2])
+                                if self.bins[-1]!=aduHist[1]:
+                                        self.bins = np.append(self.bins, aduHist[1])
                 elif len(aduHist)>3:
                         self.bins = np.array(aduHist)
                 self.ROI = ROI
