@@ -63,6 +63,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
         except:
             print 'did not add encoder detector'
             pass
+    dets.append(l3tDetector())
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage')
     return dets
@@ -95,6 +96,7 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     except:
         print 'did not add encoder detector'
         pass
+    dets.append(l3tDetector())
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage')
     return dets

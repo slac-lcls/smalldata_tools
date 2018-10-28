@@ -8,7 +8,8 @@ from fitCenter import  fitCenter
 from photons import  photon,photon2,photon3
 #from SmallDataDefaultDetector import ebeamDetector
 from SmallDataUtils import  defaultDetectors,lightStatus,ipmDetector,bmmonDetector,epicsDetector,encoderDetector,controlDetector,aiDetector,ttDetector,damageDetector,ttRawDetector,xtcavDetector,detData,getCfgOutput,getUserData,getUserEnvData,defaultRedisVars,wave8Detector,setParameter
-from SmallDataUtils import ebeamDetector
+from SmallDataUtils import ebeamDetector, gasDetector
+from SmallDataUtils import l3tDetector
 from epicsarchive import EpicsArchive
 
 #from SmallDataAna_psana import  SmallDataAna_psana

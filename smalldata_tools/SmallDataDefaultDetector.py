@@ -312,6 +312,34 @@ class damageDetector(defaultDetector):
                 dl[alias.replace('-','_')]=val
         return dl
 
+#no psana detector for this. Need to code 'from scratch'
+class l3tDetector(object):
+    def __init__(self, name=None):
+        if name is None:
+            self.name = 'l3t'
+        else:
+            self.name = name
+
+        #self.det=psana.Detector(detname)
+        self._debug = False
+
+    #rely on fail save
+    def inRun(self):
+        return True
+
+    def _setDebug(self, debug):
+        self._debug = debug
+
+    def data(self, evt):
+        dl={}
+        try:
+            l3t = evt.get(psana.L3T.DataV2,psana.Source(''))
+            if l3t is not None:
+                dl['accept']=l3t.accept()
+        except:
+            pass
+        return dl
+
 #
 # needs testing with data.
 #
@@ -586,15 +614,34 @@ class xtcavDetector(defaultDetector):
 
 #cheap out and only store the one field we look at for now.
 class ebeamDetector(defaultDetector):
-    def __init__(self, detname, name=None):
+    def __init__(self, name=None):
         if name is None:
-            self.name = detname
+            self.name = 'ebeam'
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, 'EBeam', name)
     def data(self, evt):
         dl={}
         ebeamData = self.det.get(evt)
         if ebeamData is not None:
             dl['L3Energy']=ebeamData.ebeamL3Energy()
+        return dl
+
+class gasDetector(defaultDetector):
+    def __init__(self, name=None):
+        if name is None:
+            self.name = 'gas_detector'
+        else:
+            self.name = name
+        defaultDetector.__init__(self, 'FEEGasDetEnergy', name)
+    def data(self, evt):
+        dl={}
+        gdetData = self.det.get(evt)
+        if gdetData is not None:
+            dl['f_11_ENRC']=gdetData.f_11_ENRC()
+            dl['f_12_ENRC']=gdetData.f_12_ENRC()
+            dl['f_21_ENRC']=gdetData.f_21_ENRC()
+            dl['f_22_ENRC']=gdetData.f_22_ENRC()
+            dl['f_63_ENRC']=gdetData.f_63_ENRC()
+            dl['f_64_ENRC']=gdetData.f_64_ENRC()
         return dl
