@@ -2,15 +2,17 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import sparse
 from utilities import hist2d
+import holoviews as hv
 
 class droplets(object):
-    def __init__(self,h5file,detName='epix',dropName='droplet'):
+    def __init__(self,h5file,detName='epix',dropName='droplet', plotWith='matplotlib'):
         self._detName=detName
         self._dropName=dropName
         if self._dropName[-1]!='_':
             self._dropName+='_'
         self._h5 = h5file
         self._h5dir = self._h5.get_node('/'+self._detName)
+        self._plotWith=plotWith
 
     def getKeys(self):
         keyList=[]
@@ -43,6 +45,7 @@ class droplets(object):
                 #if Filter is not None:
                 #    print 'DEBUG Shapes', h5Name, Filter.shape[0], self._h5.get_node('/'+self._detName, h5Name).shape[0]
                 if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
+                    print 'DEBUG: ',h5Name, self._h5.get_node('/'+self._detName, h5Name).read().shape, Filter.shape
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
                 else:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
@@ -54,6 +57,10 @@ class droplets(object):
             else:
                 print 'did not find adu, will not flatten'
                 return
+
+        else:
+            if len(filterArray.shape)==1 and filterArray.shape[0] == self.__dict__['adu'].shape[0]:
+                filterArray = np.array([filterArray ,]*self.__dict__['adu'].shape[1]).transpose() & (self.__dict__['adu']>0)
 
         for key in self.getKeys():
             if key == 'detSize':
@@ -103,30 +110,49 @@ class droplets(object):
                 imgsROI.append(img)
         return imgsROI
 
-    def plotSpectrum(self, plotLog=True, aduRange=[]):
+    def plotSpectrum(self, plotLog=True, aduRange=[], ROI=None):
         if len(aduRange)==0:
-            aduRange=[0,700]
+            aduRange=[0.1,700]
         elif len(aduRange)==1:
-            aduRange=[0,aduRange[0]]
+            aduRange=[0.1,aduRange[0]]
         elif len(aduRange)==2:
             aduRange=[aduRange[0], aduRange[1]]
             
-        hst = np.histogram(self.__dict__['adu'], np.arange(aduRange[0],aduRange[1]))
-        if plotLog:
-            plt.semilogy(hst[1][1:],hst[0],'o')
+        if ROI is None:
+            dadu = self.__dict__['adu']
         else:
-            plt.plot(hst[1][1:],hst[0],'o')
+            dadu = self.__dict__['adu']
+            dx = self.__dict__['x'].flatten()
+            dy = self.__dict__['y'].flatten()
+            inROIx = np.logical_and(dx > np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
+            inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[2],dy < np.array(self.ROI).flatten()[3]) 
+            inROI = np.logical_and(inROIx, inROIy)
+            dadu = dadu.flatten()[inROI]
+
+        hst = np.histogram(adau, np.arange(aduRange[0],aduRange[1]))
+        if self._plotWith=='matplotlib':
+            if plotLog:
+                plt.semilogy(hst[1][1:],hst[0],'o')
+            else:
+                plt.plot(hst[1][1:],hst[0],'o')
+        elif self._plotWith=='holoviews':
+            if plotLog:
+                return hv.Scatter((hst[1][1:],np.log(hst[0])))#,'ADU','log_nDrops')
+            else:
+                return hv.Scatter((hst[1][1:],hst[0]))#,'ADU','nDrops')
+        else:
+            return hst
             
-    def plotAduX(self, ADUrange=[120,180],maxLim=99.5):
+    def plotAduX(self, aduRange=[120,180],maxLim=99.5):
         #self.__dict__['detSize'] = [dX, dY] #708, 772 or epix
         dX = self.__dict__['detSize'][0]
         dY = self.__dict__['detSize'][1]
         if len(self.__dict__['X'].shape)>1:
             self.flattenDropArray()
         plt.figure()
-        hist2d(self.__dict__['X'][self.__dict__['Y']<=dY],self.__dict__['adu'][self.__dict__['Y']<=dY], numBins=[dX,180], histLims=[0,dX,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+        hist2d(self.__dict__['X'][self.__dict__['Y']<=dY],self.__dict__['adu'][self.__dict__['Y']<=dY], numBins=[dX,180], histLims=[0,dX,aduRange[0], aduRange[1]],limits=[1,maxLim])
 
-    def plotAduY(self, ADUrange=[120,180],maxLim=99.5):    
+    def plotAduY(self, aduRange=[120,180],maxLim=99.5):    
         dX = self.__dict__['detSize'][0]
         dY = self.__dict__['detSize'][1]
         if len(self.__dict__['Y'].shape)>1:
@@ -134,27 +160,27 @@ class droplets(object):
         plt.figure()
         if self._detName.find('epix')>=0 or self._detName.find('Epix')>=0:
             plt.subplot(211)
-            hist2d(self.__dict__['Y'][self.__dict__['X']<351],self.__dict__['adu'][self.__dict__['X']<351], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+            hist2d(self.__dict__['Y'][self.__dict__['X']<351],self.__dict__['adu'][self.__dict__['X']<351], numBins=[dY,180], histLims=[0,dY,aduRange[0], aduRange[1]],limits=[1,maxLim])
             plt.subplot(212)
-            hist2d(self.__dict__['Y'][self.__dict__['X']>353],self.__dict__['adu'][self.__dict__['X']>353], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+            hist2d(self.__dict__['Y'][self.__dict__['X']>353],self.__dict__['adu'][self.__dict__['X']>353], numBins=[dY,180], histLims=[0,dY,aduRange[0], aduRange[1]],limits=[1,maxLim])
         else:
-            hist2d(self.__dict__['Y'][self.__dict__['X']<=dX],self.__dict__['adu'][self.__dict__['X']<=dX], numBins=[dY,180], histLims=[0,dY,ADUrange[0], ADUrange[1]],limits=[1,maxLim])
+            hist2d(self.__dict__['Y'][self.__dict__['X']<=dX],self.__dict__['adu'][self.__dict__['X']<=dX], numBins=[dY,180], histLims=[0,dY,aduRange[0], aduRange[1]],limits=[1,maxLim])
 
-    def plotXY(self, ADUrange=[120,180], npix=0):            
+    def plotXY(self, aduRange=[120,180], npix=0):            
         dX = self.__dict__['detSize'][0]
         dY = self.__dict__['detSize'][1]
-        allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
-        allY = self.__dict__['Y'][self.__dict__['adu']>ADUrange[0]]
-        alladu = self.__dict__['adu'][self.__dict__['adu']>ADUrange[0]]
+        allX = self.__dict__['X'][self.__dict__['adu']>aduRange[0]]
+        allY = self.__dict__['Y'][self.__dict__['adu']>aduRange[0]]
+        alladu = self.__dict__['adu'][self.__dict__['adu']>aduRange[0]]
         if npix!=0:
-            allNpix=self.__dict__['npix'][self.__dict__['adu']>ADUrange[0]]
+            allNpix=self.__dict__['npix'][self.__dict__['adu']>aduRange[0]]
             
-        if ADUrange[1]>ADUrange[0]:
-            allX = allX[alladu<ADUrange[1]]
-            allY = allY[alladu<ADUrange[1]]
+        if aduRange[1]>aduRange[0]:
+            allX = allX[alladu<aduRange[1]]
+            allY = allY[alladu<aduRange[1]]
             if npix!=0:
-                allNpix = allNpix[alladu<ADUrange[1]]
-            alladu = alladu[alladu<ADUrange[1]]
+                allNpix = allNpix[alladu<aduRange[1]]
+            alladu = alladu[alladu<aduRange[1]]
         if npix!=0:
             if npix>0:
                 allX = allX[allNpix==npix] 
@@ -169,18 +195,18 @@ class droplets(object):
         ndrop_int = max(1,490000./allX.shape[0])
         hist2d(allX,allY, numBins=[int(dX/ndrop_int),int(dY/ndrop_int)])
 
-    def aduSlices(self,axis='y', ADUrange=[0,-1], npix=0):
-        allX = self.__dict__['X'][self.__dict__['adu']>ADUrange[0]]
-        allY = self.__dict__['Y'][self.__dict__['adu']>ADUrange[0]]
-        alladu = self.__dict__['adu'][self.__dict__['adu']>ADUrange[0]]
+    def aduSlices(self,axis='y', aduRange=[0,-1], npix=0):
+        allX = self.__dict__['X'][self.__dict__['adu']>aduRange[0]]
+        allY = self.__dict__['Y'][self.__dict__['adu']>aduRange[0]]
+        alladu = self.__dict__['adu'][self.__dict__['adu']>aduRange[0]]
         if npix!=0:
-            allNpix=self.__dict__['npix'][self.__dict__['adu']>ADUrange[0]]
-        if ADUrange[1]>ADUrange[0]:
-            allX = allX[alladu<ADUrange[1]]
-            allY = allY[alladu<ADUrange[1]]
+            allNpix=self.__dict__['npix'][self.__dict__['adu']>aduRange[0]]
+        if aduRange[1]>aduRange[0]:
+            allX = allX[alladu<aduRange[1]]
+            allY = allY[alladu<aduRange[1]]
             if npix!=0:
-                allNpix = allNpix[alladu<ADUrange[1]]
-            alladu = alladu[alladu<ADUrange[1]]
+                allNpix = allNpix[alladu<aduRange[1]]
+            alladu = alladu[alladu<aduRange[1]]
         if npix!=0:
             if npix>0:
                 allX = allX[allNpix==npix] 
