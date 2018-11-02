@@ -45,6 +45,7 @@ class SmallDataAna_psana(object):
         self.expname=expname
         self.hutch=expname[0:3]
         self.plotWith=plotWith
+        self.sda=None
         currExpname = RegDB.experiment_info.active_experiment(self.hutch.upper())[1]
         if expname==currExpname:
             lastRun = RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['num']
@@ -120,18 +121,21 @@ class SmallDataAna_psana(object):
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
         self.jobsIds = []
+        self.commonModeStrings=['raw','pedSub','unb','hist','median','medianNorm','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110']
 
     def commonModeStr(self, common_mode=0):
         if common_mode<0:
             return 'raw_'
         elif common_mode==5:
             return 'unb_'
+        elif common_mode==4 or common_mode==1:
+            return 'hist_'
         elif common_mode==6:
-            return 'cm6_'
-        elif common_mode==45:
             return 'median_'
+        elif common_mode==45:
+            return 'median_45_'
         elif common_mode==46:
-            return 'cm46_'
+            return 'medianNorm_'
         elif common_mode==47:
             return 'cm47_'
         elif common_mode==71:
@@ -423,17 +427,17 @@ class SmallDataAna_psana(object):
     def getAvImage(self,detname=None, imgName=None):
         avImages=[]
         for key in self.__dict__.keys():
+            if key.find('AvImg')!=0:
+                continue
             if key.find('_mask_')>=0:
                 continue
             if key.find('_azint_')>=0:
                 continue
             if imgName is not None and key.find(imgName)<0:
                 continue
-            if key.find('AvImg')==0:
-                if detname is not None and key.find(detname)>=0:
-                    avImages.append(key)
-                elif detname is None:
-                    avImages.append(key)
+            if detname is not None and key.find(detname)<0:
+                continue
+            avImages.append(key)
         if len(avImages)==0:
             print 'please create the AvImage first!'
             return
@@ -473,7 +477,9 @@ class SmallDataAna_psana(object):
 
     def _getDetName_from_AvImage(self,avimage):
         detname=''
-        dns = avimage.replace('AvImg_','').replace('std_','').replace('median_','').replace('pedSub_','').replace('cm46_','').replace('cm72_','').replace('cm71_','').replace('raw_','').replace('unb_','').split('_')
+        for thisCmString in self.commonModeStrings:
+            avimage=avimage.replace(thisCmString+'_','')
+        dns = avimage.split('_')
         for ddns in dns:
             if ddns.find('thres')<0 and ddns.find('Filter')<0:
                 detname+=ddns;detname+='_'
