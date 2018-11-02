@@ -147,7 +147,7 @@ class DetObject(dropObject):
       elif self.det.dettype == 2:
         self.common_mode = 1
       elif self.det.dettype == 13:
-        self.common_mode = 46
+        self.common_mode = 6
       elif self.det.dettype == 26:
         self.common_mode = 0 #pedestal subtract
       self.applyMask = applyMask
@@ -712,8 +712,11 @@ class DetObject(dropObject):
       elif self.common_mode%100==36:
         self.evt.dat = self.det.calib(evt, cmpars=[6], mbits=mbits, rms = self.rms)
         needGain=False
+      elif self.common_mode%100==34:
+        self.evt.dat = self.det.calib(evt, cmpars=(4,6,100,100), mbits=mbits)
+        needGain=False
       elif self.common_mode%100==4:
-        self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,30), mbits=mbits)
+        self.evt.dat = self.det.calib(evt, cmpars=(4,6,30,10), mbits=mbits)
         needGain=False
       elif self.common_mode%100==71:
         self.evt.dat = self.det.calib(evt, cmpars=(7,1,100), mbits=mbits) #correction in rows

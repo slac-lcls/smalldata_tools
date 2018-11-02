@@ -121,7 +121,7 @@ class SmallDataAna_psana(object):
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
         self.jobsIds = []
-        self.commonModeStrings=['raw','pedSub','unb','hist','median','medianNorm','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110']
+        self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110']
 
     def commonModeStr(self, common_mode=0):
         if common_mode<0:
@@ -132,10 +132,14 @@ class SmallDataAna_psana(object):
             return 'hist_'
         elif common_mode==6:
             return 'median_'
+        elif common_mode==34:
+            return 'histAmiLike_'
+        elif common_mode==36:
+            return 'medianNoNorm_'
         elif common_mode==45:
-            return 'median_45_'
+            return 'median45_'
         elif common_mode==46:
-            return 'medianNorm_'
+            return 'medianSN_'
         elif common_mode==47:
             return 'cm47_'
         elif common_mode==71:
@@ -424,7 +428,7 @@ class SmallDataAna_psana(object):
             imgM = np.median(img,axis=0)#.squeeze()
             self.__dict__[data.replace('AvImg_','AvImg_median_')]=imgM
 
-    def getAvImage(self,detname=None, imgName=None):
+    def getAvImage(self,detname=None, imgname=None):
         avImages=[]
         for key in self.__dict__.keys():
             if key.find('AvImg')!=0:
@@ -433,7 +437,7 @@ class SmallDataAna_psana(object):
                 continue
             if key.find('_azint_')>=0:
                 continue
-            if imgName is not None and key.find(imgName)<0:
+            if imgname is not None and key.find(imgname)<0:
                 continue
             if detname is not None and key.find(detname)<0:
                 continue
@@ -487,8 +491,8 @@ class SmallDataAna_psana(object):
             detname = detname[:-1]
         return detname
 
-    def plotAvImage(self,detname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
-        detname, img, avImage = self.getAvImage(detname=None)
+    def plotAvImage(self,detname=None,imgname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
+        detname, img, avImage = self.getAvImage(detname=detname, imgname=imgname)
 
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
