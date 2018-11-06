@@ -121,7 +121,7 @@ class SmallDataAna_psana(object):
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
         self.jobsIds = []
-        self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110']
+        self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110','calib']
 
     def commonModeStr(self, common_mode=0):
         if common_mode<0:
@@ -132,6 +132,8 @@ class SmallDataAna_psana(object):
             return 'hist_'
         elif common_mode==6:
             return 'median_'
+        elif common_mode==30:
+            return 'calib_'
         elif common_mode==34:
             return 'histAmiLike_'
         elif common_mode==36:
@@ -482,7 +484,7 @@ class SmallDataAna_psana(object):
     def _getDetName_from_AvImage(self,avimage):
         detname=''
         for thisCmString in self.commonModeStrings:
-            avimage=avimage.replace(thisCmString+'_','')
+            avimage=avimage.replace(thisCmString+'_','').replace('AvImg_','')
         dns = avimage.split('_')
         for ddns in dns:
             if ddns.find('thres')<0 and ddns.find('Filter')<0:
