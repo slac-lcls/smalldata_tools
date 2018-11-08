@@ -420,8 +420,10 @@ class SmallDataAna_psana(object):
         else:
             imgA = img.sum(axis=0)#.squeeze()
         if det.mask is not None and useMask:
-            imgA[det.mask==0]=0
-                
+            try:
+                imgA[det.mask==0]=0
+            except:
+                np.squeeze(imgA)[np.squeeze(det.mask)==0]=0
         self.__dict__[data]=imgA
         if std:
             imgS = img.std(axis=0)#.squeeze()
