@@ -38,10 +38,10 @@ class ROIObject(dropObject):
     self.rebin = False
     if rms is not None:
       if rms.ndim==4:
-        rms = rms[0].squeeze()
+        rms = rms[0]#.squeeze()
       self.rms = self.applyROI(rms)
   def applyROI(self, array):
-    array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
+    #array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
     self.bound = np.array(self.bound)
     self.bound = self.bound.squeeze()
     if array.ndim < self.bound.ndim:
@@ -101,7 +101,7 @@ class ROIObject(dropObject):
     array = arrayIn.copy().squeeze()
     array.data[array.data<cutADU]=0
     if 'rms' in self.__dict__.keys() and self.rms is not None:
-      array.data[array.data<cutRms*self.rms]=0
+      array.data[array.data<cutRms*self.rms.squeeze()]=0
     if singlePhoton:
       array.data[array.data>0]=1
     #array.data = array.data.astype(np.float64)
@@ -121,7 +121,7 @@ class ROIObject(dropObject):
     
 #idea is to get rid of "common" lines of all detectors as they come automatically.
 class DetObject(dropObject):
-    def __init__(self,srcName,env,run,name=None, common_mode=1, applyMask=0):
+    def __init__(self,srcName,env,run,name=None, common_mode=None, applyMask=0):
       self._srcName=srcName
       if name is not None:
         self._name = name
@@ -708,6 +708,9 @@ class DetObject(dropObject):
         needGain=False
       elif self.common_mode%100==6:
         self.evt.dat = self.det.calib(evt, cmpars=[6], mbits=mbits, rms = self.rms, normAll=True)
+        needGain=False
+      elif self.common_mode%100==30:
+        self.evt.dat = self.det.calib(evt)
         needGain=False
       elif self.common_mode%100==36:
         self.evt.dat = self.det.calib(evt, cmpars=[6], mbits=mbits, rms = self.rms)
