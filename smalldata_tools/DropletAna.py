@@ -129,7 +129,7 @@ class droplets(object):
             inROI = np.logical_and(inROIx, inROIy)
             dadu = dadu.flatten()[inROI]
 
-        hst = np.histogram(adau, np.arange(aduRange[0],aduRange[1]))
+        hst = np.histogram(dadu, np.arange(aduRange[0],aduRange[1]))
         if self._plotWith=='matplotlib':
             if plotLog:
                 plt.semilogy(hst[1][1:],hst[0],'o')
