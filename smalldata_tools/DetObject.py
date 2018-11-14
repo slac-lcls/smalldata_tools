@@ -130,6 +130,7 @@ class DetObject(dropObject):
       self.det=psana.Detector(srcName)
       self.run=run
       self.storeEnv = False
+      self.__storeSum = {}
       #det.dettype
       #1->CsPad, 2->Cs2x2, 13->epix100a
       #6->opal, 27->zyla, 26->jungfrau
@@ -248,9 +249,6 @@ class DetObject(dropObject):
             elif self.mask.shape!=self.ped.shape:
               self.mask = np.ones(self.imgShape)
               self.cmask = np.ones(self.imgShape)
-          if self.det.dettype==26:
-            self.mask = self.mask.sum(axis=0)
-            self.cmask = self.cmask.sum(axis=0)
         except:
           try:
             if self.det.dettype==30:
@@ -332,6 +330,11 @@ class DetObject(dropObject):
 
     def storeEnvironment(self):
       self.storeEnv = True
+    def storeSum(self, sumAlgo=None):
+      if sumAlgo is not None:
+        self.__storeSum[sumAlgo]=None
+      else:
+        return self.__storeSum
     def setMask(self, mask):
       self.mask = mask
     def setcMask(self, mask):
@@ -472,6 +475,42 @@ class DetObject(dropObject):
           self.evt.__dict__['env_AnalogV']  = self.evt.envRow[7]*0.001
           self.evt.__dict__['env_DigitalV']  = self.evt.envRow[8]*0.001
 
+    def processSums(self):
+      for key in self.__storeSum.keys():
+        asImg=False
+        thres=-1.e9
+        for skey in key.split('_'):
+          if skey.find('img')>=0:
+            asImg=True
+          else:
+            if skey.find('thresADU')>=0:
+              thres=float(skey.replace('thresADU',''))
+            
+        dat_to_be_summed = self.evt.dat
+        if thres>1e-9:
+          dat_to_be_summed[self.evt.dat<thres]=0.
+
+        if key.find('nhits')>=0:
+          dat_to_be_summed[dat_to_be_summed>0]=1
+          
+        if key.find('square')>=0:
+          dat_to_be_summed = np.square(dat_to_be_summed)
+
+        if asImg:
+          try:
+            dat_to_be_summed = self.det.image(int(run),self.evt.dat)
+          except:
+            pass
+
+        print 'have dat_to_be_summed ',dat_to_be_summed.sum()
+        if self.__storeSum[key] is None:
+          self.__storeSum[key] = dat_to_be_summed.copy()
+        else:
+          self.__storeSum[key] += dat_to_be_summed
+        print 'summed dat ',self.__storeSum[key].sum()
+
+
+
     def processDetector(self):
       self.processROIs()
       self.processDroplets()
@@ -482,6 +521,7 @@ class DetObject(dropObject):
       self.processPhotons3()
       self.processTemplatePeakFits()
       self.processEnvironment()
+      self.processSums()
       # calculate azimuthal average if requested
       for thisAzavName,thisAzav in zip(self.getAzAvKeys(),self.getAzAvs()):
         if self.evt.dat is not None:

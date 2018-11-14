@@ -224,7 +224,7 @@ def getCfgOutput(det):
     #baseName=det._name+'_'
     baseName=''
     for key in det.__dict__.keys():
-        if key == 'mask_ROI' or key == 'mask_ROI_shape' or key == 'bankMasks':
+        if key == 'mask_ROI' or key == 'mask_ROI_shape' or key == 'bankMasks' or key.find('__')==0:
             continue
         if isinstance(det[key], list) or isinstance(det[key], np.ndarray):
             if isinstance(det[key], list):
