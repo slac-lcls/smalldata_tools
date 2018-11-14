@@ -77,9 +77,9 @@ class ROIObject(dropObject):
     #why do I need to invert this?
     X, Y = np.meshgrid(np.arange(array.shape[0]), np.arange(array.shape[1]))
     try:
-      imagesums = np.sum(np.sum(array,axis=0),axis=0)
-      centroidx = np.sum(np.sum(array*X.T,axis=0),axis=0)
-      centroidy = np.sum(np.sum(array*Y.T,axis=0),axis=0)
+      imagesums = np.nansum(np.nansum(array,axis=0),axis=0)
+      centroidx = np.nansum(np.nansum(array*X.T,axis=0),axis=0)
+      centroidy = np.nansum(np.nansum(array*Y.T,axis=0),axis=0)
       return centroidx/imagesums,centroidy/imagesums 
     except:
       return np.nan,np.nan
@@ -107,13 +107,13 @@ class ROIObject(dropObject):
     #array.data = array.data.astype(np.float64)
     if mean:
       if params[0]<0:
-        return array.squeeze().mean()
+        return np.nanmean(array.squeeze())
       else:
-        return array.squeeze().mean(axis=params[0])
+        return np.nanmean(array.squeeze(),axis=params[0])
     if params[0]<0:
-      return array.squeeze().sum()
+      return np.nansum(array.squeeze())
     else:
-      return array.squeeze().sum(axis=params[0])
+      return np.nansum(array.squeeze(),axis=params[0])
   def getProjs(self):
     retkey = [ self[key] for key in self.__dict__.keys() if key[:4]=='proj' ]
     #print retkey
@@ -360,13 +360,13 @@ class DetObject(dropObject):
           ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(np.ones_like(self.evt.dat).astype(bool))))
         if ROI.writeArea:
           self.evt.__dict__['write_'+ROI.name] = ROI.area.squeeze()
-        self.evt.__dict__['write_'+ROI.name+'_max'] = ROI.area.astype(np.float64).max()
-        self.evt.__dict__['write_'+ROI.name+'_sum'] = ROI.area.astype(np.float64).sum()
+        self.evt.__dict__['write_'+ROI.name+'_max'] = np.nanmax(ROI.area.astype(np.float64))
+        self.evt.__dict__['write_'+ROI.name+'_sum'] = np.nansum(ROI.area.astype(np.float64))
         self.evt.__dict__['write_'+ROI.name+'_com'] = ROI.centerOfMass(ROI.area)
         for pj in ROI.getProjs():
           self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]] = ROI.projection(ROI.area, pj[:-1])
-          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_max'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].max()
-          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_sum'] = self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]].sum()
+          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_max'] = np.nanmax(self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]])
+          self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_sum'] = np.nansum(self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]])
         if ROI.rebin:
           self.evt.__dict__['write_'+ROI.name+'_rebin'] = ROI.Rebin(ROI.area)
 
