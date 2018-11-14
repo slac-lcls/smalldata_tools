@@ -230,6 +230,8 @@ if haveCspad:
             cspad.addAzAv(phiBins=11, Pplane=0)
         except:
             pass
+    cspad.storeSum(sumAlgo='calib')
+    cspad.storeSum(sumAlgo='square')
     dets.append(cspad)
 
 ########################################################## 
@@ -321,6 +323,14 @@ for eventNr,evt in enumerate(ds.events()):
                             redisList.append(sdkey)
             print 'Saving in REDIS: ',redisList
             smldata.connect_redis(redisList)
+
+sumDict={'Sums': {}}
+for det in dets:
+    for key in det.storeSum().keys():
+        sumData=smldata.sum(det.storeSum()[key])
+        sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
+if len(sumDict['Sums'].keys())>0:
+    smldata.save(sumDict)
 
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()
