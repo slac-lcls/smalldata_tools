@@ -3,6 +3,7 @@ from scipy import sparse
 import time
 from ImgAlgos.PyAlgos import photons
 import scipy.ndimage.filters as filters
+import itertools
 
 def fcn(buffer):
     if len(buffer[buffer<buffer[2]])>0:
@@ -48,11 +49,9 @@ class photon:
         """
         tstart=time.time()
         fimage, locMask = self.prepImage(image, self.mask)
-
         #photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
         #note: this works on tiled detectors.
         photons_nda = photons(fimage, locMask)
-
         ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
         ret_dict['nPhot']=photons_nda.sum()
         ret_dict['nPhot_mask']=photons_nda[locMask>0].sum()
@@ -72,10 +71,10 @@ class photon:
                 tile=[]
                 for iTile,photonTile in enumerate(photonsImg):
                     sImage = sparse.coo_matrix(photonTile)
-                    data.append(sImage.data.tolist())
-                    row.append(sImage.row.tolist())
-                    col.append(sImage.col.tolist())
-                    tile.append((np.ones_like(sImage.data)*iTile).tolist())
+                    data = list(itertools.chain.from_iterable([data, sImage.data.tolist()]))
+                    row = list(itertools.chain.from_iterable([row, sImage.data.tolist()]))
+                    col = list(itertools.chain.from_iterable([col, sImage.data.tolist()]))
+                    tile = list(itertools.chain.from_iterable([tile, (np.ones_like(sImage.data)*iTile).tolist()]))
                 data = np.array(data)
                 row = np.array(row)
                 col = np.array(col)
