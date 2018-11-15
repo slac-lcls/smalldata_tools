@@ -559,7 +559,7 @@ class CubeAna(object):
         return None
 
     #change this: do not use what typically contains ROI to pick slice, add explicit value.
-    def plotCubeImage(self, run=None, sig=None, plotWith=None, plotLog=False, plot3d=False, sigIdx=None):
+    def plotCubeImage(self, run=None, sig=None, plotWith=None, plotLog=False, plot3d=False, sigIdx=None, useHoloviews=True, normIdx=None):
         if plotWith==None:
             plotWith=self._plotWith
         runKey = None
@@ -598,19 +598,7 @@ class CubeAna(object):
         if sig not in cubeDict.variables:
             print 'could not find sig, return'; return
 
-        if plot3d:
-            if plotWith=='matplotlib':
-                print 'only supported with bokeh'
-                return
-            bins = self._cubeSumDict['bins'].data
-            data2plot = cubeDict[sig].data
-            data2plot = self._reduceData(data2plot, sigROI).copy()
-            if sigIdx is not None:
-                data2plot=data2plot[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
-                bins=bins[bins.shape[0]/2-sigIdx/2:bins.shape[0]/2+sigIdx/2]
-            layout,im,p=plot2d_from3d(data2plot=data2plot,cmaps=cmaps,coord=bins.tolist(),init_plot=bins[bins.shape[0]/2])
-            show(layout)
-        else:
+        if not plot3d:
             if sigIdx is not None:
                 data2plot=cubeDict[sig].data[sigIdx]
             else:
@@ -620,9 +608,19 @@ class CubeAna(object):
 
             extent=[0,data2plot.shape[0],0,data2plot.shape[1]]
             plotImage(data2plot, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self._plot_dirname, extent=extent, plotLog=plotLog)
+            return
+        
+        if plotWith=='matplotlib':
+            print 'only supported with bokeh'
+            return
+            
+        if useHoloviews:
+            return self._inspectCube(run=run, sig=sig, sigIdx=sigIdx, plotLog=plotLog, normIdx=normIdx, useHoloviews=True, plotLowHighPercentile=True)
+        else:
+            self._inspectCube(run=run, sig=sig, sigIdx=sigIdx, plotLog=plotLog, normIdx=normIdx, useHoloviews=False, plotLowHighPercentile=True)
 
     #change this: do not use what typically contains ROI to pick slice, add explicit value.
-    def inspectCube(self, run=None, sig=None, sigIdx=None, normIdx=None, plotWith=None, useHoloviews=False, plotLowHighPercentile=True, plotLog=False):
+    def _inspectCube(self, run=None, sig=None, sigIdx=None, normIdx=None, plotWith=None, useHoloviews=False, plotLowHighPercentile=True, plotLog=False):
         if plotWith==None:
             plotWith=self._plotWith
             if plotWith=='matplotlib':
@@ -676,7 +674,6 @@ class CubeAna(object):
                     return
             if isinstance(normIdx, list):
                 normIdx=np.array(normIdx)
-            print 'normIdx: ',normIdx
             if normIdx.shape[0]==data2plot.shape[0]:
                 normBins=[]
                 normdata2plot=[]
