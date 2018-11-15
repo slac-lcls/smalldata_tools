@@ -1254,7 +1254,7 @@ def hv_imageFromIndex(index, cmap, imgLow, imgHigh, data2plot, **kwargs):
 def hv_3dimage(data2plot, **kwargs):
     """
     function to plot images with holoviews
-    Input are data (2-d array)
+    Input are data (3-d array)
 
     Parameters
     ----------
@@ -1267,6 +1267,7 @@ def hv_3dimage(data2plot, **kwargs):
     width = kwargs.pop("width",600)
     height = kwargs.pop("height",int(width*0.8))
     clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+    plotLowHighPercentile = kwargs.pop("plotLowHighPercentile",True)
 
     #dump = kwargs.pop("cmap",None)
     #dump = kwargs.pop("imgLow",None)
@@ -1285,17 +1286,61 @@ def hv_3dimage(data2plot, **kwargs):
     dimIdx = hv.Dimension('index', range=(0,data2plot.shape[0]-1))
     dimCol = hv.Dimension('cmap', values=['viridis','fire','seismic','gray','rainbow','jet','nipy_spectral'])
     
+    if plotLog:
+        data2plot=np.log(data2plot)
+        data2plot[np.isinf(data2plot)]=np.nan 
+        data2plot[np.isneginf(data2plot)]=np.nan 
+        data2plot[np.isnan(data2plot)]=0
+
     #try to get decent color scale limits from middle image, go towards later images if necessary
-    imgLimIdx=int(data2plot.shape[0]/2)
-    while (np.nanstd(data2plot[imgLimIdx])==0 and imgLimIdx<shp[0]):
-        imgLimIdx+=1
-    imgMin = np.nanmin(data2plot[imgLimIdx])
-    imgMax = np.nanmax(data2plot[imgLimIdx])
-    imgPLow = np.nanpercentile(data2plot[imgLimIdx],5)
-    imgPHigh = np.nanpercentile(data2plot[imgLimIdx],99.9)
+    #imgLimIdx=int(data2plot.shape[0]/2)
+    #while (np.nanstd(data2plot[imgLimIdx])==0 and imgLimIdx<shp[0]):
+    #    imgLimIdx+=1
+    #dataForLimits=data2plot[imgLimIdx]
+    dataForLimits=data2plot
+    lowPercentile=np.arange(0,100).tolist()
+    hP1 = np.arange(0,90) 
+    hP2 = np.arange(90,99,0.1) 
+    hP = np.append(hP1, hP2)
+    hP3 = np.arange(99,100,0.01) 
+    try:
+        testP=np.percentile(data2plot, 99.99)
+        hP = np.append(hP, hP3)
+        hP4 = np.arange(99.99,100,0.001) 
+        try:
+            testP=np.percentile(data2plot, hP4[-1])
+            hP = np.append(hP, hP4)
+        except:
+            try:
+                testP=np.percentile(data2plot, hP4[-5])
+                hP = np.append(hP, hP4[:-5])
+            except:
+                pass
+    except:
+        try:
+            testP=np.percentile(data2plot, 99.9)
+            hP3 = np.arange(99,99.91,0.01) 
+            hP = np.append(hP, hP3)
+        except:
+            pass
+    highPercentile=hP.tolist()
     
-    dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
-    dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
+    imgMin = np.nanmin(dataForLimits)
+    imgMax = np.nanmax(dataForLimits)
+    valuesLow = np.nanpercentile(dataForLimits,lowPercentile).tolist()
+    valuesHigh = np.nanpercentile(dataForLimits,highPercentile).tolist() 
+    valuesHigh.append(imgMax)
+    imgPLow = valuesLow[5]
+    imgPHigh = valuesHigh[-10]    
+    if imgPHigh > valuesLow[-1]: valuesLow.append(imgPHigh)
+    
+    if plotLowHighPercentile:
+        dimColLow = hv.Dimension('imgLow', values=valuesLow, default=imgPLow)
+        #print 'values for high slider: ', valuesHigh
+        dimColHigh = hv.Dimension('imgHigh', values=valuesHigh, default=imgPHigh)
+    else:
+        dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
+        dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
 
     plotFunc = partial(hv_imageFromIndex,data2plot=data2plot, kwargs=kwargs)
     dmap = hv.DynamicMap(plotFunc, kdims=[dimIdx, dimColLow, dimColHigh, dimCol])

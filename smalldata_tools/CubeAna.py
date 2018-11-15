@@ -1,11 +1,13 @@
 import glob
 from os import path
+from os import makedirs
 import tables
 import numpy as np
 from scipy import sparse
 from utilities import rebinShape
 from utilities_plotting import plotMarker, plotImage
 from utilities_plotting import plot2d_from3d, plot3d_img_time
+from utilities_plotting import hv_3dimage
 from utilities import E2lam
 from utilities import dictToHdf5
 from utilities import image_from_dxy
@@ -42,7 +44,11 @@ class CubeAna(object):
                 self._dirname=dirname
                 self._plot_dirname = dirname+'/smalldata_plots'
             if not path.isdir(self._plot_dirname):
-                makedirs(self._plot_dirname)
+                try:
+                    makedirs(self._plot_dirname)
+                except:
+                    self._plot_dirname='./smalldata_plots'
+                    makedirs(self._plot_dirname)
 
         self._fname=''
         allFiles = glob.glob('%s/Cube_%s_Run%03d_*.h5'%(self._dirname,self._expname,run))
@@ -616,7 +622,7 @@ class CubeAna(object):
             plotImage(data2plot, xLabel='', plotWith=plotWith, runLabel=runKey, plotTitle="image for %s for run %s"%(sig, runKey), plotDirname=self._plot_dirname, extent=extent, plotLog=plotLog)
 
     #change this: do not use what typically contains ROI to pick slice, add explicit value.
-    def inspectCube(self, run=None, sig=None, sigIdx=None, plotWith=None, useHoloviews=False):
+    def inspectCube(self, run=None, sig=None, sigIdx=None, normIdx=None, plotWith=None, useHoloviews=False, plotLowHighPercentile=True, plotLog=False):
         if plotWith==None:
             plotWith=self._plotWith
             if plotWith=='matplotlib':
@@ -658,9 +664,31 @@ class CubeAna(object):
 
         bins = self._cubeSumDict['bins'].data
         data2plot = cubeDict[sig].data
+        if sigROI is not None:
+            data2plot = self._reduceData(data2plot, sigROI).copy() #apply ROI
+        
+        if normIdx is not None:
+            if isinstance(normIdx, basestring):
+                if normIdx in cubeDict.keys():
+                    normIdx = self._cubeSumDict[normIdx].data
+                else:
+                    print 'normIdx %s not in cube, options are: '%normIdx, cubeDict.keys()
+                    return
+            if isinstance(normIdx, list):
+                normIdx=np.array(normIdx)
+            print 'normIdx: ',normIdx
+            if normIdx.shape[0]==data2plot.shape[0]:
+                normBins=[]
+                normdata2plot=[]
+                #apparently, the array nan is not the same as numpy nan. Whatever.
+                for d2p,nI,dB,isNan in zip(data2plot, normIdx, bins, xr.ufuncs.isnan(normIdx)):
+                    if nI!=0 and nI!=np.nan and not isNan:
+                        normBins.append(dB)
+                        normdata2plot.append(d2p/nI)
+                data2plot=np.array(normdata2plot)
+                bins=np.array(normBins)
 
         if not useHoloviews:
-            data2plot = self._reduceData(data2plot, sigROI).copy() #apply ROI
             #replace nan & inf for JavaScript
             data2plot[np.isinf(data2plot)]=np.nan 
             data2plot[np.isneginf(data2plot)]=np.nan 
@@ -680,7 +708,10 @@ class CubeAna(object):
             print 'done'
         
         else:
-            print 'put code from notebook here?'
+            dmap = hv_3dimage(data2plot=data2plot, plotLowHighPercentile=plotLowHighPercentile,plotLog=plotLog)
+            return dmap
+            #show(dmap)
+            #print 'put code from notebook here?'
 
 
     def getReducedCube(self, aimShape=None, aimSize=4000000, runKey = None):
