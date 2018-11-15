@@ -502,13 +502,10 @@ class DetObject(dropObject):
           except:
             pass
 
-        print 'have dat_to_be_summed ',dat_to_be_summed.sum()
         if self.__storeSum[key] is None:
           self.__storeSum[key] = dat_to_be_summed.copy()
         else:
           self.__storeSum[key] += dat_to_be_summed
-        print 'summed dat ',self.__storeSum[key].sum()
-
 
 
     def processDetector(self):
