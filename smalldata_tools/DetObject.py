@@ -498,7 +498,7 @@ class DetObject(dropObject):
 
         if asImg:
           try:
-            dat_to_be_summed = self.det.image(int(run),self.evt.dat)
+            dat_to_be_summed = self.det.image(int(run),dat_to_be_summed)
           except:
             pass
 
