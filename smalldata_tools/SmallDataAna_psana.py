@@ -1858,6 +1858,8 @@ class SmallDataAna_psana(object):
         if (rank==0):
             print 'Variables to be read from xtc: ',myCube.targetVarsXtc
 
+        if isinstance(nEvtsPerBin, basestring): nEvtsPerBin=int(nEvtsPerBin)
+
         detInData=[]
         for k in self.Keys():
             if k.alias()!='':
