@@ -831,8 +831,17 @@ class SmallDataAna(object):
         if scanVar is not None and scanVar!='':
             isScan=True
         if isScan:
-            nPoints=np.unique(self.getVar('scan/%s'%scanVar)).shape[0]
-            print 'this run is a scan of %s with %d points'%(scanVar,nPoints)
+            if isinstance(scanVar, basestring):
+                scanVar=[scanVar]
+            nPoints=[]
+            for thisScanVar in scanVar:
+                nPoints.append(np.unique(self.getVar('scan/%s'%thisScanVar)).shape[0])
+            if len(scanVar)==1:
+                print 'this run is a scan of %s with %d points'%(scanVar[0],nPoints[0])
+            else:
+                print 'this run is a scan of'
+                for sv,npts in zip(scanVar, nPoints):
+                    print ' %s with %d points'%(sv,npts)
 
     def hasKey(self, inkey):
         """ return boolean to reflect if a given variable is present in data
@@ -1158,10 +1167,13 @@ class SmallDataAna(object):
 
         isDaqDelayScan=False
         scanVar = self.getScanName()
-        if scanVar.find('lxt')>=0:
-            isDaqDelayScan=True
-            #print 'DEBUG: found that we have a delay scan'
-            nomDelay=self.getVar('scan/%s'%scanVar)*1e12
+        if isinstance(scanVar,basestring):
+            scanVar=[scanVar]
+        for scanVN in scanVar:
+            if scanVN.find('lxt')>=0:
+                isDaqDelayScan=True
+                #print 'DEBUG: found that we have a delay scan'
+                nomDelay=self.getVar('scan/%s'%scanVN)*1e12
 
         if not isDaqDelayScan:
             if self.hasKey('enc/lasDelay'):
@@ -1372,34 +1384,44 @@ class SmallDataAna(object):
         return iSig, extent
 
     def getScanName(self):
+        scanNames=[]
         for key in self.Keys('scan'):
             if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0:
-                return key.replace('/scan/','').replace('scan/','')
-        return ''
+                scanNames.append(key.replace('/scan/','').replace('scan/',''))
+        if len(scanNames)==0: return ''
+        elif len(scanNames)==1: return scanNames[0]
+        else: return scanNames
 
     def getScanValues(self):
         #get the scan variable & time correct if desired
         scanVarName = self.getScanName()
-        if scanVarName.find('lxt')>=0 or scanVarName=='':
-            delays=self.getDelay()
-            #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
-            if delays is None or delays.mean()==0 or delays.std()==0: 
-                return '',[]
-            scan = delays
-            if scanVarName == '': 
-                if self._delay_ttCorr:
-                    scanVarName='delay (tt corrected) [fs]'
-                else:
-                    scanVarName='delay [fs]'
-        else:
-            try:
-                scanOrg = self.getVar('scan/var0')
-                scan = scanOrg
-            except:
-                scan=[]
-        return scanVarName,scan
+        scanValues=[]
+        if isinstance(scanVarName, basestring):
+            scanVarName=[scanVarName]
+        for scanVN in scanVarName:
+            if scanVN.find('lxt')>=0 or scanVarName=='':
+                delays=self.getDelay()
+                #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
+                if delays is None or delays.mean()==0 or delays.std()==0: 
+                    return '',[]
+                scanValues.append(delays)
+                if scanVN == '': 
+                    if self._delay_ttCorr:
+                        scanVarName='delay (tt corrected) [fs]'
+                    else:
+                        scanVarName='delay [fs]'
+            else:
+                try:
+                    scanOrg = self.getVar('scan/var0')
+                    scanValues.append(scanOrg)
+                except:
+                    scanValues.append([])
+        if len(scanVarName)==0:return '',[]
+        elif len(scanVarName)==1:return scanVarName[0],scanValues[0]
+        else: return scanVarName,scan
 
 
+    #FIX ME FOR SURE!
     def getBins(self,bindef=[], debug=False):
         Bins = util_getBins(bindef, debug)
         if Bins is not None:
@@ -1407,18 +1429,25 @@ class SmallDataAna(object):
 
         #have no input at all, assume we have unique values in scan. If not, return empty list 
         scanVarName, scan =  self.getScanValues()
-
+        if isinstance(scanVarName, basestring):
+            scanVarName=[scanVarName]
+        BinList=[]
         if len(bindef)==0:
-            if scanVarName=='':
-                print 'this run is no scan, will need bins as input, quit now'
-                return []
-            print 'no bins as input, we will use the scan variable %s '%scanVarName
-            Bins = np.unique(scan)
-            if scanVarName.find('lxt')>=0:
-                Bins*=1e12
-            if debug:
-                print 'Bins: ',Bins
-            return Bins
+            for scanVN in scanVarName:
+                if scanVarName=='':
+                    print 'this run is no scan, will need bins as input, quit now'
+                    return []
+                print 'no bins as input, we will use the scan variable %s '%scanVarName
+                Bins = np.unique(scan)
+                if scanVarName.find('lxt')>=0:
+                    Bins*=1e12
+                if debug:
+                    print 'Bins: ',Bins
+                BinList.append(Bins)
+            if len(BinList)==1:
+                return BinList[0]
+            else:
+                return BinList
 
         #give a single number (binwidth or numBin)
         if len(bindef)==1:
@@ -1706,38 +1735,6 @@ class SmallDataAna(object):
             print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
 
             
-    def defPlots(self, useFilter=None):
-        scanVarName,scan =  self.getScanValues(True)
-        total_filter = np.ones_like(scan).astype(bool)
-        if useFilter is not None and self.Sels.has_key(useFilter):
-            total_filter =  self.getFilter(useFilter, [plotvar])
-
-        fig=plt.figure(figsize=(10,6))
-        plt.title('Standard Plots for Run %i'%self.run)
-        
-        gs=gridspec.GridSpec(2,2,width_ratios=[2,2])
-        self.plotVar('ipm2/sum',fig=plt.subplot(gs[0]),useFilter=useFilter)
-        self.plotVar(['ipm2/sum','ebeam/L3Energy'],fig=plt.subplot(gs[1]),asHist=True,useFilter=useFilter)
-        if len(scan)<200:
-            pmin=scan[0]
-            pmax=scan[-1]
-        else:
-            pmin = np.percentile(scan[total_filter],0.1)
-            pmax = np.percentile(scan[total_filter],99.9)
-        values = scan[total_filter]
-        values = values[~np.isnan(values)]
-        hst = np.histogram(scan[total_filter],np.linspace(pmin,pmax,100))
-        plt.subplot(gs[2]).plot(hst[1][:-1],hst[0],'o')
-        #plt.subplot(gs[2]).xlabel(scanVarName)
-        #plt.subplot(gs[2]).ylabel('entries')
-        plt.xlabel(scanVarName)
-        plt.ylabel('entries')
-        
-        if self.hasKey(self.ttBaseStr+'AMPL'):
-            if self.ttCorr is not None and np.nanstd(self.getVar(self.ttCorr))>0:
-                self.plotVar(self.ttCorr,fig=plt.subplot(gs[3]))
-            else:
-                self.plotVar(self.ttBaseStr+'FLTPOS_PS',fig=plt.subplot(gs[3]))
 
     #########################################################
     ###
