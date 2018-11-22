@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import h5py
 import fnmatch
+import itertools
 
 from matplotlib import pyplot as plt
 from utilities import E2lam
@@ -151,6 +152,8 @@ class DetObject(dropObject):
         self.common_mode = 6
       elif self.det.dettype == 26:
         self.common_mode = 0 #pedestal subtract
+      elif self.det.dettype == 32: #epix10ka(2m)
+        self.common_mode = 0 #pedestal subtract
       self.applyMask = applyMask
       #default to CsPad
       self.pixelsize=[110e-6]
@@ -159,9 +162,11 @@ class DetObject(dropObject):
         self.pixelsize=[170e-3/3840*binning]
       if srcName.find('ungfrau')>=0:
         self.pixelsize=[75e-6]
-      if srcName.find('icarus')>=0:
+      elif srcName.find('icarus')>=0:
         self.pixelsize=[25e-6]
-      if srcName.find('pix')>=0:
+      elif srcName.find('pix10k')>=0:
+        self.pixelsize=[100e-6]
+      if srcName.find('pix')>=0 and not srcName.find('10ka'):
         self.pixelsize=[50e-6]
         epixCfg = env.configStore().get(psana.Epix.Config100aV2, self.det.source)
         self.carrierId0 = epixCfg.carrierId0()
@@ -171,6 +176,7 @@ class DetObject(dropObject):
         self.analogCardId0 = epixCfg.analogCardId0()
         self.analogCardId1 = epixCfg.analogCardId1()
         self.storeEnvironment()
+      #all area detectors (not ocean optics&not acqiris
       if self.det.name.__str__().find('OceanOptics')<0 and self.det.dettype != 16:
         self.rms = self.det.rms(run)
         self.ped = self.det.pedestals(run)
@@ -218,6 +224,32 @@ class DetObject(dropObject):
           yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,psana.Source(srcName))
           self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
           self.imgShape = self.ped.shape
+        ################
+        ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
+        ################
+        elif self.det.dettype == 32: #for the epix 2m
+          if self.rms is None or self.rms.shape!=self.ped.shape:
+            self.rms=np.ones_like(self.ped)
+          newPed=[[]]
+          newGain=[[]]
+          newRms=[[]]
+          for islice,rms,gain,ped in itertools.izip(itertools.count(),self.rms, self.gain, self.ped):
+            iGain=islice/16
+            if islice%16==0 and islice>0:
+              newPed.append([ped])
+              newGain.append([gain])
+              newRms.append([rms])
+            else:
+              newPed[iGain].append(ped)
+              newGain[iGain].append(gain)
+              newRms[iGain].append(rms)
+          self.ped=np.array(newPed)
+          self.gain=np.array(newGain)
+          self.rms=np.array(newRms)
+          self.imgShape=self.det.image(run, self.ped[0])
+        ################
+        ###back to regular code....
+        ################
         elif self.ped is not None:
           self.imgShape = self.ped.shape
         try:
@@ -233,6 +265,9 @@ class DetObject(dropObject):
               self.imgShape=self.ped.shape[1:]
         except:
           pass
+        #######
+        # masks
+        #######
         try:
           self.statusMask = self.det.mask(run, status=True)
           self.mask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True)
@@ -241,6 +276,23 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
           if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
+          print 'DEBUG mask: ',self.mask.shape
+          ################
+          ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
+          ################
+          if self.det.dettype == 32: #for the epix 2m
+            newMask=[]
+            newCMask=[]
+            for quad,cquad in zip(np.squeeze(self.mask),np.squeeze(self.cmask)):
+              for asic,casic in zip(quad,cquad):
+                newMask.append(asic)
+                newCMask.append(casic)
+            self.mask=np.array(newMask)
+            self.cmask=np.array(newCMask)
+          ################
+          ###back to regular code....
+          ################
+          print 'DEBUG mask 2: ',self.mask.shape
           #this is e.g. for the zyla or OPAL when a pedestal with a different ROI is present.
           if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
             if self.det.dettype==30: #this might not only have been here for the icarus, but I cannot remember
@@ -260,7 +312,10 @@ class DetObject(dropObject):
           except:
             self.mask = None
             self.cmask = None
+        print 'DEBUG mask 3: ',self.mask.shape
+        ########
         #geometry
+        ########
         try:
           self.x = self.det.coords_x(run)
           self.y = self.det.coords_y(run)
@@ -285,7 +340,22 @@ class DetObject(dropObject):
           else:
             if (rank == 0):
               print 'detector of type ',self.det.dettype,' has no fallback for x/y coords!'
-        if self.det.dettype == 1 or self.det.dettype == 2 or self.det.dettype == 13 or self.det.dettype == 26: 
+        ################
+        ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
+        ################
+        if self.det.dettype == 32: #for the epix 2m
+          newX=[]
+          newY=[]
+          for xquad,yquad in zip(np.squeeze(self.x),np.squeeze(self.y)):
+            for xasic,yasic in zip(xquad,yquad):
+              newX.append(xasic)
+              newY.append(yasic)
+          self.x=np.array(newX)
+          self.y=np.array(newY)
+        ################
+        ###back to regular code....
+        ################
+        if self.det.dettype == 1 or self.det.dettype == 2 or self.det.dettype == 13 or self.det.dettype == 26 or self.det.dettype == 32: 
             try:
               iX, iY = self.det.indexes_xy(run)
               self.iX=np.array(iX)
@@ -298,6 +368,21 @@ class DetObject(dropObject):
         else:          
           self.iX=self.x
           self.iY=self.y
+          ################
+          ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
+          ################
+        if self.det.dettype == 32: #for the epix 2m
+          newX=[]
+          newY=[]
+          for xquad,yquad in zip(np.squeeze(self.iX),np.squeeze(self.iY)):
+            for xasic,yasic in zip(xquad,yquad):
+              newX.append(xasic)
+              newY.append(yasic)
+          self.iX=np.array(newX)
+          self.iY=np.array(newY)
+          ################
+          ###back to regular code....
+          ################
       else:
         self.rms = None
         self.mask = None
@@ -729,6 +814,13 @@ class DetObject(dropObject):
       elif self.common_mode==0:
         if self.det.dettype==26:
           self.evt.dat = self.det.calib(evt, cmpars=(7,0,100), mbits=mbits)
+        elif self.det.dettype==32:
+          ##########
+          ### FIX ME epix10ka
+          #will need to read gain bit from data and use right pedestal.
+          #will hopefully get calib function for this.
+          ##########
+          self.evt.dat = self.det.raw_data(evt)-self.ped[0]
         else:
           self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
