@@ -313,7 +313,7 @@ class SmallDataAna_psana(object):
         else:
             return aliases
 
-    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter='', nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
+    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
         if not isinstance(detname, basestring):
             print 'please give parameter name unless specifying arguments in right order. detname is first'
             return
@@ -347,8 +347,8 @@ class SmallDataAna_psana(object):
         run = self.dsIdxRun
         times=[]
         if self.sda is None or 'fh5' not in self.sda.__dict__.keys():
-            useFilter=''
-        if useFilter!='':
+            useFilter = None
+        if useFilter is not None:
             evttsSel = self.sda.getSelIdx(useFilter)
             print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter)
             if numEvts==-1:
@@ -403,7 +403,7 @@ class SmallDataAna_psana(object):
 
         #make array
         data='AvImg_';
-        if useFilter:
+        if useFilter is not None:
             data+='Filter'+useFilter+'_'
         if thresADU!=0:
             data+='thresADU%d_'%int(thresADU)
@@ -1241,8 +1241,8 @@ class SmallDataAna_psana(object):
             np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.sda.expname,int(self.run)),mask)
         return mask
          
-    def makePedestal(self, detname, filterName='', numEvts=-1, pedRange=[10,10000], rmsRange=[2.,7.], i0Check='ipm', dirname='./'):
-        if i0Check=='':
+    def makePedestal(self, detname, useFilter=None, numEvts=-1, pedRange=[10,10000], rmsRange=[2.,7.], i0Check='ipm', dirname='./'):
+        if i0Check=='' or i0Check is None:
             i0List=[]
         elif i0Check=='ipm':
             if self.sda.expname[:3]=='xpp':
@@ -1255,10 +1255,10 @@ class SmallDataAna_psana(object):
             i0List = ['gas_detector/f_22_ENRC']
     
         minFrac = 1e6
-        for i0 in i0List:
+        for i0 in i0List and useFilter is not None:
             try:
                 i0Median = np.nanmedian(self.sda.getVar(i0))
-                i0Off = np.nanmedian(self.sda.getVar(i0, filterName))
+                i0Off = np.nanmedian(self.sda.getVar(i0, useFilter))
             except:
                 print 'if not smallData file is available, try pass i0Check=\'\''
             if minFrac > i0Off/i0Median:
@@ -1268,12 +1268,16 @@ class SmallDataAna_psana(object):
             print 'This selection seems to lets too many events with beam through, will quit'
             return
 
-        self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, median=True)
-        self.AvImage(detname,numEvts=numEvts,useFilter=filterName, common_mode=-1, useMask=False, std=True)
+        self.AvImage(detname,numEvts=numEvts,useFilter=useFilter, common_mode=-1, useMask=False, median=True)
+        self.AvImage(detname,numEvts=numEvts,useFilter=useFilter, common_mode=-1, useMask=False, std=True)
         fname='%s-end.data'%self.sda.run
-        pedImg = self.__dict__['AvImg_median_Filter%s_raw_%s'%(filterName,detname)]
+        if useFilter is not None:
+            pedImg = self.__dict__['AvImg_median_Filter%s_raw_%s'%(useFilter,detname)]
+            rmsImg = self.__dict__['AvImg_std_Filter%s_raw_%s'%(useFilter,detname)]
+        else:
+            pedImg = self.__dict__['AvImg_median_raw_%s'%(detname)]
+            rmsImg = self.__dict__['AvImg_std_raw_%s'%(detname)]
         pedStat = np.logical_and(pedImg > min(pedRange), pedImg < max(pedRange))
-        rmsImg = self.__dict__['AvImg_std_Filter%s_raw_%s'%(filterName,detname)]
         rmsStat = np.logical_and(rmsImg > min(rmsRange), rmsImg < max(rmsRange))
         status = (~(np.logical_and(rmsStat, pedStat))).astype(int)
 
@@ -1298,10 +1302,16 @@ class SmallDataAna_psana(object):
         if not os.path.exists(dirname+'pixel_status'):
             os.makedirs(dirname+'pixel_status')
         print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
-        det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_%s'%(filterName,detname)], fmt='%.1f',addmetad=True)
+        if useFilter is not None:
+            det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.1f',addmetad=True)
+        else:
+            det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_raw_%s'%(detname)], fmt='%.1f',addmetad=True)
         print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-        det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(filterName,detname)], fmt='%.1f',addmetad=True)
         print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
+        if useFilter is not None:
+            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.1f',addmetad=True)
+        else:
+            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.1f',addmetad=True)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
     def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=None,ty=None):
