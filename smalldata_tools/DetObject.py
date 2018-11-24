@@ -176,6 +176,22 @@ class DetObject(dropObject):
         self.analogCardId0 = epixCfg.analogCardId0()
         self.analogCardId1 = epixCfg.analogCardId1()
         self.storeEnvironment()
+      if srcName.find('pix10k')>=0:
+        epixCfg = env.configStore().get(psana.Epix.Config10ka2MV1, self.det.source)               
+        self.carrierId0 = []
+        self.carrierId1 = []
+        self.pixelConfig = []
+        self.trbit = []
+        for i in range(epixCfg.elemCfg_shape()[0]):
+          elemCfg=epixCfg.elemCfg(i)
+          self.carrierId0.append(elemCfg.carrierId0())
+          self.carrierId1.append(elemCfg.carrierId1())
+          self.pixelConfig.append(elemCfg.asicPixelConfigArray())
+          trbits=[]
+          for ia in range(elemCfg.asics_shape()[0]):
+            trbits.append(elemCfg.asics(ia).trbit())
+          self.trbit.append(trbits)
+        self.gainSetting = 0
       #all area detectors (not ocean optics&not acqiris
       if self.det.name.__str__().find('OceanOptics')<0 and self.det.dettype != 16:
         self.rms = self.det.rms(run)
@@ -276,7 +292,6 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
           if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          print 'DEBUG mask: ',self.mask.shape
           ################
           ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
           ################
@@ -292,7 +307,6 @@ class DetObject(dropObject):
           ################
           ###back to regular code....
           ################
-          print 'DEBUG mask 2: ',self.mask.shape
           #this is e.g. for the zyla or OPAL when a pedestal with a different ROI is present.
           if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
             if self.det.dettype==30: #this might not only have been here for the icarus, but I cannot remember
@@ -312,7 +326,6 @@ class DetObject(dropObject):
           except:
             self.mask = None
             self.cmask = None
-        print 'DEBUG mask 3: ',self.mask.shape
         ########
         #geometry
         ########
@@ -420,6 +433,8 @@ class DetObject(dropObject):
         self.__storeSum[sumAlgo]=None
       else:
         return self.__storeSum
+    def setPed(self, ped):
+      self.ped = ped
     def setMask(self, mask):
       self.mask = mask
     def setcMask(self, mask):
@@ -820,7 +835,10 @@ class DetObject(dropObject):
           #will need to read gain bit from data and use right pedestal.
           #will hopefully get calib function for this.
           ##########
-          self.evt.dat = self.det.raw_data(evt)-self.ped[0]
+          if len(self.ped.shape)>3:
+            self.evt.dat = self.det.raw_data(evt)-self.ped[0]
+          else:
+            self.evt.dat = self.det.raw_data(evt)-self.ped
         else:
           self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
