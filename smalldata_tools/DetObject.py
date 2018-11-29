@@ -182,6 +182,9 @@ class DetObject(dropObject):
         self.carrierId1 = []
         self.pixelConfig = []
         self.trbit = []
+        self.pixelGain=[]
+        #asicList=[0,3,1,2]
+        asicList=[0,1,3,2]
         for i in range(epixCfg.elemCfg_shape()[0]):
           elemCfg=epixCfg.elemCfg(i)
           self.carrierId0.append(elemCfg.carrierId0())
@@ -191,6 +194,19 @@ class DetObject(dropObject):
           for ia in range(elemCfg.asics_shape()[0]):
             trbits.append(elemCfg.asics(ia).trbit())
           self.trbit.append(trbits)
+          cfgShape=elemCfg.asicPixelConfigArray().shape
+          cfgReshape=elemCfg.asicPixelConfigArray().reshape(cfgShape[0]/2, cfgShape[1]*2,order='F')
+          pixelGain=np.ones_like(cfgReshape).astype(float)
+          #CHECK ME: this could be completely wrong! need data to check! pedestals would be fine!
+          for ia in asicList:
+            if elemCfg.asics(ia).trbit()==1:
+              continue
+            asicGainConfig=cfgReshape[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]
+            pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
+          pixelGain=pixelGain.reshape(cfgShape,order='F')
+          self.pixelGain.append(pixelGain)
+        self.pixelGain=np.array(self.pixelGain)
+        
         self.gainSetting = 0
       #all area detectors (not ocean optics&not acqiris
       if self.det.name.__str__().find('OceanOptics')<0 and self.det.dettype != 16:
@@ -295,7 +311,7 @@ class DetObject(dropObject):
           ################
           ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
           ################
-          if self.det.dettype == 32: #for the epix 2m
+          if self.det.dettype == 32 and len(self.mask.squeeze().shape)==4: #for the epix 2m
             newMask=[]
             newCMask=[]
             for quad,cquad in zip(np.squeeze(self.mask),np.squeeze(self.cmask)):
@@ -356,7 +372,7 @@ class DetObject(dropObject):
         ################
         ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
         ################
-        if self.det.dettype == 32: #for the epix 2m
+        if self.det.dettype == 32 and len(self.x.squeeze().shape)==4: #for the epix 2m
           newX=[]
           newY=[]
           for xquad,yquad in zip(np.squeeze(self.x),np.squeeze(self.y)):
@@ -384,7 +400,7 @@ class DetObject(dropObject):
           ################
           ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
           ################
-        if self.det.dettype == 32: #for the epix 2m
+        if self.det.dettype == 32 and len(self.iX.squeeze().shape)==4: #for the epix 2m
           newX=[]
           newY=[]
           for xquad,yquad in zip(np.squeeze(self.iX),np.squeeze(self.iY)):
@@ -463,6 +479,7 @@ class DetObject(dropObject):
           ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(np.ones_like(self.evt.dat).astype(bool))))
         if ROI.writeArea:
           self.evt.__dict__['write_'+ROI.name] = ROI.area.squeeze()
+        #  print 'DEBUG ROI ',self.evt.__dict__['write_'+ROI.name].shape
         self.evt.__dict__['write_'+ROI.name+'_max'] = np.nanmax(ROI.area.astype(np.float64))
         self.evt.__dict__['write_'+ROI.name+'_sum'] = np.nansum(ROI.area.astype(np.float64))
         self.evt.__dict__['write_'+ROI.name+'_com'] = ROI.centerOfMass(ROI.area)
@@ -892,6 +909,16 @@ class DetObject(dropObject):
       elif self.common_mode%100==55:
         self.evt.dat = self.det.calib(evt, cmpars=(5,5000), mbits=mbits)
         needGain=False
+      elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
+        self.evt.dat = self.det.calib(evt, mbits=mbits)
+        #XXX
+      elif self.common_mode%100==81: #my horrible kludge that might work for fixed gains.
+          if len(self.ped.shape)>3:
+            print 'not a supported mode, return None'
+            self.evt.dat = None
+          else:
+            self.evt.dat = self.det.raw_data(evt)-self.ped
+            self.evt.dat *= self.pixelGain 
       elif self.common_mode%100==10:
         needGain=False
         #data = self.det.raw_data(evt)-self.det.pedestals(evt)        
