@@ -197,17 +197,22 @@ class DetObject(dropObject):
           cfgShape=elemCfg.asicPixelConfigArray().shape
           cfgReshape=elemCfg.asicPixelConfigArray().reshape(cfgShape[0]/2, cfgShape[1]*2,order='F')
           pixelGain=np.ones_like(cfgReshape).astype(float)
-          #CHECK ME: this could be completely wrong! need data to check! pedestals would be fine!
           for ia in asicList:
             if elemCfg.asics(ia).trbit()==1:
               continue
             asicGainConfig=cfgReshape[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]
-            pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
+            pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
+            #pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
           pixelGain=pixelGain.reshape(cfgShape,order='F')
           self.pixelGain.append(pixelGain)
         self.pixelGain=np.array(self.pixelGain)
         
         self.gainSetting = 0
+        if self.pixelGain.mean()==0:
+          if self.trbit.mean()==1:
+            self.gainSetting = 1 #gain switch HL
+          else:
+            self.gainSetting = 2 #gain switch ML
       #all area detectors (not ocean optics&not acqiris
       if self.det.name.__str__().find('OceanOptics')<0 and self.det.dettype != 16:
         self.rms = self.det.rms(run)
@@ -842,6 +847,10 @@ class DetObject(dropObject):
       needGain = (self.gain is not None) #check if we can/need to apply gain later
       if self.common_mode<0:
           self.evt.dat = self.det.raw_data(evt)
+          if self.det.dettype==32 and self.common_mode==-1:
+            self.evt.dat = self.evt.dat&0x3fff
+          elif self.det.dettype==32 and self.common_mode!=-1:
+            self.evt.dat = self.evt.dat
           needGain=False
       elif self.common_mode==0:
         if self.det.dettype==26:
@@ -853,9 +862,9 @@ class DetObject(dropObject):
           #will hopefully get calib function for this.
           ##########
           if len(self.ped.shape)>3:
-            self.evt.dat = self.det.raw_data(evt)-self.ped[0]
+            self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped[0]
           else:
-            self.evt.dat = self.det.raw_data(evt)-self.ped
+            self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped
         else:
           self.evt.dat = self.det.raw_data(evt)-self.ped
         #self.evt.dat = self.det.raw_data(evt).astype(float)-self.ped
@@ -910,15 +919,26 @@ class DetObject(dropObject):
         self.evt.dat = self.det.calib(evt, cmpars=(5,5000), mbits=mbits)
         needGain=False
       elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
-        self.evt.dat = self.det.calib(evt, mbits=mbits)
-        #XXX
+        #self.evt.dat = self.det.calib(evt, mbits=mbits)
+        evt_dat = self.det.calib(evt)
+        self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32)
+        self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        
       elif self.common_mode%100==81: #my horrible kludge that might work for fixed gains.
           if len(self.ped.shape)>3:
             print 'not a supported mode, return None'
             self.evt.dat = None
           else:
-            self.evt.dat = self.det.raw_data(evt)-self.ped
-            self.evt.dat *= self.pixelGain 
+            raw_dat = self.det.raw_data(evt)
+            gain_dat = raw_dat&0xc000
+            dat_dat =  (raw_dat&0x3fff)-self.ped
+            if self.gainSetting == 0:
+              self.evt.dat = dat_dat*self.pixelGain 
+            elif self.gainSetting == 1:
+              self.evt.dat = dat_dat[gain_dat==0]+dat_dat[gain_dat>1]*100.
+            else:
+              self.evt.dat = dat_dat[gain_dat==0]*3.+dat_dat[gain_dat>1]*100.
+              #self.evt.dat = dat_dat[gain_dat==0]*100./3.+dat_dat[gain_dat>1]*100.
       elif self.common_mode%100==10:
         needGain=False
         #data = self.det.raw_data(evt)-self.det.pedestals(evt)        
