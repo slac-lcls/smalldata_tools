@@ -1118,7 +1118,7 @@ class SmallDataAna_psana(object):
                 except:
                     print 'please enter an integer'
                     continue
-                mask_r_nda = np.zeros_like(det.rms(self.run))
+                mask_r_nda = np.zeros_like(det.coords_x(self.run))
                 if needsGeo:
                     for tile in mask_r_nda:
                         tile[0:nEdge,:]=1
@@ -1132,6 +1132,25 @@ class SmallDataAna_psana(object):
                     tile[nEdge:-1,:]=1
                     tile[:,0:nEdge]=1
                     tile[:,nEdge:-1]=1
+                    plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
+
+            if shape=='cen' or shape=='center':
+                ctot=raw_input("Enter number of center rows that should be masked:")
+                try:
+                    nEdge = int(ctot)
+                except:
+                    print 'please enter an integer'
+                    continue
+                mask_r_nda = np.zeros_like(det.coords_x(self.run))
+                if needsGeo:
+                    for tile in mask_r_nda:
+                        tile[int(tile.shape[0]/2-nEdge):int(tile.shape[0]/2+nEdge),:]=1
+                        tile[:,int(tile.shape[1]/2-nEdge):int(tile.shape[1]/2+nEdge)]=1
+                    plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
+                else:
+                    tile=mask_r_nda
+                    tile[int(tile.shape[0]/2-nEdge):int(tile.shape[0]/2+nEdge),:]=1
+                    tile[:,int(tile.shape[1]/2-nEdge):int(tile.shape[1]/2+nEdge)]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
 
             if mask_r_nda is not None:
@@ -1225,15 +1244,15 @@ class SmallDataAna_psana(object):
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
             if det.dettype==2:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
             elif det.dettype==1:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==13:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
             elif det.dettype==19:
-                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==32:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
@@ -1252,9 +1271,9 @@ class SmallDataAna_psana(object):
         if i0Check=='' or i0Check is None:
             i0List=[]
         elif i0Check=='ipm':
-            if self.sda.expname[:3]=='xpp':
+            if self.expname[:3]=='xpp':
                 i0List = ['ipm3/sum']
-            elif self.sda.expname[:3]=='xcs':
+            elif self.expname[:3]=='xcs':
                 i0List = ['ipm5/sum']
             else:
                 i0List=[]
