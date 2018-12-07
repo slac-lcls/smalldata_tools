@@ -121,7 +121,7 @@ class SmallDataAna_psana(object):
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
         self.jobsIds = []
-        self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110','calib']
+        self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110','calib','cm80','cm81']
 
     def commonModeStr(self, common_mode=0):
         if common_mode<0:
@@ -1225,20 +1225,27 @@ class SmallDataAna_psana(object):
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
             if det.dettype==2:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)
             elif det.dettype==1:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
             elif det.dettype==13:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)
+                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)
             elif det.dettype==19:
-                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
+            elif det.dettype==32:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.sda.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
             print 'save mask in %s as %s '%(dirname,fname)
-            np.savetxt(dirname+fname,mask)
+            #np.savetxt(dirname+fname,mask)
+            det.save_txtnda(dirname+fname,mask.astype(float), fmt='%d',addmetad=True)
         elif raw_input("Save to local?\n") in ["y","Y"]:
-            np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.sda.expname,int(self.run)),mask)
+            if len(mask.shape)<=2:
+                np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.expname,int(self.run)),mask)
+            elif len(mask.shape)==3:
+                np.savetxt('Mask_%s_%s_Run%03d.data'%(avImage,self.expname,int(self.run)),mask.reshape(mask.shape[0]*mask.shape[1], mask.shape[2]))
+                
         return mask
          
     def makePedestal(self, detname, useFilter=None, numEvts=-1, pedRange=[10,10000], rmsRange=[2.,7.], i0Check='ipm', dirname='./'):
