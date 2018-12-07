@@ -41,6 +41,11 @@ class ROIObject(dropObject):
       if rms.ndim==4:
         rms = rms[0]#.squeeze()
       self.rms = self.applyROI(rms)
+    if mask is not None:
+      try:
+        self.mask = self.applyROI(mask)
+      except:
+        pass
   def applyROI(self, array):
     #array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
     self.bound = np.array(self.bound)
@@ -84,6 +89,8 @@ class ROIObject(dropObject):
       return centroidx/imagesums,centroidy/imagesums 
     except:
       return np.nan,np.nan
+  def addNsat(self,highLim=None):
+    self.Nsat = highLim
   def addRebin(self,shape=[],asImage=False):
     self.rebin = True
     self.__dict__['rebin'] = shape
@@ -153,7 +160,8 @@ class DetObject(dropObject):
       elif self.det.dettype == 26:
         self.common_mode = 0 #pedestal subtract
       elif self.det.dettype == 32: #epix10ka(2m)
-        self.common_mode = 0 #pedestal subtract
+        #self.common_mode = 0 #pedestal subtract
+        self.common_mode = 80 #default calib
       self.applyMask = applyMask
       #default to CsPad
       self.pixelsize=[110e-6]
@@ -265,24 +273,27 @@ class DetObject(dropObject):
         ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
         ################
         elif self.det.dettype == 32: #for the epix 2m
+          self.rms = self.rms.squeeze()
+          self.gain = self.gain.squeeze()
+          self.ped = self.ped.squeeze()
           if self.rms is None or self.rms.shape!=self.ped.shape:
             self.rms=np.ones_like(self.ped)
-          newPed=[[]]
-          newGain=[[]]
-          newRms=[[]]
-          for islice,rms,gain,ped in itertools.izip(itertools.count(),self.rms, self.gain, self.ped):
-            iGain=islice/16
-            if islice%16==0 and islice>0:
-              newPed.append([ped])
-              newGain.append([gain])
-              newRms.append([rms])
-            else:
-              newPed[iGain].append(ped)
-              newGain[iGain].append(gain)
-              newRms[iGain].append(rms)
-          self.ped=np.array(newPed)
-          self.gain=np.array(newGain)
-          self.rms=np.array(newRms)
+          #newPed=[[]]
+          #newGain=[[]]
+          #newRms=[[]]
+          #for islice,rms,gain,ped in itertools.izip(itertools.count(),self.rms, self.gain, self.ped):
+          #  iGain=islice/16
+          #  if islice%16==0 and islice>0:
+          #    newPed.append([ped])
+          #    newGain.append([gain])
+          #    newRms.append([rms])
+          #  else:
+          #    newPed[iGain].append(ped)
+          #    newGain[iGain].append(gain)
+          #    newRms[iGain].append(rms)
+          #self.ped=np.array(newPed)
+          #self.gain=np.array(newGain)
+          #self.rms=np.array(newRms)
           self.imgShape=self.det.image(run, self.ped[0])
         ################
         ###back to regular code....
@@ -290,7 +301,7 @@ class DetObject(dropObject):
         elif self.ped is not None:
           self.imgShape = self.ped.shape
         try:
-          if self.det.dettype==26:
+          if self.det.dettype==26 or self.det.dettype==32:
             pedImg = self.det.image(run, self.ped[0])
           else:
             pedImg = self.det.image(run, self.ped)
@@ -313,21 +324,6 @@ class DetObject(dropObject):
           self.cmask = self.det.mask(run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
           if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
             print 'found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum())
-          ################
-          ###TEMPORARY FIX! LOOK AT DATA FOR SMALL EPIX10KA as well!
-          ################
-          if self.det.dettype == 32 and len(self.mask.squeeze().shape)==4: #for the epix 2m
-            newMask=[]
-            newCMask=[]
-            for quad,cquad in zip(np.squeeze(self.mask),np.squeeze(self.cmask)):
-              for asic,casic in zip(quad,cquad):
-                newMask.append(asic)
-                newCMask.append(casic)
-            self.mask=np.array(newMask)
-            self.cmask=np.array(newCMask)
-          ################
-          ###back to regular code....
-          ################
           #this is e.g. for the zyla or OPAL when a pedestal with a different ROI is present.
           if self.mask is not None and len(self.mask.shape)==2 and self.mask.shape!=self.imgShape:
             if self.det.dettype==30: #this might not only have been here for the icarus, but I cannot remember
@@ -338,7 +334,17 @@ class DetObject(dropObject):
               self.cmask = np.ones(self.imgShape)
         except:
           try:
-            if self.det.dettype==30:
+            if self.det.dettype==32 and self.statusMask is not None:
+              if self.statusMask.shape[0]==7:
+                self.statusMask = (~((~(self.statusMask.astype(bool))).sum(axis=0)).astype(bool))
+              self.mask = self.statusMask
+              try: 
+                self.cmask = self.det.mask(run, status=True,calib=True)
+                if self.det.dettype==32 and self.cmask.shape[0]==7:
+                  self.cmask = (~((~(self.cmask.astype(bool))).sum(axis=0)).astype(bool))
+              except:
+                self.cmask = self.statusMask
+            elif self.det.dettype==30:
               self.mask = np.ones(self.ped.shape)
               self.cmask = np.ones(self.ped.shape)
             else:
@@ -447,6 +453,8 @@ class DetObject(dropObject):
       if 'ped' in self.__dict__.keys() and self.ped.shape != self.imgShape:
         self.needsGeo=True
 
+      print 'X',self.mask.shape, self.statusMask.shape
+
     def storeEnvironment(self):
       self.storeEnv = True
     def storeSum(self, sumAlgo=None):
@@ -470,7 +478,7 @@ class DetObject(dropObject):
     def saveFull(self):
       self.__dict__['full']=ROIObject([0,1e6], name='full', writeArea=True, rms=self.rms)
     def addROI(self, ROIname, ROI_limit, writeArea=False):
-      self.__dict__[ROIname]=ROIObject(ROI_limit, name=ROIname, writeArea=writeArea, rms=self.rms)
+      self.__dict__[ROIname]=ROIObject(ROI_limit, name=ROIname, writeArea=writeArea, rms=self.rms, mask=self.cmask)
     def getROIs(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], ROIObject) ]
     def processROIs(self):
@@ -478,6 +486,7 @@ class DetObject(dropObject):
         print 'no data for', self._name,' , let mpiDataSource take care of this'
         return
       for ROI in self.getROIs():
+        print 'proc ROI'
         if self.mask is not None:
           ROI.area=ROI.applyROI(np.ma.masked_array(self.evt.dat, ~(self.mask.astype(bool))))
         else:
@@ -494,6 +503,8 @@ class DetObject(dropObject):
           self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]+'_sum'] = np.nansum(self.evt.__dict__['write_'+ROI.name+'_'+pj[-1]])
         if ROI.rebin:
           self.evt.__dict__['write_'+ROI.name+'_rebin'] = ROI.Rebin(ROI.area)
+        if 'Nsat' in ROI.__dict__.keys():
+          self.evt.__dict__['write_'+ROI.name+'_nsat'] = (ROI.area >= ROI.Nsat).astype(int).sum()
 
     def getDroplets(self):
       return [ self[key] for key in self.__dict__.keys() if isinstance(self[key], droplet.droplet)  or isinstance(self[key], droplet.droplet) ]
