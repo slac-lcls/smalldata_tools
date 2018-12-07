@@ -339,9 +339,10 @@ class DetObject(dropObject):
                 self.statusMask = (~((~(self.statusMask.astype(bool))).sum(axis=0)).astype(bool))
               self.mask = self.statusMask
               try: 
-                self.cmask = self.det.mask(run, status=True,calib=True)
+                self.cmask = self.det.mask(run, calib=True)
                 if self.det.dettype==32 and self.cmask.shape[0]==7:
                   self.cmask = (~((~(self.cmask.astype(bool))).sum(axis=0)).astype(bool))
+                self.cmask = (self.cmask & self.statusMask)
               except:
                 self.cmask = self.statusMask
             elif self.det.dettype==30:
