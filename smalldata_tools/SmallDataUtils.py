@@ -236,6 +236,10 @@ def getCfgOutput(det):
     #now add ROI boundaries (so we can use mask, rms from main det object later....)
     for ROI in det.getROIs():
         cfgDict[baseName+ROI.name+'_bound'] = np.array(ROI.bound)
+        if 'ped' in ROI.__dict__.keys() and ROI.ped is not None:
+            cfgDict[baseName+ROI.name+'_ped'] = np.array(ROI.ped)
+        if 'mask' in ROI.__dict__.keys() and ROI.mask is not None:
+            cfgDict[baseName+ROI.name+'_mask'] = np.array(ROI.mask)
 
     for drops in det.getDroplets():
         for aduHist in drops.aduHists:
