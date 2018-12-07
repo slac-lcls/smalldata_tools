@@ -123,11 +123,13 @@ class azimuthalBinning:
     self.idxphi = np.digitize(pbm.ravel(),self.phiVec)-1
     self.matrix_q = 4*np.pi/lam*np.sin(self.matrix_theta/2)
     q_max = np.nanmax(self.matrix_q[~self.mask])
+    q_min = np.nanmin(self.matrix_q[~self.mask])
     qbin = np.array(qbin)
     if qbin.size==1:
       if rank==0:
         print 'qmax: ',q_max,' qbin ',qbin
-      self.qbins = np.arange(0,q_max+qbin,qbin)
+      #self.qbins = np.arange(0,q_max+qbin,qbin)
+      self.qbins = np.arange(q_min-qbin,q_max+qbin,qbin)
     else:
       self.qbins = qbin
     self.q = (self.qbins[0:-1]+self.qbins[1:])/2
