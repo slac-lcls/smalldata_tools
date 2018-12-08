@@ -745,9 +745,11 @@ class DetObject(dropObject):
       thresADUhigh =  kwargs.pop("thresADUhigh",None)
       print 'adding azav: ',azavName
 
-      azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
       if userMask is not None and userMask.shape == self.mask.shape:
-        azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool)&userMask.astype(bool))
+        azavMask = ~(self.mask.astype(bool)&userMask.astype(bool))
+      else:
+        azavMask = ~(self.cmask.astype(bool)&self.mask.astype(bool))
+
       if rank==0:
         print 'mask %d pixel for azimuthal integration'%azavMask.sum()
       if dis_to_sam is None:
@@ -779,6 +781,7 @@ class DetObject(dropObject):
       self.__dict__[azavName+'_thresRms'] = thresRms
       self.__dict__[azavName+'_thresADU'] = thresADU
       self.__dict__[azavName+'_thresADUhigh'] = thresADUhigh
+      self.__dict__[azavName+'_azavMask'] = azavMask
       print 'added azav: ',azavName
 
     def addDroplet(self,threshold=5.0, thresholdLow=3., thresADU=71., name='droplet', useRms=True, ROI=[], relabel=True, flagMasked=False):
