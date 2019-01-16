@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import sparse
 import itertools
 from skimage import feature
 from numba import jit
@@ -39,15 +38,15 @@ def fitCircles(x,y,r,yerr=None, guess=None):
       return np.sqrt((x-xc)**2 + (y-yc)**2)
 
   def f(par,x,y):
-    Ri = calc_R(x,y,par)
-    return Ri - Ri.mean()
+      Ri = calc_R(x,y,par)
+      return Ri - Ri.mean()
 
   def f_global(par,Mat_r,Mat_x,Mat_y):
-    err = []
-    for r,x,y in zip( Mat_r, Mat_x, Mat_y):
-        errLocal = f(par,x,y)
-        err = np.concatenate((err, errLocal))          
-    return err
+      err = []
+      for r,x,y in zip( Mat_r, Mat_x, Mat_y):
+          errLocal = f(par,x,y)
+          err = np.concatenate((err, errLocal))          
+      return err
 
   if guess is None or len(guess)!=2:
       x_m = np.mean(x[0])
@@ -66,7 +65,7 @@ def fitCircles(x,y,r,yerr=None, guess=None):
       fitRes['success'] = success
   else:
       center, ier = optimize.leastsq(f_global, center_estimate, args=(r,x,y))
-      print center
+      print(center)
       fitRes['ier'] = ier
   xc, yc = center
   fitRes['xCen'] = xc
@@ -132,11 +131,11 @@ def findCenter(arSparse, rBound, xcenBound, ycenBound, nbin=100, retHoughArray=F
     fitRes['centerx'] = centerx
     fitRes['centery'] = centery
     if retHoughArray:
-            fitRes['houghArray'] = arHough
+        fitRes['houghArray'] = arHough
     else:
-            fitRes['houghArray_projR'] = maxdim0
-            fitRes['houghArray_projX'] = maxdim1
-            fitRes['houghArray_projY'] = maxdim2
+        fitRes['houghArray_projR'] = maxdim0
+        fitRes['houghArray_projX'] = maxdim1
+        fitRes['houghArray_projY'] = maxdim2
     return fitRes
 
 
@@ -153,10 +152,10 @@ def iterateCenter(arSparse, ar_shape, rRange, nbin=100, prec=1, redFac=5., retHo
         xRange=[maxX-rSizeX*0.5, maxX+rSizeX*0.5]
         yRange=[maxY-rSizeY*0.5, maxY+rSizeY*0.5]
         if printProgress:
-            print 'finding the center in ranges: ',rRange, xRange, yRange
+            print('finding the center in ranges: ',rRange, xRange, yRange)
         fitRes = findCenter(arSparse, rRange, xRange, yRange, nbin=nbin, retHoughArray=retHoughArray, nBinR=nBinR)
         if printProgress:
-            print 'found center: ',maxX, maxY, maxR
+            print('found center: ',maxX, maxY, maxR)
 
     temp = fitRes['xCen']
     fitRes['xCen'] = fitRes['yCen']
@@ -168,23 +167,23 @@ def getMaxR(fitRes, norm=False, minDr=-1):
         radii = fitRes['radii']
         rRes = fitRes['houghArray_projR']
     except:
-        print 'the passed fit Result does not have the necessary keys'
+        print('the passed fit Result does not have the necessary keys')
         return[]
 
     if norm:
         maxR = argrelextrema(np.array(rRes)/radii, np.greater)
     else:
         maxR = argrelextrema(np.array(rRes), np.greater)
-    print 'maxR: ',maxR
+    print('maxR: ',maxR)
     maxRadii = radii[maxR[0]]
     if maxRadii.shape[0]==0:
-        print 'no maxima could be found!'
+        print('no maxima could be found!')
         return []
     resAtRadii = np.array(rRes)[maxR[0]]
     resAtRadii,maxRadii = (list(x) for x in zip(*sorted(zip( resAtRadii, maxRadii))))
 
-    #print 'DEBUG: ',maxRadii
-    #print 'DEBUG: ',resAtRadii
+    #print('DEBUG: ',maxRadii)
+    #print('DEBUG: ',resAtRadii)
     
     nrad=[]
     #loop inverse!
@@ -203,7 +202,7 @@ def getMaxR(fitRes, norm=False, minDr=-1):
 def FindFitCenter(image, mask, inParams={}):
     ar = image
     if len(ar.shape)!=2 or len(mask.shape)!=2:
-        print 'image of mask are not 2-d arrays, cannot find centers'
+        print('image of mask are not 2-d arrays, cannot find centers')
         return
 
     #parameters found to be typcially right
@@ -227,16 +226,16 @@ def FindFitCenter(image, mask, inParams={}):
         try:
             params[inkey]=inParams[inkey]
         except:
-            print 'fit parameter do not have key ',inkey,', available are: ',params.keys()
+            print('fit parameter do not have key ',inkey,', available are: ',params.keys())
             pass
 
-    print 'now find edges'
+    print('now find edges')
     arThres,arSparse = applyCanny(ar, mask.astype(bool), sigma=params['sigma'], thres=params['low_threshold'], thresH=params['high_threshold'])
 
-    print 'use hough transform to find center & ring candidates'
+    print('use hough transform to find center & ring candidates')
     res = iterateCenter(arSparse, [arThres.shape[0], arThres.shape[1]], [1,1401], prec=params['precision'], overfillFactor=params['overFac'], nBinR=params['nBinR'])
     maxR1 =  getMaxR(res, norm=params['norm'], minDr=params['deltaR'])
-    print 'maxR1: ',maxR1
+    print('maxR1: ',maxR1)
 
     ringInfo=[]
     pointsInCircles=[]
@@ -248,7 +247,7 @@ def FindFitCenter(image, mask, inParams={}):
 
     plotDetail=False
     #use cKDTree to select points in ring of width 2*deltaR around circle
-    print 'select points in circles using cKDTree and select good candidates for final fit using RANSAC'
+    print('select points in circles using cKDTree and select good candidates for final fit using RANSAC')
     tree = cKDTree(np.array([arSparse.col, arSparse.row]).T)
     for ir, r in enumerate(maxR1):
         if len(ringInfo)>=params['nMaxRing']:
@@ -259,7 +258,7 @@ def FindFitCenter(image, mask, inParams={}):
         inRing = set(rOuter).symmetric_difference(set(rInner))
         thisRingInfo['rInput']=r
         thisRingInfo['pointsInCircle']=list(inRing)
-        print 'input radius, #points ',r,len(list(inRing))
+        print('input radius, #points ',r,len(list(inRing)))
         if len(list(inRing))<params['minPoints']:
             continue
         #use ransac to pick points most likely to belong to circle
@@ -267,11 +266,11 @@ def FindFitCenter(image, mask, inParams={}):
         thisRingInfo['inFrac']=inliers.astype(int).sum()/float(len(list(inRing)))
         thisRingInfo['inliers']=inliers
         thisRingInfo['ransac_result']=model_robust
-        print 'ring %d, infrac %f, #points %d' %(ir, thisRingInfo['inFrac'], len(thisRingInfo['inliers']))
+        print('ring %d, infrac %f, #points %d' %(ir, thisRingInfo['inFrac'], len(thisRingInfo['inliers'])))
         if thisRingInfo['inFrac']>params['minInFrac'] and thisRingInfo['inliers'].astype(int).sum()>=params['minPoints']:
             ringInfo.append(thisRingInfo)
  
-    print 'now prepare for the final fit'
+    print('now prepare for the final fit')
     allX=[]
     allY=[]
     allR=[]
@@ -283,5 +282,5 @@ def FindFitCenter(image, mask, inParams={}):
         combRes = fitCircles(allX,allY,allR,yerr=True)
         return combRes, ringInfo, arSparse
     except:
-        print 'combined fit failed'
+        print('combined fit failed')
         return -1, ringInfo, arSparse
