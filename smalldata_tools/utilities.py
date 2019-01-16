@@ -25,35 +25,35 @@ from numba import jit
 import sys
 
 def MAD(a, c=0.6745, axis=None):
-  """
-  Median Absolute Deviation along given axis of an array:
-  
-  median(abs(a - median(a))) / c
-  
-  c = 0.6745 is the constant to convert from MAD to std; it is used by
-  default  
-  """
-  
-  a = np.ma.masked_where(a!=a, a)
-  if a.ndim == 1:
-    d = np.ma.median(a)
-    m = np.ma.median(ma.fabs(a - d) / c)
-  else:
-    d = np.ma.median(a, axis=axis)
-    # I don't want the array to change so I have to copy it?
-    if axis > 0:
-      aswp = np.ma.swapaxes(a,0,axis)
+    """
+    Median Absolute Deviation along given axis of an array:
+    
+    median(abs(a - median(a))) / c
+    
+    c = 0.6745 is the constant to convert from MAD to std; it is used by
+    default  
+    """
+    
+    a = np.ma.masked_where(a!=a, a)
+    if a.ndim == 1:
+        d = np.ma.median(a)
+        m = np.ma.median(ma.fabs(a - d) / c)
     else:
-      aswp = a
-      m = np.ma.median(ma.fabs(aswp - d) / c, axis=0)
+        d = np.ma.median(a, axis=axis)
+        # I don't want the array to change so I have to copy it?
+        if axis > 0:
+            aswp = np.ma.swapaxes(a,0,axis)
+        else:
+            aswp = a
+            m = np.ma.median(ma.fabs(aswp - d) / c, axis=0)
       
-  return m
+    return m
     
 def nanmedian(arr, **kwargs):
-      """
-      Returns median ignoring NAN
-      """
-      return np.ma.median( np.ma.masked_where(arr!=arr, arr), **kwargs )
+    """
+    Returns median ignoring NAN
+    """
+    return np.ma.median( np.ma.masked_where(arr!=arr, arr), **kwargs )
     
 def running_median_insort(seq, windowsize=10):
     isArray= isinstance(seq, np.ndarray)
@@ -96,84 +96,84 @@ def rebinFactor(a, shape):
 
 def rebin(a, shape):
     if isinstance(shape, float) or isinstance(shape, int):
-      shape = [shape, shape]
+        shape = [shape, shape]
     if (a.shape[0]%shape[0]) == 0 and (a.shape[1]%shape[1]) == 0:
-      rebinFactor(a, shape)
+        rebinFactor(a, shape)
     else:
-      factor = [ float(int(a.shape[0]/shape[0])+1), float(int(a.shape[1]/shape[1])+1)]
-      bigImg = ndimage.zoom(a, [shape[0]*factor[0]/a.shape[0],shape[1]*factor[1]/a.shape[1]])
-      img = rebinFactor(bigImg, shape)
+        factor = [ float(int(a.shape[0]/shape[0])+1), float(int(a.shape[1]/shape[1])+1)]
+        bigImg = ndimage.zoom(a, [shape[0]*factor[0]/a.shape[0],shape[1]*factor[1]/a.shape[1]])
+        img = rebinFactor(bigImg, shape)
     return img
 
 def rebinShape( a, newshape ):
-  '''Rebin an array to a new shape.
-  '''
-  assert len(a.shape) == len(newshape)
+    '''Rebin an array to a new shape.
+    '''
+    assert len(a.shape) == len(newshape)
 
-  slices = [ slice(0,old, float(old)/new) for old,new in zip(a.shape,newshape) ]
-  coordinates = np.mgrid[slices]
-  indices = coordinates.astype('i')   #choose the biggest smaller integer index
-  return a[tuple(indices)]
+    slices = [ slice(0,old, float(old)/new) for old,new in zip(a.shape,newshape) ]
+    coordinates = np.mgrid[slices]
+    indices = coordinates.astype('i')   #choose the biggest smaller integer index
+    return a[tuple(indices)]
 
 
 def reduceVar(vals, sigROI,threshold=-1e25):
     if threshold!=-1e25:
-      vals = vals[vals<threshold]=0
-    print 'array shape: ',len(vals.shape)
+        vals = vals[vals<threshold]=0
+    print('array shape: ',len(vals.shape))
     if len(vals.shape)>1 and sigROI!=[]:
-      if len(vals.shape)==2:
-        if not isinstance(sigROI, list):
-          return vals[:,sigROI]
-        elif len(sigROI)>1:
-          return vals[:,sigROI[0]:sigROI[1]]
-        else:
-          return vals[:,sigROI[0]]
-      elif len(vals.shape)==3:
-        if not isinstance(sigROI, list):
-          return vals[:,sigROI,:]
-        elif len(sigROI)==1:
-          return vals[:,sigROI[0],:]
-        elif len(sigROI)==2:
-          return vals[:,sigROI[0]:sigROI[1],:]
-        else:
-          return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3]]
-      elif len(vals.shape)==4:
-        if not isinstance(sigROI, list):
-          return vals[:,sigROI,:,:]
-        elif len(sigROI)==1:
-          return vals[:,sigROI[0],:,:]
-        elif len(sigROI)==2:
-          return vals[:,sigROI[0]:sigROI[1],:,:]
-        elif len(sigROI)==4:
-          return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3],:]
-        else:
-          return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3],sigROI[4]:sigROI[5]]
+        if len(vals.shape)==2:
+            if not isinstance(sigROI, list):
+                return vals[:,sigROI]
+            elif len(sigROI)>1:
+                return vals[:,sigROI[0]:sigROI[1]]
+            else:
+                return vals[:,sigROI[0]]
+        elif len(vals.shape)==3:
+            if not isinstance(sigROI, list):
+                return vals[:,sigROI,:]
+            elif len(sigROI)==1:
+                return vals[:,sigROI[0],:]
+            elif len(sigROI)==2:
+                return vals[:,sigROI[0]:sigROI[1],:]
+            else:
+                return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3]]
+        elif len(vals.shape)==4:
+            if not isinstance(sigROI, list):
+                return vals[:,sigROI,:,:]
+            elif len(sigROI)==1:
+                return vals[:,sigROI[0],:,:]
+            elif len(sigROI)==2:
+                return vals[:,sigROI[0]:sigROI[1],:,:]
+            elif len(sigROI)==4:
+                return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3],:]
+            else:
+                return vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3],sigROI[4]:sigROI[5]]
 
-    print 'this dimension is not yet implemented:',vals.shape,' ROI: ',sigROI
+    print('this dimension is not yet implemented:',vals.shape,' ROI: ',sigROI)
     return vals
 
 def getBins(bindef=[], debug=False):
-  #have full list of bin boundaries, just return it
-  if len(bindef)>3:
-    return bindef
+    #have full list of bin boundaries, just return it
+    if len(bindef)>3:
+        return bindef
   
-  if len(bindef)==3:
-    if type(bindef[2]) is int:
-      Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
-    else:
-      Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
-    if Bins[-1]<bindef[1]:
-      Bins = np.append(Bins,max(bindef[0],bindef[1]))
-    return Bins
+    if len(bindef)==3:
+        if type(bindef[2]) is int:
+            Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
+        else:
+            Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
+        if Bins[-1]<bindef[1]:
+            Bins = np.append(Bins,max(bindef[0],bindef[1]))
+        return Bins
 
-  if len(bindef)==2:
-    if debug:
-      print 'only two bin boundaries, so this is effectively a cut...cube will have a single image'
-    Bins = np.array([min(bindef[0],bindef[1]),max(bindef[0],bindef[1])])
-    return Bins
+    if len(bindef)==2:
+        if debug:
+            print('only two bin boundaries, so this is effectively a cut...cube will have a single image')
+        Bins = np.array([min(bindef[0],bindef[1]),max(bindef[0],bindef[1])])
+        return Bins
 
-  #fallback.
-  return None
+    #fallback.
+    return None
     
 #from ixppy
 def E2lam(E,o=0):
@@ -182,52 +182,52 @@ def E2lam(E,o=0):
         set o to 0 if working at sub-100 eV energies
     """
     if o:
-      E=E
+        E=E
     else:
-      E=eV(E)
+        E=eV(E)
     lam=(12398.4/E)*1e-10
     return lam
-  #lam = 12.39842 /E
-  #return lam
+    #lam = 12.39842 /E
+    #return lam
 
 def eV(E):
-  if E < 100:
-    E=E*1000.0;
-    return E*1.0
+    if E < 100:
+        E=E*1000.0;
+        return E*1.0
 
 def checkDet(env, detname):
-  for key in env.configStore().keys():
-    if key.alias()==detname:
-      return True
-  for key in env.configStore().keys():
-    #print key.src().__repr__(),detname,key.src().__repr__()==detname
-    if key.src().__repr__()==detname:
-      return True
-  return False
+    for key in env.configStore().keys():
+        if key.alias()==detname:
+            return True
+    for key in env.configStore().keys():
+        #print(key.src().__repr__(),detname,key.src().__repr__()==detname)
+        if key.src().__repr__()==detname:
+            return True
+    return False
         
 def printR(rank=0, message=''):
-  if rank==0:
-    print message
+    if rank==0:
+        print(message)
 
 def printMsg(eventNr, run, rank=0, size=1):
-  printFreq = 10
-  #if eventNr > 10000:
-  #  printFreq = 10000
-  if eventNr > 1000:
-    printFreq = 1000
-  elif eventNr > 120:
-    printFreq = 100
+    printFreq = 10
+    #if eventNr > 10000:
+    #  printFreq = 10000
+    if eventNr > 1000:
+        printFreq = 1000
+    elif eventNr > 120:
+        printFreq = 100
     
-  if eventNr%printFreq == 0:
-    if rank == 0:
-      usage = resource.getrusage(resource.RUSAGE_SELF)
-      print "*** In Event: run", run, ",event# in single job =", eventNr,', total about ',eventNr*size,' memory used: ',usage[2]*resource.getpagesize()/1000000.,' at ',time.strftime('%X')
+    if eventNr%printFreq == 0:
+      if rank == 0:
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        print("*** In Event: run", run, ",event# in single job =", eventNr,', total about ',eventNr*size,' memory used: ',usage[2]*resource.getpagesize()/1000000.,' at ',time.strftime('%X'))
 
 def getExpName(env):  
-  if (env.jobName()).find('shmem')>=0:
-    return RegDB.experiment_info.active_experiment('XPP')[1]
-  else:
-    return env.experiment()
+    if (env.jobName()).find('shmem')>=0:
+        return RegDB.experiment_info.active_experiment('XPP')[1]
+    else:
+        return env.experiment()
 
 ##########################################################################################
 ###  helper classes & functions
@@ -236,40 +236,40 @@ def getExpName(env):
 def hasKey(inkey, inh5=None, printThis=False):
     hasKey = False
     if inh5 is None:
-      print 'no input file given'
-      return hasKey
+        print('no input file given')
+        return hasKey
     if not isinstance(inh5, tables.file.File):
-      print 'input file is not a tables h5file'
-      return hasKey
+        print('input file is not a tables h5file')
+        return hasKey
 
     try:
-      if inkey[0]==['/']:
-        inkey=inkey[1:]
-      if inkey.find('/')>=0:
-        inh5.get_node('/'+inkey.split('/')[0],inkey.split('/')[1])
-      else:
-        inh5.get_node('/'+inkey)
-      hasKey=True
+        if inkey[0]==['/']:
+            inkey=inkey[1:]
+        if inkey.find('/')>=0:
+            inh5.get_node('/'+inkey.split('/')[0],inkey.split('/')[1])
+        else:
+            inh5.get_node('/'+inkey)
+        hasKey=True
     except:
-      pass
+        pass
     return hasKey
 
 def getVar(fh5, plotvar):
-  if not hasKey(plotvar,fh5):
-    print 'signal variable %s not in littleData file'%(plotvar)
-    return
+    if not hasKey(plotvar,fh5):
+        print('signal variable %s not in littleData file'%(plotvar))
+        return
 
-  if plotvar[0]!=['/']:
-    plotvar='/'+plotvar
-  try:
-    if len(plotvar.split('/'))>2:
-      vals = fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
-    else:
-      vals = fh5.get_node(plotvar).read()
-    return vals.squeeze()
-  except:
-    print 'failed to get data for ',plotvar
-    return
+    if plotvar[0]!=['/']:
+        plotvar='/'+plotvar
+    try:
+        if len(plotvar.split('/'))>2:
+            vals = fh5.get_node('/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
+        else:
+            vals = fh5.get_node(plotvar).read()
+        return vals.squeeze()
+    except:
+        print('failed to get data for ',plotvar)
+        return
 
 def getTTstr(fh5):
   """
@@ -311,13 +311,13 @@ def getDelay(fh5, use_ttCorr=True, addEnc=False):
   for node in fh5.get_node('/scan')._f_list_nodes():
     if node.name.find('var')<0 and node.name.find('none')<0 and node.name.find('lxt')>=0 and node.name.find('damage')<0:
       isDaqDelayScan=True
-      #print 'DEBUG: found that we have a delay scan'
+      #print('DEBUG: found that we have a delay scan')
       nomDelay=node.read()*1e12
 
   if not isDaqDelayScan:
     if hasKey('enc/lasDelay',fh5):
       encVal = getVar(fh5,'enc/lasDelay')
-      #print 'DEBUG: encoder info',encVal.std()
+      #print('DEBUG: encoder info',encVal.std())
       if encVal.std()>1e-9:
         nomDelay=encVal
         addEnc=False
@@ -335,13 +335,13 @@ def getDelay(fh5, use_ttCorr=True, addEnc=False):
         nomDelay = epics_delay
 
   if addEnc and not hasKey('enc/lasDelay',fh5):
-    print 'required to add encoder value, did not find encoder!'
+    print('required to add encoder value, did not find encoder!')
   if addEnc and hasKey('enc/lasDelay',fh5):            
     if getVar(fh5,'enc/lasDelay').std()>1e-6:
       nomDelay+=getVar(fh5,'enc/lasDelay').value
 
   if use_ttCorr:
-    #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()
+    #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
     return (ttCorr+nomDelay)
   else:
     return nomDelay
@@ -389,9 +389,9 @@ _ = get_offVar(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr
 # utility functions for droplet stuff
 ###
 def gaussian(x, amp, cen, wid):
-                return amp * exp(-(x-cen)**2 /(2*wid**2))
+    return amp * exp(-(x-cen)**2 /(2*wid**2))
 def lorentzian(x,p0,p1):
-		return (p0**2)/(p0**2 + (x-p1)**2)
+    return (p0**2)/(p0**2 + (x-p1)**2)
 
 def neighborImg(img):
     img_up = np.roll(img,1,axis=0); img_up[0,:]=0
@@ -408,11 +408,11 @@ def cm_epix(img,rms,maxCorr=30, histoRange=30, colrow=3, minFrac=0.25, normAll=F
     imgThres+=neighborImg(imgThres)
     imgThres+=imgThres+(abs(img)>histoRange)
     if mask is not None:
-      imgThres+=(mask==0).astype(int)
+        imgThres+=(mask==0).astype(int)
 
     maskedImg = np.ma.masked_array(img, imgThres)
     if normAll:
-      maskedImg -= maskedImg.mean()
+        maskedImg -= maskedImg.mean()
     if colrow%2==1:
         rs = maskedImg.reshape(704/2,768*2,order='F')
         rscount = np.ma.count_masked(rs,axis=0)
@@ -437,56 +437,56 @@ def cm_epix(img,rms,maxCorr=30, histoRange=30, colrow=3, minFrac=0.25, normAll=F
 # utility functions for plotting data as 2-d histogram
 ###
 def hist2d(ar1, ar2,limits=[1,99.5],numBins=[100,100],histLims=[np.nan,np.nan, np.nan, np.nan],weights=None, doPlot=True):
-        pmin0 = np.nanmin(ar1); pmin1 = np.nanmin(ar2)
-        pmax0 = np.nanmax(ar1); pmax1 = np.nanmax(ar2)
-        if not np.isnan(np.percentile(ar1,limits[0])):
-            pmin0 = np.percentile(ar1,limits[0])
-        if not np.isnan(np.percentile(ar2,limits[0])):
-            pmin1 = np.percentile(ar2,limits[0])
-        if limits[1]<100:
-            if not np.isnan(np.percentile(ar1,limits[1])):
-                pmax0 = np.percentile(ar1,limits[1])
-            if not np.isnan(np.percentile(ar2,limits[1])):
-                pmax1 = np.percentile(ar2,limits[1])
-        if histLims[0] is not np.nan:
-            pmin0 = histLims[0]
-            pmax0 = histLims[1]
-            pmin1 = histLims[2]
-            pmax1 = histLims[3]
-        v0 = ar1
-        v1 = ar2
-        binEdges0 = np.linspace(pmin0, pmax0, numBins[0])
-        binEdges1 = np.linspace(pmin1, pmax1, numBins[1])
-        ind0 = np.digitize(v0, binEdges0)
-        ind1 = np.digitize(v1, binEdges1)
-        ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
-        if weights is None:
-                iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
-        else:
-                iSig = np.bincount(ind2d, weights=weights, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1)    
-        if doPlot:
-          plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]],clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
-          plt.colorbar()
-        return iSig
+    pmin0 = np.nanmin(ar1); pmin1 = np.nanmin(ar2)
+    pmax0 = np.nanmax(ar1); pmax1 = np.nanmax(ar2)
+    if not np.isnan(np.percentile(ar1,limits[0])):
+        pmin0 = np.percentile(ar1,limits[0])
+    if not np.isnan(np.percentile(ar2,limits[0])):
+        pmin1 = np.percentile(ar2,limits[0])
+    if limits[1]<100:
+        if not np.isnan(np.percentile(ar1,limits[1])):
+            pmax0 = np.percentile(ar1,limits[1])
+        if not np.isnan(np.percentile(ar2,limits[1])):
+            pmax1 = np.percentile(ar2,limits[1])
+    if histLims[0] is not np.nan:
+        pmin0 = histLims[0]
+        pmax0 = histLims[1]
+        pmin1 = histLims[2]
+        pmax1 = histLims[3]
+    v0 = ar1
+    v1 = ar2
+    binEdges0 = np.linspace(pmin0, pmax0, numBins[0])
+    binEdges1 = np.linspace(pmin1, pmax1, numBins[1])
+    ind0 = np.digitize(v0, binEdges0)
+    ind1 = np.digitize(v1, binEdges1)
+    ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
+    if weights is None:
+        iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
+    else:
+        iSig = np.bincount(ind2d, weights=weights, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1)    
+    if doPlot:
+        plt.imshow(iSig,aspect='auto', interpolation='none',origin='lower',extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]],clim=[np.percentile(iSig,limits[0]),np.percentile(iSig,limits[1])])
+        plt.colorbar()
+    return iSig
 
 ###
 def dictToHdf5(filename, indict):
-  f = h5py.File(filename,'w')
-  if isinstance(indict, dict):
-    for key in indict.keys():
-      npAr = np.array(indict[key])
-      dset = f.create_dataset(key, npAr.shape, dtype='f')
-      dset[...] = npAr
-  elif isinstance(indict, xr.Dataset):
-    for key in indict.variables:
-      npAr = np.array(indict[key].data)
-      try:
-        dset = f.create_dataset(key, npAr.shape, dtype='f')
-        dset[...] = npAr
-      except:
-        print 'failed to write key: ',key, npAr
-        pass
-  f.close()
+    f = h5py.File(filename,'w')
+    if isinstance(indict, dict):
+        for key in indict.keys():
+            npAr = np.array(indict[key])
+            dset = f.create_dataset(key, npAr.shape, dtype='f')
+            dset[...] = npAr
+    elif isinstance(indict, xr.Dataset):
+        for key in indict.variables:
+            npAr = np.array(indict[key].data)
+            try:
+                dset = f.create_dataset(key, npAr.shape, dtype='f')
+                dset[...] = npAr
+            except:
+                print('failed to write key: ',key, npAr)
+                pass
+    f.close()
 
 #
 # code for peak finding.
@@ -504,7 +504,7 @@ def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
         elif kind == "stepDown":
             weights[0:nWeights/2]=0
         else:
-            print 'for fits not using stepUp or stepDown you need to provide weights!'
+            print('for fits not using stepUp or stepDown you need to provide weights!')
             return
     weights = np.array(weights).squeeze()
     retDict = {}
@@ -553,7 +553,7 @@ def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
         mprIter = mpr
         currPeakMin = max(0,mprIter-allFwhm[-1])
         currPeakMax = min(mprIter+allFwhm[-1],len(fP))
-        print 'zero array: ',currPeakMin, currPeakMax
+        print('zero array: ',currPeakMin, currPeakMax)
         fP[currPeakMin:currPeakMax]=[0]*(currPeakMax-currPeakMin)
         while np.max(fP)>iterFrac*allAmp[0]:
             retDict['fp_%d'%len(allPos)]=np.array(fP)#fP.deep_copy()
@@ -578,7 +578,7 @@ def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
 
                 currPeakMin = max(0,mprIter-tfwhm)
                 currPeakMax = min(mprIter+tfwhm,len(fP))
-                #print len(allPos),' new peak vals: ',tpos, tamp, tfwhm, ' zero array: ',currPeakMin, currPeakMax
+                #print(len(allPos),' new peak vals: ',tpos, tamp, tfwhm, ' zero array: ',currPeakMin, currPeakMax)
                 fP[currPeakMin:currPeakMax]=[0]*(currPeakMax-currPeakMin)
 
                 allPos.append(tpos + nWeights/2.)
@@ -596,7 +596,7 @@ def fitTrace(data, kind="stepUp", weights=None, iterFrac=-1., maxPeak=100):
         retDict['allFwhm'] = allFwhm
 
     #for k in retDict.keys():
-        #print 'fit Trace test: ',k,retDict[k]
+        #print('fit Trace test: ',k,retDict[k])
 
     return retDict
 
@@ -647,7 +647,7 @@ class dropObject(object):
       else:
         self.__dict__[name]=[data]
     else:
-      print 'field ',name,' already in dropObject: ',self._name
+      print('field ',name,' already in dropObject: ',self._name)
   def __repr__(self):
     return "dropObject with fields: "+str(self.__dict__.keys())
   def __getitem__(self,x):
@@ -671,11 +671,11 @@ def shapeFromKey_h5(fh5, thiskey):
 
 
 def rename_reduceRandomVar(outFileName):
-    print 'rename_reduceRandomVar ',outFileName
+    print('rename_reduceRandomVar ',outFileName)
     if outFileName.find('.inprogress')<0:
-        print 'filename does not end in inprogress, will quit'
+        print('filename does not end in inprogress, will quit')
         sys.exit()
-    print 'Renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress',''))
+    print('Renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress','')))
 
     #open file.
     fin = h5py.File(outFileName,'r')
@@ -684,53 +684,53 @@ def rename_reduceRandomVar(outFileName):
     #groups (binning Variables)
     randomNbins=1
     for k in fin.keys():
-      #deal with groups first. 
-      if isinstance(fin[k],  h5py.Group):
-        if k!='random':
-          fin.copy(k, fout)
-        else:
-          for kk in fin[k]:
-            randomNbins*=fin[k][kk].shape[0]
+        #deal with groups first. 
+        if isinstance(fin[k],  h5py.Group):
+            if k!='random':
+                fin.copy(k, fout)
+            else:
+                for kk in fin[k]:
+                    randomNbins*=fin[k][kk].shape[0]
 
-      #config & setup have no shape, just copy.
-      elif k.find('Cfg')>=0 or k=='cubeSelection':
-        fin.copy(k, fout)
+        #config & setup have no shape, just copy.
+        elif k.find('Cfg')>=0 or k=='cubeSelection':
+            fin.copy(k, fout)
 
     nEntryShape=fin['nEntries'].shape
     nEntryBinsFlat=1.
     for idc, idim in enumerate(nEntryShape): 
-      nEntryBinsFlat*=idim
-      if idim==randomNbins:randAxis=idc
+        nEntryBinsFlat*=idim
+        if idim==randomNbins:randAxis=idc
         
     for k in fin.keys():
-      if isinstance(fin[k],  h5py.Group): continue
-      if k.find('Cfg')>=0 or k=='cubeSelection' or k.find('dim')>=0: continue
+        if isinstance(fin[k],  h5py.Group): continue
+        if k.find('Cfg')>=0 or k=='cubeSelection' or k.find('dim')>=0: continue
         
-      if len(fin[k].shape)>=len(nEntryShape):
-        kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
-      else:
-        print 'cannot determine shape for reshaping: ',fin[k].shape, len(nEntryShape)
-        continue
+        if len(fin[k].shape)>=len(nEntryShape):
+            kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
+        else:
+            print('cannot determine shape for reshaping: ',fin[k].shape, len(nEntryShape))
+            continue
 
-      if kShape == nEntryShape:
-        if randomNbins>1 and randomNbins in nEntryShape:
-          data=fin[k].value.sum(axis=randAxis)
-          fout.create_dataset(k, data=data)
+        if kShape == nEntryShape:
+            if randomNbins>1 and randomNbins in nEntryShape:
+                data=fin[k].value.sum(axis=randAxis)
+                fout.create_dataset(k, data=data)
+            else:
+                fin.copy(k, fout)
         else:
-          fin.copy(k, fout)
-      else:
-        newShp=list(nEntryShape)
-        for iShp,shp in enumerate(fin[k].shape):
-          if iShp==0: continue
-          newShp.append(shp)
-        newShp=tuple(newShp)
-        print 'I am reshaping ',k,' -- ',kShape,' -- ',newShp
-        newArray=fin[k].value.reshape(newShp)
-        if randomNbins>1 and randomNbins in newArray.shape:
-          data=newArray.sum(axis=randAxis)
-          fout.create_dataset(k, data=data)
-        else:
-          fout.create_dataset(k, data=newArray)
+            newShp=list(nEntryShape)
+            for iShp,shp in enumerate(fin[k].shape):
+                if iShp==0: continue
+                newShp.append(shp)
+            newShp=tuple(newShp)
+            print('I am reshaping ',k,' -- ',kShape,' -- ',newShp)
+            newArray=fin[k].value.reshape(newShp)
+            if randomNbins>1 and randomNbins in newArray.shape:
+                data=newArray.sum(axis=randAxis)
+                fout.create_dataset(k, data=data)
+            else:
+                fout.create_dataset(k, data=newArray)
 
     fout.close()
     os.remove(outFileName)
@@ -766,35 +766,37 @@ def getCMpeak(img, nPeakSel=4, minPeakNum=100, ADUmin=-100, ADUmax=200, step=0.5
 
     return retDict
 
-def image_from_dxy(d,x,y):
-  if np.array(x).shape!=np.array(y).shape or  np.array(d).shape!=np.array(y).shape:
-    print 'shapes of data or x/y do not match ',np.array(d).shape, np.array(x).shape, np.array(y).shape
-  if (x.flatten()[0]-int(x.flatten()[0]))!=0:
-    #cspad
-    if x.shape==(32,185,388): imgShape=[1689,1689]
-    #cs140k
-    elif x.shape==(2,185,388): imgShape=[391,371] #at least for one geometry
-    #epix100a
-    elif x.shape==(704,768): imgShape=[709,773]
-    #jungfrau512k
-    elif x.shape==(1,512,1024): imgShape=[514,1030]
-    elif x.shape==(512,1024): imgShape=[514,1030]
-    #jungfrau1M
-    elif x.shape==(2,512,1024): imgShape=[1064,1030]
-    elif len(x.shape)==2:#is already image (and not special detector)
-      return d
+def image_from_dxy(d,x,y, outShape=None):
+    if np.array(x).shape!=np.array(y).shape or  np.array(d).shape!=np.array(y).shape:
+        print('shapes of data or x/y do not match ',np.array(d).shape, np.array(x).shape, np.array(y).shape)
+    if (x.flatten()[0]-int(x.flatten()[0]))!=0:
+        #cspad
+        if x.shape==(32,185,388): imgShape=[1689,1689]
+        #cs140k
+        elif x.shape==(2,185,388): imgShape=[391,371] #at least for one geometry
+        #epix100a
+        elif x.shape==(704,768): imgShape=[709,773]
+        #jungfrau512k
+        elif x.shape==(1,512,1024): imgShape=[514,1030]
+        elif x.shape==(512,1024): imgShape=[514,1030]
+        #jungfrau1M
+        elif x.shape==(2,512,1024): imgShape=[1064,1030]
+        elif len(x.shape)==2:#is already image (and not special detector)
+            return d
+        else:
+            print('do not know which detector in need of a special geometry this is, cannot determine shape of image');      return
+        ix = x.copy()
+        ix = ix - np.min(ix)
+        ix = (ix/np.max(ix)*imgShape[0]).astype(int)
+        iy = y.copy()
+        iy = iy - np.min(iy)
+        iy = (iy/np.max(iy)*imgShape[1]).astype(int)
     else:
-      print 'do not know which detector this is, cannot decide shape of iamge'
-      return
-    ix = x.copy()
-    ix = ix - np.min(ix)
-    ix = (ix/np.max(ix)*imgShape[0]).astype(int)
-    iy = y.copy()
-    iy = iy - np.min(iy)
-    iy = (iy/np.max(iy)*imgShape[1]).astype(int)
-  else:
-    ix=x.astype(int)
-    iy=y.astype(int)
+        ix=x.astype(int)
+        iy=y.astype(int)
 
-  img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=(np.max(ix)+1, np.max(iy)+1)).todense()
-  return img
+    if outShape is None:
+        img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=(np.max(ix)+1, np.max(iy)+1)).todense()
+    else:
+        img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
+    return img
