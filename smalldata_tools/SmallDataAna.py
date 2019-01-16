@@ -55,7 +55,7 @@ size = comm.Get_size()
  
 class Cube(object):
     """ class to define binning operation for small/big data in a given run"""
-    def __init__(self, binVar='', bins=[], cubeName=None, useFilter=None, addBinVars=None):
+    def __init__(self, binVar, bins=[], useFilter=None, cubeName=None, addBinVars=None):
         self.binVar = binVar
         self.bins = bins
         self.useFilter = useFilter
@@ -101,18 +101,18 @@ class Cube(object):
                 inputBins = addBinVars[1:]
             addbins = util_getBins(inputBins)
             if addbins is None:
-                print 'Could not define bin boundaries for addBinVars:',inputBins
-                print 'automatic detection only works for primary binning axis'
+                print('Could not define bin boundaries for addBinVars:',inputBins)
+                print('automatic detection only works for primary binning axis')
             addBinVars[addBinVars[0]] = addbins
         elif isinstance(addBinVars,dict):
             for addVar in addBinVars.keys():
                 addbins = util_getBins(addBinVars[addVar])
                 if addbins is None:
-                    print 'Could not define bin boundaries for addBinVars:',addBinVars[addVar]
-                    print 'automatic detection only works for primary binning axis'
+                    print('Could not define bin boundaries for addBinVars:',addBinVars[addVar])
+                    print('automatic detection only works for primary binning axis')
                 addBinVars[addVar] = addbins
         else:
-            print 'please pass addBinVar as list: [ varName, bins ]'
+            print('please pass addBinVar as list: [ varName, bins ]')
             
         for k in addBinVars:
             self.addBinVars[k] = addBinVars[k]
@@ -152,30 +152,30 @@ class Cube(object):
             for tv in tVar:
                 self.addIdxVars.append(tv)
         else:
-            print 'addIdxVar need to be a string or list of strings, got: ',tVar
+            print('addIdxVar need to be a string or list of strings, got: ',tVar)
 
     def printCube(self, Sel=None):
         """
         parameter: name of filter/selection
         prints the setting of this cube.
         """
-        print 'cube: ',self.cubeName
+        print('cube: ',self.cubeName)
         if len(self.bins)==3 and type(self.bins[2]) is int:
-            print '%s binned from %g to %g in %i bins'%(self.binVar,self.bins[0],self.bins[1],self.bins[2])
+            print('%s binned from %g to %g in %i bins'%(self.binVar,self.bins[0],self.bins[1],self.bins[2]))
         elif len(self.bins)==3:
-            print '%s binned from %g to %g in %i bins'%(self.binVar,self.bins[0],self.bins[1],int((self.bins[1]-self.bins[0])/self.bins[2]))
+            print('%s binned from %g to %g in %i bins'%(self.binVar,self.bins[0],self.bins[1],int((self.bins[1]-self.bins[0])/self.bins[2])))
         elif len(self.bins)==0:
-            print 'will use scan steps for binning'
+            print('will use scan steps for binning')
         elif len(self.bins)==2:
-            print 'have a single bin from %g to %g'%(self.bins[0],self.bins[1])
+            print('have a single bin from %g to %g'%(self.bins[0],self.bins[1]))
         elif len(self.bins)==1:
-            print 'use step size of %g, determine boundaries from data'%self.bins[0]
+            print('use step size of %g, determine boundaries from data'%self.bins[0])
         else:
-            print '%s binned from %g to %g in %i bins'%(self.binVar,min(self.bins),max(self.bins),len(self.bins))
+            print('%s binned from %g to %g in %i bins'%(self.binVar,min(self.bins),max(self.bins),len(self.bins)))
         if Sel is not None:
             for icut,cut in enumerate(Sel.cuts):
-                print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
-        print 'we will bin: ',self.targetVars
+                print('Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2]))
+        print('we will bin: ',self.targetVars)
 
 
 class Selection(object):
@@ -189,7 +189,7 @@ class Selection(object):
         elif isinstance(newFilter, list):
             self._filter = np.array(newFilter)
         else:
-            print 'cannot set filter array with this ',newFilter
+            print('cannot set filter array with this ',newFilter)
     def addCut(self, varName, varmin, varmax):
         """
         add a variable to the selection
@@ -212,9 +212,9 @@ class Selection(object):
     def printCuts(self):
         """ print the currently defined list of square cuts for selection/filter"""
         for icut,cut in enumerate(self.cuts):
-            print 'Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2])
+            print('Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2]))
         if isinstance(self._filter, np.ndarray):
-            print 'of %d events %d pass filter'%(self._filter.shape[0], self._filter.sum())
+            print('of %d events %d pass filter'%(self._filter.shape[0], self._filter.sum()))
     def add(self, additionalSel):
         """ add all cuts defined in a different filter to this one"""
         for cut in additionalSel.cuts:
@@ -252,7 +252,7 @@ class SmallDataAna(object):
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-            print 'setting up dirs:'
+            print('setting up dirs:')
             if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
@@ -261,7 +261,7 @@ class SmallDataAna(object):
         else:
             self.fname='%s/%s'%(self.dirname,filename)
         if intable != 'redis':
-            print 'and now open in dir: ',self.dirname,' to open file ',self.fname
+            print('and now open in dir: ',self.dirname,' to open file ',self.fname)
 
         self.Sels = {}
         self.cubes = {}
@@ -305,12 +305,12 @@ class SmallDataAna(object):
             elif isinstance(intable, basestring) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
-                print 'pass unknown input parameter or file cannot be found: ',intable
+                print('pass unknown input parameter or file cannot be found: ',intable)
                 return None
         elif path.isfile(self.fname):
             self.fh5=tables.open_file(self.fname,'r')
         else: #if path.isfile(self.fname):
-            print 'could not find file: ',self.fname
+            print('could not find file: ',self.fname)
             return None
 
         self.xrData = {}
@@ -319,7 +319,7 @@ class SmallDataAna(object):
         #check that required live fields are actually present
         for key in self._live_fields:
             if not key in self._fields.keys():
-                print 'cannot find required variable %s, will return None!'%key
+                print('cannot find required variable %s, will return None!'%key)
                 return None
         self.ttCorr, self.ttBaseStr = self._getTTstr()
 
@@ -330,9 +330,9 @@ class SmallDataAna(object):
             if self._isRedis:
                 evttime = self.fh5.fetch_data(self.run,['event_time'])['event_time']
                 if len(evttime)<1:
-                    print 'read from REDIS, found no entries for run ',self.run,', cannot make SmallData object'
+                    print('read from REDIS, found no entries for run ',self.run,', cannot make SmallData object')
                     return None
-                print 'read data for run %d from REDIS, have %d events'%(self.run,len(evttime))
+                print('read data for run %d from REDIS, have %d events'%(self.run,len(evttime)))
             else:
                 evttime = self.fh5.get_node('/event_time').read()
             self._fields['event_time'][1]='inXr'
@@ -344,7 +344,7 @@ class SmallDataAna(object):
         elif not self._isRedis:
             timeData = self.fh5.get_node('/EvtID','time').read()
             if timeData is None:
-                print 'could not find eventtime data ',self._fields.keys()
+                print('could not find eventtime data ',self._fields.keys())
             #evt_id.time()[0] << 32 | evt_id.time()[1] 
             else:
                 evttime = (timeData[:,0].astype(np.int64) << 32 | timeData[:,1])
@@ -352,7 +352,7 @@ class SmallDataAna(object):
                 self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='EvtID__time') 
                 self._fields['EvtID/time'][1]='inXr'
         else:
-            print 'could not create xarray'
+            print('could not create xarray')
             return
         self._addXarray()
         #there won't be any xarray files of correct size when running "live"
@@ -433,7 +433,7 @@ class SmallDataAna(object):
                 dimArr = np.arange(0, dataShape[1])
                 coords={'time': self._tStamp[:setNevt],'dim0':dimArr}
                 dims=('time','dim0')
-                #print '1-d data per event, not IPM-channels: ',key,tleaf_name, dataShape
+                #print('1-d data per event, not IPM-channels: ',key,tleaf_name, dataShape)
         else:
             coords={'time': self._tStamp[:setNevt]}
             dims = ['time']
@@ -442,7 +442,7 @@ class SmallDataAna(object):
                 dimStr = 'dim%d'%dim
                 coords[dimStr] = thisDim
                 dims.append(dimStr)
-            #print 'more >-2-d data per event, fill on request ',key,tleaf_name, dataShape
+            #print('more >-2-d data per event, fill on request ',key,tleaf_name, dataShape)
 
         return dataShape, coords, dims
 
@@ -459,14 +459,14 @@ class SmallDataAna(object):
                 #1-dim date
                 if len(redisInfo[key][0])<=2:
                     keys_for_xarray.append(key)
-        #print 'DEBUG ',keys_for_xarray
+        #print('DEBUG ',keys_for_xarray)
         nEvts = self.fh5.fetch_data(run=self.run, keys=['event_time'])['event_time'].shape[0]
         nEvts_in_Xarray = -1
         try:
             nEvts_in_Xarray = self.xrData['event_time'].shape[0]
-            #print 'DEBUG:---events--',nEvts_in_Xarray, nEvts
+            #print('DEBUG:---events--',nEvts_in_Xarray, nEvts)
             if nEvts == nEvts_in_Xarray:
-                #print 'DEBUG: no update needed'
+                #print('DEBUG: no update needed')
                 return
         except:
             pass
@@ -476,16 +476,16 @@ class SmallDataAna(object):
         keys_for_xarray.append('event_time')
         data_for_xarray = self.fh5.fetch_data(self.run,keys=keys_for_xarray)
         evttime = data_for_xarray['event_time']
-        #print 'update from %d events to %d '%(nEvts_in_Xarray, evttime.shape[0])
+        #print('update from %d events to %d '%(nEvts_in_Xarray, evttime.shape[0]))
         self._fields['event_time'][1]='inXr'
         evttime_sec = evttime >> 32
         evttime_nsec = evttime - (evttime_sec << 32)
         self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
-        #print 'DEBUG: ',self._tStamp.shape,data_for_xarray['event_time'].shape,' -- ',data_for_xarray['ipm2/sum'].shape
+        #print('DEBUG: ',self._tStamp.shape,data_for_xarray['event_time'].shape,' -- ',data_for_xarray['ipm2/sum'].shape)
         minNevt=data_for_xarray[keys_for_xarray[0]].shape[0]
         for key in keys_for_xarray:
             if data_for_xarray[key].shape[0]<minNevt:
-                #print 'DEBUG: mismatched data...',key
+                #print('DEBUG: mismatched data...',key)
                 minNevt=data_for_xarray[key].shape[0]
         self.xrData = xr.DataArray(evttime[:minNevt], coords={'time': self._tStamp[:minNevt]}, dims=('time'),name='event_time')
         for key in keys_for_xarray:
@@ -523,7 +523,7 @@ class SmallDataAna(object):
                         self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:].replace('/','__')) ])
                         self._fields[fieldkey][1]='inXr'
                     except:
-                        print 'failed to create dataset for: ',fieldkey, self._fields[fieldkey]
+                        print('failed to create dataset for: ',fieldkey, self._fields[fieldkey])
                 continue
             for tleaf in node._f_list_nodes():
                 if not isinstance(tleaf, tables.group.Group):         
@@ -536,7 +536,7 @@ class SmallDataAna(object):
                     #limit on dimensions here!
                     if len(dataShape)<=2 and coords is not None:
                         if len(dataShape)==2 and dataShape[1]>25 and (dataShape[0]*dataShape[1])>1e7:
-                            print 'array for %s is too large (shape %d * %d), will load when asked'%(fieldName,dataShape[0], dataShape[1])
+                            print('array for %s is too large (shape %d * %d), will load when asked'%(fieldName,dataShape[0], dataShape[1]))
                             continue
                         self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key,tleaf.name).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
                         self._fields[fieldName][1]='inXr'
@@ -545,31 +545,31 @@ class SmallDataAna(object):
         """  add new variables to xrData. Keep track so that it will be saved on 
         destuction of main object"""
         if name.find('__')>=0 and name.replace('__','/') not in self._fields.keys():
-            print 'Names of newly defined variables may not contain __, will replace with single _'
+            print('Names of newly defined variables may not contain __, will replace with single _')
             name = name.replace('__','_')
         if not isinstance(data, np.ndarray):
             try:
                 data = np.array(data)
             except:
-                print 'data is not array and could not be cast to one either'
+                print('data is not array and could not be cast to one either')
                 return
         if data.shape[0] < self._tStamp.shape[0]:
-            print 'only adding event based data is implemented so far'
+            print('only adding event based data is implemented so far')
             return
         if data.shape[0] > self._tStamp.shape[0]:
-            print 'have more events, only attach ones matching time stamps'
+            print('have more events, only attach ones matching time stamps')
             data=data[self._tStamp.shape[0]]
 
         #if not self._isRedis and name[0]!='/': name='/'+name
         name = name.replace('__','/')
         if name not in self._fields.keys():
-            #print 'DEBUG: add a new variable to Xarray: ',name
+            #print('DEBUG: add a new variable to Xarray: ',name)
             self._fields[name]=[data.shape, 'inXr', 'mem']
         elif self._fields[name][2]=='main':
-            #print 'add a variable from the main data to Xarray: ',name
+            #print('add a variable from the main data to Xarray: ',name)
             self._fields[name]=[data.shape, 'inXr', 'main']
         elif  self._fields[name][2]=='xrfile':
-            #print 'add a variable from an netcdf to Xarray: ',name
+            #print('add a variable from an netcdf to Xarray: ',name)
             self._fields[name]=[data.shape, 'inXr', 'xrfile']
             try:
                 testShape = self.xrData[name].data.shape
@@ -581,7 +581,7 @@ class SmallDataAna(object):
             except:
                 pass
         else:
-            #print 'try to add a variable already present in xrData, only replace values!'
+            #print('try to add a variable already present in xrData, only replace values!')
             self.xrData[name].data = data
             return
 
@@ -610,7 +610,7 @@ class SmallDataAna(object):
         for key in self.xrData.keys():
             fieldName = key.replace('__','/')
             if fieldName not in self._fields.keys():
-                print 'added new data field %s to list',key
+                print('added new data field %s to list',key)
                 self._fields[fieldName]={self.xrData[key].shape, 'inXr', 'mem'}
 
     def _writeNewData(self):
@@ -620,7 +620,7 @@ class SmallDataAna(object):
         #do not write files for REDIS (as you are likely auto-updating...)
         if self._isRedis:
             return
-        print 'save derived data to be loaded next time:'
+        print('save derived data to be loaded next time:')
         for key in self._fields.keys():
             #delay is special: make sure it gets redefined on each new SmallDataAna creation 
             #to allow to use different definitions. getDelay will be called internally w/ default params 
@@ -628,12 +628,12 @@ class SmallDataAna(object):
             #saving does not help performace this is a cheap calculation.
             if key=='delay': continue 
             if self._fields[key][2] == 'mem':
-                print 'saving data for field: ',key, self._fields[key]
+                print('saving data for field: ',key, self._fields[key])
                 data = self.getVar(key)
-                #print 'DEBUG: shape ',data.shape
+                #print('DEBUG: shape ',data.shape)
                 if key[0]=='/': key = key[1:]
                 if isinstance(data, xr.DataArray):
-                    print 'get xarray for ',key
+                    print('get xarray for ',key)
                     new_xrData = data
                 elif isinstance(data, np.ndarray):
                     if len(data.shape)==1:
@@ -649,10 +649,10 @@ class SmallDataAna(object):
                             dims.append(dimStr)
                         new_xrData = xr.DataArray(data, coords=coords, dims=dims,name=name)
                 else:
-                    print 'was passed data which is neither xArray nor np. array. will not save ',key
+                    print('was passed data which is neither xArray nor np. array. will not save ',key)
 
                 xrname='%s/xr_%s_%s_Run%03d.nc'%(self.dirname,key.replace('/','__'),self.expname,self.run)
-                print 'data for %s is only in memory, write to file with name: %s '%(key,xrname)
+                print('data for %s is only in memory, write to file with name: %s '%(key,xrname))
                 new_xrData.to_netcdf(xrname,engine='h5netcdf')
 
     def _readXarrayData(self):
@@ -672,12 +672,12 @@ class SmallDataAna(object):
                         self._fields[key]=[add_xrDataSet[key].shape, 'inXr', 'xrfile']
                         values = add_xrDataSet[key].values
                         self.addVar(key, values)
-                        #need to print this dataset, otherwise this does not work. Why #DEBUG ME
-                        print 'found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key]
+                        #need to print(this dataset, otherwise this does not work. Why #DEBUG ME)
+                        print('found filename %s, added data for key %s '%(fname, key), add_xrDataSet[key])
                         add_xrDataSet.close()
-                        print 'closed the xarray file '
+                        print('closed the xarray file ')
                     except:
-                        print 'failed at xr.open_dataset for: ',self.dirname+'/'+fname
+                        print('failed at xr.open_dataset for: ',self.dirname+'/'+fname)
 
 ###
 # functions to add extra variables to smallData
@@ -692,7 +692,7 @@ class SmallDataAna(object):
         dataOrg = self.getVar(name)
         dataNew=running_median_insort(dataOrg, windowsize=windowsize)
         medVarName = ('median_%s'%name).replace('/','_')
-        print 'add variable named: ',medVarName
+        print('add variable named: ',medVarName)
         self.addVar(medVarName, dataNew)
 
     def _getStartOffIdx(self, selName, nNbr=3, overWrite=False):
@@ -703,7 +703,7 @@ class SmallDataAna(object):
             tStamp = self.xrData.event_time.values
             filterOff = self.getFilter(selName.split('__')[0]+'__off')
             startOffIdx = get_startOffIdx(tStamp, filterOff, nNbr=nNbr)
-            print 'add offIdx to data: ',('%s_offIdx_nNbr%02d'%(selName, nNbr))
+            print('add offIdx to data: ',('%s_offIdx_nNbr%02d'%(selName, nNbr)))
             self.addVar('%s_offIdx_nNbr%02d'%(selName, nNbr), startOffIdx)
         return startOffIdx
 
@@ -802,7 +802,7 @@ class SmallDataAna(object):
             keysFiltered.append(thiskey)
             keyShapesFiltered.append(thiskeyshape)
             if printKeys:
-                print thiskey
+                print(thiskey)
         if returnShape:
             for tkey, tshape in zip(keysFiltered, keyShapesFiltered):
                 if tkey not in self._fields.keys():
@@ -817,10 +817,10 @@ class SmallDataAna(object):
         elif ('EvtID/fid' in self._fields.keys()):
             nent = self._fields['EvtID/fid'][0][0]
         else:
-            print 'could not find dataset with fiducials'
+            print('could not find dataset with fiducials')
             nent=-1
         if printThis:
-            print 'Number of events in %s is %i'%(self.fname, nent)
+            print('Number of events in %s is %i'%(self.fname, nent))
         return nent
 
     def printRunInfo(self):
@@ -837,11 +837,11 @@ class SmallDataAna(object):
             for thisScanVar in scanVar:
                 nPoints.append(np.unique(self.getVar('scan/%s'%thisScanVar)).shape[0])
             if len(scanVar)==1:
-                print 'this run is a scan of %s with %d points'%(scanVar[0],nPoints[0])
+                print('this run is a scan of %s with %d points'%(scanVar[0],nPoints[0]))
             else:
-                print 'this run is a scan of'
+                print('this run is a scan of')
                 for sv,npts in zip(scanVar, nPoints):
-                    print ' %s with %d points'%(sv,npts)
+                    print(' %s with %d points'%(sv,npts))
 
     def hasKey(self, inkey):
         """ return boolean to reflect if a given variable is present in data
@@ -879,7 +879,7 @@ class SmallDataAna(object):
         useFilter: name of selection to add this cut to (required)
         """
         if useFilter is None:
-            print 'you need to pass the name for the filter/selection you want to use'
+            print('you need to pass the name for the filter/selection you want to use')
             return
         if not self.Sels.has_key(useFilter):
             self.Sels[useFilter] = Selection()
@@ -890,15 +890,15 @@ class SmallDataAna(object):
                 if self.Sels.has_key(varName):
                     self.Sels[useFilter].add(self.Sels[varName])
                 else:
-                    print 'Cannot add cuts for filter %s as its not defined yet'%varName
+                    print('Cannot add cuts for filter %s as its not defined yet'%varName)
             elif isinstance(varName, Selection):
                 self.Sels[useFilter].add(varName)
             else:
-                print 'need to pass selection to add as Selection or its name'
+                print('need to pass selection to add as Selection or its name')
         Filter = self.getFilter(useFilter=useFilter)
         self.Sels[useFilter]._setFilter(Filter)
         #if self.Sels[useFilter]._filter is not None:
-        #    print 'of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum())
+        #    print('of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum()))
     def removeCut(self, varName, useFilter):
         """
         remove a variable from the selection
@@ -907,7 +907,7 @@ class SmallDataAna(object):
            useFilter: name of selection/filter
         """
         if not self.Sels.has_key(useFilter):
-            print 'Selection with name %s does not exist, cannot remove cut'%useFilter
+            print('Selection with name %s does not exist, cannot remove cut'%useFilter)
             return
         self.Sels[useFilter].removeCut(varName)
         Filter = self.getFilter(useFilter=useFilter)
@@ -922,17 +922,17 @@ class SmallDataAna(object):
         """
         if selName is not None:
             if selName not in self.Sels:
-                print 'could not find selection ',selName,', options are: ',
+                print('could not find selection ',selName,', options are: ',)
                 for sel in self.Sels:
-                    print sel
+                    print(sel)
                 return
-            print self.Sels[selName].printCuts()
+            print(self.Sels[selName].printCuts())
             return
         for sel in self.Sels:
-            print sel
+            print(sel)
             if not brief:
-                print self.Sels[sel].printCuts()
-                print '--------------------------'
+                print(self.Sels[sel].printCuts())
+                print('--------------------------')
     def printCuts(self, selName=None, brief=True):
         """
         alias to printSelections
@@ -949,13 +949,13 @@ class SmallDataAna(object):
         elif 'EvtID/fid' in self._fields.keys():
             total_filter=np.ones_like(self.getVar('EvtID/fid')).astype(bool)
         else:
-            print 'cannot find fiducials, cannot define a filter'
+            print('cannot find fiducials, cannot define a filter')
             return None
 
         useFilterBase = useFilter.split('__')[0]
         if useFilter==None or useFilterBase not in self.Sels.keys():
             if debug and useFilterBase not in self.Sels.keys():
-                print 'Selection %s is not available, defined Selections are:'%useFilter
+                print('Selection %s is not available, defined Selections are:'%useFilter)
                 self.printSelections()
             return total_filter.squeeze()
 
@@ -998,7 +998,7 @@ class SmallDataAna(object):
                     for ft in filters:
                         total_filter_test&=ft     
                         
-                    print 'getFilter: Cut %f < %s < %f passes %d events of %d, total passes up to now: %d '%(thiscut[1], thiscut[0], thiscut[2], filters[-1].sum(), thisPlotvar.shape[0], total_filter_test.sum())
+                    print('getFilter: Cut %f < %s < %f passes %d events of %d, total passes up to now: %d '%(thiscut[1], thiscut[0], thiscut[2], filters[-1].sum(), thisPlotvar.shape[0], total_filter_test.sum()))
 
         for ft in filters:
             total_filter&=ft     
@@ -1055,8 +1055,8 @@ class SmallDataAna(object):
         if plotvar not in self._fields.keys():
             self._updateFromXarray()
         if plotvar not in self._fields.keys():
-            print 'available keys are: ',self._fields.keys()
-            print 'signal variable %s not in list'%(plotvar)
+            print('available keys are: ',self._fields.keys())
+            print('signal variable %s not in list'%(plotvar))
             return
 
         #FIX ME
@@ -1067,8 +1067,8 @@ class SmallDataAna(object):
                 if not self._isRedis:
                     if len(plotvar.split('/'))>1:
                         #this can fail when the data is too large. better debugging?
-                        #print 'DEBUG B ',('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1])
-                        #print 'node: ',self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1])
+                        #print('DEBUG B ',('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
+                        #print('node: ',self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
                         vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
                     else:
                         vals = self.fh5.get_node('/'+plotvar).read()
@@ -1077,7 +1077,7 @@ class SmallDataAna(object):
                 if vals.shape[0]==self._tStamp.shape[0]:
                     tArrName = plotvar.replace('/','__')
                     if addToXarray:
-                        print 'add me to xarray...',plotvar
+                        print('add me to xarray...',plotvar)
                         self.addVar(tArrName, vals)
             else:
                 if not self._isRedis:
@@ -1093,7 +1093,7 @@ class SmallDataAna(object):
                     vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar][Filter]
             return vals.squeeze()
         except:
-            print 'failed to get data for ',plotvar
+            print('failed to get data for ',plotvar)
             return
 
     def getRedVar(self, plotvar,threshold=-1e25):
@@ -1125,7 +1125,7 @@ class SmallDataAna(object):
                     else:
                         vals=vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3]]
                 else:
-                    print 'this dimension is not yet implemented:',len(sig.shape)
+                    print('this dimension is not yet implemented:',len(sig.shape))
         return vals
 
     def get1dVar(self, plotvar,threshold=-1e25):
@@ -1172,13 +1172,13 @@ class SmallDataAna(object):
         for scanVN in scanVar:
             if scanVN.find('lxt')>=0:
                 isDaqDelayScan=True
-                #print 'DEBUG: found that we have a delay scan'
+                #print('DEBUG: found that we have a delay scan')
                 nomDelay=self.getVar('scan/%s'%scanVN)*1e12
 
         if not isDaqDelayScan:
             if self.hasKey('enc/lasDelay'):
                 encVal = self.getVar('enc/lasDelay')
-                #print 'DEBUG: encoder info',np.nanstd(encVal)
+                #print('DEBUG: encoder info',np.nanstd(encVal))
                 if np.nanstd(encVal)>1e-9:
                     nomDelay=encVal
                     addEnc=False
@@ -1193,14 +1193,14 @@ class SmallDataAna(object):
                     elif np.nanstd(encVal)>1e-3:
                         nomDelay=encVal
                     else:
-                        print 'strange encoder value for runs taken before encoder FEX....', encCal.std()
+                        print('strange encoder value for runs taken before encoder FEX....', encCal.std())
                 else:
                     epics_delay = self.getVar('epics/lxt_ttc')
                     if epics_delay.std()!=0:
                         nomDelay = epics_delay
 
         if addEnc and self.hasKey('enc/lasDelay'):
-            print 'required to add encoder value, did not find encoder!'
+            print('required to add encoder value, did not find encoder!')
         if addEnc and self.hasKey('enc/lasDelay'):
             if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
                 nomDelay=nomDelay.copy()+self.getVar('enc/lasDelay')
@@ -1212,7 +1212,7 @@ class SmallDataAna(object):
                 pass
 
         if use_ttCorr:
-            #print 'DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std()
+            #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
             delay = (ttCorr+nomDelay)
         else:
             delay = nomDelay
@@ -1225,26 +1225,26 @@ class SmallDataAna(object):
         if len(hst)==2:
             return [hst[0].max(), hst[1][hst[0].argmax()]]
         else:
-            print 'getPeak is not yet implemented for this type of data (need 1d histo)'
+            print('getPeak is not yet implemented for this type of data (need 1d histo)')
 
     def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None, plotMultidimMean=False):
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
         if isinstance(plotvar, basestring) or (len(plotvar)==2 and (isinstance(plotvar[0], basestring) and not isinstance(plotvar[1], basestring))):
             if len(numBins)!=1:
-                print 'bin# needs to be of same dimensions as plotvariables (1d)'
+                print('bin# needs to be of same dimensions as plotvariables (1d)')
                 return
             return self.plotVar1d(plotvar, numBins=numBins[0], useFilter=useFilter, limits=limits,fig=fig,plotWith=plotWith, plotMultidimMean=plotMultidimMean)
         elif len(plotvar)>2:
-            print 'plotting of 3 variables is not defined yet'
+            print('plotting of 3 variables is not defined yet')
             return
         if len(numBins)!=2:
             if len(numBins)==1:
                 numBins=[numBins[0],numBins[0]]
             else:
-                print 'bin# needs to be of same dimentions as plotvariables (2d)'
+                print('bin# needs to be of same dimentions as plotvariables (2d)')
             if plotMultidimMean:
-                print 'plotting multidim means of two variables is not implemented yet'
+                print('plotting multidim means of two variables is not implemented yet')
                 return
         return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
 
@@ -1254,11 +1254,11 @@ class SmallDataAna(object):
 
         if isinstance(plotvar,list):
             if not (self.hasKey(plotvar[0]) or plotvar[0]=='delay'): 
-                print 'request variable %s not in smallData file'%plotvar
+                print('request variable %s not in smallData file'%plotvar)
                 return
         else:
             if not (self.hasKey(plotvar) or plotvar=='delay'): 
-                print 'request variable %s not in smallData file'%plotvar
+                print('request variable %s not in smallData file'%plotvar)
                 return
 
         if plotvar=='delay':
@@ -1288,11 +1288,11 @@ class SmallDataAna(object):
                 pmin=min(limits[0],limits[1])
                 pmax=max(limits[0],limits[1])
             hst = np.histogram(vals[~np.isnan(vals)],np.linspace(pmin,pmax,numBins))
-            print 'plot %s from %g to %g'%(plotvar,pmin,pmax)
+            print('plot %s from %g to %g'%(plotvar,pmin,pmax))
         else:
             vals = np.nanmean(vals,axis=0)
             if len(vals.shape)==0:
-                print 'mean of plotvar is ',vals
+                print('mean of plotvar is ',vals)
                 return 
 
             if len(vals.shape)==1:
@@ -1306,7 +1306,7 @@ class SmallDataAna(object):
                     return
                 
             elif len(vals.shape)==3:
-                print 'cannot plot 3-dim data'
+                print('cannot plot 3-dim data')
                 return
 
         if isinstance(plotvar, list):
@@ -1324,7 +1324,7 @@ class SmallDataAna(object):
             if isinstance(plotvar,list):
                 plotvar = plotvar[0]
             if not self.hasKey(plotvar) or plotvar == 'delay': 
-                print 'request variable %s not in smallData file'%(plotvar)
+                print('request variable %s not in smallData file'%(plotvar))
                 return
         vals=[]
         for plotvar in plotvars:
@@ -1335,7 +1335,7 @@ class SmallDataAna(object):
             else:   
                 vals.append(self.get1dVar(plotvar))
             if len(vals[-1].shape)!=1:
-                print 'variable %s does not return a scalar, this is not yet implemented'%plotvar
+                print('variable %s does not return a scalar, this is not yet implemented'%plotvar)
         pmin0 = np.nanmin(vals[0]); pmin1 = np.nanmin(vals[1]);
         pmax0 = np.nanmax(vals[0]); pmax1 = np.nanmax(vals[1]);
         if limits[0]>0:
@@ -1348,7 +1348,7 @@ class SmallDataAna(object):
                 pmax0 = np.percentile(vals[0],limits[1])
             if not np.isnan(np.percentile(vals[1],limits[1])):
                 pmax1 = np.percentile(vals[1],limits[1])
-        print 'plots %s from %g to %g and  %s from %g to %g '%(plotvars[0],pmin0,pmax0,plotvars[1],pmin1,pmax1)
+        print('plots %s from %g to %g and  %s from %g to %g '%(plotvars[0],pmin0,pmax0,plotvars[1],pmin1,pmax1))
         total_filter=np.ones(vals[0].shape[0]).astype(bool)
         filters=[]
         filters.append((vals[0] >= pmin0 ) & (vals[0] <= pmax0))
@@ -1358,7 +1358,7 @@ class SmallDataAna(object):
         for ft in filters:
             total_filter&=ft                
 
-        print 'select ',total_filter.sum(),' of ',np.ones_like(total_filter).sum(),' events'
+        print('select ',total_filter.sum(),' of ',np.ones_like(total_filter).sum(),' events')
         if not asHist:
             msize=2
             if len(vals[1][total_filter])<100:
@@ -1435,14 +1435,14 @@ class SmallDataAna(object):
         if len(bindef)==0:
             for scanVN in scanVarName:
                 if scanVarName=='':
-                    print 'this run is no scan, will need bins as input, quit now'
+                    print('this run is no scan, will need bins as input, quit now')
                     return []
-                print 'no bins as input, we will use the scan variable %s '%scanVarName
+                print('no bins as input, we will use the scan variable %s '%scanVarName)
                 Bins = np.unique(scan)
                 if scanVarName.find('lxt')>=0:
                     Bins*=1e12
                 if debug:
-                    print 'Bins: ',Bins
+                    print('Bins: ',Bins)
                 BinList.append(Bins)
             if len(BinList)==1:
                 return BinList[0]
@@ -1469,7 +1469,7 @@ class SmallDataAna(object):
             minEnc+=-1
         minEnc /= 10.
         maxEnc = (int(max(scan)*10.)+1)/10.
-        print minEnc,maxEnc,bindef[0]
+        print(minEnc,maxEnc,bindef[0])
         if minEnc!=maxEnc and abs(minEnc)<101 and abs(maxEnc<1001):
             if type(bindef[0]) is int:
                 Bins=np.linspace(minEnc, maxEnc, bindef[0],endpoint=True)
@@ -1478,11 +1478,11 @@ class SmallDataAna(object):
             if Bins[-1]< maxEnc:
                 Bins=np.append(Bins,maxEnc)
             if debug:
-                print 'Bins....',Bins
+                print('Bins....',Bins)
             return Bins
 
         else:
-          print 'you passed only one number and the this does not look like a new delay scan or a normal scan'
+          print('you passed only one number and the this does not look like a new delay scan or a normal scan')
           return []
 
     def getScan(self, sig='', i0='', Bins=100, useFilter=None):
@@ -1502,7 +1502,7 @@ class SmallDataAna(object):
                     for bound in sigp:
                         plotVar+='-%g'%bound
         else:
-            print 'could not get signal variable %s, please specify'%plotVar.replace('__','/')
+            print('could not get signal variable %s, please specify'%plotVar.replace('__','/'))
             return
 
         if i0!='':
@@ -1531,7 +1531,7 @@ class SmallDataAna(object):
             FilterOn = FilterOn & ~np.isnan(binVal)
             FilterOff = FilterOff & ~np.isnan(binVal)
 
-        print 'from %i events keep %i (%i off events)'%(np.ones_like(i0Val).sum(),np.ones_like(i0Val[FilterOn]).sum(), np.ones_like(i0Val[FilterOff]).sum() )
+        print('from %i events keep %i (%i off events)'%(np.ones_like(i0Val).sum(),np.ones_like(i0Val[FilterOn]).sum(), np.ones_like(i0Val[FilterOff]).sum() ))
 
         #get the scan variable & time correct if desired
         scanVarName,scan =  self.getScanValues()
@@ -1547,13 +1547,13 @@ class SmallDataAna(object):
                     scanPoints = np.linspace(scanUnique[0],scanUnique[-1],Bins)
                 elif isinstance(Bins,float):
                     if (abs(scanUnique[0]-scanUnique[-1])/Bins) > 1e5:
-                        print 'this are more than 100k bins! will not try....'
+                        print('this are more than 100k bins! will not try....')
                         return
                     scanPoints = np.arange(scanUnique[0],scanUnique[-1],Bins)
             elif isinstance(Bins,list) or isinstance(Bins,np.ndarray):
                 scanPoints = Bins
             else:
-                print 'Bins: ',isinstance(Bins,list),' -- ',Bins
+                print('Bins: ',isinstance(Bins,list),' -- ',Bins)
             scanOnIdx = np.digitize(scan[FilterOn], scanPoints)
             scanPoints = np.concatenate([scanPoints, [scanPoints[-1]+(scanPoints[1]-scanPoints[0])]],0)
             usedDigitize = 1
@@ -1604,9 +1604,9 @@ class SmallDataAna(object):
             iSig = np.bincount(scanOnIdx, sigVal[FilterOn], minlength=len(scanPoints)+1)
 
         if OffData:
-            print '#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints)
+            print('#scan points: -- 3 ',len(scanPointsT),len(scanOffPoints),len(scanPoints))
         else:
-            print '#scan points: -- 3 ',len(scanPoints)
+            print('#scan points: -- 3 ',len(scanPoints))
         scan = iSig/iNorm
         #scan = scan/np.mean(scan[1]) # normalize to 1 for first energy point?
         scan = scan[1:-1]
@@ -1635,7 +1635,7 @@ class SmallDataAna(object):
             returnDict['binPoints']=binPoints
             returnDict['binVar']=binVar[0]
         if plotThis:
-            #print 'retData: ',returnDict
+            #print('retData: ',returnDict)
             self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig, plotWith=plotWith)
         return returnDict
 
@@ -1647,7 +1647,7 @@ class SmallDataAna(object):
         scanVarName = returnDict['scanVarName']
         scanPoints = returnDict['scanPoints']
         scan = returnDict['scan']
-        print 'plot ',plotVarName, scanVarName, ' shape ',scan.shape,' plot diff ',plotDiff
+        print('plot ',plotVarName, scanVarName, ' shape ',scan.shape,' plot diff ',plotDiff)
 
         if interpolation!='' and returnDict.has_key('scanOffPoints'):
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
@@ -1732,7 +1732,7 @@ class SmallDataAna(object):
                     plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
 
         elif plotWith != 'no_plot':
-            print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'
+            print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot')
 
             
 
@@ -1742,6 +1742,8 @@ class SmallDataAna(object):
     ###
     #########################################################
     def addCube(self, cubeName, binVar='', bins=[], useFilter='', addBinVars=None):    
+        if cubeName in self.cubes.keys():
+            print('Cube %s has already been defined, will be redefined now'%cubeName)
         self.cubes[cubeName] = Cube(binVar, bins, cubeName=cubeName, useFilter=useFilter, addBinVars=addBinVars)
         
     def addToCube(self, cubeName, targetVariable, isIdxVar=False):
@@ -1751,29 +1753,32 @@ class SmallDataAna(object):
             else:
                 self.cubes[cubeName].addIdxVar(targetVariable)
         else:
-            print 'could not add variable %s to cube %s as this cube was not found'%(targetVariable, cubeName)
+            print('could not add variable %s to cube %s as this cube was not found'%(targetVariable, cubeName))
 
     def getCube(self, cubeName):
         if cubeName in self.cubes.keys():
             return self.cubes[cubeName]
+        else:
+            print('Cube %s not defined yet, options are: '%(cubeName), self.cubes.keys())
+            return None
         
     def printCubes(self, printDetail=True):
         cubeNames=[]
         if len(self.cubes.keys())>0:
-            print 'defined cubes:'
+            print('defined cubes:')
             for cubeName in self.cubes.keys():
                 cube = self.cubes[cubeName]
                 if printDetail:
                     cube.printCube(self.Sels[cube.useFilter])
                 else:
-                    print cubeName
+                    print(cubeName)
                 cubeNames.append(cubeName)
         return cubeNames
 
     def prepCubeData(self, cubeName):
         cube = self.getCube(cubeName)
         if not (self.hasKey(cube.binVar) or cube.binVar == 'delay'):
-            print 'selection variable not in littleData, cannot make the data for this cube'
+            print('selection variable not in littleData, cannot make the data for this cube')
             return None
 
         # create the bins for the cube
@@ -1786,7 +1791,7 @@ class SmallDataAna(object):
                 Bins = np.insert(Bins,0,Bins[0]-1e-5)
                 Bins = np.append(Bins,Bins[-1]+1e-5)
             else:
-                print 'prepCube could not prepare Bins: ',scanValues[0]!='' , len(scanValues[1])
+                print('prepCube could not prepare Bins: ',scanValues[0]!='' , len(scanValues[1]))
         else:
             Bins = self.getBins(cube.bins)
         if not isinstance(Bins, np.ndarray):
@@ -1812,7 +1817,7 @@ class SmallDataAna(object):
                             cube.dropletProc[dropBaseName]['shape'] = ( np.nanmax(self.getVar('UserDataCfg/%s/iX'%dropDet)), 
                                                                         np.nanmax(self.getVar('UserDataCfg/%s/iY'%dropDet)))
                         else:
-                            print 'could not find droplets with base name: ',dropBaseName
+                            print('could not find droplets with base name: ',dropBaseName)
                     else:
                         cube.dropletProc[dropBaseName]['fct'].append(dropFct)                        
 
@@ -1880,7 +1885,7 @@ class SmallDataAna(object):
                 
         #floating point error really mess this up otherwise....
         if abs(max(Bins))<1e-9:
-            print 'I think this should go!!! WARNING!!!'
+            print('I think this should go!!! WARNING!!!')
             binVar*=1e12
             Bins*=1e12
 
@@ -1905,7 +1910,7 @@ class SmallDataAna(object):
             ft=self.getFilter(cube.useFilter, debug=True)
             return
         if debug and rank==0:
-            print 'bin boundaries: ',Bins
+            print('bin boundaries: ',Bins)
 
         nTotBins=Bins.shape[0]-1
         binShp=[Bins.shape[0]-1]
@@ -2127,7 +2132,7 @@ class SmallDataAna(object):
                         col = ty
                         if max(row)>=cube.dropletProc[droplet]['shape'][0] or max(col)>=cube.dropletProc[droplet]['shape'][1]:
                             if rank==0:
-                                print 'inconsistent shape ',self.shape, max(row), max(col)
+                                print('inconsistent shape ',self.shape, max(row), max(col))
                         imageAsMatrix = sparse.coo_matrix( (data, (row, col)),shape=cube.dropletProc[droplet]['shape']).todense()
                         imageList.append(np.asarray(imageAsMatrix))
                     else:
@@ -2240,16 +2245,16 @@ class SmallDataAna(object):
         if detname=='None':
             aliases=self.Keys2d()
             if len(aliases)<1:
-                print 'no area detectors in littleData, all keys present are:'
+                print('no area detectors in littleData, all keys present are:')
                 self.Keys(printKeys=True)
             if len(aliases)==1:
                 detname = aliases[0]
             else:
-                print 'detectors in event: \n',
+                print('detectors in event: \n',)
                 for alias in aliases:
-                    print alias
+                    print(alias)
                 detname = raw_input("Select detector to select ROI of?:\n")
-        print 'we are looking at ',detname
+        print('we are looking at ',detname)
 
         #arrays useful for thresholding
         detsrc = detname.split('/')[0]
@@ -2307,10 +2312,10 @@ class SmallDataAna(object):
                 elif detname is None:
                     avImages.append(key)
         if len(avImages)==0:
-            print 'creating the AvImage first!'
+            print('creating the AvImage first!')
             return
         elif len(avImages)>1:
-            print 'we have the following options: ',avImages
+            print('we have the following options: ',avImages)
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
@@ -2320,11 +2325,11 @@ class SmallDataAna(object):
         
     def plotAvImage(self,detname=None, ROI=[],limits=[5,99.5]):
         img = self.getAvImage(detname=detname, ROI=ROI)
-        print img.shape
+        print(img.shape)
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
-        print 'using the percentiles %g/%g as plot min/max: (%g, %g)'%(limits[0],limits[1],plotMin,plotMax)
+        print('using the percentiles %g/%g as plot min/max: (%g, %g)'%(limits[0],limits[1],plotMin,plotMax))
 
         image = img
         
@@ -2346,9 +2351,9 @@ class SmallDataAna(object):
         try:
             from utilities_FitCenter import fitCircle
         except:
-            print 'could not import underlying code, this does not work yet'
+            print('could not import underlying code, this does not work yet')
             return
-        print 'nearly done, but there is an issue in the image display and x/y coordinates that needs figuring out with faster x-respose.....'
+        print('nearly done, but there is an issue in the image display and x/y coordinates that needs figuring out with faster x-respose.....')
         #return
         avImages=[]
         for key in self.__dict__.keys():
@@ -2358,23 +2363,23 @@ class SmallDataAna(object):
                 elif detname is None:
                     avImages.append(key)
         if len(avImages)==0:
-            print 'please create the AvImage first!'
+            print('please create the AvImage first!')
             return
         elif len(avImages)>1:
-            print 'we have the following options: ',avImages
+            print('we have the following options: ',avImages)
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
         detname = avImage.split('_')[1]
-        print 'detname: ',detname,avImage
+        print('detname: ',detname,avImage)
         image = self.__dict__[avImage]
         if len(image.shape)!=2:
-            print 'not a 2-d image! Will return. image %s has %d dims'%(avImage,len(image.shape))
+            print('not a 2-d image! Will return. image %s has %d dims'%(avImage,len(image.shape)))
             return
 
         plotMax = np.percentile(image, 99.5)
         plotMin = np.percentile(image, 5)
-        print 'using the 5/99.5% as plot min/max: (',plotMin,',',plotMax,')'
+        print('using the 5/99.5% as plot min/max: (',plotMin,',',plotMax,')')
 
         if mask:
             image = (image*mask)
@@ -2419,8 +2424,8 @@ class SmallDataAna(object):
 
                 if raw_input("Happy with this fit:\n") in ["y","Y"]:
                     happy = True
-                print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
-                print 'avs: ',parr[:,0].mean(),parr[:,1].mean()
+                print('x,y: ',res['xCen'],res['yCen'],' R ',res['R'])
+                print('avs: ',parr[:,0].mean(),parr[:,1].mean())
         else:
             happy = False
             while not happy:
@@ -2433,7 +2438,7 @@ class SmallDataAna(object):
                     thresMin=float(thres.split(',')[0])
                     thresMax=np.nanmax(image)
                 thresP = np.percentile(image, float(thresMin))
-                print 'thresP',thresP
+                print('thresP',thresP)
                 imageThres=image.copy()
                 imageThres[image>thresP]=1
                 imageThres[image<thresP]=0
@@ -2448,8 +2453,8 @@ class SmallDataAna(object):
 
             #res = fitCircle(x.flatten()[image.flatten()>thresP],y.flatten()[image.flatten()>thresP])
             res = fitCircle(x.flatten()[imageThres.flatten().astype(bool)],y.flatten()[imageThres.flatten().astype(bool)])
-            print 'res',res
-            print 'x,y av: ',(x.flatten()[imageThres.flatten().astype(bool)]).mean(),(y.flatten()[imageThres.flatten().astype(bool)].mean())
+            print('res',res)
+            print('x,y av: ',(x.flatten()[imageThres.flatten().astype(bool)]).mean(),(y.flatten()[imageThres.flatten().astype(bool)].mean()))
             circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
             fig=plt.figure(figsize=(10,10))
             #will need to check of rotation necessary here???
@@ -2458,15 +2463,15 @@ class SmallDataAna(object):
             plt.gca().add_artist(circleM)
             plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
             plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
-            print 'x,y: ',res['xCen'],res['yCen'],' R ',res['R']
+            print('x,y: ',res['xCen'],res['yCen'],' R ',res['R'])
     
             plt.show()
 
     def MakeMask(self, detname=None):
-        print ' not yet implemented, exists in SmallDataAna_psana.py'
+        print(' not yet implemented, exists in SmallDataAna_psana.py')
 
     def azimuthalBinning(self, detname=None):
-        print ' not yet implemented, exists in SmallDataProduced.py, uses code in xppmodules/src. Not sure if good idea'
+        print(' not yet implemented, exists in SmallDataProduced.py, uses code in xppmodules/src. Not sure if good idea')
 
     ##########################################################################
     ###
@@ -2483,10 +2488,10 @@ class SmallDataAna(object):
         #get basename of droplets
         dkey = [ key for key in self.Keys() if key.find('dropletsAdu')>=0]
         if len(dkey)==0:
-            print 'did not find any droplets in this smallData file: ',self.fh5.filename
+            print('did not find any droplets in this smallData file: ',self.fh5.filename)
             return
         if len(dkey)>1:
-            print 'we have the following options: ',dbkey
+            print('we have the following options: ',dbkey)
             basename=raw_input('type the name of the droplets to use:')
         else:
             basename = dkey[0].split('dropletsAdu')[0]
@@ -2538,7 +2543,7 @@ class SmallDataAna(object):
 
         if writeFile:
             f = open(data+'.txt','w')
-            print 'write DropletCube file for ',data, ' to ',data,'.txt'
+            print('write DropletCube file for ',data, ' to ',data,'.txt')
             #indent does NOT work here...
             #json.dump(returnDict,f,indent=2)
             json.dump(returnDict,f)
@@ -2588,13 +2593,13 @@ class SmallDataAna(object):
             try:
                 self._epicsArchive = EpicsArchive()
             except:
-                print 'failed to create the EPICS archiver'
+                print('failed to create the EPICS archiver')
                 return None
 
         #check if PV is present
         PVlist = self._epicsArchive.search_pvs(PVname, do_print=False)
         if len(PVlist)==0:
-            print 'PV %s is not in archiver'%PVname
+            print('PV %s is not in archiver'%PVname)
             return
 
         #get start&stop time to ask the archiver for.
@@ -2636,9 +2641,9 @@ class SmallDataAna(object):
                     nevents = len(self.xrData.fiducials.time.data[self.xrData.fiducials.time.data>epicsTime])
                     newArray = np.append(newArray, np.ones(nevents)*da_epics.data[-1])
                 else:
-                    print 'no group for time: ',epicsTime.astype(float)
+                    print('no group for time: ',epicsTime.astype(float))
                 pass
-                #print 'no data for key: ',epicsTime
+                #print('no data for key: ',epicsTime)
 
         da_epics_new = xr.DataArray(newArray, coords={'time': self.xrData.fiducials.time}, dims=('time'),name=name)
         self.addVar(name, da_epics_new)

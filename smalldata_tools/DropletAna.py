@@ -35,17 +35,17 @@ class droplets(object):
             h5Name = self._dropName+node.name.replace(self._dropName,'')
             keyName=node.name.replace(self._dropName,'')
             if not only_XYADU:
-                print 'fill drop all ',h5Name
+                print('fill drop all ',h5Name)
                 if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
                 else:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
             elif (keyName=='X' or keyName=='Y' or keyName=='adu' or keyName=='npix'):
-                print 'fill drop (only x,y,adu) ',h5Name
+                print('fill drop (only x,y,adu) ',h5Name)
                 #if Filter is not None:
                 #    print 'DEBUG Shapes', h5Name, Filter.shape[0], self._h5.get_node('/'+self._detName, h5Name).shape[0]
                 if Filter is not None and Filter.shape[0] == self._h5.get_node('/'+self._detName, h5Name).shape[0]:
-                    print 'DEBUG: ',h5Name, self._h5.get_node('/'+self._detName, h5Name).read().shape, Filter.shape
+                    print('DEBUG: ',h5Name, self._h5.get_node('/'+self._detName, h5Name).read().shape, Filter.shape)
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()[Filter]
                 else:
                     self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
@@ -55,7 +55,7 @@ class droplets(object):
             if 'adu' in self.getKeys():
                 filterArray = (self.__dict__['adu']>0)
             else:
-                print 'did not find adu, will not flatten'
+                print('did not find adu, will not flatten')
                 return
 
         else:
@@ -69,7 +69,7 @@ class droplets(object):
                 self.__dict__[key] = self.__dict__[key][filterArray].flatten()
 
     def getDropPixels(self, ievt, debug=False):
-        print 'will need to be reimplemented'
+        print('will need to be reimplemented')
         return
         if not 'Pix' in self.__dict__.keys():
             nDroplets = self._h5[self._detName][self._dropName+'nDroplets'][ievt]
@@ -93,7 +93,7 @@ class droplets(object):
         for iDrop in range(0,nDroplets):
             img= np.array(Pix[idxPix:(idxPix+sizes[iDrop])]).reshape(sizeX[iDrop],sizeY[iDrop])
             if debug:
-                print 'adu ',adu[iDrop],img.sum()
+                print('adu ',adu[iDrop],img.sum())
             imgs.append(img)
             idxPix+=sizes[iDrop]
         ret_dict = {'images' : imgs}

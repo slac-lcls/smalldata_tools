@@ -251,32 +251,32 @@ class CubeAna(object):
         return inArray
         
     def addAzInt(self, detname=None, phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None, tx=0, ty=0):
-      if detname is None:
-        if len(self._detConfig.keys())==0:
-          detname = self._detConfig.keys()[0]
-        else:
-          detname = raw_input('Which detector do we want to azimuthally average? ',self._detConfig.keys())
+        if detname is None:
+          if len(self._detConfig.keys())==0:
+              detname = self._detConfig.keys()[0]
+          else:
+              detname = raw_input('Which detector do we want to azimuthally average? ',self._detConfig.keys())
 
-      cmask = self._detConfig[detname]['calib_mask']
-      smask = self._detConfig[detname]['mask']
-      azavMask = ~(cmask.astype(bool)&smask.astype(bool))
-      if userMask is not None and userMask.shape == self.mask.shape:
-        azavMask = ~(cmask.astype(bool)&smask.astype(bool)&userMask.astype(bool))
+        cmask = self._detConfig[detname]['calib_mask']
+        smask = self._detConfig[detname]['mask']
+        azavMask = ~(cmask.astype(bool)&smask.astype(bool))
+        if userMask is not None and userMask.shape == self.mask.shape:
+            azavMask = ~(cmask.astype(bool)&smask.astype(bool)&userMask.astype(bool))
 
-      print 'mask %d pixel for azimuthal integration'%azavMask.sum()
+        print 'mask %d pixel for azimuthal integration'%azavMask.sum()
 
-      x = self._detConfig[detname]['x']
-      y = self._detConfig[detname]['y']
-      self.__dict__[azavName] = ab.azimuthalBinning(x=x.flatten()/1e3,y=y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin,tx=tx, ty=ty)
-      self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
-      self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
-      self.__dict__[azavName+'_norm'] = self.__dict__[azavName].norm
-      self.__dict__[azavName+'_normPhi'] = self.__dict__[azavName].Cake_norm
-      self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
-      self.__dict__[azavName+'_Pplane'] = Pplane
-      self.__dict__[azavName+'_tx'] = tx
-      self.__dict__[azavName+'_ty'] = ty
-      self.__dict__[azavName+'_detname'] = detname
+        x = self._detConfig[detname]['x']
+        y = self._detConfig[detname]['y']
+        self.__dict__[azavName] = ab.azimuthalBinning(x=x.flatten()/1e3,y=y.flatten()/1e3,xcen=center[0]/1e3,ycen=center[1]/1e3,d=dis_to_sam,mask=azavMask.flatten(),lam=E2lam(eBeam)*1e10,Pplane=Pplane,phiBins=phiBins,qbin=qBin,tx=tx, ty=ty)
+        self.__dict__[azavName+'_q'] = self.__dict__[azavName].q
+        self.__dict__[azavName+'_correction'] = self.__dict__[azavName].correction
+        self.__dict__[azavName+'_norm'] = self.__dict__[azavName].norm
+        self.__dict__[azavName+'_normPhi'] = self.__dict__[azavName].Cake_norm
+        self.__dict__[azavName+'_phi'] = self.__dict__[azavName].phiVec
+        self.__dict__[azavName+'_Pplane'] = Pplane
+        self.__dict__[azavName+'_tx'] = tx
+        self.__dict__[azavName+'_ty'] = ty
+        self.__dict__[azavName+'_detname'] = detname
 
     def makeImg(self, detname=None):        
         if detname is None:

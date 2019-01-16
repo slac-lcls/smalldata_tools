@@ -29,7 +29,7 @@ class photons(object):
                 continue
 
             h5Name = self._photName+node.name.replace(self._photName,'')
-            #print 'h5name ',h5Name
+            #print('h5name ',h5Name)
             keyName=node.name.replace(self._photName,'')
             self.__dict__[keyName] = self._h5.get_node('/'+self._detName, h5Name).read()
         
@@ -45,7 +45,7 @@ class photons(object):
         row = self._h5.get_node('/'+self._detName+'/'+self._photName+'row')[iEvt]
         col = self._h5.get_node('/'+self._detName+'/'+self._photName+'col')[iEvt]
         if max(row)>=self.shape[0] or max(col)>=self.shape[1]:
-            print 'inconsistent shape ',self.shape, max(row), max(col)
+            print('inconsistent shape ',self.shape, max(row), max(col))
         return sparse.coo_matrix( (data, (row, col)),shape=self.shape ).todense()
 
     def photImg(self, filterArray=None):
