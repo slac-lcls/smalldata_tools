@@ -11,6 +11,7 @@ from SmallDataUtils import  defaultDetectors,lightStatus,ipmDetector,bmmonDetect
 from SmallDataUtils import ebeamDetector, gasDetector
 from SmallDataUtils import l3tDetector
 from epicsarchive import EpicsArchive
+from roi import ROIObject
 
 #from SmallDataAna_psana import  SmallDataAna_psana
 #from SmallDataAna import  photons,droplets,Cube,Selection,SmallDataAna

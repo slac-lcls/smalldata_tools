@@ -13,7 +13,7 @@ class fitCenter:
         self.xArr = xArr
         self.yArr = yArr
         if self.xArr is None and (imgShape is None or len(imgShape)<2):
-            print 'no geometry information is given, return'
+            print('no geometry information is given, return')
             return
         if self.xArr is None:
             x = np.arange(0, imgShape[1])

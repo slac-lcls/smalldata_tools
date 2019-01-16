@@ -27,9 +27,9 @@ class templatePeakFit:
                 peakTemplate = tables.open_file(templateFile).root.singlePicked_alt
                 self.peakTemplateWf = peakTemplate[60:250].copy()
             except:
-                print 'could not find requested waveform in file: ',templateWaveform
+                print('could not find requested waveform in file: ',templateWaveform)
         if self.peakTemplateWf is None:
-            print 'We do not have a template waveform, will return None'
+            print('We do not have a template waveform, will return None')
             return None
 
         #normalize waveform - set maximum to 1
@@ -52,7 +52,7 @@ class templatePeakFit:
         templateSum = np.zeros(self.templateShapeMax)
         for i in range(self.nPeaks):
             if args[i] < 0:
-                print "nPeaks %d, nonsensical args[%d], bailing" %(self.nPeaks, i), args
+                print("nPeaks %d, nonsensical args[%d], bailing" %(self.nPeaks, i), args)
                 return np.zeros(self.templateShapeMax)
             if (args[i]>templateMaxPos):
                 templatePk = np.append(np.zeros(args[i]-templateMaxPos), template)
@@ -67,7 +67,7 @@ class templatePeakFit:
             templatep = templatePk*(1.-frac1)+templatePkp*frac1
             ##        if args[3]==0:
             ##            return template1*args[i+self.nPeaks]
-            ##    print args[1], 
+            ##    print(args[1], )
             try:
                 templateSum += templatep*args[i+self.nPeaks]
             except:
@@ -117,11 +117,11 @@ class templatePeakFit:
         ret_dict={}
         args0 = self.findPars(trace)
         ret_dict['initialGuess']=args0
-        if debug: print 'DEBUG: initial parameters for leastsq fit:', args0
+        if debug: print('DEBUG: initial parameters for leastsq fit:', args0)
         maxTrace = np.nanmax(trace)*self.saturationFraction
         ret_dict['maxTrace']=maxTrace
         ret_dict['nmaxTrace']=(trace>maxTrace).sum()
-        if debug: print 'maxtrace: ',maxTrace,' n high pix ',(trace>maxTrace).sum() 
+        if debug: print('maxtrace: ',maxTrace,' n high pix ',(trace>maxTrace).sum() )
         resObj=None
         if self.fitMethod.split('_')[0] == 'sn':
             #my way to fit this.
@@ -130,7 +130,7 @@ class templatePeakFit:
             else:
                 maskSaturation=np.ones_like(trace).astype(bool)
             errorfunction = lambda p: self.templateArray(p, trace.shape[0])[maskSaturation]-trace[maskSaturation]
-            print 'func is defined - silke ',self.fitMethod.split('_')[1]
+            print('func is defined - silke ',self.fitMethod.split('_')[1])
             if self.fitMethod.split('_')[1]=='old':
                 resObj, success = scipy.optimize.leastsq(errorfunction, args0)
             else:
@@ -140,7 +140,7 @@ class templatePeakFit:
             minFunc = lambda p: self.clippedDelta(p, trace, maxTrace)
             resObj = scipy.optimize.least_squares(minFunc, args0)#, method=self.fitMethod('_')[1]) #chokes if I pass a method.
         else:
-            print 'this fit method is not defined', self.fitMethod
+            print('this fit method is not defined', self.fitMethod)
         if resObj is not None:
             if isinstance(resObj, np.ndarray):
                 ret_dict['fit_params']=resObj

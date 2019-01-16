@@ -12,11 +12,25 @@ def fcn(buffer):
         return 0.
 
 class photon:
-    def __init__(self, ADU_per_photon=154, mask=None, rms=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0, ROI=None):
+    """
+    Wrapper for the psana algorithms described at
+    
+    Parameters: ADU_per_photon, mask, name, nphotMax, nphotRet, thresADU, retImg, ROI
+    ADU_per_photon (def:154): expected value for a single photon in the detector in question
+    mask (def:None): pass a mask in here, is None: use mask stored in DetObject
+    name (def:'photon'): name used in hdf5 for data
+    retImg (def: 0): 0: return photon/pixel histogram
+                     1: return photon data as spare array (photon, x, y)
+                     2: return data as dense image in photons
+    nphotMax (def: 25): maximum number of photons/pixel for #photon per pixel histogram
+    nphotRet (def: 100): number of photon candidates returned for retImg=1
+    thresADU (def: 0.9): fraction of ADU_per_photon in the most neighboring pixels needed to count as a photon 
+    ROI (def: None): ROI of detector that photons should be reached for in.
+    """
+    def __init__(self, ADU_per_photon=154, mask=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0, ROI=None):
         self.ADU_per_photon = ADU_per_photon
         self.name = name
         self.mask = mask
-        self.rms = rms
         self.nphotMax = nphotMax
         self.nphotRet = nphotRet
         self.retImg = retImg
@@ -26,12 +40,16 @@ class photon:
             self.ROI = np.array(self.ROI)
 
     def prepImage(self,image, mask):
+        """
+        convert image from ADU to (fractional) photons
+        apply the ROI if applicable (to both image&mask)
+        """
         image = image/self.ADU_per_photon
         if self.ROI is None:
             return image, mask
 
         if self.ROI.ndim != image.ndim:
-            print 'photons: have wrong ROI shape compared to image: ',self.ROI.shape, image.shape
+            print('photons: have wrong ROI shape compared to image: ',self.ROI.shape, image.shape)
             return image, mask
                 
         if self.ROI.shape[0]==2 and len(self.ROI.shape)==2:
@@ -39,7 +57,7 @@ class photon:
         elif self.ROI.shape[0]==3:
             return image[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]], mask[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]]
         else:
-            print 'ROI format not correct(ly treated) ',self.ROI.shape, image.shape
+            print('ROI format not correct(ly treated) ',self.ROI.shape, image.shape)
             return image, mask
 
     def photon(self,image):
@@ -98,7 +116,7 @@ class photon:
                 ret_dict['tile']=(np.append(tile[:self.nphotRet], np.zeros(self.nphotRet-len(tile)))).astype(int)
 
             if ret_dict['data'].shape[0]!=self.nphotRet or  ret_dict['row'].shape[0]!=self.nphotRet or  ret_dict['col'].shape[0]!=self.nphotRet or  ret_dict['tile'].shape[0]!=self.nphotRet:
-                print 'shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape,ret_dict['tile'].shape
+                print('shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape,ret_dict['tile'].shape)
 
         return ret_dict
 
@@ -107,6 +125,7 @@ class photon:
 #
 import scipy.ndimage.measurements as measurements
 class photon2:
+    """ deprecated: attemps to code pyalgo algo using pure python"""
     def __init__(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon2', nphotMax=25, retImg=0, nphotRet=100):
         self.ADU_per_photon = ADU_per_photon
         self.thresRms=thresRms
@@ -152,7 +171,7 @@ class photon2:
         if self.retImg>0:
             #now sparsify the image (data, xIdx, yIdx)
             if self.retImg>1:
-                #print 'DEBUG: shape ',photImg.shape, fphotons.shape
+                #print('DEBUG: shape ',photImg.shape, fphotons.shape
                 ret_dict['img']=photImg.copy()
             else:
                 sImage = sparse.coo_matrix(photImg)
@@ -175,6 +194,7 @@ class photon2:
 
 
 class photon3:
+    """deprecated: recode pyalgo photon algorithms w/ flexible threshold before that was introduced."""
     def __init__(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon3', nphotMax=25, retImg=0, nphotRet=100, maxMethod=0):
         self.ADU_per_photon = ADU_per_photon
         self.thresRms=thresRms

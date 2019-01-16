@@ -16,120 +16,120 @@ import scipy.ndimage.filters as filters
 from scipy import sparse
 
 class aduHist:
-        def __init__(self,aduHist=[], ROI=None, name=''):
-                self.name=name+'aduHist'
-                self.bins=[]
-                if len(aduHist)==1:
-                        self.bins=np.arange(0, aduHist[0])
-                elif len(aduHist)==2:
-                        self.bins=np.arange(aduHist[0], aduHist[1])
-                elif len(aduHist)==3:
-                        if isinstance(aduHist[2], int):
-                                self.bins=np.linspace(aduHist[0], aduHist[1], max(2,aduHist[2]))
-                        if isinstance(aduHist[2], float):
-                                self.bins=np.arange(aduHist[0], aduHist[1], aduHist[2])
-                                if self.bins[-1]!=aduHist[1]:
-                                        self.bins = np.append(self.bins, aduHist[1])
-                elif len(aduHist)>3:
-                        self.bins = np.array(aduHist)
-                self.ROI = ROI
-        def fillHist(self, dadu, pos=None):
-                if pos is None:
-                        return np.histogram(dadu.flatten()[dadu.flatten()>0], self.bins)[0]
-                elif pos.shape==(0,):
-                        return (np.histogram(pos, self.bins))[0]
-                else:
-                        dx = pos[:,0].flatten()
-                        dy = pos[:,1].flatten()
-                        inROIx = np.logical_and(dx > np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
-                        inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[2],dy < np.array(self.ROI).flatten()[3]) 
-                        inROI = np.logical_and(inROIx, inROIy)
-                        daduF = dadu.flatten()[inROI]
-                        hist = np.histogram(daduF[daduF>0], self.bins)
-                        return hist[0]
-                        
+    def __init__(self,aduHist=[], ROI=None, name=''):
+        self.name=name+'aduHist'
+        self.bins=[]
+        if len(aduHist)==1:
+            self.bins=np.arange(0, aduHist[0])
+        elif len(aduHist)==2:
+            self.bins=np.arange(aduHist[0], aduHist[1])
+        elif len(aduHist)==3:
+            if isinstance(aduHist[2], int):
+                self.bins=np.linspace(aduHist[0], aduHist[1], max(2,aduHist[2]))
+            if isinstance(aduHist[2], float):
+                self.bins=np.arange(aduHist[0], aduHist[1], aduHist[2])
+                if self.bins[-1]!=aduHist[1]:
+                    self.bins = np.append(self.bins, aduHist[1])
+        elif len(aduHist)>3:
+            self.bins = np.array(aduHist)
+        self.ROI = ROI
+    def fillHist(self, dadu, pos=None):
+        if pos is None:
+            return np.histogram(dadu.flatten()[dadu.flatten()>0], self.bins)[0]
+        elif pos.shape==(0,):
+            return (np.histogram(pos, self.bins))[0]
+        else:
+            dx = pos[:,0].flatten()
+            dy = pos[:,1].flatten()
+            inROIx = np.logical_and(dx > np.array(self.ROI).flatten()[0],dx < np.array(self.ROI).flatten()[1]) 
+            inROIy = np.logical_and(dy > np.array(self.ROI).flatten()[2],dy < np.array(self.ROI).flatten()[3]) 
+            inROI = np.logical_and(inROIx, inROIy)
+            daduF = dadu.flatten()[inROI]
+            hist = np.histogram(daduF[daduF>0], self.bins)
+            return hist[0]
+            
 class dropletSave:
-        def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False, ROI=None):
-                self.name=name
-                self.maxDroplets = maxDroplets
-                self.dropPosInt = dropPosInt
-                self.retPixel = retPixel
-                self.ret2ndMom = ret2ndMom
-                self.thresADU = thresADU
-                self.flagMasked = flagMasked
-                self.ragged=ragged
-                self.ROI=ROI
+    def __init__(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False, ROI=None):
+        self.name=name
+        self.maxDroplets = maxDroplets
+        self.dropPosInt = dropPosInt
+        self.retPixel = retPixel
+        self.ret2ndMom = ret2ndMom
+        self.thresADU = thresADU
+        self.flagMasked = flagMasked
+        self.ragged=ragged
+        self.ROI=ROI
 
-        def shapeArray(self, returnDict):
-                for key in returnDict.keys():
-                        if key.find(self.name)<0:
-                                continue;
-                        if key.find('nDroplets')>=0:
-                                continue;
-                        if key.find('aduHist')>=0:
-                                continue;
-                        if self.ragged:
-                                returnDict['ragged_'+key] = returnDict.pop(key)
-                                #print ('ragged_'+key), returnDict['ragged_'+key].shape,'----'
-                                continue
-                        try: 
-                                inputSize = len(returnDict[key])
-                        except:
-                                print 'cannot get len of: ',key
-                                print '--> ',returnDict[key]
-                                import sys
-                                sys.exit()
-                        try:
-                                if key.find('Pix')<0:
-                                        if inputSize>=self.maxDroplets:
-                                                returnDict[key] = returnDict[key][:self.maxDroplets]
-                                        else:
-                                                returnDict[key] = np.append(returnDict[key], np.zeros(self.maxDroplets-len(returnDict[key])))
-                                else:
-                                        if inputSize>=self.maxDroplets*self.retPixel:
-                                                returnDict[key] = returnDict[key][:self.retPixel*self.maxDroplets]
-                                        else:
-                                                returnDict[key] = np.append(returnDict[key], np.zeros(self.retPixel*self.maxDroplets-len(returnDict[key])))
-                        except:
-                                print 'something else went wrong for: ',key
-                                print 'maxdroplets: ',self.maxDroplets
-                                print '--> ',returnDict[key]
-                                import sys
-                                sys.exit()
-
-        def initArray(self):
-                ret_dict = {(self.name+'_npix'): np.zeros(self.maxDroplets,dtype=np.int)}
-                ret_dict[self.name+'_adu'] = np.zeros(self.maxDroplets)
-                if self.dropPosInt:
-                        ret_dict[self.name+'X'] = np.zeros(self.maxDroplets,dtype=np.int)
-                        ret_dict[self.name+'Y'] = np.zeros(self.maxDroplets,dtype=np.int)
+    def shapeArray(self, returnDict):
+        for key in returnDict.keys():
+            if key.find(self.name)<0:
+                continue;
+            if key.find('nDroplets')>=0:
+                continue;
+            if key.find('aduHist')>=0:
+                continue;
+            if self.ragged:
+                returnDict['ragged_'+key] = returnDict.pop(key)
+                #print(('ragged_'+key), returnDict['ragged_'+key].shape,'----')
+                continue
+            try: 
+                inputSize = len(returnDict[key])
+            except:
+                print('cannot get len of: ',key)
+                print('--> ',returnDict[key])
+                import sys
+                sys.exit()
+            try:
+                if key.find('Pix')<0:
+                    if inputSize>=self.maxDroplets:
+                        returnDict[key] = returnDict[key][:self.maxDroplets]
+                    else:
+                        returnDict[key] = np.append(returnDict[key], np.zeros(self.maxDroplets-len(returnDict[key])))
                 else:
-                        ret_dict[self.name+'X'] = np.zeros(self.maxDroplets)
-                        ret_dict[self.name+'Y'] = np.zeros(self.maxDroplets)
-                ret_dict[self.name+'_bb00'] = np.zeros(self.maxDroplets)
-                ret_dict[self.name+'_bb01'] = np.zeros(self.maxDroplets)
-                ret_dict[self.name+'_bb10'] = np.zeros(self.maxDroplets)
-                ret_dict[self.name+'_bb11'] = np.zeros(self.maxDroplets)
-                if self.ret2ndMom!=0:
-                        for i in np.arange(self.ret2ndMom):
-                                for ii in np.arange(self.ret2ndMom):
-                                        ret_dict['%s_mom%d%d'%(self.name,i,ii)] = np.zeros(self.maxDroplets)
-                if self.retPixel!=0:
-                        ret_dict[self.name+'_Pix'] = np.zeros([self.maxDroplets*self.retPixel])
-                if self.flagMasked:
-                        ret_dict[self.name+'_masked'] = np.zeros(self.maxDroplets)
-                return ret_dict
-                                
+                    if inputSize>=self.maxDroplets*self.retPixel:
+                        returnDict[key] = returnDict[key][:self.retPixel*self.maxDroplets]
+                    else:
+                        returnDict[key] = np.append(returnDict[key], np.zeros(self.retPixel*self.maxDroplets-len(returnDict[key])))
+            except:
+                print('something else went wrong for: ',key)
+                print('maxdroplets: ',self.maxDroplets)
+                print('--> ',returnDict[key])
+                import sys
+                sys.exit()
+
+    def initArray(self):
+        ret_dict = {(self.name+'_npix'): np.zeros(self.maxDroplets,dtype=np.int)}
+        ret_dict[self.name+'_adu'] = np.zeros(self.maxDroplets)
+        if self.dropPosInt:
+            ret_dict[self.name+'X'] = np.zeros(self.maxDroplets,dtype=np.int)
+            ret_dict[self.name+'Y'] = np.zeros(self.maxDroplets,dtype=np.int)
+        else:
+            ret_dict[self.name+'X'] = np.zeros(self.maxDroplets)
+            ret_dict[self.name+'Y'] = np.zeros(self.maxDroplets)
+        ret_dict[self.name+'_bb00'] = np.zeros(self.maxDroplets)
+        ret_dict[self.name+'_bb01'] = np.zeros(self.maxDroplets)
+        ret_dict[self.name+'_bb10'] = np.zeros(self.maxDroplets)
+        ret_dict[self.name+'_bb11'] = np.zeros(self.maxDroplets)
+        if self.ret2ndMom!=0:
+            for i in np.arange(self.ret2ndMom):
+                for ii in np.arange(self.ret2ndMom):
+                    ret_dict['%s_mom%d%d'%(self.name,i,ii)] = np.zeros(self.maxDroplets)
+        if self.retPixel!=0:
+            ret_dict[self.name+'_Pix'] = np.zeros([self.maxDroplets*self.retPixel])
+        if self.flagMasked:
+            ret_dict[self.name+'_masked'] = np.zeros(self.maxDroplets)
+        return ret_dict
+                
 class photonizeDrops:
-        def __init__(self,ADU_per_photon=154, thresFrac = 0.48, maxPhotons=1500, maxMultPhotons=25, name=''):
-                if name[-1]!='_' and len(name)>0:
-                        self.name = name+'_'
-                else:
-                        self.name=name
-                self.ADU_per_photon = ADU_per_photon
-                self.thresFrac = thresFrac
-                self.maxPhotons = maxPhotons
-                self.maxMultPhotons = maxMultPhotons
+    def __init__(self,ADU_per_photon=154, thresFrac = 0.48, maxPhotons=1500, maxMultPhotons=25, name=''):
+        if name[-1]!='_' and len(name)>0:
+            self.name = name+'_'
+        else:
+            self.name=name
+        self.ADU_per_photon = ADU_per_photon
+        self.thresFrac = thresFrac
+        self.maxPhotons = maxPhotons
+        self.maxMultPhotons = maxMultPhotons
 
 class droplet:
     def __init__(self, threshold=10.0, thresholdLow=3., thresADU=71., rms=None, mask=None, name='', useRms=True, relabel=True):
@@ -162,7 +162,7 @@ class droplet:
 
     def setDebug(self, debug):
         if isinstance(debug, bool):
-                self.debug = debug
+            self.debug = debug
 
     def addDropletSave(self,thresADU=[np.nan,np.nan],maxDroplets=1500, name='',dropPosInt=False, retPixel=False, ret2ndMom=0, flagMasked=False, ragged=False, ROI=None):
         dropSave = dropletSave(thresADU,maxDroplets, name,dropPosInt, retPixel, ret2ndMom, flagMasked, ragged, ROI)
@@ -230,7 +230,7 @@ class droplet:
     def dropletize(self, data):
         tstart=time.time()
         if data is None:
-            print 'img is None!'
+            print('img is None!')
             self.ret_dict = self.returnEmpty()
             return
 
@@ -241,31 +241,31 @@ class droplet:
         time_label = time.time()
         #get all neighbors
         if (self.threshold != self.thresholdLow):
-                imgDrop = self.neighborImg(img_drop[0])
-                img = self.prepareImg(data, low=True)
-                #
-                if self.relabel:
-                        imgDrop[img==0]=0
-                        img_drop_relabel = measurements.label(imgDrop)
-                        imgDrop = img_drop_relabel[0]
+            imgDrop = self.neighborImg(img_drop[0])
+            img = self.prepareImg(data, low=True)
+            #
+            if self.relabel:
+                    imgDrop[img==0]=0
+                    img_drop_relabel = measurements.label(imgDrop)
+                    imgDrop = img_drop_relabel[0]
         else:
-                imgDrop = img_drop[0]
+            imgDrop = img_drop[0]
 
         drop_ind = np.arange(1,img_drop[1]+1)
         adu_drop = measurements.sum(img,imgDrop, drop_ind)
         self.ret_dict = {'nDroplets': len(drop_ind)}
         tfilled=time.time()
         if len(self.aduHists)>0:
-                if not self.aduROI:
-                        self.procADUHist(adu_drop)
-                        if len(self.dropletSaves)==0:
-                                return
+            if not self.aduROI:
+                self.procADUHist(adu_drop)
+                if len(self.dropletSaves)==0:
+                    return
 
         if self.aduROI:
-                pos_drop = np.array(measurements.center_of_mass(img,img_drop[0], drop_ind))
-                self.procADUHist(adu_drop, pos_drop)
+            pos_drop = np.array(measurements.center_of_mass(img,img_drop[0], drop_ind))
+            self.procADUHist(adu_drop, pos_drop)
         if len(self.dropletSaves)==0:
-                return
+            return
 
         #clean list with lower threshold. Only that one!
         vThres = np.where(adu_drop<self.thresADU)[0]
@@ -280,30 +280,30 @@ class droplet:
         # add label_img_neighbor w/ mask as image -> sum ADU , field "masked" (binary)?
         ###
         if '_flagMasked' not in self.__dict__.keys():
-                flagMasked=False
-                for saveD in self.dropletSaves:
-                        if saveD.flagMasked:
-                                flagMasked=True
-                self.__dict__['_flagMasked'] = flagMasked
+            flagMasked=False
+            for saveD in self.dropletSaves:
+                    if saveD.flagMasked:
+                            flagMasked=True
+            self.__dict__['_flagMasked'] = flagMasked
         if self.__dict__['_flagMasked']:
-                maxImg = filters.maximum_filter(imgDrop,footprint=self.footprint)
-                maskMax = measurements.sum(self.mask,maxImg, drop_ind)
-                imgDropMin = imgDrop.copy()
-                imgDropMin[imgDrop==0]=(imgDrop.max()+1)
-                minImg = filters.minimum_filter(imgDropMin,footprint=self.footprint)
-                minImg[minImg==(imgDrop.max()+1)]=0
-                maskMin = measurements.sum(self.mask,maxImg, drop_ind)
-                maskDrop = maskMax+maskMin
+            maxImg = filters.maximum_filter(imgDrop,footprint=self.footprint)
+            maskMax = measurements.sum(self.mask,maxImg, drop_ind)
+            imgDropMin = imgDrop.copy()
+            imgDropMin[imgDrop==0]=(imgDrop.max()+1)
+            minImg = filters.minimum_filter(imgDropMin,footprint=self.footprint)
+            minImg[minImg==(imgDrop.max()+1)]=0
+            maskMin = measurements.sum(self.mask,maxImg, drop_ind)
+            maskDrop = maskMax+maskMin
 
         ###
         #figure out if we need to run region props....
         ###
         if '_needProps' not in self.__dict__.keys():
-                _needProps=False
-                for saveD in self.dropletSaves:
-                        if saveD.ret2ndMom>1 or saveD.retPixel:
-                                _needProps=True
-                self.__dict__['_needProps'] = _needProps
+            _needProps=False
+            for saveD in self.dropletSaves:
+                if saveD.ret2ndMom>1 or saveD.retPixel:
+                    _needProps=True
+            self.__dict__['_needProps'] = _needProps
 
         #adu_drop = np.delete(adu_drop,vThres)
         pos_drop = []
@@ -318,100 +318,100 @@ class droplet:
         #<old code> -- check result against new code.
         #if not '_needProps' in self.__dict__keys():
         if not self.__dict__['_needProps']:
-                #t1 = time.time()
-                imgNpix = img.copy(); imgNpix[img>0]=1
-                #drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
-                ##drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
-                #drop_adu = measurements.sum(img,imgDrop, drop_ind_thres)
-                #drop_pos = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
-                npix_drop = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
-                adu_drop = measurements.sum(img,imgDrop, drop_ind_thres)
-                pos_drop = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
+            #t1 = time.time()
+            imgNpix = img.copy(); imgNpix[img>0]=1
+            #drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
+            ##drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
+            #drop_adu = measurements.sum(img,imgDrop, drop_ind_thres)
+            #drop_pos = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
+            npix_drop = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
+            adu_drop = measurements.sum(img,imgDrop, drop_ind_thres)
+            pos_drop = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
         else:
-                #t2 = time.time()
-                self.regions = measure.regionprops(imgDrop, intensity_image=img, cache=True)
-                dropSlices = measurements.find_objects(imgDrop)
-                for droplet,ds in zip(self.regions,dropSlices):
-                        pos_drop.append(droplet['weighted_centroid'])
-                        moments.append(droplet['weighted_moments_central'])
-                        bbox.append(droplet['bbox'])
-                        adu_drop.append(droplet['intensity_image'].sum())
-                        npix_drop.append((droplet['intensity_image']>0).sum())
-                        images.append(droplet['intensity_image'].flatten())
+            #t2 = time.time()
+            self.regions = measure.regionprops(imgDrop, intensity_image=img, cache=True)
+            dropSlices = measurements.find_objects(imgDrop)
+            for droplet,ds in zip(self.regions,dropSlices):
+                pos_drop.append(droplet['weighted_centroid'])
+                moments.append(droplet['weighted_moments_central'])
+                bbox.append(droplet['bbox'])
+                adu_drop.append(droplet['intensity_image'].sum())
+                npix_drop.append((droplet['intensity_image']>0).sum())
+                images.append(droplet['intensity_image'].flatten())
         #t3 = time.time()
-        #print 'times: ',t2-t1, t3-t2, self.__dict__['_needProps']
+        #print('times: ',t2-t1, t3-t2, self.__dict__['_needProps'])
 
-        #print 'types - list: ',isinstance(drop_npix, list),isinstance(npix_drop, list)
-        #print 'types - array: ',isinstance(drop_npix, np.array),isinstance(npix_drop, np.array)
-        #print 'npix A: ',len(drop_npix), ' -- ', drop_npix
-        #print 'npix B: ',len(npix_drop), ' -- ', npix_drop
-        #print 'ADU A: ',len(drop_adu), ' -- ', drop_adu
-        #print 'ADU B: ',len(adu_drop), ' -- ', adu_drop
-        #print 'pos A ',len(drop_pos), len(drop_pos[0])
-        #print 'pos B ',len(pos_drop), len(pos_drop[0])
+        #print('types - list: ',isinstance(drop_npix, list),isinstance(npix_drop, list))
+        #print('types - array: ',isinstance(drop_npix, np.array),isinstance(npix_drop, np.array))
+        #print('npix A: ',len(drop_npix), ' -- ', drop_npix)
+        #print('npix B: ',len(npix_drop), ' -- ', npix_drop)
+        #print('ADU A: ',len(drop_adu), ' -- ', drop_adu)
+        #print('ADU B: ',len(adu_drop), ' -- ', adu_drop)
+        #print('pos A ',len(drop_pos), len(drop_pos[0]))
+        #print('pos B ',len(pos_drop), len(pos_drop[0]))
 
         for saveD in self.dropletSaves:
-                dropName = self.name
-                if saveD.name!='':
-                        dropName = dropName+'_'+saveD.name
-                aduArray = np.array(adu_drop).copy()
-                Filter = np.ones_like(aduArray).astype(bool)
-                if (saveD.thresADU[0] is not np.nan) and (saveD.thresADU[1] is not np.nan):
-                        Filter = ((aduArray>saveD.thresADU[0]) & (aduArray<saveD.thresADU[1]))
-                elif saveD.thresADU[0] is not np.nan:
-                        Filter = (aduArray>saveD.thresADU[0]) 
-                elif saveD.thresADU[1] is not np.nan:
-                        Filter = (aduArray<saveD.thresADU[1])                        
-                if saveD.ROI is not None and len(pos_drop)>0:
-                        dx = np.array(pos_drop)[:,0].flatten()
-                        dy = np.array(pos_drop)[:,1].flatten()
-                        Filter = np.logical_and(Filter, dx > np.array(saveD.ROI).flatten()[0])
-                        Filter = np.logical_and(Filter, dx < np.array(saveD.ROI).flatten()[1]) 
-                        Filter = np.logical_and(Filter, dy > np.array(saveD.ROI).flatten()[2])
-                        Filter = np.logical_and(Filter, dy < np.array(saveD.ROI).flatten()[3]) 
+            dropName = self.name
+            if saveD.name!='':
+                dropName = dropName+'_'+saveD.name
+            aduArray = np.array(adu_drop).copy()
+            Filter = np.ones_like(aduArray).astype(bool)
+            if (saveD.thresADU[0] is not np.nan) and (saveD.thresADU[1] is not np.nan):
+                Filter = ((aduArray>saveD.thresADU[0]) & (aduArray<saveD.thresADU[1]))
+            elif saveD.thresADU[0] is not np.nan:
+                Filter = (aduArray>saveD.thresADU[0]) 
+            elif saveD.thresADU[1] is not np.nan:
+                Filter = (aduArray<saveD.thresADU[1])                        
+            if saveD.ROI is not None and len(pos_drop)>0:
+                dx = np.array(pos_drop)[:,0].flatten()
+                dy = np.array(pos_drop)[:,1].flatten()
+                Filter = np.logical_and(Filter, dx > np.array(saveD.ROI).flatten()[0])
+                Filter = np.logical_and(Filter, dx < np.array(saveD.ROI).flatten()[1]) 
+                Filter = np.logical_and(Filter, dy > np.array(saveD.ROI).flatten()[2])
+                Filter = np.logical_and(Filter, dy < np.array(saveD.ROI).flatten()[3]) 
 
-                self.ret_dict[dropName+'_nDroplets'] = Filter.sum()
-                self.ret_dict[dropName+'_adu'] = aduArray[Filter]
-                self.ret_dict[dropName+'_npix'] = np.array(npix_drop)[Filter]
-                if saveD.flagMasked:
-                        self.ret_dict[dropName+'_masked'] = np.array(maskDrop)[Filter]
-                if Filter.sum()>0:
-                        self.ret_dict[dropName+'_X'] = np.array(pos_drop)[Filter][:,0]
-                        self.ret_dict[dropName+'_Y'] = np.array(pos_drop)[Filter][:,1]
+            self.ret_dict[dropName+'_nDroplets'] = Filter.sum()
+            self.ret_dict[dropName+'_adu'] = aduArray[Filter]
+            self.ret_dict[dropName+'_npix'] = np.array(npix_drop)[Filter]
+            if saveD.flagMasked:
+                self.ret_dict[dropName+'_masked'] = np.array(maskDrop)[Filter]
+            if Filter.sum()>0:
+                self.ret_dict[dropName+'_X'] = np.array(pos_drop)[Filter][:,0]
+                self.ret_dict[dropName+'_Y'] = np.array(pos_drop)[Filter][:,1]
+            else:
+                self.ret_dict[dropName+'_X'] = np.array([0.])
+                self.ret_dict[dropName+'_Y'] = np.array([0.])
+            if saveD.ret2ndMom>1:
+                moments_dropLocal = np.array(moments)[Filter]
+                if len(moments_dropLocal)>0:
+                    for i in (np.arange(saveD.ret2ndMom)):
+                        for ii in (np.arange(saveD.ret2ndMom)):
+                            if i==0 and ii==0:
+                                continue
+                            self.ret_dict['%s_mom%d%d'%(dropName,i,ii)] = moments_dropLocal[:,i,ii]
                 else:
-                        self.ret_dict[dropName+'_X'] = np.array([0.])
-                        self.ret_dict[dropName+'_Y'] = np.array([0.])
-                if saveD.ret2ndMom>1:
-                        moments_dropLocal = np.array(moments)[Filter]
-                        if len(moments_dropLocal)>0:
-                                for i in (np.arange(saveD.ret2ndMom)):
-                                        for ii in (np.arange(saveD.ret2ndMom)):
-                                                if i==0 and ii==0:
-                                                        continue
-                                                self.ret_dict['%s_mom%d%d'%(dropName,i,ii)] = moments_dropLocal[:,i,ii]
-                        else:
-                                for i in (np.arange(saveD.ret2ndMom)):
-                                        for ii in (np.arange(saveD.ret2ndMom)):
-                                                if i==0 and ii==0:
-                                                        continue
-                                                self.ret_dict['%s_mom%d%d'%(dropName,i,ii)] = [0.]
-                if (saveD.retPixel):
-                        if Filter.sum()>0:
-                                self.ret_dict[dropName+'_bbox_x0'] = np.array(bbox)[Filter][:,0]
-                                self.ret_dict[dropName+'_bbox_y0'] = np.array(bbox)[Filter][:,1]
-                                self.ret_dict[dropName+'_bbox_x1'] = np.array(bbox)[Filter][:,2]
-                                self.ret_dict[dropName+'_bbox_y1'] = np.array(bbox)[Filter][:,3]
-                                try:
-                                        self.ret_dict[dropName+'_Pix'] = (np.concatenate(np.array(images).flatten()[Filter])).flatten()
-                                except:
-                                        self.ret_dict[dropName+'_Pix'] = [0.]
-                        else:
-                                self.ret_dict[dropName+'_bbox_x0'] =  [0.]
-                                self.ret_dict[dropName+'_bbox_y0'] =  [0.]
-                                self.ret_dict[dropName+'_bbox_x1'] =  [0.]
-                                self.ret_dict[dropName+'_bbox_y1'] =  [0.]
-                                self.ret_dict[dropName+'_Pix'] = [0.]
-                saveD.shapeArray(self.ret_dict)
+                    for i in (np.arange(saveD.ret2ndMom)):
+                        for ii in (np.arange(saveD.ret2ndMom)):
+                            if i==0 and ii==0:
+                                continue
+                            self.ret_dict['%s_mom%d%d'%(dropName,i,ii)] = [0.]
+            if (saveD.retPixel):
+                if Filter.sum()>0:
+                    self.ret_dict[dropName+'_bbox_x0'] = np.array(bbox)[Filter][:,0]
+                    self.ret_dict[dropName+'_bbox_y0'] = np.array(bbox)[Filter][:,1]
+                    self.ret_dict[dropName+'_bbox_x1'] = np.array(bbox)[Filter][:,2]
+                    self.ret_dict[dropName+'_bbox_y1'] = np.array(bbox)[Filter][:,3]
+                    try:
+                        self.ret_dict[dropName+'_Pix'] = (np.concatenate(np.array(images).flatten()[Filter])).flatten()
+                    except:
+                        self.ret_dict[dropName+'_Pix'] = [0.]
+                else:
+                    self.ret_dict[dropName+'_bbox_x0'] =  [0.]
+                    self.ret_dict[dropName+'_bbox_y0'] =  [0.]
+                    self.ret_dict[dropName+'_bbox_x1'] =  [0.]
+                    self.ret_dict[dropName+'_bbox_y1'] =  [0.]
+                    self.ret_dict[dropName+'_Pix'] = [0.]
+            saveD.shapeArray(self.ret_dict)
 
         self.ret_dict['evtTimeDrop']=time.time() - tstart
         self.ret_dict['evtTimeFind']=tfilled - tstart
@@ -421,14 +421,14 @@ class droplet:
 
         tstartPhot=time.time()            
         vThres = np.where(adu_drop <= (self.photonizeDrops.thresFrac*self.photonizeDrops.ADU_per_photon))[0]
-        #print len(vThres)
+        #print(len(vThres))
         drop_ind = np.delete(drop_ind,vThres)
         adu_drop = np.delete(adu_drop,vThres)
         bbox = np.delete(bbox,vThres,0)
         images = np.delete(images,vThres,0)
 
         vSingle = np.where(adu_drop <= ((1.+self.photonizeDrops.thresFrac)*self.photonizeDrops.ADU_per_photon))[0]
-        #print vSingle
+        #print(vSingle)
         singles_ind = drop_ind[vSingle]
         singles_adu = measurements.sum(img,img_drop[0], singles_ind).tolist()
         singles_pos = measurements.center_of_mass(img,img_drop[0], singles_ind)
@@ -443,10 +443,10 @@ class droplet:
 
         #imgg is correct. need to come up with x.y
         for s,bbx,imgg in zip(adu_drop,bbox,images):
-            #print s
+            #print(s)
             num_phts = np.ceil(s/self.photonizeDrops.ADU_per_photon - self.photonizeDrops.thresFrac)
             lgrid = np.meshgrid(range(bbx[0],bbx[2]),range(bbx[1],bbx[3]))
-            #print lgrid
+            #print(lgrid)
             posX = lgrid[0].transpose().flatten()
             posY = lgrid[1].transpose().flatten()
 
@@ -466,12 +466,12 @@ class droplet:
         #make img to get doubles
         pdata = np.ones(len(singles_adu)).astype(int)
         try:
-                px = (np.array(singles_pos)[:,0]).astype(int)
-                py = (np.array(singles_pos)[:,1]).astype(int)
+            px = (np.array(singles_pos)[:,0]).astype(int)
+            py = (np.array(singles_pos)[:,1]).astype(int)
         except:
-                px = np.ones(len(singles_adu)).astype(int)
-                py = np.ones(len(singles_adu)).astype(int)
-        #print 'img shape: ',data.shape, px.max(), py.max()
+            px = np.ones(len(singles_adu)).astype(int)
+            py = np.ones(len(singles_adu)).astype(int)
+        #print('img shape: ',data.shape, px.max(), py.max())
         sImgSparse = sparse.coo_matrix((pdata, (px, py)),shape=data.shape).todense()
         self.ret_dict[self.photonizeDrops.name+'pHist']=np.histogram(sImgSparse.flatten(), np.arange(0,self.photonizeDrops.maxMultPhotons))[0]
         self.ret_dict[self.photonizeDrops.name+'nPhot']=sImgSparse.sum()

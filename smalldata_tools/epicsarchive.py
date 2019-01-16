@@ -44,7 +44,7 @@ class EpicsArchive(object):
                 self._pts_cache = pts
                 self._pv_cache = PV
             else:
-                print "Invalid dates! Start must be BEFORE end!"
+                print("Invalid dates! Start must be BEFORE end!")
                 pts = []
         if not raw:
             pts = pts_string_time(pts)
@@ -78,10 +78,10 @@ class EpicsArchive(object):
         Return cache if it exists, otherwise print a message.
         """
         if self._pts_cache is None:
-            print "No cached points to use. Please choose a PV."
+            print("No cached points to use. Please choose a PV.")
             return None, None
         else:
-            print "Found cached data for {}".format(self._pv_cache)
+            print("Found cached data for {}".format(self._pv_cache))
             return self._pts_cache, self._pv_cache
 
     def search_pvs(self, glob, do_print=True):
@@ -97,7 +97,7 @@ class EpicsArchive(object):
         if do_print:
             success = list_print(pvs)
             if not success:
-                print "No PVs found."
+                print("No PVs found.")
         else:
             return pvs
 
@@ -297,6 +297,6 @@ def list_print(data):
         line = ""
         for text in row:
             line += line_elem.format(text, col_width)
-        print line
+        print(line)
     return True
 
