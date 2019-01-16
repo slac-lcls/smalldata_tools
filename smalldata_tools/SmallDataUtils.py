@@ -18,10 +18,12 @@ def defaultDetectors(hutch):
         dets = cxiDetectors()
     elif hutch.lower()=='mec':
         dets = mecDetectors()
+    elif hutch.lower()=='det':
+        dets = detDetectors()
     else:
         dets = []
     detsInRun= [ det for det in dets if det.inRun() ]
-    #print 'found %d detectors '%len(detsInRun)
+    #print('found %d detectors '%len(detsInRun))
     return detsInRun
 
 def amoDetectors():
@@ -48,7 +50,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     try:
         dets.append(adcDetector('adc','adc'))
     except:
-        print 'did not find slow Adc detector'
+        print('did not find slow Adc detector')
     dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
@@ -58,10 +60,10 @@ def xppDetectors(beamCodes=[[162],[91]]):
         dets.append(encoderDetector('usbencoder','enc'))
     except:
         try:
-            print 'did not find encoder detector with alias, look for DAQ name'
+            print('did not find encoder detector with alias, look for DAQ name')
             dets.append(encoderDetector('XppEndstation.0:USDUSB.0','enc'))
         except:
-            print 'did not add encoder detector'
+            print('did not add encoder detector')
             pass
     dets.append(l3tDetector())
     dets.append(damageDetector())
@@ -94,7 +96,7 @@ def xcsDetectors(beamCodes=[[162],[89]]):
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
         dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
     except:
-        print 'did not add encoder detector'
+        print('did not add encoder detector')
         pass
     dets.append(l3tDetector())
     dets.append(damageDetector())
@@ -155,10 +157,13 @@ def mecDetectors(beamCodes=[[162],[]]):
         pass
     return dets
 
+def detDetectors():
+    return []
+
 
 def detData(detList, evt):
     #mpiDataSource Issue? cpo, tjlane
-    #if one of the keys here contains an epty dict (say: no user PV that are in the data)
+    #if one of the keys here contains an empty dict (say: no user PV that are in the data)
     #then it will not be saved. Also any keys _after_ that dir will be lost!
     #test: misspell userPV in producer file and see that the scan directory disappears....
     data={}
@@ -166,7 +171,7 @@ def detData(detList, evt):
         try:
             data[det.name] = det.data(evt)
         except:
-            #print 'could not get data in this event for detector ',det.name
+            #print('could not get data in this event for detector ',det.name)
             pass
     return data
 
@@ -174,15 +179,17 @@ def setParameter(detList, Params, detName='tt'):
     for det in detList:
         if det.name==detName:
             det.setPars(Params)
-
+###
 #userData functions
+###
 def getUserData(det):
+    """return dictionary with event-based user data from input detector, apply mask here."""
     det_dict= {}
     try:
         userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('write_')>=0 ]
-        #print 'DEBUG SmallDataUtils: getting keys: ',userData_keys
+        #print('DEBUG SmallDataUtils: getting keys: ',userData_keys)
         for key in userData_keys:
-            #print 'DEBUG SmallDataUtils: getting data for key: ',key
+            #print('DEBUG SmallDataUtils: getting data for key: ',key)
             if isinstance(det.evt[key], np.ndarray):
                 if isinstance(det.evt[key], np.ma.masked_array):
                     data = det.evt[key].data
@@ -190,7 +197,7 @@ def getUserData(det):
                         data[det.evt[key].mask]=0
                     else:
                         data[det.evt[key].mask]=np.nan
-                    #print eventNr,' is ndarray ',key
+                    #print(eventNr,' is ndarray ',key)
                     det_dict[key.replace('write_','')] = data
                 else:
                     det_dict[key.replace('write_','')] = det.evt[key]
@@ -201,6 +208,7 @@ def getUserData(det):
     return det_dict
 
 def getUserEnvData(det):
+    """return environment data for a detectors as a dictionary (temperatures,....)"""
     env_dict= {}
     try:
         envData_keys = [ key for key in det.evt.__dict__.keys() if key.find('env_')>=0 ]
@@ -218,8 +226,8 @@ def getUserEnvData(det):
         pass
     return env_dict
 
-#get userData configuration data
 def getCfgOutput(det):
+    """return the configuration data for the user data (parameters for feature extraction) as a dict"""
     cfgDict={}
     #baseName=det._name+'_'
     baseName=''
@@ -252,6 +260,9 @@ def getCfgOutput(det):
                 cfgDict[baseName+dropSave.name+'_ROI'] = np.array(dropSave.ROI)
     return cfgDict
 
+###
+# REDIS stuff: not very performant. Switch to ZMQ where at least the non-performance is more under my control.
+###
 def defaultRedisVars(hutch):
     defList = ['lightStatus/xray', 'lightStatus/laser','event_time','fiducials']
     #FIX ME: APPEND PLEASE!
@@ -272,7 +283,7 @@ def defaultRedisVars(hutch):
     else:
         dets = []
     #detsInRun= [ det for det in dets if det.inRun() ]
-    #print 'found %d detectors '%len(detsInRun)
+    #print('found %d detectors '%len(detsInRun))
     return redisVars
 
 def amoRedisVars():

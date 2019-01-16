@@ -3,12 +3,12 @@ import numpy as np
 try:
     from pylab import ginput
 except:
-    print 'could not import ginput'
+    print('could not import ginput')
     pass
 try:
     from matplotlib import pyplot as plt
 except:
-    print 'could not import pyplot'
+    print('could not import pyplot')
     pass
 from matplotlib import gridspec
 from matplotlib import path
@@ -194,7 +194,7 @@ class SmallDataAna_psana(object):
                         keys.append(k)
             #keys=evt.keys()
             if printthis: 
-                print keys
+                print(keys)
                 return
             else:
                 return keys
@@ -203,7 +203,7 @@ class SmallDataAna_psana(object):
             try:
                 keys=self.ds.events().next().keys()
                 if printthis: 
-                    print keys
+                    print(keys)
                     return
                 else:
                     return keys
@@ -216,7 +216,7 @@ class SmallDataAna_psana(object):
         else:
             keys=self.ds.env().configStore().keys()
         if printthis: 
-            print keys
+            print(keys)
         else:
             return keys
 
@@ -226,7 +226,7 @@ class SmallDataAna_psana(object):
         else:
             keys=self.ds.env().epicsStore().aliases()
         if printthis: 
-            print keys
+            print(keys)
         else:
             return keys
         
@@ -245,9 +245,10 @@ class SmallDataAna_psana(object):
             if len(aliases)==1:
                 detname = aliases[0]
             else:
-                print 'detectors in event: \n',
+                detsString='detectors in event: \n'
                 for alias in aliases:
-                    print alias
+                    detsString+=alias+', '
+                print(detsString)
                 detname = raw_input("Select detector to get detector info for?:\n")
         printR(rank, 'try to make psana Detector with: %s'%detname)
 
@@ -315,15 +316,16 @@ class SmallDataAna_psana(object):
 
     def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
         if not isinstance(detname, basestring):
-            print 'please give parameter name unless specifying arguments in right order. detname is first'
+            print('please give parameter name unless specifying arguments in right order. detname is first')
             return
         #look for detector
         if detname=='None':
             detname = self._getDetName()
             if isinstance(detname, list):
-                print 'detectors in event: \n',
+                detsString='detectors in event: \n'
                 for alias in detname:
-                    print alias
+                    detsString+=alias+', '
+                print(detsString)
                 detname = raw_input("Select detector to get detector info for?:\n")
 
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
@@ -337,10 +339,10 @@ class SmallDataAna_psana(object):
         if detname.find('opal')>=0:
             common_mode = -1
             if pedestals[0,0]==-1:
-                print 'time tool opal, image was not saved. Should ideally exclude from detector list'
+                print('time tool opal, image was not saved. Should ideally exclude from detector list')
                 return
         else:
-            print 'done setting up the geometry'
+            print('done setting up the geometry')
 
         #now get the non-image data
         imgAr = []
@@ -350,17 +352,17 @@ class SmallDataAna_psana(object):
             useFilter = None
         if useFilter is not None:
             evttsSel = self.sda.getSelIdx(useFilter)
-            print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter)
+            print('using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter))
             if numEvts==-1:
                 numEvts = len(evttsSel)-nSkip
                 if numEvts<0:
-                    print 'have no events, quit'
+                    print('have no events, quit')
                     return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
                 times.append(psana.EventTime(evtts[1],evtts[0]))
         else:
             times = run.times()[nSkip:]
-        print 'requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events'
+        print('requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events')
         if (min(len(times),numEvts) < numEvts*0.5):
             if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
                 return
@@ -368,21 +370,21 @@ class SmallDataAna_psana(object):
                 numEvts = len(times)
 
         for tm in times:
-            #print 'numEvts ',numEvts
+            #print('numEvts ',numEvts)
             if numEvts<=0:
                 break
             try:
                 evt=run.event(tm)
             except:
-                print 'Could not get this event, skip '
+                print('Could not get this event, skip ')
                 continue
             if evt is None:
-                print 'Returned event is None, skip'
+                print('Returned event is None, skip')
                 continue
             if minIpm!=-1 and ( (self.hutch=='xpp' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XppSb2_Ipm)')).sum() < minIpm) or (self.hutch=='xcs' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XCS-IPM-05)')).sum() < minIpm)):
                 continue
             if printFid:
-                print (evt.get(psana.EventId)).fiducials()
+                print((evt.get(psana.EventId)).fiducials())
             aliases = [ k.alias() for k in evt.keys() ]
             if not detname in aliases:
                 continue
@@ -410,7 +412,7 @@ class SmallDataAna_psana(object):
         if thresRms!=0:
             data+='thresRms%d_'%int(thresRms*10.)
 
-        print 'use common mode: ',common_mode
+        print('use common mode: ',common_mode)
         data+=self.commonModeStr(common_mode)
         data+=detname
 
@@ -447,10 +449,10 @@ class SmallDataAna_psana(object):
                 continue
             avImages.append(key)
         if len(avImages)==0:
-            print 'please create the AvImage first!'
+            print('please create the AvImage first!')
             return
         elif len(avImages)>1:
-            print 'we have the following options: ',avImages
+            print('we have the following options: ',avImages)
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
@@ -463,17 +465,17 @@ class SmallDataAna_psana(object):
         for key in self.__dict__.keys():
             if key.find('_mask_')>=0:
                 continue
-            print 'key ',key
+            print('key ',key)
             if key.find('azint')>=0:
                 if detname is not None and key.find(detname)>=0:
                     azInts.append(key)
                 elif detname is None:
                     azInts.append(key)
         if len(azInts)==0:
-            print 'please create an azimuthal integral first!'
+            print('please create an azimuthal integral first!')
             return
         elif len(azInts)>1:
-            print 'we have the following options: ',azInts
+            print('we have the following options: ',azInts)
             avInt=raw_input('type the name of the AvImage to use:')
         else:
             avInt=azInts[0]
@@ -504,7 +506,7 @@ class SmallDataAna_psana(object):
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
+        print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         if len(img.shape)>2:
             image = self.__dict__[detname].det.image(self.run, img)
@@ -585,7 +587,7 @@ class SmallDataAna_psana(object):
         if len(avImages)<=0:
             return
         fname = '%s%s_Run%03d_%s.h5'%(dirname,self.expname,self.run,avImages[0])
-        print 'now save information to file: ',fname
+        print('now save information to file: ',fname)
         imgFile = h5py.File(fname, "w")
         for key in data_to_save:
             addToHdf5(imgFile, key, data_to_save[key])
@@ -602,10 +604,10 @@ class SmallDataAna_psana(object):
                 elif detname is None:
                     avImages.append(key)
         if len(avImages)==0:
-            print 'please create the AvImage first!'
+            print('please create the AvImage first!')
             return
         elif len(avImages)>1:
-            print 'we have the following options: ',avImages
+            print('we have the following options: ',avImages)
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
@@ -614,7 +616,7 @@ class SmallDataAna_psana(object):
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
+        print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         fig=plt.figure(figsize=(10,6))
         gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
@@ -642,7 +644,7 @@ class SmallDataAna_psana(object):
             p =np.array(ginput(2))
             p_axis1=[int(p[:,1].min()),int(p[:,1].max())+1]
             p_axis0=[int(p[:,0].min()),int(p[:,0].max())+1]
-            print 'points:',p
+            print('points:',p)
             plt.subplot(gs[1]).imshow(image[p_axis1[0]:p_axis1[1],p_axis0[0]:p_axis0[1]],clim=[plotMin,plotMax],interpolation='None')
             plt.pause(0.0001)
             if needsGeo:
@@ -653,7 +655,7 @@ class SmallDataAna_psana(object):
                 happy = True
                     
         if not needsGeo:
-            print 'ROI: [[%i,%i], [%i,%i]]'%(p[:,1].min(),p[:,1].max(),p[:,0].min(),p[:,0].max())
+            print('ROI: [[%i,%i], [%i,%i]]'%(p[:,1].min(),p[:,1].max(),p[:,0].min(),p[:,0].max()))
             return
 
         if len(mask_nda.shape)>2:
@@ -661,7 +663,7 @@ class SmallDataAna_psana(object):
                 if tile.sum()>0:
                     ax0 = np.arange(0,tile.sum(axis=0).shape[0])[tile.sum(axis=0)>0]
                     ax1 = np.arange(0,tile.sum(axis=1).shape[0])[tile.sum(axis=1)>0]
-                    print 'ROI: [[%i,%i], [%i,%i], [%i,%i]]'%(itile,itile+1,ax1.min(),ax1.max(),ax0.min(),ax0.max())
+                    print('ROI: [[%i,%i], [%i,%i], [%i,%i]]'%(itile,itile+1,ax1.min(),ax1.max(),ax0.min(),ax0.max()))
                     fig=plt.figure(figsize=(6,6))
                     plt.imshow(img[itile,ax1.min():ax1.max(),ax0.min():ax0.max()],interpolation='none')
                     plt.pause(0.0001)
@@ -671,7 +673,7 @@ class SmallDataAna_psana(object):
             if tile.sum()>0:
                 ax0 = np.arange(0,tile.sum(axis=0).shape[0])[tile.sum(axis=0)>0]
                 ax1 = np.arange(0,tile.sum(axis=1).shape[0])[tile.sum(axis=1)>0]
-                print 'ROI: [[%i,%i], [%i,%i]]'%(ax1.min(),ax1.max(),ax0.min(),ax0.max())
+                print('ROI: [[%i,%i], [%i,%i]]'%(ax1.min(),ax1.max(),ax0.min(),ax0.max()))
             
 
     def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inParams={}):
@@ -683,7 +685,7 @@ class SmallDataAna_psana(object):
         nPixRaw=1.
         for idim in mask.shape:
             nPixRaw=nPixRaw*idim
-        print 'check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw)
+        print('check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw))
         if (mask.sum()/nPixRaw)<0.5 and not forceMask:
             mask=~mask
         try:
@@ -732,7 +734,7 @@ class SmallDataAna_psana(object):
         plt.xlim(limits[0])
         plt.ylim(limits[1])
         plt.show()
-        print 'center ',combRes['xCen'],combRes['yCen']
+        print('center ',combRes['xCen'],combRes['yCen'])
         if needsGeo:
             geo = self.__dict__[detname].det.geometry(self.run)
             d=160000.
@@ -740,16 +742,16 @@ class SmallDataAna_psana(object):
             ixd,iyd = geo.point_coord_indexes(p_um=(d,d))
             combRes['yCen'] = d*(combRes['yCen']-ix0)/(ixd-ix0)
             combRes['xCen'] = d*(combRes['xCen']-iy0)/(iyd-iy0)
-            print 'center Final mid',combRes['xCen'],combRes['yCen']
+            print('center Final mid',combRes['xCen'],combRes['yCen'])
             helpVar =  combRes['xCen']
             combRes['xCen'] = combRes['yCen']
             combRes['yCen'] = helpVar
             for r in combRes['R']:
-                print 'aradii: ',r,d*r/(ixd-ix0)
+                print('aradii: ',r,d*r/(ixd-ix0))
         else:
             for r in combRes['R']:
-                print 'aradii: ',r
-        print 'center Final ',combRes['xCen'],combRes['yCen']
+                print('aradii: ',r)
+        print('center Final ',combRes['xCen'],combRes['yCen'])
         return combRes
  
     def FitCircleMouse(self, detname=None, use_mask=False, limits=[5,99.5], use_mask_local=False):
@@ -834,17 +836,17 @@ class SmallDataAna_psana(object):
         if needsGeo:
             if self.__dict__[detname].det.dettype==30:
                 if singleTile<0:
-                    print 'we need to select a tile for the icarus'
+                    print('we need to select a tile for the icarus')
                     return
                 elif singleTile>=img.shape[0]:
-                    print 'requested tile %d, detector %s only has %d tiles'%(singleTile, detname, image.shape[0])
+                    print('requested tile %d, detector %s only has %d tiles'%(singleTile, detname, image.shape[0]))
                     return
                     
                 image = img[singleTile]
                 x = x[singleTile]
                 y = y[singleTile]
                 extent=[x.min(), x.max(), y.min(), y.max()]
-                print 'icarus image: ',img.shape, image.shape, extent
+                print('icarus image: ',img.shape, image.shape, extent)
             else:
                 image = self.__dict__[detname].det.image(self.run, img)
         else:
@@ -861,7 +863,7 @@ class SmallDataAna_psana(object):
                 points=ginput(n=0)
                 parr=np.array(points)
                 if parr.shape[0]==1:
-                    print '[x,y]: [%f, %f]'%(parr[0][0],parr[0][1])
+                    print('[x,y]: [%f, %f]'%(parr[0][0],parr[0][1]))
                     happy=True
                     break
                 res = fitCircle(parr[:,0],parr[:,1])
@@ -875,7 +877,7 @@ class SmallDataAna_psana(object):
                 plt.gca().add_artist(circle)
                 plt.plot([res['xCen'],res['xCen']],[y.min(),y.max()],'r')
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
-                print '[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.)
+                print('[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.))
                 if raw_input("Happy with this selection:\n") in ["y","Y"]:
                     happy = True
 
@@ -887,7 +889,7 @@ class SmallDataAna_psana(object):
                     happy = True
                 else:                    
                     if not plotIt:
-                        print 'this is not going to work, you either need to specify a threshold or require plots'
+                        print('this is not going to work, you either need to specify a threshold or require plots')
                         return
                     fig=plt.figure(figsize=(10,10))
                     if needsGeo:
@@ -897,7 +899,7 @@ class SmallDataAna_psana(object):
                     thres = float(raw_input("min percentile % of selected points:\n"))
 
                     thresP = np.percentile(img[img!=0], thres)
-                    print 'thresP',thresP
+                    print('thresP',thresP)
                     imageThres=image.copy()
                     imageThres[image>thresP]=1
                     imageThres[image<thresP]=0
@@ -915,7 +917,7 @@ class SmallDataAna_psana(object):
                 else:
                     res = fitCircle(x.flatten()[img[singleTile].flatten()>thresP],y.flatten()[img[singleTile].flatten()>thresP])
             circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
-            print '[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.)
+            print('[x,y] (micron): [%f, %f] R (in mm): %f '%(res['xCen'],res['yCen'],res['R']/1000.))
             if plotIt:
                 fig=plt.figure(figsize=(10,10))
                 if needsGeo:
@@ -932,7 +934,7 @@ class SmallDataAna_psana(object):
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
+        print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
         if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
@@ -963,7 +965,7 @@ class SmallDataAna_psana(object):
         iX = self.__dict__[detname+'_iX']
         iY = self.__dict__[detname+'_iY']
         extent=[x.min(), x.max(), y.min(), y.max()]
-        #print 'DEBUG: extent(x,y min,max)',extent
+        #print('DEBUG: extent(x,y min,max)',extent)
         if self.__dict__[detname].det.dettype==30:
             if singleTile<0 or singleTile>= img.shape[0]:
                 x=x[0]
@@ -978,7 +980,7 @@ class SmallDataAna_psana(object):
         while select:
             fig=plt.figure(figsize=(12,10))
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
-            #print "rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:"
+            #print("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:")
             #needs to be pixel coordinates for rectable selection to work.
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
@@ -986,7 +988,7 @@ class SmallDataAna_psana(object):
             #shape = raw_input()
             #this definitely works for the rayonix...
             if shape=='r':
-                print 'select two corners: '
+                print('select two corners: ')
                 p =np.array(ginput(2))
                 mask_roi=np.zeros_like(image)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
@@ -999,9 +1001,9 @@ class SmallDataAna_psana(object):
                     if self.__dict__[detname].det.dettype==30:
                         maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
                         mask_r_nda = np.array(maskTuple)
-                print 'mask from rectangle (shape):',mask_r_nda.shape
+                print('mask from rectangle (shape):',mask_r_nda.shape)
             elif shape=='R':
-                print 'coordinates to select: '
+                print('coordinates to select: ')
                 htot = raw_input("horizontal,vertical h1 h2 v1 v2 ?\n")
                 h = htot.split(' ');h1=float(h[0]);h2=float(h[1]);v1=float(h[2]);v2=float(h[3]);
                 mask_roi=np.zeros_like(image)
@@ -1012,7 +1014,7 @@ class SmallDataAna_psana(object):
                 else:
                     mask_r_nda = mask_roi
                     plt.subplot(gs[1]).imshow(mask_r_nda)
-                print 'mask from rectangle (shape):',mask_r_nda.shape
+                print('mask from rectangle (shape):',mask_r_nda.shape)
             elif shape=='c':
                 fig=plt.figure(figsize=(12,10))
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
@@ -1023,30 +1025,30 @@ class SmallDataAna_psana(object):
                 if raw_input("Select center by mouse?\n") in ["y","Y"]:
                     c=ginput(1)
                     cx=c[0][0];cy=c[0][1]
-                    print 'Corrdinates of selected center: ',cx,' ',cy
+                    print('Corrdinates of selected center: ',cx,' ',cy)
                 else:
                     ctot = raw_input("center (x y)?\n")
                     c = ctot.split(' ');cx=float(c[0]);cy=float(c[1]);
                 if raw_input("Select outer radius by mouse?\n") in ["y","Y"]: 
                     r=ginput(1)
                     rox=r[0][0];roy=r[0][1]
-                    print 'outer radius point: ',r[0]
+                    print('outer radius point: ',r[0])
                     ro=np.sqrt((rox-cx)**2+(roy-cy)**2)
                     if raw_input("Select inner radius by mouse (for donut-shaped mask)?\n") in ["y","Y"]:
                         r=ginput(1)
                         rix=r[0][0];riy=r[0][1]
-                        print 'inner radius point: ',r[0]
+                        print('inner radius point: ',r[0])
                         ri=np.sqrt((rix-cx)**2+(riy-cy)**2)
                     else:
                         ri=0
-                    print 'radii: ',ro,' ',ri
+                    print('radii: ',ro,' ',ri)
                 else:
                     rtot = raw_input("radii (r_outer r_inner)?\n")
                     r = rtot.split(' ');ro=float(r[0]);ri=max(0.,float(r[1]));        
                 mask_router_nda = np.array( [(ix-cx)**2+(iy-cy)**2<ro**2 for ix, iy in zip(x,y)] )
                 mask_rinner_nda = np.array( [(ix-cx)**2+(iy-cy)**2<ri**2 for ix, iy in zip(x,y)] )
                 mask_r_nda = mask_router_nda&~mask_rinner_nda
-                print 'mask from circle (shape):',mask_r_nda.shape
+                print('mask from circle (shape):',mask_r_nda.shape)
                 if needsGeo:
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
@@ -1067,7 +1069,7 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None',extent=(x.min(),x.max(),y.min(),y.max()))
                 nPoints = int(raw_input("Number of Points (-1 until middle mouse click)?\n"))
                 p=np.array(ginput(nPoints))
-                print p
+                print(p)
                 mpath=path.Path(p)
                 all_p = np.array([ (ix,iy) for ix,iy in zip(x.flatten(),y.flatten()) ] )
                 mask_r_nda = np.array([mpath.contains_points(all_p)]).reshape(x.shape)
@@ -1078,7 +1080,7 @@ class SmallDataAna_psana(object):
                 if self.__dict__[detname].det.dettype==30:
                     maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
                     mask_r_nda = np.array(maskTuple)
-                print 'mask from polygon (shape):',mask_r_nda.shape
+                print('mask from polygon (shape):',mask_r_nda.shape)
             elif shape=='d' or shape=='n':
                 figDark=plt.figure(figsize=(12,10))
                 gsPed=gridspec.GridSpec(1,2,width_ratios=[1,1])
@@ -1101,12 +1103,12 @@ class SmallDataAna_psana(object):
                 ctot=raw_input("Enter allowed pedestal range (min max)")
                 c = ctot.split(' ');pedMin=float(c[0]);pedMax=float(c[1]);
                 mask_r_nda=np.zeros_like(pedResult)
-                print mask_r_nda.sum()
+                print(mask_r_nda.sum())
                 mask_r_nda[pedResult<pedMin]=1
                 mask_r_nda[pedResult>pedMax]=1
-                print mask_r_nda.sum()
+                print(mask_r_nda.sum())
                 mask_r_nda = (mask_r_nda.astype(bool)).astype(int)
-                print mask_r_nda.sum()
+                print(mask_r_nda.sum())
                 if needsGeo:
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
                 else:
@@ -1116,7 +1118,7 @@ class SmallDataAna_psana(object):
                 try:
                     nEdge = int(ctot)
                 except:
-                    print 'please enter an integer'
+                    print('please enter an integer')
                     continue
                 mask_r_nda = np.zeros_like(det.coords_x(self.run))
                 if needsGeo:
@@ -1139,7 +1141,7 @@ class SmallDataAna_psana(object):
                 try:
                     nEdge = int(ctot)
                 except:
-                    print 'please enter an integer'
+                    print('please enter an integer')
                     continue
                 mask_r_nda = np.zeros_like(det.coords_x(self.run))
                 if needsGeo:
@@ -1154,7 +1156,7 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
 
             if mask_r_nda is not None:
-                print 'created a mask....',len(mask)
+                print('created a mask....',len(mask))
                 mask.append(mask_r_nda.astype(bool).copy())
                 countMask=1
                 totmask_nm1 = mask[0]
@@ -1166,10 +1168,10 @@ class SmallDataAna_psana(object):
                     countMask+=1
                 else:
                     totmask = totmask_nm1
-            #print 'DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape
-            print 'masked in this step: ',np.ones_like(self.__dict__[detname].x)[mask_r_nda.astype(bool)].sum()
-            print 'masked up to this step: ',np.ones_like(self.__dict__[detname].x)[totmask_nm1].sum()
-            print 'masked tot: ',np.ones_like(self.__dict__[detname].x)[totmask].sum()
+            #print('DEBUG: ',mask_r_nda.shape, totmask_nm1.shape, x.shape)
+            print('masked in this step: ',np.ones_like(self.__dict__[detname].x)[mask_r_nda.astype(bool)].sum())
+            print('masked up to this step: ',np.ones_like(self.__dict__[detname].x)[totmask_nm1].sum())
+            print('masked tot: ',np.ones_like(self.__dict__[detname].x)[totmask].sum())
 
             if len(mask)>1:
                 fig=plt.figure(figsize=(15,9))
@@ -1177,7 +1179,7 @@ class SmallDataAna_psana(object):
                 plt.show()
                 image_mask = img.copy(); image_mask[totmask]=0;
                 #image_mask_nm1 = img.copy(); image_mask_nm1[totmask_nm1]=0;
-                #print 'DEBUG: ',(img-image_mask_nm1).sum(), (img-image_mask).sum()
+                #print('DEBUG: ',(img-image_mask_nm1).sum(), (img-image_mask).sum())
                 plt.subplot(gs2[0]).imshow(image,clim=[plotMin,plotMax])
                 if needsGeo:
                     plt.subplot(gs2[1]).imshow(det.image(self.run,image_mask),clim=[plotMin,plotMax])
@@ -1228,7 +1230,7 @@ class SmallDataAna_psana(object):
             totmask = (totmask.astype(bool)).astype(int)
         else:
             totmask = (~(totmask.astype(bool))).astype(int)
-        print 'edited code....'
+        print('edited code....')
         self.__dict__['_mask_'+avImage]=totmask
 
         if  det.dettype == 2:
@@ -1256,7 +1258,7 @@ class SmallDataAna_psana(object):
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
-            print 'save mask in %s as %s '%(dirname,fname)
+            print('save mask in %s as %s '%(dirname,fname))
             #np.savetxt(dirname+fname,mask)
             det.save_txtnda(dirname+fname,mask.astype(float), fmt='%d',addmetad=True)
         elif raw_input("Save to local?\n") in ["y","Y"]:
@@ -1286,12 +1288,12 @@ class SmallDataAna_psana(object):
                 i0Median = np.nanmedian(self.sda.getVar(i0))
                 i0Off = np.nanmedian(self.sda.getVar(i0, useFilter))
             except:
-                print 'if not smallData file is available, try pass i0Check=\'\''
+                print('if not smallData file is available, try pass i0Check=\'\'')
             if minFrac > i0Off/i0Median:
                 minFrac=i0Off/i0Median
-            print 'median value for ',i0,' is ',i0Median,' and for the off events ',i0Off,' offRatio: ',i0Off/i0Median
+            print('median value for ',i0,' is ',i0Median,' and for the off events ',i0Off,' offRatio: ',i0Off/i0Median)
         if minFrac > 0.05 and i0List!=[]:
-            print 'This selection seems to lets too many events with beam through, will quit'
+            print('This selection seems to lets too many events with beam through, will quit')
             return
 
         self.AvImage(detname,numEvts=numEvts,useFilter=useFilter, common_mode=-1, useMask=False, median=True)
@@ -1327,13 +1329,13 @@ class SmallDataAna_psana(object):
             os.makedirs(dirname+'pixel_rms')
         if not os.path.exists(dirname+'pixel_status'):
             os.makedirs(dirname+'pixel_status')
-        print 'save pedestal file in %s as %s '%(dirname+'pedestals/',fname)
+        print('save pedestal file in %s as %s '%(dirname+'pedestals/',fname))
         if useFilter is not None:
             det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.1f',addmetad=True)
         else:
             det.save_txtnda(dirname+'pedestals/'+fname,self.__dict__['AvImg_median_raw_%s'%(detname)], fmt='%.1f',addmetad=True)
-        print 'save noise file in %s as %s '%(dirname+'pixel_rms/',fname)
-        print 'save status file in %s as %s '%(dirname+'pixel_status/',fname)
+        print('save noise file in %s as %s '%(dirname+'pixel_rms/',fname))
+        print('save status file in %s as %s '%(dirname+'pixel_status/',fname))
         if useFilter is not None:
             det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.1f',addmetad=True)
         else:
@@ -1351,13 +1353,13 @@ class SmallDataAna_psana(object):
         self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name, Pplane=Pplane, userMask=userMask,tx=tx,ty=ty)
 
     def getAzAvs(self,detname=None):
-      if detname is None:
-        detname, img, avImage = self.getAvImage(detname=None)   
         if detname is None:
-          return
-      azintArray = [ self.__dict__[detname][key] for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
-      azintNames = [ key for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
-      return azintNames, azintArray
+            detname, img, avImage = self.getAvImage(detname=None)   
+            if detname is None:
+                return
+        azintArray = [ self.__dict__[detname][key] for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
+        azintNames = [ key for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
+        return azintNames, azintArray
 
     def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, data=None, imgName=None):
         avImage=None
@@ -1377,12 +1379,12 @@ class SmallDataAna_psana(object):
                 mask = self.__dict__['_mask_'+avImage]
                 img = (img*mask)
             else:
-                print 'no local mask defined for ',avImage
+                print('no local mask defined for ',avImage)
 
         azIntNames,azIntegrations = self.getAzAvs(detname)
         if len(azIntegrations)>1:
             if azintName is None:
-                print 'we have the following options: ',azIntNames
+                print('we have the following options: ',azIntNames)
                 azintName=raw_input('type the name of the Azimuthal integral to use:')
             azIntegs = [ iiaz for iName, iiaz in zip(azIntNames,azIntegrations) if iName==azintName]
             azInteg = azIntegs[0]
@@ -1407,7 +1409,7 @@ class SmallDataAna_psana(object):
         azint=''
         if len(azIntegrations)>1:
             if azintName is None:
-                print 'we have the following options: ',azIntNames
+                print('we have the following options: ',azIntNames)
                 azintName=raw_input('type the name of the Azimuthal integral to use:')
             azIntegs = [ iiaz for iName, iiaz in zip(azIntNames,azIntegrations) if iName==azintName]
             azInteg = azIntegs[0]
@@ -1416,16 +1418,16 @@ class SmallDataAna_psana(object):
             azInteg = azIntegrations[0]
             azint = azIntNames[0]
         if azint=='':
-            print 'did not find azimuthal integral asked for'
+            print('did not find azimuthal integral asked for')
             return
         else:
             if ('_azint_'+azint) not in self.__dict__.keys():
-                print 'did not find azint ',azint,', all keys are: ',self.__dict__.keys()
+                print('did not find azint ',azint,', all keys are: ',self.__dict__.keys())
         try:
             azintValues = self.__dict__['_azint_'+azint]
             fig=plt.figure(figsize=(8,5))
             if len(azintValues.shape)==1:
-                print azintValues.shape, self.__dict__[detname].__dict__[azint+'_q'].shape
+                print(azintValues.shape, self.__dict__[detname].__dict__[azint+'_q'].shape)
                 plt.plot(self.__dict__[detname].__dict__[azint+'_q'],azintValues,'o')
             elif len(azintValues.shape)==2:
                 plt.imshow(azintValues,aspect='auto',interpolation='none')
@@ -1480,7 +1482,7 @@ class SmallDataAna_psana(object):
             plt.subplot2grid((3,3),(0,1)).imshow(azintValues_c0m1[:,ymin:ymax],aspect='auto',interpolation='none')
             plt.subplot2grid((3,3),(2,1)).imshow(azintValues_c0p1[:,ymin:ymax],aspect='auto',interpolation='none')
 
-            print zoom, (zoom[0]!=zoom[1])
+            print(zoom, (zoom[0]!=zoom[1]))
             while zoom[0]!=zoom[1]:
                 if zoom[1]<zoom[0] or zoom[0]<0 or zoom[1]<0:
                     yString=raw_input('please enter x-boundaries of the zoomed figure as c1,c2 or [c1,c2]:')
@@ -1517,20 +1519,20 @@ class SmallDataAna_psana(object):
                 elif detname is None:
                     avImages.append(key)
         if len(avImages)==0:
-            print 'please create the AvImage first!'
+            print('please create the AvImage first!')
             return
         elif len(avImages)>1:
-            print 'we have the following options: ',avImages
+            print('we have the following options: ',avImages)
             avImage=raw_input('type the name of the AvImage to use:')
         else:
             avImage=avImages[0]
         detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
-        print img.shape
+        print(img.shape)
 
         plotMax = np.percentile(img, limits[1])
         plotMin = np.percentile(img, limits[0])
-        print 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax)
+        print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
         if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
@@ -1557,7 +1559,7 @@ class SmallDataAna_psana(object):
 
         plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
-        print 'select two corners: '
+        print('select two corners: ')
         p =np.array(ginput(2))
         mask_roi=np.zeros_like(image)
         mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
@@ -1567,12 +1569,12 @@ class SmallDataAna_psana(object):
             mask_r_nda = mask_roi
 
         if mask_r_nda is not None:
-            #print 'created a mask....'
+            #print('created a mask....')
             if mask is None:
                 mask = mask_r_nda.astype(bool).copy()
             else:
                 mask = np.logical_or(mask,mask_r_nda)
-        print 'masked: ',np.ones_like(x)[mask.astype(bool)].sum()
+        print('masked: ',np.ones_like(x)[mask.astype(bool)].sum())
 
         image_mask = img.copy(); image_mask[~mask]=0;
         if needsGeo:
@@ -1611,7 +1613,7 @@ class SmallDataAna_psana(object):
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
             detname = self.addDetInfo(detname=detname, common_mode=common_mode)
             if detname == 'None':
-                print 'need detector name as input! '
+                print('need detector name as input! ')
                 return
         det=self.__dict__[detname].det
         rms = self.__dict__[detname+'_rms']
@@ -1692,7 +1694,7 @@ class SmallDataAna_psana(object):
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
             detname = self.addDetInfo(detname=detname, common_mode=common_mode)
             if detname == 'None':
-                print 'need detector name as input! '
+                print('need detector name as input! ')
                 return
         det=self.__dict__[detname].det
         rms = self.__dict__[detname+'_rms']
@@ -1749,15 +1751,15 @@ class SmallDataAna_psana(object):
                 allPedsImg.append(allPeds[-1].tolist())
                 allRmsImg.append(allRms[-1].tolist())
             if len(printVal)<2:
-                print 'getting pedestal from run ',pedRun
+                print('getting pedestal from run ',pedRun)
             elif len(printVal)>=4:
-                print 'run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum())
+                print('run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum()))
             elif len(printVal)>=2:
-                print 'run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum())
+                print('run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum()))
 
         ped2d=[] 
         rms2d=[] 
-        print 'maxmin peds ',allPeds[icurrRun].shape, allPeds[icurrRun].max()  , allPeds[icurrRun].min() ,np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5)
+        print('maxmin peds ',allPeds[icurrRun].shape, allPeds[icurrRun].max()  , allPeds[icurrRun].min(),np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5))
         for thisPed,thisRms in zip(allPeds,allRms):
             #ped2d.append(np.histogram(thisPed.flatten(), np.arange(np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5)))[0],10)
             ped2d.append(np.histogram(thisPed.flatten(), np.arange(0, np.percentile(allPeds[icurrRun],99.5)*1.2,10))[0].tolist())
@@ -1770,7 +1772,7 @@ class SmallDataAna_psana(object):
         
         ped2dNorm = np.array(ped2dNorm)
         rms2dNorm = np.array(rms2dNorm)
-        print 'shapes:',rms2dNorm.shape, ped2dNorm.shape
+        print('shapes:',rms2dNorm.shape, ped2dNorm.shape)
 
         self.__dict__['pedHisto_'+detname] = np.array(ped2d)
         self.__dict__['rmsHisto_'+detname] = np.array(rms2d)
@@ -1803,7 +1805,7 @@ class SmallDataAna_psana(object):
             elif showPlot == 'rms3d':
                 return hv_3dimage(allRmsImg)
             else:
-                print 'this is not a defined option'
+                print('this is not a defined option')
                 return
 
         #fallback to matplotlib
@@ -1826,7 +1828,7 @@ class SmallDataAna_psana(object):
         if detname is 'None':
             detname = self.addDetInfo(detname=detname)
             if detname == 'None':
-                print 'need detector name as input! '
+                print('need detector name as input! ')
                 return
 
         if len(common_modes)==0:
@@ -1860,9 +1862,9 @@ class SmallDataAna_psana(object):
             else:
                 imgs.append(self.__dict__[imgNames[-1]])
 
-        #print imgNames
+        #print(imgNames)
         #for img in imgs:
-        #    print img.shape
+        #    print(img.shape)
 
         if plotWith is None:
             plotWith=self.plotWith
@@ -1892,7 +1894,7 @@ class SmallDataAna_psana(object):
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
         if (rank==0):
-            print 'Variables to be read from xtc: ',myCube.targetVarsXtc
+            print('Variables to be read from xtc: ',myCube.targetVarsXtc)
 
         if isinstance(nEvtsPerBin, basestring): nEvtsPerBin=int(nEvtsPerBin)
 
@@ -1908,7 +1910,7 @@ class SmallDataAna_psana(object):
                 dName = det['source']
             else:
                 dName = det
-            #print 'DEBUG dName ',dName
+            #print('DEBUG dName ',dName)
             if dName in detInData:
                 detNames.append(dName)
                 targetVarsXtc.append(det)
@@ -1936,7 +1938,7 @@ class SmallDataAna_psana(object):
 
                 for cfgVar in myCube.targetVarsCfg:
                     addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
-                    print 'add cfgVar to hdf5', cfgVar.replace('/','_')
+                    print('add cfgVar to hdf5', cfgVar.replace('/','_'))
 
                 fout.close()
             return
@@ -1950,9 +1952,9 @@ class SmallDataAna_psana(object):
             outFileName=outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
         try:
-            #print 'DEBUG: open file %s in rank %d '%(outFileName, rank)
+            #print('DEBUG: open file %s in rank %d '%(outFileName, rank))
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
-            #print 'DEBUG: opened file %s in rank %d '%(outFileName, rank)
+            #print('DEBUG: opened file %s in rank %d '%(outFileName, rank))
         except:
             try:
                 fout2 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
@@ -1960,9 +1962,9 @@ class SmallDataAna_psana(object):
                 fout2.close()
                 try:
                     import pwd
-                    print 'A: ',oct(os.stat(outFileName).st_mode)[-3:]
-                    print 'B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name
-                    print 'C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos
+                    print('A: ',oct(os.stat(outFileName).st_mode)[-3:])
+                    print('B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name)
+                    print('C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos)
                     printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
                 except:
                     printR(rank, 'failed at printing info about file')
@@ -1977,9 +1979,9 @@ class SmallDataAna_psana(object):
                     outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
 
-                print 'bin the data now....be patient'
+                print('bin the data now....be patient')
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
-                print 'now write outputfile (only small data) to : ',outFileName
+                print('now write outputfile (only small data) to : ',outFileName)
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
                 #FIX ME: TEST THIS!!!!
@@ -1992,7 +1994,7 @@ class SmallDataAna_psana(object):
 
                 for cfgVar in myCube.targetVarsCfg:
                     addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
-                    print 'add cfgVar to hdf5', cfgVar.replace('/','_')
+                    print('add cfgVar to hdf5', cfgVar.replace('/','_'))
 
                 fout.close()
             return
@@ -2033,7 +2035,7 @@ class SmallDataAna_psana(object):
         numBin = np.array(cubeData.nEntries).flatten().shape[0]
         bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
         #this is the done correctly....
-        #print 'DEBUG: bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
+        #print('DEBUG: bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
 
         binID=np.ones(bins_per_job,dtype=int); binID*=-1
         detShapes=[]
@@ -2048,7 +2050,7 @@ class SmallDataAna_psana(object):
                 detShape = (self.__dict__[thisdetName].ped[0]).shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
-            #print 'DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape
+            #print('DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape)
             det_arrayBin=np.zeros(csShape)
             detArrays.append(np.zeros(csShape))#det_arrayBin)
             detSArrays.append(np.zeros(csShape))#det_arrayBin)
@@ -2056,7 +2058,7 @@ class SmallDataAna_psana(object):
             detOffArrays.append(np.zeros(csShape))#det_arrayBin)
             detIArrays.append(np.zeros(csShape))#det_arrayBin)
             if rank==0:
-                print 'for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape
+                print('for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape)
 
         ###
         #nominal cube
@@ -2064,7 +2066,7 @@ class SmallDataAna_psana(object):
         for ib,fids,evttimes in itertools.izip(itertools.count(), eventIdxDict['fiducial'],eventIdxDict['evttime']):
             if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
                 continue
-            print 'bin: %d has %d events, will be treated in rank %d'%(ib, len(fids),rank)
+            print('bin: %d has %d events, will be treated in rank %d'%(ib, len(fids),rank))
             binID[ib%bins_per_job]=ib
 
             nEvts_bin=0
@@ -2118,14 +2120,14 @@ class SmallDataAna_psana(object):
                         nEntries_off.append(0)
                         continue
                     else:
-                        print 'something is wrong with this bin, got fiducials like: ',fids
+                        print('something is wrong with this bin, got fiducials like: ',fids)
                         break
                 #get unique event time
                 evttimes, evtIdx = np.unique(allevttimes, return_inverse=True)
                 #count how often each of these appears to get right mean/sum later
                 noff_evt = np.bincount(evtIdx)
                 nEntries_off.append(np.array(noff_evt).sum())
-                print 'bin: %d has %d off events with %d unique off events'%(ib, nEntries_off[-1], len(evttimes),)
+                print('bin: %d has %d off events with %d unique off events'%(ib, nEntries_off[-1], len(evttimes)))
                 #get matching fiducials
                 off_fids = np.bincount(evtIdx, allfids)
                 off_fids = off_fids/noff_evt
@@ -2169,7 +2171,7 @@ class SmallDataAna_psana(object):
 
             nEntries = cubeData['nEntries'].values
             if len(nEntries.shape)>1:
-                #print 'DEBUG reshape rank %d '%(rank),' nEntries shape/rank ',nEntries.shape, rank*bins_per_job,(rank+1)*bins_per_job
+                #print('DEBUG reshape rank %d '%(rank),' nEntries shape/rank ',nEntries.shape, rank*bins_per_job,)(rank+1)*bins_per_job
                 nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job]#, ' -- ',nEntries
             #this goes wrong for bins w/o entries. Split this?
             for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
@@ -2205,9 +2207,9 @@ class SmallDataAna_psana(object):
                     imgSArray.append(thisImgS)
                     imgMArray.append(thisImgM)
                     imgIArray.append(thisImgI)
-                    #print 'DEBUG append images here  : ',thisImg[0][11]
-                    #print 'DEBUG append images photon: ',thisImgI[0][11]
-                #print 'imgArray length: rank %d '%rank,len(imgArray)
+                    #print('DEBUG append images here  : ',thisImg[0][11])
+                    #print('DEBUG append images photon: ',thisImgI[0][11])
+                #print('imgArray length: rank %d '%rank,len(imgArray))
                 
             if rank==0:
                 imgArrayShape=imgArray[0].shape
@@ -2220,7 +2222,7 @@ class SmallDataAna_psana(object):
             for i in range(0,len(imgArrayShape)):
                 arShape+=(imgArrayShape[i],)
 #            if rank==0:
-            #print 'DEBUG: print array shape before saving: ',arShape,' rank ',rank
+            #print('DEBUG: print(array shape before saving: ',arShape,' rank ',rank)
 
             cubeBigData = fout.create_dataset('%s'%detName,arShape)
             if storeMeanStd:
@@ -2237,7 +2239,7 @@ class SmallDataAna_psana(object):
             for iSlice,Slice,SliceO, SliceS,SliceM,SliceI in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray,imgIArray):
                 if np.nansum(Slice)!=0:
                     cubeBigData[rank*bins_per_job+iSlice,:] = Slice
-                    print 'bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:]))
+                    print('bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:])))
 
                 if offEventsCube>0 and np.nansum(SliceO)>0:
                     cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
@@ -2280,11 +2282,11 @@ class SmallDataAna_psana(object):
 
         for cfgVar in myCube.targetVarsCfg:
             addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
-            print 'add cfgVar to hdf5', cfgVar.replace('/','_')
+            print('add cfgVar to hdf5', cfgVar.replace('/','_'))
 
         fout.close()
         comm.Barrier()
-        #print 'in rank now: ',rank
+        #print('in rank now: ',rank)
         if rank==0:
-            print 'renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress',''))
+            print('renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress','')))
             rename_reduceRandomVar(outFileName)

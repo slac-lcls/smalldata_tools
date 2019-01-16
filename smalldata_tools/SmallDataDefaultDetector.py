@@ -134,7 +134,7 @@ class epicsDetector(defaultDetector):
                 self.pvs.append(psana.Detector(pv))
                 self.PVlist.append(pv)
             except:
-                print 'could not find EPICS PV %s in data'%pv
+                print('could not find EPICS PV %s in data'%pv)
             
     def inRun(self):
         if len(self.pvs)>0:
@@ -194,7 +194,7 @@ class aiDetector(defaultDetector):
 
     def setPars(self, AIOPars):
         if len(AIOPars)<2:
-            print 'need 2/3 lists: channel#, user-friendly names & conversion factors (optional)'
+            print('need 2/3 lists: channel#, user-friendly names & conversion factors (optional)')
             return
         self.aioInfo[0] = AIOPars[0]
         self.aioInfo[1] = AIOPars[1]
@@ -254,7 +254,7 @@ class ttDetector(defaultDetector):
             try:
                 self.pvs.append(psana.Detector(pv))
             except:
-                print 'could not find timetool EPICS PV %s in data'%pv
+                print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
     def inRun(self):
         if len(self.pvs)>0:
@@ -451,7 +451,7 @@ class ttRawDetector(defaultDetector):
         for lOff in self.laserOff:
             if lOff in evtCodes:
                 if self._debug:
-                    print 'ttRaw: laser off event!'
+                    print('ttRaw: laser off event!')
                 return ttData
             
         try:
@@ -476,7 +476,7 @@ class ttRawDetector(defaultDetector):
                     self.runningRef=ttRef
                 else:
                     self.runningRef=ttRef*self.ref_convergence + self.runningRef*(1.-self.ref_convergence)
-                #print 'update self.runningRef'
+                #print('update self.runningRef')
                 ttData['tt_reference']=self.runningRef        
         return ttData
 
@@ -537,7 +537,7 @@ class ttRawDetector(defaultDetector):
                 beloh = (f>((f[-25:].mean()+tamp)/2.)).nonzero()[0]-mpr
             else:
                 beloh = (f<tamp/2).nonzero()[0]-mpr            
-            #print 'beloh ',len(beloh[beloh<0]),len(beloh[beloh>0])
+            #print('beloh ',len(beloh[beloh<0]),len(beloh[beloh>0]))
             tfwhm = abs(beloh[beloh<0][-1]-beloh[beloh>0][0])
         except:
             tfwhm = 0.
@@ -555,7 +555,7 @@ class ttRawDetector(defaultDetector):
             ttCorr+=ttOrg*ttOrg*self.ttCalib[2]
         retDict['pos_ps']=ttCorr
         #for k in retDict.keys():
-        #    print 'ret ',k,retDict[k]
+        #    print('ret ',k,retDict[k])
 
         return retDict
 
@@ -595,7 +595,7 @@ class xtcavDetector(defaultDetector):
                   timeAr = np.append(timeArOrg[0],np.array([np.nan] * (self.size-arSize)))
                   power = np.append(power[0],np.array([np.nan] * (self.size-arSize)))
               else:
-                print 'Xtcav array is too small in run, please check littleData configuration',env.run()
+                print('Xtcav array is too small in run, please check littleData configuration',env.run())
                 time = timeArOrg[:self.size]
                 power = power[:self.size]
 
