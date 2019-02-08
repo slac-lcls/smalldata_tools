@@ -120,6 +120,7 @@ class SmallDataAna_psana(object):
         except:
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
+        self.calibhisto={}
         self.jobsIds = []
         self.commonModeStrings=['raw','pedSub','unb','hist','histAmiLike','median','medianNoNorm','medianSN','median45','cm47','cm71','cm72','cm10','cm145','cm146','cm147','cm110','calib','cm80','cm81']
 
@@ -148,6 +149,10 @@ class SmallDataAna_psana(object):
             return 'cm71_'
         elif common_mode==72:
             return 'cm72_'
+        elif common_mode==80:
+            return 'cm80_'
+        elif common_mode==81:
+            return 'cm81_'
         elif common_mode==10:
             return 'cm10_'
         elif common_mode==105:
@@ -1230,7 +1235,7 @@ class SmallDataAna_psana(object):
             totmask = (totmask.astype(bool)).astype(int)
         else:
             totmask = (~(totmask.astype(bool))).astype(int)
-        print('edited code....')
+
         self.__dict__['_mask_'+avImage]=totmask
 
         if  det.dettype == 2:
@@ -1690,11 +1695,11 @@ class SmallDataAna_psana(object):
             im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms,1),np.percentile(rms,99)])
         cbar2 = plt.colorbar(im2)
 
-    def calibHisto(self, detname='None', common_mode=0, printVal=[-1], plotWith=None, showPlot=None):
-        if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
-            detname = self.addDetInfo(detname=detname, common_mode=common_mode)
+    def _fillCalibHisto(self, detname='None', printVal=[-1], pedBinWidth=10, rmsBinWidth=0.1):
+        if not detname in self.__dict__.keys():
+            detname = self.addDetInfo(detname=detname)
             if detname == 'None':
-                print('need detector name as input! ')
+                print 'need detector name as input! '
                 return
         det=self.__dict__[detname].det
         rms = self.__dict__[detname+'_rms']
@@ -1705,11 +1710,12 @@ class SmallDataAna_psana(object):
         #now look at directory and get filenames of darks. Hmm. extra function?
         detNameStr = det.name.__str__()
         if detNameStr.find('Epix')>=0 or detNameStr.find('epix')>=0:
-            detTypeStr='Epix100a::CalibV1'
+            if detNameStr.find('10k')>=0:
+                detTypeStr='Epix10ka2M::CalibV1'
+            else:
+                detTypeStr='Epix100a::CalibV1'
         elif detNameStr.find('ungfrau')>=0:
             detTypeStr='Jungfrau::CalibV1'
-        elif detNameStr.find('Epix')>=0:
-            detTypeStr='Epix100a::CalibV1'
         elif  detNameStr.find('2x2')>=0:
             detTypeStr='CsPad2x2::CalibV1'
         else:
@@ -1722,22 +1728,19 @@ class SmallDataAna_psana(object):
                 pedNames.append(fname)
                 pedRuns.append(int(fname.split('-')[0]))
 
-        currRun=0
-        icurrRun=0
         allPeds=[]
         allRms=[]
+        allStatus=[]
         allPedsImg=[]
         allRmsImg=[]
         pedRuns.sort()
         for ipedRun,pedRun in enumerate(pedRuns):
-            if pedRun <= self.run and self.run-pedRun < self.run-currRun:
-                currRun = pedRun
-                icurrRun = ipedRun
             allPeds.append(det.pedestals(pedRun))
             allRms.append(det.rms(pedRun))
+            allStatus.append((det.mask(pedRun, status=True)==0).sum())
             if needsGeo:
                 try:
-                    if detTypeStr=='Jungfrau::CalibV1':
+                    if detTypeStr=='Jungfrau::CalibV1' or detTypeStr=='Epix10ka2M::CalibV1':
                         allPedsImg.append(det.image(self.run, allPeds[-1][0]).tolist())
                         allRmsImg.append(det.image(self.run, allRms[-1][0]).tolist())
                     else:
@@ -1751,77 +1754,106 @@ class SmallDataAna_psana(object):
                 allPedsImg.append(allPeds[-1].tolist())
                 allRmsImg.append(allRms[-1].tolist())
             if len(printVal)<2:
-                print('getting pedestal from run ',pedRun)
+                print 'getting pedestal from run ',pedRun
             elif len(printVal)>=4:
-                print('run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum()))
+                print 'run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum())
             elif len(printVal)>=2:
-                print('run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum()))
+                print 'run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum())                        
 
+        allPeds = np.array(allPeds)
+        allRms = np.array(allRms)
         ped2d=[] 
+        ped2dmax=[] 
+        ped2dfwhm=[] 
         rms2d=[] 
-        print('maxmin peds ',allPeds[icurrRun].shape, allPeds[icurrRun].max()  , allPeds[icurrRun].min(),np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5))
-        for thisPed,thisRms in zip(allPeds,allRms):
-            #ped2d.append(np.histogram(thisPed.flatten(), np.arange(np.percentile(allPeds[icurrRun],0.5), np.percentile(allPeds[icurrRun],99.5)))[0],10)
-            ped2d.append(np.histogram(thisPed.flatten(), np.arange(0, np.percentile(allPeds[icurrRun],99.5)*1.2,10))[0].tolist())
-            rms2d.append(np.histogram(thisRms.flatten(), np.arange(0, allRms[icurrRun].max()*1.05,0.1))[0].tolist())
-        ped2dNorm=[] 
-        rms2dNorm=[] 
-        for thisPed,thisRms in zip(ped2d,rms2d):
-            ped2dNorm.append(np.array(thisPed).astype(float)/np.array(ped2d[icurrRun]).astype(float))
-            rms2dNorm.append(np.array(thisRms).astype(float)/np.array(rms2d[icurrRun]).astype(float))
-        
-        ped2dNorm = np.array(ped2dNorm)
-        rms2dNorm = np.array(rms2dNorm)
-        print('shapes:',rms2dNorm.shape, ped2dNorm.shape)
 
-        self.__dict__['pedHisto_'+detname] = np.array(ped2d)
-        self.__dict__['rmsHisto_'+detname] = np.array(rms2d)
+        pedHisMin = np.nanmin(allPeds)
+        pedHisMax = np.nanmax(allPeds)
+        pedHisLow = np.nanpercentile(allPeds,0.5)
+        pedHisHigh = np.nanpercentile(allPeds,99.5)
+        rmsHisMin = np.nanmin(allRms)
+        rmsHisMax = np.nanmax(allRms)
+        rmsHisLow = np.nanpercentile(allRms,0.5)
+        rmsHisHigh = np.nanpercentile(allRms,99.5)
+        #print 'maxmin peds ',allPeds[0].shape, pedHisMax  , pedHisMin , pedHisLow, pedHisHigh
+        for thisPed,thisRms in zip(allPeds,allRms):
+            ped2d.append(np.histogram(thisPed.flatten(), np.arange(pedHisLow*0.8, pedHisHigh*1.2,pedBinWidth))[0])
+            ped2dmax.append(np.argmax(ped2d[-1])*pedBinWidth+pedHisLow*0.8)
+            maxwhere = np.argwhere(ped2d[-1]>(np.nanmax(ped2d[-1])*0.5))
+            try:
+                if isinstance((maxwhere[-1]-maxwhere[0]), np.ndarray):
+                    ped2dfwhm.append((maxwhere[-1]-maxwhere[0])[0]*pedBinWidth)
+                else:
+                    ped2dfwhm.append(maxwhere[-1]-maxwhere[0]*pedBinWidth)
+            except:
+                ped2dfwhm.append(0)
+            rms2d.append(np.histogram(thisRms.flatten(), np.arange(rmsHisLow*0.8, rmsHisHigh*1.2, rmsBinWidth))[0])
 
         ped2d = np.array(ped2d)
-        ped2dNorm = np.array(ped2dNorm)
         rms2d = np.array(rms2d)
-        rms2dNorm = np.array(rms2dNorm)
 
+        #save array to SmallDataAna_psana object to possibly be used again.
+        #separate plotting functions later.
+        self.calibhisto['status'] = np.array(allStatus)
+        self.calibhisto['rms3d'] = np.array(allRmsImg)
+        self.calibhisto['ped3d'] = np.array(allPedsImg)
+        self.calibhisto['runs'] = np.array(pedRuns)
+        self.calibhisto['ped2d'] = np.array(ped2d)
+        self.calibhisto['ped2dmax'] = np.array(ped2dmax)
+        self.calibhisto['ped2dfwhm'] = np.array(ped2dfwhm)
+        self.calibhisto['rms2d'] = np.array(rms2d)
+        self.calibhisto['pedBinWidth'] = pedBinWidth
+        self.calibhisto['pedBinLow'] = pedHisLow*0.8
+        self.calibhisto['rmsBinWidth'] = rmsBinWidth
+        self.calibhisto['rmsBinLow'] = rmsHisLow*0.8
+
+    def plotCalibHisto(self, detname='None',  printVal=[-1], pedBinWidth=10, rmsBinWidth=0.1, plotWith=None, showPlot=None):
+        if 'rms3d' not in self.calibhisto.keys():
+            self._fillCalibHisto(detname=detname, printVal=printVal, pedBinWidth=pedBinWidth, rmsBinWidth=rmsBinWidth)        
         if plotWith is None:
             plotWith=self.plotWith
 
         if plotWith=='bokeh_notebook':
             plotwidth=400
-            boundsPed = (0, np.array(pedRuns).min(),  allPeds[icurrRun].max(), np.array(pedRuns).max())
-            pedZ = (np.percentile(ped2d,1),np.percentile(ped2d,99.5))
-            pedZNorm = (np.percentile(ped2dNorm,1),np.percentile(ped2dNorm,99.5))
-            boundsRms = (0, np.array(pedRuns).min(),  allRms[icurrRun].max(), np.array(pedRuns).max())
-            rmsZ = (np.percentile(rms2d,1),np.percentile(rms2d,99.5))
-            rmsZNorm = (np.percentile(rms2dNorm,1),np.percentile(rms2dNorm,99.5))
+            boundsPed = (0, np.array(self.calibhisto['runs']).min(),  allPeds[icurrRun].max(), np.array(self.calibhisto['runs']).max())
+            pedZ = (np.percentile(self.calibhisto['ped2d'],1),np.percentile(self.calibhisto['ped2d'],99.5))
+            boundsRms = (0, np.array(self.calibhisto['runs']).min(),  allRms[icurrRun].max(), np.array(self.calibhisto['runs']).max())
+            rmsZ = (np.percentile(self.calibhisto['rms2d'],1),np.percentile(self.calibhisto['rms2d'],99.5))
             runDim=hv.Dimension('run')
 
+            #replace norm plots by zoomed plots.
             if showPlot is None:
-                return (hv.Image(ped2d, kdims=[hv.Dimension('pedestal'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedVals', range=pedZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
-                        hv.Image(ped2dNorm, kdims=[hv.Dimension('pedestal/ref'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedValsNorm', range=pedZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
-                        hv.Image(rms2d, kdims=[hv.Dimension('rmsestal'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsVals', range=rmsZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
-                        hv.Image(rms2dNorm, kdims=[hv.Dimension('rmsestal/ref'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsValsNorm', range=rmsZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) ).cols(2)
+                return (hv.Image(self.calibhisto['ped2d'], kdims=[hv.Dimension('pedestal'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedVals', range=pedZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(self.calibhisto['ped2d'], kdims=[hv.Dimension('pedestal'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedVals', range=pedZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        #hv.Image(self.calibhisto['ped2dNorm'], kdims=[hv.Dimension('pedestal/ref'),runDim], bounds=boundsPed, vdims=[hv.Dimension('pedValsNorm', range=pedZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(self.calibhisto['rms2d'], kdims=[hv.Dimension('rmsestal'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsVals', range=rmsZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        #hv.Image(self.calibhisto['rms2d'], kdims=[hv.Dimension('rmsestal'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsVals', range=rmsZ)]).options( cmap='viridis',colorbar=True, width=plotwidth) + \
+                        hv.Image(self.calibhisto['rms2dNorm'], kdims=[hv.Dimension('rmsestal/ref'),runDim], bounds=boundsRms, vdims=[hv.Dimension('rmsValsNorm', range=rmsZNorm)]).options( cmap='viridis',colorbar=True, width=plotwidth) ).cols(2)
             elif showPlot == 'ped3d':
-                return hv_3dimage(allPedsImg)
+                return hv_3dimage(self.calibhisto['ped3d'])
             elif showPlot == 'rms3d':
-                return hv_3dimage(allRmsImg)
+                return hv_3dimage(self.calibhisto['rms3d'])
             else:
-                print('this is not a defined option')
+                print 'this is not a defined option'
                 return
 
         #fallback to matplotlib
         figDark=plt.figure(figsize=(11,10))
         gsPed=gridspec.GridSpec(2,2)
-        im0 = plt.subplot(gsPed[0]).imshow(ped2d,clim=[np.percentile(ped2d,1),np.percentile(ped2d,99)],interpolation='none',aspect='auto')
+
+        plt.subplot(gsPed[0]).plot(self.calibhisto['runs'],self.calibhisto['ped2dmax'],'bo')
+        plt.subplot(gsPed[0]).plot(self.calibhisto['runs'],self.calibhisto['ped2dmax']+self.calibhisto['ped2dfwhm'],'ro')
+        plt.subplot(gsPed[0]).plot(self.calibhisto['runs'],self.calibhisto['ped2dmax']-self.calibhisto['ped2dfwhm'],'ro')
+
+        plt.subplot(gsPed[1]).plot(self.calibhisto['runs'],self.calibhisto['status'],'o')
+
+        ch_ped2d = self.calibhisto['ped2d']
+        im0 = plt.subplot(gsPed[2]).imshow(ch_ped2d.T,vmin=np.percentile(ch_ped2d,1),vmax=np.percentile(ch_ped2d,99),interpolation='none',aspect='auto',extent=[0, ch_ped2d.shape[0], self.calibhisto['pedBinLow'],self.calibhisto['pedBinLow']+ch_ped2d.shape[1]*self.calibhisto['pedBinWidth']], origin='lower')
         cbar0 = plt.colorbar(im0)
 
-        im01 = plt.subplot(gsPed[1]).imshow(ped2dNorm,clim=[np.percentile(ped2dNorm,1),np.percentile(ped2dNorm,99)],interpolation='none',aspect='auto')
-        cbar01 = plt.colorbar(im01)
-
-        im2 = plt.subplot(gsPed[2]).imshow(rms2d,clim=[np.percentile(rms2d,1),np.percentile(rms2d,99)],interpolation='none',aspect='auto')
+        ch_rms2d = self.calibhisto['rms2d']
+        im2 = plt.subplot(gsPed[3]).imshow(ch_rms2d.T,vmin=np.percentile(ch_rms2d,1),vmax=np.percentile(ch_rms2d,99),interpolation='none',aspect='auto',extent=[0, ch_rms2d.shape[0], self.calibhisto['rmsBinLow'],self.calibhisto['rmsBinLow']+ch_rms2d.shape[1]*self.calibhisto['rmsBinWidth']], origin='lower')
         cbar2 = plt.colorbar(im2)
-
-        im21 = plt.subplot(gsPed[3]).imshow(rms2dNorm,clim=[np.percentile(rms2dNorm,1),np.percentile(rms2dNorm,99)],interpolation='none',aspect='auto')
-        cbar21 = plt.colorbar(im21)
 
 
     def compareCommonMode(self, detname='None',common_modes=[], numEvts=100, thresADU=0., thresRms=0., plotWith=None):
