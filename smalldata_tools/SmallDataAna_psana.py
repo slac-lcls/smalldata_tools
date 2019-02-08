@@ -319,6 +319,83 @@ class SmallDataAna_psana(object):
         else:
             return aliases
 
+    def getImages(self, detname='None', numEvts=-1, useFilter=None, nSkip=0, common_mode=0):
+        if not isinstance(detname, basestring):
+            print 'please give parameter name unless specifying arguments in right order. detname is first'
+            return
+        #look for detector
+        if detname=='None':
+            detname = self._getDetName()
+            if isinstance(detname, list):
+                print 'detectors in event: \n',
+                for alias in detname:
+                    print alias
+                detname = raw_input("Select detector to get detector info for?:\n")
+
+        if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
+            self.addDetInfo(detname=detname, common_mode=common_mode)
+        det=self.__dict__[detname]
+        rms = self.__dict__[detname+'_rms']
+        pedestals = self.__dict__[detname+'_pedestals']
+        iX = self.__dict__[detname+'_iX']
+        iY = self.__dict__[detname+'_iY']
+
+        if detname.find('opal')>=0:
+            common_mode = -1
+            if pedestals[0,0]==-1:
+                print 'time tool opal, image was not saved. Should ideally exclude from detector list'
+                return
+        else:
+            print 'done setting up the geometry'
+
+        #now get the non-image data
+        imgAr = []
+        run = self.dsIdxRun
+        times=[]
+        if self.sda is None or 'fh5' not in self.sda.__dict__.keys():
+            useFilter = None
+        if useFilter is not None:
+            evttsSel = self.sda.getSelIdx(useFilter)
+            print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter)
+            if numEvts==-1:
+                numEvts = len(evttsSel)-nSkip
+                if numEvts<0:
+                    print 'have no events, quit'
+                    return
+            for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
+                times.append(psana.EventTime(evtts[1],evtts[0]))
+        else:
+            times = run.times()[nSkip:]
+        print 'requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events'
+        if (min(len(times),numEvts) < numEvts*0.5):
+            if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
+                return
+            else:
+                numEvts = len(times)
+
+        for tm in times:
+            #print 'numEvts ',numEvts
+            if numEvts<=0:
+                break
+            try:
+                evt=run.event(tm)
+            except:
+                print 'Could not get this event, skip '
+                continue
+            if evt is None:
+                print 'Returned event is None, skip'
+                continue
+            aliases = [ k.alias() for k in evt.keys() ]
+            if not detname in aliases:
+                continue
+
+            det.evt = dropObject()
+            det.getData(evt)
+            imgAr.append(det.evt.dat.copy())
+            numEvts-=1
+
+        return np.array(imgAr)
+
     def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
         if not isinstance(detname, basestring):
             print('please give parameter name unless specifying arguments in right order. detname is first')
