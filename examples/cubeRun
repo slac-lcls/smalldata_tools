@@ -112,8 +112,6 @@ RUNJOBS=`bjobs -u all -q $QUEUE | grep $QUEUE | grep run | grep $RUN | wc | awk 
 #    fi
 #fi
 
-echo 'will use queue: ' $QUEUE
-
 if [ $EXP != 'xxx' ]; then
     ARGSTR=$ARGSTR' --exp '$EXP
 else
@@ -142,8 +140,6 @@ if [ $QUEUE == 'psanaq' ]; then
 	NJOBS=12
     fi
 fi
-
-echo 'will use queue: ' $QUEUE
 
 BASEDIR=/reg/d/psdm/$HUTCH/$EXP/results
 if [ ! -d  $BASEDIR ]; then
@@ -189,8 +185,13 @@ if [ $SINGLEJOB -eq 1 ]; then
         --run $RUN`
     fi
 else
+    echo 'will use queue: ' $QUEUE
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME
+#    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
+#        mpirun --mca btl ^openib python $PYTHON_EXE \
+#	$ARGSTR \
+#        --run $RUN`
     CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
         mpirun python $PYTHON_EXE \
 	$ARGSTR \
@@ -198,7 +199,7 @@ else
 fi
 
 source /reg/g/psdm/etc/psconda.sh
-#conda activate ana-1.3.42 #special release made for MEC with mpi writing
+#conda activate ana-1.3.63 
 
 echo $CMD
 $CMD
