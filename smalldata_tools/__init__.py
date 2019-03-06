@@ -2,8 +2,10 @@ from utilities import  dropObject,hist2d,printMsg,checkDet,rebin,addToHdf5
 from DetObject import DetObject
 from acf import  acf
 from azimuthalBinning import  azimuthalBinning
-from DetObject import  ROIObject,DetObject
-from droplet import  aduHist,dropletSave,photonizeDrops,droplet
+#from roi import ROIObject
+#from DetObject import  DetObject
+#from droplet import  aduHist,dropletSave,photonizeDrops,droplet
+from droplet import  dropletFunc
 from fitCenter import  fitCenter
 from photons import  photon,photon2,photon3
 #from SmallDataDefaultDetector import ebeamDetector
@@ -11,7 +13,6 @@ from SmallDataUtils import  defaultDetectors,lightStatus,ipmDetector,bmmonDetect
 from SmallDataUtils import ebeamDetector, gasDetector
 from SmallDataUtils import l3tDetector
 from epicsarchive import EpicsArchive
-from roi import ROIObject
 
 #from SmallDataAna_psana import  SmallDataAna_psana
 #from SmallDataAna import  photons,droplets,Cube,Selection,SmallDataAna

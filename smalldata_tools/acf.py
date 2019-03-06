@@ -2,12 +2,18 @@ import os
 import time
 import numpy as np
 from scipy.signal import fftconvolve
+from DetObject import DetObjectFunc
 
-class acf:
-    def __init__(self, resolution=0.1, name=''):
-        self.resolution = resolution
-        if name=='':
-            self.name='acf'
+class acf(DetObjectFunc):
+    def __init__(self,  **kwargs):
+        try:
+            kwargs['_name'] = 'acf_'+kwargs['_name']
+        except:
+            kwargs['_name'] = 'acf'
+        super(acf, self).__init__(**kwargs)
+        self.resolution = 0.1
+        for key in kwargs:
+            self.__dict__[key] = kwargs[key]
 
     def autocorrelate_image(self,image):
         """
@@ -84,10 +90,10 @@ class acf:
         
         return profile
 
-    def speckle_profile_image(self, image, resolution=1.0):
+    def process(self, image):
         tstart = time.time()
         acfImage = self.autocorrelate_image(image)
-        prf = self.speckle_profile(acfImage, resolution=resolution)
+        prf = self.speckle_profile(acfImage, resolution=self.resolution)
         ret_dict = {'profile_0': prf[:,0]}
         ret_dict['profile_1'] = prf[:,1]
         ret_dict['time'] = time.time()-tstart

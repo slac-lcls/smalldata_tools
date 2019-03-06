@@ -186,25 +186,35 @@ def getUserData(det):
     """return dictionary with event-based user data from input detector, apply mask here."""
     det_dict= {}
     try:
-        userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('write_')>=0 ]
+        userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('_write_')>=0 ]
         #print('DEBUG SmallDataUtils: getting keys: ',userData_keys)
         for key in userData_keys:
             #print('DEBUG SmallDataUtils: getting data for key: ',key)
-            if isinstance(det.evt[key], np.ndarray):
-                if isinstance(det.evt[key], np.ma.masked_array):
-                    data = det.evt[key].data
-                    if np.issubdtype(data.dtype, np.integer):
-                        data[det.evt[key].mask]=0
+            if isinstance(getattr(det.evt, key),dict):
+                for kkey in getattr(det.evt,key).keys():
+                    #print('DEBUG SmallDataUtils: getting data for key, kkey: ',key, kkey)
+                    fieldName = ('%s_%s'%(key,kkey)).replace('_write_','')
+                    #print 'fieldname ',fieldName
+                    if isinstance(getattr(det.evt,key)[kkey], tuple):
+                        det_dict[fieldName] = np.array(getattr(det.evt,key)[kkey])
                     else:
-                        data[det.evt[key].mask]=np.nan
+                        det_dict[fieldName] = getattr(det.evt,key)[kkey]
+            elif isinstance(det.evt.__dict__[key], np.ndarray):
+                if isinstance(det.evt.__dict__[key], np.ma.masked_array):
+                    data = det.evt.__dict__[key].data
+                    if np.issubdtype(data.dtype, np.integer):
+                        data[det.evt.__dict__[key].mask]=0
+                    else:
+                        data[det.evt.__dict__[key].mask]=np.nan
                     #print(eventNr,' is ndarray ',key)
-                    det_dict[key.replace('write_','')] = data
+                    det_dict[key.replace('_write_','')] = data
                 else:
-                    det_dict[key.replace('write_','')] = det.evt[key]
+                    det_dict[key.replace('_write_','')] = det.evt.__dict__[key]
             else:
-                det_dict[key.replace('write_','')] = np.array(det.evt[key])
+                det_dict[key.replace('_write_','')] = np.array(det.evt.__dict__[key])
     except:
         pass
+    #print 'det_dict ',det_dict.keys()
     return det_dict
 
 def getUserEnvData(det):
@@ -213,15 +223,15 @@ def getUserEnvData(det):
     try:
         envData_keys = [ key for key in det.evt.__dict__.keys() if key.find('env_')>=0 ]
         for key in envData_keys:
-            if isinstance(det.evt[key], np.ndarray):
-                if isinstance(det.evt[key], np.ma.masked_array):
-                    data = det.evt[key].data
-                    data[det.evt[key].mask]=np.nan
+            if isinstance(det.evt.__dict__[key], np.ndarray):
+                if isinstance(det.evt.__dict__[key], np.ma.masked_array):
+                    data = det.evt.__dict__[key].data
+                    data[det.evt.__dict__[key].mask]=np.nan
                     env_dict[key.replace('env_','')] = data
                 else:
-                    env_dict[key.replace('env_','')] = det.evt[key]
+                    env_dict[key.replace('env_','')] = det.evt.__dict__[key]
             else:
-                env_dict[key.replace('env_','')] = np.array(det.evt[key])
+                env_dict[key.replace('env_','')] = np.array(det.evt.__dict__[key])
     except:
         pass
     return env_dict

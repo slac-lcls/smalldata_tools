@@ -270,7 +270,7 @@ class SmallDataAna_psana(object):
 
         if detname in self.__dict__.keys():
             printR(rank, 'redefine detector object with different common mode: %d instead of %d'%( common_mode,self.__dict__[detname].common_mode))
-        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
+        det = DetObject.getDetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
         self.__dict__[detname]=det
         if (detname+'_pedestals') in self.__dict__.keys():
             return detname
@@ -278,8 +278,8 @@ class SmallDataAna_psana(object):
         self.__dict__[detname+'_rms'] = det.rms
         self.__dict__[detname+'_x']=det.x
         self.__dict__[detname+'_y']=det.y
-        self.__dict__[detname+'_iX']=det.iX
-        self.__dict__[detname+'_iY']=det.iY
+        self.__dict__[detname+'_ix']=det.ix
+        self.__dict__[detname+'_iy']=det.iy
 
         if detnameDict is not None:
             for key in detnameDict.keys():
@@ -337,8 +337,8 @@ class SmallDataAna_psana(object):
         det=self.__dict__[detname]
         rms = self.__dict__[detname+'_rms']
         pedestals = self.__dict__[detname+'_pedestals']
-        iX = self.__dict__[detname+'_iX']
-        iY = self.__dict__[detname+'_iY']
+        ix = self.__dict__[detname+'_ix']
+        iy = self.__dict__[detname+'_iy']
 
         if detname.find('opal')>=0:
             common_mode = -1
@@ -415,8 +415,8 @@ class SmallDataAna_psana(object):
         det=self.__dict__[detname]
         rms = self.__dict__[detname+'_rms']
         pedestals = self.__dict__[detname+'_pedestals']
-        iX = self.__dict__[detname+'_iX']
-        iY = self.__dict__[detname+'_iY']
+        ix = self.__dict__[detname+'_ix']
+        iy = self.__dict__[detname+'_iy']
 
         if detname.find('opal')>=0:
             common_mode = -1
@@ -718,8 +718,8 @@ class SmallDataAna_psana(object):
         plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
         plt.pause(0.0001)
 
-        iX = self.__dict__[detname+'_iX']
-        iY = self.__dict__[detname+'_iY']
+        ix = self.__dict__[detname+'_ix']
+        iy = self.__dict__[detname+'_iy']
 
         happy = False
         while not happy:
@@ -732,7 +732,7 @@ class SmallDataAna_psana(object):
             if needsGeo:
                 mask_roi=np.zeros_like(image)
                 mask_roi[p_axis1[0]:p_axis1[1],p_axis0[0]:p_axis0[1]]=1
-                mask_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(iX,iY)] )
+                mask_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
             if raw_input("Happy with this selection:\n") in ["y","Y"]:
                 happy = True
                     
@@ -1044,8 +1044,8 @@ class SmallDataAna_psana(object):
             x, y = np.meshgrid(xVec, yVec)
             self.__dict__[detname+'_x'] = x
             self.__dict__[detname+'_y'] = y
-        iX = self.__dict__[detname+'_iX']
-        iY = self.__dict__[detname+'_iY']
+        ix = self.__dict__[detname+'_ix']
+        iy = self.__dict__[detname+'_iy']
         extent=[x.min(), x.max(), y.min(), y.max()]
         #print('DEBUG: extent(x,y min,max)',extent)
         if self.__dict__[detname].det.dettype==30:
@@ -1075,7 +1075,7 @@ class SmallDataAna_psana(object):
                 mask_roi=np.zeros_like(image)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
                 if needsGeo:
-                    mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(iX,iY)] )
+                    mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
                     mask_r_nda = mask_roi
@@ -1091,7 +1091,7 @@ class SmallDataAna_psana(object):
                 mask_roi=np.zeros_like(image)
                 mask_roi[h1:h2,v1:v2]=1
                 if needsGeo:
-                    mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(iX,iY)] )
+                    mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
                     mask_r_nda = mask_roi
@@ -1628,8 +1628,8 @@ class SmallDataAna_psana(object):
         det = self.__dict__[detname].det
         x = self.__dict__[detname+'_x']
         y = self.__dict__[detname+'_y']
-        iX = self.__dict__[detname+'_iX']
-        iY = self.__dict__[detname+'_iY']
+        ix = self.__dict__[detname+'_ix']
+        iy = self.__dict__[detname+'_iy']
         extent=[x.min(), x.max(), y.min(), y.max()]
 
         fig=plt.figure(figsize=(10,6))
@@ -1646,7 +1646,7 @@ class SmallDataAna_psana(object):
         mask_roi=np.zeros_like(image)
         mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
         if needsGeo:
-            mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(iX,iY)] )
+            mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
         else:
             mask_r_nda = mask_roi
 

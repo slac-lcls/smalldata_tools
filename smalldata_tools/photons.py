@@ -4,6 +4,7 @@ import time
 from ImgAlgos.PyAlgos import photons
 import scipy.ndimage.filters as filters
 import itertools
+from DetObject import DetObjectFunc
 
 def fcn(buffer):
     if len(buffer[buffer<buffer[2]])>0:
@@ -11,7 +12,7 @@ def fcn(buffer):
     else:
         return 0.
 
-class photon:
+class photon(DetObjectFunc):
     """
     Wrapper for the psana algorithms described at
     
@@ -19,104 +20,48 @@ class photon:
     ADU_per_photon (def:154): expected value for a single photon in the detector in question
     mask (def:None): pass a mask in here, is None: use mask stored in DetObject
     name (def:'photon'): name used in hdf5 for data
-    retImg (def: 0): 0: return photon/pixel histogram
-                     1: return photon data as spare array (photon, x, y)
-                     2: return data as dense image in photons
-    nphotMax (def: 25): maximum number of photons/pixel for #photon per pixel histogram
-    nphotRet (def: 100): number of photon candidates returned for retImg=1
     thresADU (def: 0.9): fraction of ADU_per_photon in the most neighboring pixels needed to count as a photon 
-    ROI (def: None): ROI of detector that photons should be reached for in.
     """
-    def __init__(self, ADU_per_photon=154, mask=None, name='photon', nphotMax=25, nphotRet=100, thresADU=0.9, retImg=0, ROI=None):
-        self.ADU_per_photon = ADU_per_photon
-        self.name = name
-        self.mask = mask
-        self.nphotMax = nphotMax
-        self.nphotRet = nphotRet
-        self.retImg = retImg
-        self.thresADU = thresADU
-        self.ROI = ROI
-        if isinstance(self.ROI, list):
-            self.ROI = np.array(self.ROI)
+    def __init__(self, **kwargs):
+        self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
+        self.thresADU = kwargs.get('thresADU',0.9)
+        self._name = kwargs.get('name','photon')
+        self._mask = kwargs.get('mask',None)
+
+    def setFromDet(self, det):
+        super(photon, self).setFromDet(det)
+        if self._mask is None and det.mask is not None:
+            setattr(self, '_mask', det.mask.astype(np.uint8))
 
     def prepImage(self,image, mask):
         """
         convert image from ADU to (fractional) photons
-        apply the ROI if applicable (to both image&mask)
+        #apply the ROI if applicable (to both image&mask)
         """
         image = image/self.ADU_per_photon
-        if self.ROI is None:
-            return image, mask
+        return image, mask
 
-        if self.ROI.ndim != image.ndim:
-            print('photons: have wrong ROI shape compared to image: ',self.ROI.shape, image.shape)
-            return image, mask
-                
-        if self.ROI.shape[0]==2 and len(self.ROI.shape)==2:
-            return image[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1]], mask[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1]]
-        elif self.ROI.shape[0]==3:
-            return image[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]], mask[self.ROI[0,0]:self.ROI[0,1],self.ROI[1,0]:self.ROI[1,1],self.ROI[2,0]:self.ROI[2,1]]
-        else:
-            print('ROI format not correct(ly treated) ',self.ROI.shape, image.shape)
-            return image, mask
-
-    def photon(self,image):
+    def process(self,image):
         """
         use PyAlgo method to find photons.
 
         """
         tstart=time.time()
-        fimage, locMask = self.prepImage(image, self.mask)
-        #photons_nda_nomask = photons(fimage, np.ones_like(self.mask),thr_fraction=self.thresADU)
+        fimage, locMask = self.prepImage(image, self._mask)
+        #photons_nda_nomask = photons(fimage, np.ones_like(self._mask),thr_fraction=self.thresADU)
         #note: this works on tiled detectors.
         photons_nda = photons(fimage, locMask)
-        ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
-        ret_dict['nPhot']=photons_nda.sum()
-        ret_dict['nPhot_mask']=photons_nda[locMask>0].sum()
-        #ret_dict['nPhot_nomask']=photons_nda_nomask.sum()
-        if self.retImg>0:
-            #next line: work around fact that mask sometimes gets ignored.
-            photonsImg = photons_nda.copy()
-            photonsImg[locMask==0]=0
-            if self.retImg>1:
-                ret_dict['img']=photonsImg
-                return ret_dict
+        #make filling of histogram a function to be run on dict with nphot(ADU?),row,col 
+        ret_dict = {'nPhot': photons_nda.sum()}
+        ret_dict['nPhot_mask']=photons_nda[locMask>0].sum() 
+        #ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
+        self.dat = photons_nda
+        #print 'self.dat: ',self.dat.shape
 
-            if len(photonsImg.shape)>2: #tiled detector!
-                data=[]
-                row=[]
-                col=[]
-                tile=[]
-                for iTile,photonTile in enumerate(photonsImg):
-                    sImage = sparse.coo_matrix(photonTile)
-                    data = list(itertools.chain.from_iterable([data, sImage.data.tolist()]))
-                    row = list(itertools.chain.from_iterable([row, sImage.data.tolist()]))
-                    col = list(itertools.chain.from_iterable([col, sImage.data.tolist()]))
-                    tile = list(itertools.chain.from_iterable([tile, (np.ones_like(sImage.data)*iTile).tolist()]))
-                data = np.array(data)
-                row = np.array(row)
-                col = np.array(col)
-                tile= np.array(tile)
-            else:
-                sImage = sparse.coo_matrix(photonsImg)
-                data = sImage.data
-                row = sImage.row
-                col = sImage.col
-                tile = np.zeros_like(data)
-
-            if data.shape[0] >= self.nphotRet:
-                ret_dict['data']=data[:self.nphotRet]
-                ret_dict['row']=row[:self.nphotRet]
-                ret_dict['col']=col[:self.nphotRet]
-                ret_dict['tile']=tile[:self.nphotRet]
-            else:
-                ret_dict['data']=(np.append(data[:self.nphotRet], np.zeros(self.nphotRet-len(data)))).astype(int)
-                ret_dict['row']=(np.append(row[:self.nphotRet], np.zeros(self.nphotRet-len(row)))).astype(int)
-                ret_dict['col']=(np.append(col[:self.nphotRet], np.zeros(self.nphotRet-len(col)))).astype(int)
-                ret_dict['tile']=(np.append(tile[:self.nphotRet], np.zeros(self.nphotRet-len(tile)))).astype(int)
-
-            if ret_dict['data'].shape[0]!=self.nphotRet or  ret_dict['row'].shape[0]!=self.nphotRet or  ret_dict['col'].shape[0]!=self.nphotRet or  ret_dict['tile'].shape[0]!=self.nphotRet:
-                print('shapes: ',ret_dict['data'].shape,ret_dict['row'].shape,ret_dict['col'].shape,ret_dict['tile'].shape)
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
 
         return ret_dict
 
@@ -124,31 +69,44 @@ class photon:
 #
 #
 import scipy.ndimage.measurements as measurements
-class photon2:
+class photon2(DetObjectFunc):
     """ deprecated: attemps to code pyalgo algo using pure python"""
-    def __init__(self, ADU_per_photon=154, thresADU=0.7, thresRms=3., mask=None, rms=None, name='photon2', nphotMax=25, retImg=0, nphotRet=100):
-        self.ADU_per_photon = ADU_per_photon
-        self.thresRms=thresRms
-        self.thresADU=thresADU
-        self.name = name
-        self.mask = mask
-        self.rms = rms
-        self.nphotMax = nphotMax
-        self.nphotRet = nphotRet
-        self.retImg = retImg
+    def __init__(self, **kwargs):
+        self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
+        self.thresRms = kwargs.get('thresRms',3.)
+        self.thresADU = kwargs.get('thresADU',0.7)
+        self._name = kwargs.get('name','photon2')
+        self._mask = kwargs.get('mask',None)
+        self.rms = kwargs.get('rms',None)
+        self.nphotMax = kwargs.get('nphotMax',25)
+        self.nphotRet = kwargs.get('nphotRet',100)
+        self.retImg = kwargs.get('retImg',0)
 
+    def setFromDet(self, det):
+        super(photon2, self).setFromDet(det)
+        if self._mask is None and det.mask is not None:
+            setattr(self, 'mask', det.mask.astype(bool))
+        if self.rms is None and det.rms is not None:
+            setattr(self, 'mask', det.rms)
+            
     def prepImage(self,image):
         img = image.copy()
-        img[self.mask==0]=0
-        img[img<self.rms*self.thresRms]=0
+        img[self._mask==0]=0
+        if self.rms is not None:
+            img[img<self.rms*self.thresRms]=0
         return img/self.ADU_per_photon
 
-    def photon(self,image):
+    #just change name.
+    def process(self,image):
+    #    retDict = self.photon(image)
+    #    return retDict
+    #
+    #def photon(self,image):
         """
         use a method has on the PyAlgo photon method w/ flexible threshold
     
         """
-        tstart=time.time()    
+        tstart=time.time()
         fphotons = self.prepImage(image)
         fpi=fphotons//1
         fpf=fphotons%1
@@ -193,25 +151,38 @@ class photon2:
 
 
 
-class photon3:
+class photon3(DetObjectFunc):
     """deprecated: recode pyalgo photon algorithms w/ flexible threshold before that was introduced."""
-    def __init__(self, ADU_per_photon=154, thresADU=0.9, thresRms=3., mask=None, rms=None, name='photon3', nphotMax=25, retImg=0, nphotRet=100, maxMethod=0):
-        self.ADU_per_photon = ADU_per_photon
-        self.thresRms=thresRms
-        self.thresADU=thresADU
-        self.name = name
-        self.mask = mask
-        self.rms = rms
-        self.nphotMax = nphotMax
-        self.nphotRet = nphotRet
-        self.retImg = retImg
-        self.maxMethod = maxMethod
+    def __init__(self, **kwargs):
+        self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
+        self.thresRms = kwargs.get('thresRms',3.)
+        self.thresADU = kwargs.get('thresADU',0.9)
+        self._name = kwargs.get('name','photon3')
+        self._mask = kwargs.get('mask', None)
+        self.rms = kwargs.get('rms', None)
+        self.nphotMax = kwargs.get('nphotMax', 25)
+        self.nphotRet = kwargs.get('nphotRet', 100)
+        self.retImg = kwargs.get('retImg', 0)
+        self.maxMethod = kwargs.get('maxMethod', 0)
+
+    def setFromDet(self, det):
+        super(photon3, self).setFromDet(det)
+        if self._mask is None and det.mask is not None:
+            setattr(self, 'mask', det.mask.astype(bool))
+        if self.rms is None and det.rms is not None:
+            setattr(self, 'mask', det.rms)
 
     def prepImage(self,image):
         img = image.copy()
-        img[self.mask==0]=0
-        img[img<self.rms*self.thresRms]=0
+        img[self._mask==0]=0
+        if self.rms is not None:
+            img[img<self.rms*self.thresRms]=0
         return img/self.ADU_per_photon
+
+    #just change name.
+    def process(self,image):
+        retDict = self.photon(image)
+        return retDict
 
     def photon(self,image):
         """

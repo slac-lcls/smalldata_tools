@@ -8,7 +8,7 @@ only if using bokeh!
 plot as in live feedback where you can select the x&y axis. Scatter plot, optional with hextiles.
 favorite list/hutch.
 addToFavoriteList function that will add self created vars (or maybe add any ROI_sum, azav, nDroplet variables)
-"""
+""" 
 from os import makedirs
 from os import path
 from os import walk
@@ -1808,14 +1808,14 @@ class SmallDataAna(object):
                     dropFct = tVar.split(':')[2]
                     #add droplet source.
                     if dropBaseName not in cube.dropletProc.keys():
-                        if (dropBaseName+'_X') in self._fields.keys():
+                        if (dropBaseName+'_x') in self._fields.keys():
                             cube.dropletProc[dropBaseName] = {}
                             cube.dropletProc[dropBaseName]['source'] = dropDet
                             cube.dropletProc[dropBaseName]['fct'] = [dropFct]
-                            cube.dropletProc[dropBaseName]['vars'] = [dropBaseName+'_X', dropBaseName+'_Y', dropBaseName+'_adu', dropBaseName+'_npix']
+                            cube.dropletProc[dropBaseName]['vars'] = [dropBaseName+'_x', dropBaseName+'_y', dropBaseName+'_adu', dropBaseName+'_npix']
                             #get shape for image.
-                            cube.dropletProc[dropBaseName]['shape'] = ( np.nanmax(self.getVar('UserDataCfg/%s/iX'%dropDet)), 
-                                                                        np.nanmax(self.getVar('UserDataCfg/%s/iY'%dropDet)))
+                            cube.dropletProc[dropBaseName]['shape'] = ( np.nanmax(self.getVar('UserDataCfg/%s/ix'%dropDet)), 
+                                                                        np.nanmax(self.getVar('UserDataCfg/%s/iy'%dropDet)))
                         else:
                             print('could not find droplets with base name: ',dropBaseName)
                     else:
@@ -2201,9 +2201,9 @@ class SmallDataAna(object):
                     xdata = np.array(xArray).reshape(newShp)
                     ydata = np.array(yArray).reshape(newShp)
                     adudata = np.array(aduArray).reshape(newShp)
-                    dataArray = xr.DataArray(xdata, coords=coords, dims=dims,name=((droplet+'_array_X').replace('/','_')))
+                    dataArray = xr.DataArray(xdata, coords=coords, dims=dims,name=((droplet+'_array_x').replace('/','_')))
                     cubeData = xr.merge([cubeData, dataArray])
-                    dataArray = xr.DataArray(ydata, coords=coords, dims=dims,name=((droplet+'_array_Y').replace('/','_')))
+                    dataArray = xr.DataArray(ydata, coords=coords, dims=dims,name=((droplet+'_array_y').replace('/','_')))
                     cubeData = xr.merge([cubeData, dataArray])
                     dataArray = xr.DataArray(adudata, coords=coords, dims=dims,name=((droplet+'_array_adu').replace('/','_')))
                     cubeData = xr.merge([cubeData, dataArray])

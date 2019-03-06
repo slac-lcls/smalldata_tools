@@ -65,7 +65,7 @@ def fitCircles(x,y,r,yerr=None, guess=None):
       fitRes['success'] = success
   else:
       center, ier = optimize.leastsq(f_global, center_estimate, args=(r,x,y))
-      print(center)
+      #print(center)
       fitRes['ier'] = ier
   xc, yc = center
   fitRes['xCen'] = xc

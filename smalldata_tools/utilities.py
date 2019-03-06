@@ -92,27 +92,33 @@ def running_median(seq, windowsize=10):
     
 def rebinFactor(a, shape):
     sh = shape[0],a.shape[0]//shape[0],shape[1],a.shape[1]//shape[1]
+    reshaped = a.reshape(sh).mean(-1).mean(1)
     return a.reshape(sh).mean(-1).mean(1)
 
 def rebin(a, shape):
     if isinstance(shape, float) or isinstance(shape, int):
         shape = [shape, shape]
     if (a.shape[0]%shape[0]) == 0 and (a.shape[1]%shape[1]) == 0:
-        rebinFactor(a, shape)
+        img = rebinFactor(a, shape)
     else:
         factor = [ float(int(a.shape[0]/shape[0])+1), float(int(a.shape[1]/shape[1])+1)]
         bigImg = ndimage.zoom(a, [shape[0]*factor[0]/a.shape[0],shape[1]*factor[1]/a.shape[1]])
         img = rebinFactor(bigImg, shape)
     return img
 
+#this here gets better times.
 def rebinShape( a, newshape ):
     '''Rebin an array to a new shape.
     '''
     assert len(a.shape) == len(newshape)
 
-    slices = [ slice(0,old, float(old)/new) for old,new in zip(a.shape,newshape) ]
-    coordinates = np.mgrid[slices]
-    indices = coordinates.astype('i')   #choose the biggest smaller integer index
+    if np.sometrue(np.mod(a.shape, newshape)):
+        slices = [ slice(None, None, old/new) for old,new in zip(a.shape,newshape) ]
+        return a[slices]
+    else:
+        slices = [ slice(0,old, float(old)/new) for old,new in zip(a.shape,newshape) ]
+        coordinates = np.mgrid[slices]
+        indices = coordinates.astype('i')   #choose the biggest smaller integer index
     return a[tuple(indices)]
 
 
@@ -784,7 +790,8 @@ def image_from_dxy(d,x,y, outShape=None):
         elif len(x.shape)==2:#is already image (and not special detector)
             return d
         else:
-            print('do not know which detector in need of a special geometry this is, cannot determine shape of image');      return
+            print('do not know which detector in need of a special geometry this is, cannot determine shape of image')
+            return
         ix = x.copy()
         ix = ix - np.min(ix)
         ix = (ix/np.max(ix)*imgShape[0]).astype(int)
@@ -796,7 +803,7 @@ def image_from_dxy(d,x,y, outShape=None):
         iy=y.astype(int)
 
     if outShape is None:
-        img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=(np.max(ix)+1, np.max(iy)+1)).todense()
-    else:
-        img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
+        outShape = (np.max(ix)+1, np.max(iy)+1)
+        
+    img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
     return img
