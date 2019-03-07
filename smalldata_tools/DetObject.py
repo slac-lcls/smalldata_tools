@@ -2,6 +2,8 @@ import os
 import copy
 import numpy as np
 from utilities import cm_epix
+from read_uxi import read_uxi, get_uxi_timestamps, getDarks
+from read_uxi import getUxiDict
 
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -93,7 +95,10 @@ class DetObject(object):
         try:
             det = psana.Detector(srcName)
         except:
-            return None
+            if srcName.find('uxi'):
+              return UxiObject(run, **kwargs)
+            else:
+              return None
         det.alias = srcName
         if det.dettype==1:
             return CsPad2MObject(det, env, run, **kwargs)
@@ -883,6 +888,114 @@ class RayonixObject(CameraObject):
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
 
+
+class UxiObject(DetObject):
+    def __init__(self, run, **kwargs):
+        self.det = None
+        self._name = kwargs.get('name', 'uxi')
+        self._uxiDict =  kwargs.get('uxiDict', None)
+        uxiConfigDict =  kwargs.get('uxiConfigDict', None)
+        self.common_mode =  kwargs.get('common_mode', 0)
+        for k, value in uxiConfigDict.iteritems():
+          setattr(self, k, value)
+        #now get the pedestals from run unless we stuff this into the configDict before.
+        iDark, darkA, darkB =  getDarks(int(run))
+        setattr(self, 'pedestal_run', iDark)
+        setattr(self, 'ped', np.array([darkA, darkB]))
+        #geometry information. all frames have same x/y
+        self.pixelsize=[25e-6]
+        self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
+        self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
+        self.y, self.x = np.meshgrid(self.y, self.x)
+        self.x=np.array([self.x for i in range(self.ped.shape[0])])
+        self.y=np.array([self.y for i in range(self.ped.shape[0])])
+        #common mode stuff
+        self.cm_maskedROI =  kwargs.get('cm_maskedROI', None)
+        if self.cm_maskedROI is not None and isinstance(self.cm_maskedROI, list):
+            self.cm_maskedROI = np.array(self.cm_maskedROI)
+            if len(self.cm_maskedROI.shape)==1:
+              self.cm_maskedROI=np.array([self.cm_maskedROI.tolist()]*2)
+        self.cm_photonThres =  kwargs.get('cm_photonThres', 50)
+        self.cm_maskNeighbors =  kwargs.get('cm_maskNeighbors', 0)
+        self.cm_maxCorr =  kwargs.get('cm_maxCorr', self.cm_photonThres)
+        self.cm_minFrac =  kwargs.get('cm_minFrac', 0.25)
+
+    def getData(self, evt):
+        try:
+            getattr(self, 'evt')
+        except:
+            self.evt = event()
+        self.evt.dat = None
+
+        #get the timestamp. 
+        evttime = evt.get(psana.EventId).time()
+        evtfid = evt.get(psana.EventId).fiducials()
+        #get the right frame from self._uxiDict
+
+        #find uxi pictures taken the same second & get nsec & fiducials
+        uxiEvent=False; uxiIdx=-1
+        if (len(np.argwhere(uxiDict['lcls_ts_secs']==evttime[0]))>0):
+            secIdx=np.argwhere(uxiDict['lcls_ts_secs']==evttime[0])[0][0]
+            if len(np.argwhere(uxiDict['lcls_ts_necs']==evttime[1]))>0 and len(np.argwhere(uxiDict['lcls_ts_fids']==evtfid))>0:
+                print eventNr,eventNr-evtNr_withUxi,' dFid:',evtfid-evtFid_withUxi,' IDX: ',secIdx, ' sec: ',evttime[0],' nsec: ',evttime[1],uxiDict['lcls_ts_necs'][secIdx], ' fid ', evtfid, uxiDict['lcls_ts_fids'][secIdx]
+                evtNr_withUxi=eventNr
+                evtFid_withUxi=evtfid
+                if evttime[1]==uxiDict['lcls_ts_necs'][secIdx] and evtfid==uxiDict['lcls_ts_fids'][secIdx]:
+                    uxiEvent=True
+                    uxiIdx=secIdx
+        if not uxiEvent:
+            return
+
+        #now add uxi data.
+        evtUxiDict={'uxi':{}}
+        dataFrame=[]
+        dataFrame.append(uxiDict['A'][uxiIdx])
+        dataFrame.append(uxiDict['B'][uxiIdx])
+        for key in uxiDict.keys():
+            if key in ['A','B']: continue
+            if isinstance(uxiDict[key][uxiIdx],basestring):
+                if uxiDict[key][uxiIdx].find('.')>=0:
+                    self.evt.__dict__[key]=float(uxiDict[key][uxiIdx])
+                else:
+                    self.evt.__dict__[key]=int(uxiDict[key][uxiIdx])
+            else:
+                self.evt.__dict__[key]=uxiDict[key][uxiIdx]
+
+        if self.common_mode<0:
+            #return raw data 
+            self.evt.dat = dataFrame
+            return
+
+        #subtract the pedestal.
+        try:
+            dataFrame-=self.ped
+        except:
+            print('Uxi pedestal subtraction failed: shapes:',dataFrame.shape, self.ped.shape)
+
+        if self.common_mode==0:
+            #return pedestal subtraction.
+            self.evt.dat = dataFrame
+            return
+
+        if self.cm_maskedROI is not None:
+            print('subtract mean from masked area is passed.')
+            cm_mask_med = [ frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]].median() for frame,maskedROI in zip(self.evt.dat, self.cm_maskedROI )]
+            cm_mask_mean = [ frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]].mean() for frame,maskedROI in zip(self.evt.dat, self.cm_maskedROI )]
+            self.evt.__dict__['cm_masked_med'] = np.array(cm_mask_med)
+            self.evt.__dict__['cm_masked_mean'] = np.array(cm_mask_mean)
+            dataFrame = np.array([dataFrame[0]-cm_mask_mean[0], dataFrame[1]-cm_mask_mean[1]])
+
+        #only subtract the masked ROI
+        if self.common_mode==80:
+            self.evt.dat=dataFrame
+            return
+
+        corrImg, cmValues, cmValues_used = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
+        self.evt.__dict__['cm_RowMed'] = cmValues
+        self.evt.__dict__['cm_RowMed_used'] = cmValues_used
+        self.evt.dat = corrImg
+
+        return
 
 ##---------------------------------------------------------------------
 
