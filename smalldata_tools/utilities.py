@@ -439,6 +439,35 @@ def cm_epix(img,rms,maxCorr=30, histoRange=30, colrow=3, minFrac=0.25, normAll=F
                                                 
     return imgCorr.data  
 
+def cm_uxi(dataFrame, cm_photonThres, cm_maxCorr, cm_minFrac, cm_maskNeighbors):
+    #if we have masked pixels for quality, also add that mask here.
+    maskImg = (dataFrame>cm_photonThres).astype(int)
+    if cm_maskNeighbors>0:
+        maskImg+=neighborImg(maskImg)
+        #img_up = np.roll(maskImg1,axis=0); img_up[0,:]=0
+        #img_down = np.roll(maskImg-1,axis=0); img_down[-1,:]=0
+        #img_left = np.roll(maskImg1,axis=1); img_left[:,0]=0
+        #img_right = np.roll(maskImg-1,axis=1); img_right[:,-1]=0
+        #maskImg+=np.amax(np.array([img_up, img_down, img_left, img_right]),axis=0)
+
+    maskedImg = np.ma.masked_array(dataFrame, maskImg)          
+
+    cm_RowMeds=[]
+    cm_RowMedsApplied=[]
+    cm_newData=[]
+    for frame in maskedImg.data:
+        rs = frame.reshape(frame.shape[0]*2, frame.shape[1]/2, order='F')
+        rsmed = np.median(rs, axis=1)
+        cm_RowMeds.append(rsmed.tolist())
+        rscount = np.ma.count_masked(rs,axis=1) 
+        rsmed[abs(rsmed)>cm_maxCorr]=0   #do not correct more than maxCorr value
+        rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]=0 #do not correct if too few pixels contribute
+        cm_RowMedsApplied.append(rsmed.tolist())
+        imgCorr=(rs-rsmed[:,None]).reshape(maskedImg[0].shape[0],maskedImg[0].shape[1],order='F')
+        cm_newData.append(imgCorr)
+
+    return np.array(cm_newData), np.array(cm_RowMeds), np.array(cm_RowMedsApplied)
+
 ###
 # utility functions for plotting data as 2-d histogram
 ###
