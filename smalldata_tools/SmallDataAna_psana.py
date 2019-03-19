@@ -20,7 +20,6 @@ from DetObject import DetObject
 from SmallDataUtils import getUserData
 from utilities import printR
 from utilities import addToHdf5
-from utilities import dropObject
 from utilities import rename_reduceRandomVar
 from utilities_plotting import plotImageBokeh
 from utilities_plotting import hv_image
@@ -389,7 +388,7 @@ class SmallDataAna_psana(object):
             if not detname in aliases:
                 continue
 
-            det.evt = dropObject()
+            #det.evt = dropObject()
             det.getData(evt)
             imgAr.append(det.evt.dat.copy())
             numEvts-=1
@@ -471,7 +470,7 @@ class SmallDataAna_psana(object):
             if not detname in aliases:
                 continue
 
-            det.evt = dropObject()
+            #det.evt = dropObject()
             det.getData(evt)
             data = det.evt.dat.copy()
             if thresADU != 0:

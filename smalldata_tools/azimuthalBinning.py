@@ -7,6 +7,7 @@ from scipy.interpolate import griddata
 import utilities as util
 from DetObject import DetObjectFunc
 from mpi4py import MPI
+from smalldata_tools.roi_rebin import ROIFunc
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 mpiSize = comm.Get_size()
@@ -36,10 +37,11 @@ class azimuthalBinning(DetObjectFunc):
         """
         # save parameters for later use
         self._name = kwargs.get('name','azav')
+        super(azimuthalBinning, self).__init__(**kwargs)
         self._mask = kwargs.pop("userMask",None)
         self.gainImg = kwargs.pop("gainImg",None)
         self.darkImg = kwargs.pop("darkImg",None)
-        self.debug = kwargs.pop("debug",False)
+        self._debug = kwargs.pop("debug",False)
         self.ADU_per_photon = kwargs.pop("ADU_per_Photon",1.)
         self.dis_to_sam = kwargs.pop("dis_to_sam",100e-3)
         self.eBeam =  kwargs.pop("eBeam",9.5)
@@ -51,7 +53,9 @@ class azimuthalBinning(DetObjectFunc):
         self.qbin = kwargs.pop("qbin",5e-3)
         self.thresRms =  kwargs.pop("thresRms",None)
         self.thresADU =  kwargs.pop("thresADU",None)
-        self.thresADUhigh =  kwargs.pop("thresADUhigh",None)
+        self.thresADUhigh = kwargs.pop("thresADUhigh",None)
+        self.x = kwargs.pop("x",None)
+        self.y = kwargs.pop("y",None)
 
         center = kwargs.pop("center",None)
         if center is not None:
@@ -64,18 +68,31 @@ class azimuthalBinning(DetObjectFunc):
         if self._mask is not None: self._mask = np.asarray(self._mask,dtype=np.bool)
 
     def setFromDet(self, det):
-        if self._mask is not None and self._mask.shape == det.mask.shape:
-            self._mask = ~(self._mask.astype(bool)&det.mask.astype(bool))
-        else:
-            self._mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
-        self._mask = self._mask.flatten()
+        if det.mask is not None and det.cmask is not None:
+            if self._mask is not None and self._mask.shape == det.mask.shape:
+                self._mask = ~(self._mask.astype(bool)&det.mask.astype(bool))
+            else:
+                self._mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
+            self._mask = self._mask.flatten()
         #if self._mask is None and det.mask is not None:
         #    setattr(self, '_mask', det.mask.astype(np.uint8))
         if det.x is not None:
             self.x = det.x.flatten()/1e3
             self.y = det.y.flatten()/1e3
+
+    def setFromFunc(self, func):
+        super(azimuthalBinning,self).setFromFunc()
+        print 'set params from func ', func.__dict__.keys()
+        if func._x is not None: self.x = func._x.flatten()/1e3
+        if func._y is not None: self.y = func._y.flatten()/1e3
+        if func._mask is not None and isinstance(func, ROIFunc): 
+            self._mask = func._mask.astype(bool).flatten()
+        else:
+            self._mask = (~(func._mask.astype(bool))).flatten()
+        #elif func._rms is not None: 
+        #    self._mask = np.ones_like(func._rms).flatten()
         self._setup()
-            
+
     def _setup(self):
 
         if rank==0:
@@ -92,6 +109,7 @@ class azimuthalBinning(DetObjectFunc):
         ty = np.deg2rad(self.ty)
         self.xcen = float(self.xcen)
         self.ycen = float(self.ycen)
+
         # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
         (A,B,C) = (-np.sin(ty)*np.cos(tx),-np.sin(tx),-np.cos(ty)*np.cos(tx))
         (a,b,c) = (self.xcen+self.dis_to_sam*np.tan(ty),float(self.ycen)-self.dis_to_sam*np.tan(tx),self.dis_to_sam)
@@ -105,7 +123,9 @@ class azimuthalBinning(DetObjectFunc):
         matrix_theta = np.arccos( (A*(x-a)+B*(y-b)-C*c )/r )
         self.matrix_theta = matrix_theta
         self.msg("...done")
-        
+
+        if self._debug:
+            print('matrix theta: ',self.matrix_theta.shape)
         self.msg("calculating phi...",cr=0)
         matrix_phi = np.arccos( ((A**2+C**2)*(y-b)-A*B*(x-a)+B*C*c )/ \
                 np.sqrt((A**2+C**2)*(r**2-(A*(x-a)+B*(y-b)-C*c)**2)))
@@ -129,32 +149,45 @@ class azimuthalBinning(DetObjectFunc):
         theta_max = np.nanmax(matrix_theta[~self._mask])
 
         self.msg("calculating digitize")
+        if isinstance(self.phiBins, np.ndarray):
+            self.phiBins = self.phiBins.tolist()
         if isinstance(self.phiBins, list):
             if max(self.phiBins)<(2*np.pi-0.01):
-                self.phiBins.append(2*np.pi)
+                #self.phiBins.append(2*np.pi)
+                self.phiBins.append(np.array(self.phiBins).max()+0.001)
             if min(self.phiBins)>0:
-                self.phiBins.append(0)
+                #self.phiBins.append(0)
+                self.phiBins.append(np.array(self.phiBins).min()-0.001)
             self.phiBins.sort()
             self.nphi = len(self.phiBins)
-            pbm = self.matrix_phi + (self.phiBins[1]-phiBins[0])/2
+            pbm = self.matrix_phi + (self.phiBins[1]-self.phiBins[0])/2
             pbm[pbm>=2*np.pi] -= 2*np.pi
             self.phiVec = np.array(self.phiBins)
         else:
             self.nphi = self.phiBins
-            phiint = 2*np.pi/self.phiBins
+            #phiint = 2*np.pi/self.phiBins
+            phiint = (self.matrix_phi.max()-self.matrix_phi.max())/self.phiBins
             pbm = self.matrix_phi + phiint/2
             pbm[pbm>=2*np.pi] -= 2*np.pi
-            self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
+            #self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
+            self.phiVec = np.linspace(self.matrix_phi.min(),self.matrix_phi.max()+np.spacing(np.min(pbm)),self.phiBins+1)
+            ##self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
+
+        #print 'DEBUG phi in: ',self.phiVec.min(), self.phiVec.max(), self.phiVec.shape
 
         self.pbm = pbm #added for debugging of epix10k artifacts.
         self.idxphi = np.digitize(pbm.ravel(),self.phiVec)-1
+        if self.idxphi.min()<0:
+            print('pixels will overflow, will put all pixels beyond range into first bin w')
+            self.idxphi[self.idxphi<0]=0 #put all 'overflow' bins in first bin.
+        #print 'idxphi: ',self.idxphi.min(), self.idxphi.max(), self.nphi
         self.matrix_q = 4*np.pi/self.lam*np.sin(self.matrix_theta/2)
         q_max = np.nanmax(self.matrix_q[~self._mask])
         q_min = np.nanmin(self.matrix_q[~self._mask])
         qbin = np.array(self.qbin)
         if qbin.size==1:
-            if rank==0:
-                print('single q-bin: qmax: ',q_max,' qbin ',qbin)
+            if rank==0 and self._debug:
+                print('q-bin size has been given: qmax: ',q_max,' qbin ',qbin)
             #self.qbins = np.arange(0,q_max+qbin,qbin)
             self.qbins = np.arange(q_min-qbin,q_max+qbin,qbin)
         else:
@@ -195,11 +228,11 @@ class azimuthalBinning(DetObjectFunc):
             self.header += "# q binning : %.3f Ang-1\n" % (qbin)
         #remove idx & correction values for masked pixels. Also remove maks pixels from image in process fct
         self.Cake_idxs = self.Cake_idxs[self._mask.ravel()==0]
-        self.correction = self.correction[self._mask.ravel()==0]
+        self.correction = self.correction.flatten()[self._mask.ravel()==0]
         return 
 
     def msg(self,s,cr=True):
-        if (self.debug):
+        if (self._debug):
             if (cr):
                 print(s)
             else:
@@ -223,7 +256,7 @@ class azimuthalBinning(DetObjectFunc):
         if self.gainImg is not None: img/=self.gainImg
 
         img = img.ravel()[self._mask.ravel()==0]
-        print('img:', img.shape)
+        #print('img:', img.shape)
 
         if applyCorrection:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()/self.correction.ravel(), minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
@@ -231,7 +264,7 @@ class azimuthalBinning(DetObjectFunc):
         else:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
             I=np.bincount(self.Cake_idxs, weights = img                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-        print('reshape')
+        #print('reshape')
         I = np.reshape(I,(self.nphi,self.nq))
         self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
         self.Icake = I/self.Cake_norm

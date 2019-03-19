@@ -1,4 +1,4 @@
-from utilities import  dropObject,hist2d,printMsg,checkDet,rebin,addToHdf5
+from utilities import  hist2d,printMsg,checkDet,rebin,addToHdf5
 from DetObject import DetObject
 from acf import  acf
 from azimuthalBinning import  azimuthalBinning

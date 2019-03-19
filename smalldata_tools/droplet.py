@@ -32,6 +32,7 @@ class dropletFunc(DetObjectFunc):
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
+        super(dropletFunc, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold',10.)
         self.thresholdLow = kwargs.get('thresholdLow', 3.)
         self.thresADU = kwargs.get('thresADU',10.)

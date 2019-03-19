@@ -2,11 +2,14 @@ import os
 import copy
 import numpy as np
 from utilities import cm_epix
-from read_uxi import read_uxi, get_uxi_timestamps, getDarks
-from read_uxi import getUxiDict
-
+from utilities import cm_uxi
+from read_uxi import getDarks
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
+
+from read_uxi import read_uxi, get_uxi_timestamps, getDarks
+#for common mode.
+#from read_uxi import getUnbonded, getZeroPeakFit 
 
 import psana
 #from collections import Counter
@@ -31,7 +34,8 @@ class event(object):
 #
 class DetObjectFunc(object):
     def __init__(self, **kwargs):
-        if '_name' not in kwargs:
+        self._debug=False
+        if '_name' not in kwargs and '_name' not in self.__dict__.keys():
             print('Function needs to have _name as parameter, will return None')
             return None
         for key in kwargs:
@@ -49,11 +53,25 @@ class DetObjectFunc(object):
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
+        #print 'DEBUG get params for func: ',self._name
+        subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
+        funcPars={}
+        for tfunc in subFuncs:
+            sfuncDict = tfunc.params_as_dict()
+            for key in sfuncDict:
+                #print  'DEBUG get params for func - subfunc - key: ',self._name, tfunc._name, key
+                #funcPars['%s_%s_%s'%(self._name,tfunc._name,key)] = sfuncDict[key]
+                funcPars['%s'%(key)] = sfuncDict[key]
+
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (isinstance(getattr(self,key), (basestring, int, float, np.ndarray)) and key[0]!='_')}
         parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (isinstance(getattr(self,key), list) and key[0]!='_')})
         remKeys = [key for key in self.__dict__ if (key not in parList)]
-        print('DEBUG: keys which are not parameters:',remKeys)
-        return parList
+        for key, value in parList.iteritems():
+          funcPars['%s_%s'%(self._name, key)] = value
+        if self._debug: print('DEBUG: keys which are not parameters:',self._name, remKeys)
+        #print 'return for ',self._name, funcPars.keys()
+        return funcPars
+
     def setDebug(self, debug):
         if isinstance(debug, bool):
             self._debug = debug
@@ -78,6 +96,7 @@ class DetObjectFunc(object):
             subFuncResults[tfunc._name] = tfunc.process(self.dat)
         return subFuncResults
 
+
 class DetObject(object):
     def __init__(self,det,env,run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
@@ -92,13 +111,17 @@ class DetObject(object):
 
     @staticmethod
     def getDetObject(srcName, env, run, **kwargs):
+        print 'getting the camera: ',srcName
+        det = None
         try:
             det = psana.Detector(srcName)
         except:
-            if srcName.find('uxi'):
-              return UxiObject(run, **kwargs)
+            pass
+        if det is None:
+            if srcName.find('uxi')>=0:
+                return UxiObject(run, **kwargs)
             else:
-              return None
+                return det
         det.alias = srcName
         if det.dettype==1:
             return CsPad2MObject(det, env, run, **kwargs)
@@ -139,7 +162,7 @@ class DetObject(object):
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         for sf in subFuncs:
             sfPars = sf.params_as_dict()
-            parList.update({'%s__%s'%(sf._name,key): sfPars[key] for key in sfPars if (key[0]!='_' and isinstance(sfPars[key], (basestring, int, float, np.ndarray, tuple)))})
+            parList.update({'%s__%s'%(sf._name,key): value for key,value in sfPars.iteritems() if (key[0]!='_' and isinstance(value, (basestring, int, float, np.ndarray, tuple)))})
 
         #remKeys = [key for key in self.__dict__ if (key not in parList)]
         #print('DEBUG: keys which are not parameters:',remKeys)
@@ -419,10 +442,10 @@ class ZylaObject(CameraObject):
             self.mask = np.ones(self.imgShape)
             self.cmask = np.ones(self.imgShape)
 
-class ControlCameraObject(CameraObject): 
+class ControlsCameraObject(CameraObject): 
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
-        super(ControlCameraObject, self).__init__(det,env,run, **kwargs)
+        super(ControlsCameraObject, self).__init__(det,env,run, **kwargs)
         camrecCfg = env.configStore().get(psana.Camera.ControlsCameraConfigV1, self._src)
         self.imgShape = (camrecCfg.height(), camrecCfg.width())
         if self.ped is None:
@@ -550,7 +573,7 @@ class CsPadObject(TiledCameraObject):
         mbits=0 #do not apply mask (would set pixels to zero)
         #mbits=1 #set bad pixels to 0
         if self.common_mode%100==1:
-            self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100), mbits=mbits)
+            self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100,0), mbits=mbits)
             needGain=False
         elif self.common_mode%100==5:
             self.evt.dat = self.det.calib(evt, cmpars=(5,100), mbits=mbits)
@@ -559,19 +582,8 @@ class CsPadObject(TiledCameraObject):
             self.evt.dat = self.det.calib(evt, cmpars=(5,5000), mbits=mbits)
             needGain=False
         elif self.common_mode%100==10:
+            self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100,1), mbits=mbits)
             needGain=False
-            #data = self.det.raw_data(evt)-self.det.pedestals(evt)        
-            data = self.det.raw_data(evt)-self.ped
-            if self.applyMask==1:
-                data[self.mask==0]=0
-            if self.applyMask==2:
-                data[self.cmask==0]=0
-            data_def = self.det.calib(evt, cmpars=(1,25,40,200), mbits=mbits)
-            data_unb = self.det.calib(evt, cmpars=(5,100), mbits=mbits)
-            data_diff = data_unb-data_def
-            data_diff[(data_def-data)!=0]=0
-            self.evt.dat = data_def + data_diff
-            #tileAvs = [ tile[tile!=0].flatten().mean() for tile in data]
 
         #override gain if desired
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
@@ -902,6 +914,9 @@ class UxiObject(DetObject):
         iDark, darkA, darkB =  getDarks(int(run))
         setattr(self, 'pedestal_run', iDark)
         setattr(self, 'ped', np.array([darkA, darkB]))
+        setattr(self, 'rms', np.ones_like(getattr(self, 'ped')))
+        setattr(self, 'mask', None)#  np.ones_like(getattr(self, 'ped')))
+        setattr(self, 'cmask', None)# getattr(self, 'mask'))
         #geometry information. all frames have same x/y
         self.pixelsize=[25e-6]
         self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -918,7 +933,7 @@ class UxiObject(DetObject):
         self.cm_photonThres =  kwargs.get('cm_photonThres', 50)
         self.cm_maskNeighbors =  kwargs.get('cm_maskNeighbors', 0)
         self.cm_maxCorr =  kwargs.get('cm_maxCorr', self.cm_photonThres)
-        self.cm_minFrac =  kwargs.get('cm_minFrac', 0.25)
+        self.cm_minFrac =  kwargs.get('cm_minFrac', 0.05)
 
     def getData(self, evt):
         try:
@@ -934,36 +949,40 @@ class UxiObject(DetObject):
 
         #find uxi pictures taken the same second & get nsec & fiducials
         uxiEvent=False; uxiIdx=-1
-        if (len(np.argwhere(uxiDict['lcls_ts_secs']==evttime[0]))>0):
-            secIdx=np.argwhere(uxiDict['lcls_ts_secs']==evttime[0])[0][0]
-            if len(np.argwhere(uxiDict['lcls_ts_necs']==evttime[1]))>0 and len(np.argwhere(uxiDict['lcls_ts_fids']==evtfid))>0:
-                print eventNr,eventNr-evtNr_withUxi,' dFid:',evtfid-evtFid_withUxi,' IDX: ',secIdx, ' sec: ',evttime[0],' nsec: ',evttime[1],uxiDict['lcls_ts_necs'][secIdx], ' fid ', evtfid, uxiDict['lcls_ts_fids'][secIdx]
-                evtNr_withUxi=eventNr
-                evtFid_withUxi=evtfid
-                if evttime[1]==uxiDict['lcls_ts_necs'][secIdx] and evtfid==uxiDict['lcls_ts_fids'][secIdx]:
+        if (len(np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0]))>0):
+            if (len(np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0]))>1):
+                print 'more than one UXI match???'
+            secIdx=np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0])[0][0]
+            if len(np.argwhere(self._uxiDict['lcls_ts_necs']==evttime[1]))>0 and len(np.argwhere(self._uxiDict['lcls_ts_fids']==evtfid))>0:
+                #evtNr_withUxi=eventNr
+                #evtFid_withUxi=evtfid
+                if evttime[1]==self._uxiDict['lcls_ts_necs'][secIdx] and evtfid==self._uxiDict['lcls_ts_fids'][secIdx]:
                     uxiEvent=True
                     uxiIdx=secIdx
+        #print uxiEvent, uxiIdx
         if not uxiEvent:
-            return
+            return None
 
         #now add uxi data.
         evtUxiDict={'uxi':{}}
         dataFrame=[]
-        dataFrame.append(uxiDict['A'][uxiIdx])
-        dataFrame.append(uxiDict['B'][uxiIdx])
-        for key in uxiDict.keys():
-            if key in ['A','B']: continue
-            if isinstance(uxiDict[key][uxiIdx],basestring):
-                if uxiDict[key][uxiIdx].find('.')>=0:
-                    self.evt.__dict__[key]=float(uxiDict[key][uxiIdx])
+        dataFrame.append(self._uxiDict['frameA'][uxiIdx])
+        dataFrame.append(self._uxiDict['frameB'][uxiIdx])
+        for key in self._uxiDict.keys():
+            if key in ['frameA','frameB']: continue
+            if key.find('lcls_ts')>=0: continue
+            #print 'append key to event: ',key
+            if isinstance(self._uxiDict[key][uxiIdx],basestring):
+                if self._uxiDict[key][uxiIdx].find('.')>=0:
+                    self.evt.__dict__['env_%s'%key]=float(self._uxiDict[key][uxiIdx])
                 else:
-                    self.evt.__dict__[key]=int(uxiDict[key][uxiIdx])
+                    self.evt.__dict__['env_%s'%key]=int(self._uxiDict[key][uxiIdx])
             else:
-                self.evt.__dict__[key]=uxiDict[key][uxiIdx]
+                self.evt.__dict__['env_%s'%key]=self._uxiDict[key][uxiIdx]
 
         if self.common_mode<0:
             #return raw data 
-            self.evt.dat = dataFrame
+            self.evt.dat = np.array(dataFrame)
             return
 
         #subtract the pedestal.
@@ -978,12 +997,14 @@ class UxiObject(DetObject):
             return
 
         if self.cm_maskedROI is not None:
-            print('subtract mean from masked area is passed.')
-            cm_mask_med = [ frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]].median() for frame,maskedROI in zip(self.evt.dat, self.cm_maskedROI )]
-            cm_mask_mean = [ frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]].mean() for frame,maskedROI in zip(self.evt.dat, self.cm_maskedROI )]
-            self.evt.__dict__['cm_masked_med'] = np.array(cm_mask_med)
-            self.evt.__dict__['cm_masked_mean'] = np.array(cm_mask_mean)
-            dataFrame = np.array([dataFrame[0]-cm_mask_mean[0], dataFrame[1]-cm_mask_mean[1]])
+            #print('subtract mean from masked area is passed., use ROI: ',self.cm_maskedROI)
+            cm_mask_mean = [ np.nanmean(frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]]) for frame,maskedROI in zip(dataFrame, self.cm_maskedROI )]
+            cm_mask_med = [ np.nanmedian(frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]]) for frame,maskedROI in zip(dataFrame, self.cm_maskedROI )]
+            cm_mask_std = [ np.nanstd(frame[maskedROI[0]:maskedROI[1],maskedROI[2]:maskedROI[3]]) for frame,maskedROI in zip(dataFrame, self.cm_maskedROI )]
+            self.evt.__dict__['env_cm_masked_med'] = np.array(cm_mask_med)
+            self.evt.__dict__['env_cm_masked_mean'] = np.array(cm_mask_mean)
+            self.evt.__dict__['env_cm_masked_std'] = np.array(cm_mask_std)
+            dataFrame = np.array([df-corr for df, corr in zip(dataFrame,cm_mask_med)])
 
         #only subtract the masked ROI
         if self.common_mode==80:
@@ -991,8 +1012,8 @@ class UxiObject(DetObject):
             return
 
         corrImg, cmValues, cmValues_used = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
-        self.evt.__dict__['cm_RowMed'] = cmValues
-        self.evt.__dict__['cm_RowMed_used'] = cmValues_used
+        self.evt.__dict__['env_cm_RowMed'] = cmValues
+        self.evt.__dict__['env_cm_RowMed_used'] = cmValues_used
         self.evt.dat = corrImg
 
         return

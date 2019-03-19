@@ -444,29 +444,53 @@ def cm_uxi(dataFrame, cm_photonThres, cm_maxCorr, cm_minFrac, cm_maskNeighbors):
     maskImg = (dataFrame>cm_photonThres).astype(int)
     if cm_maskNeighbors>0:
         maskImg+=neighborImg(maskImg)
-        #img_up = np.roll(maskImg1,axis=0); img_up[0,:]=0
-        #img_down = np.roll(maskImg-1,axis=0); img_down[-1,:]=0
-        #img_left = np.roll(maskImg1,axis=1); img_left[:,0]=0
-        #img_right = np.roll(maskImg-1,axis=1); img_right[:,-1]=0
-        #maskImg+=np.amax(np.array([img_up, img_down, img_left, img_right]),axis=0)
 
-    maskedImg = np.ma.masked_array(dataFrame, maskImg)          
+    maskedImg = np.ma.masked_array(dataFrame, ~(maskImg.astype(bool)))
 
     cm_RowMeds=[]
     cm_RowMedsApplied=[]
     cm_newData=[]
-    for frame in maskedImg.data:
+    for frame in maskedImg: 
         rs = frame.reshape(frame.shape[0]*2, frame.shape[1]/2, order='F')
-        rsmed = np.median(rs, axis=1)
-        cm_RowMeds.append(rsmed.tolist())
+        rsmed = np.ma.median(rs, axis=1)
+        cm_RowMeds.append(rsmed.data.tolist())
         rscount = np.ma.count_masked(rs,axis=1) 
         rsmed[abs(rsmed)>cm_maxCorr]=0   #do not correct more than maxCorr value
         rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]=0 #do not correct if too few pixels contribute
-        cm_RowMedsApplied.append(rsmed.tolist())
-        imgCorr=(rs-rsmed[:,None]).reshape(maskedImg[0].shape[0],maskedImg[0].shape[1],order='F')
+        cm_RowMedsApplied.append(rsmed.data.tolist())
+        imgCorr=(rs.data-rsmed[:,None]).reshape(maskedImg[0].shape[0],maskedImg[0].shape[1],order='F')
         cm_newData.append(imgCorr)
 
     return np.array(cm_newData), np.array(cm_RowMeds), np.array(cm_RowMedsApplied)
+
+def templateArray(args, template, nPeaks, templateShape):
+        template =template#[10:110]
+        templateMaxPos = np.argmax(template)
+        templateSum = np.zeros(templateShape)
+        for i in range(nPeaks):
+            if args[i] < 0:
+                print("nPeaks %d, nonsensical args[%d], bailing" %(nPeaks, i), args)
+                return np.zeros(templateShape)
+            if (args[i]>templateMaxPos):
+                templatePk = np.append(np.zeros(int(args[i]-templateMaxPos)), template)
+            else:
+                templatePk = template[templateMaxPos-args[i]:]
+            if (templateShape-templatePk.shape[0])>0:
+                templatePk = np.append(templatePk, np.zeros(templateShape-templatePk.shape[0]))
+            elif (templateShape-templatePk.shape[0])<0:
+                templatePk = templatePk[:templateShape]
+            templatePkp = np.append(np.array([0]), templatePk[:-1])
+            frac1 = args[i+nPeaks]-int(args[i+nPeaks])
+            templatep = templatePk*(1.-frac1)+templatePkp*frac1
+            ##        if args[3]==0:
+            ##            return template1*args[i+self.nPeaks]
+            ##    print(args[1], )
+            try:
+                templateSum += templatep*args[i+nPeaks]
+            except:
+                "something unknown went wrong, peak %d, bailing" %(i)
+                return np.zeros(templateShape)
+        return templateSum
 
 ###
 # utility functions for plotting data as 2-d histogram
@@ -659,43 +683,6 @@ def findPeakSimple(trace, nMaxPeak=2, peakWid=20, peakOff=5):
     retDict['peakSum'] =  np.array(peakIdxSum)
     return retDict
 
-
-#
-# should work on removing it
-#
-class dropObject(object):
-  def __init__(self,name='noname',parent=None):
-    self._name = name
-    self._parent = parent
-
-  def add(self,name,data):
-    if (name not in self.__dict__):
-      self._add(name,data)
-    else:
-      self.__dict__[name].append(data)
-  def _add(self,name,data):
-    self.__dict__[name]=[data]
-  def addField(self,name,data):
-    if (name not in self.__dict__):
-      if isinstance(data, list) or  isinstance(data, np.ndarray):
-        self.__dict__[name]=data
-      else:
-        self.__dict__[name]=[data]
-    else:
-      print('field ',name,' already in dropObject: ',self._name)
-  def __repr__(self):
-    return "dropObject with fields: "+str(self.__dict__.keys())
-  def __getitem__(self,x):
-    return self.__dict__[x]
-  def __setitem__(self,name,var,setParent=True):
-    self._add(name,var)
-    if setParent:
-      try:
-        self[name]._parent = self
-      except:
-	pass
-  def _get_keys(self):
-    return [tk for tk in self.__dict__.keys() if not tk[0]=='_']
 
 
 def shapeFromKey_h5(fh5, thiskey):

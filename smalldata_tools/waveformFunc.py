@@ -4,11 +4,13 @@ import scipy
 from scipy import signal as scipy_signal
 from DetObject import DetObjectFunc
 from smalldata_tools.roi_rebin import spectrumFunc
+from smalldata_tools.utilities import templateArray as utility_templateArray
 
 #find the left-most peak (or so.....)
 class getCMPeakFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','cmPeak')
+        super(getCMPeakFunc, self).__init__(**kwargs)
         #need to get bin range
         #need to get ROI ? ROI w/ ROI func before!
         self.nPeak =  kwargs.get('nPeak',None)
@@ -61,6 +63,9 @@ class getCMPeakFunc(DetObjectFunc):
 
 class templateFitFunc(DetObjectFunc):
     def __init__(self, **kwargs):
+        self.nPeaks = kwargs.get('nPeaks',1)
+        self._name = kwargs.get('name','peak_%d'%self.nPeaks)
+        super(templateFitFunc, self).__init__(**kwargs)
         self.template = kwargs.get('template',None)
         if isinstance(self.template,list):
             self.template = np.array(template)
@@ -78,43 +83,17 @@ class templateFitFunc(DetObjectFunc):
         #normalize waveform - set maximum to 1
         self.template = self.template/self.template.max()
         
-        self.nPeaks = kwargs.get('nPeaks',1)
-        self._name = kwargs.get('name','peak_%d'%self.nPeaks)
         self.saturationFraction = kwargs.get('saturationFraction',0.98)
         self.nMax = kwargs.get('nMax',2) #allowed pixels above saturation fraction w/o clipping applied
         self._fitMethod = kwargs.get('fitMethod','pah_trf') #pah/sn _ trf/dogbox/lm
         self.saveParams = ['success','x', 'cost', 'fun']
         self._debug = kwargs.get('debug',False)
         self.fitShape = kwargs.get('fitShape',None)
+        self.invert = kwargs.get('invert',False)
+        self.baseline = kwargs.get('baseline',None)
 
     def templateArray(self, args, templateShape):
-        template =self.template#[10:110]
-        templateMaxPos = np.argmax(template)
-        templateSum = np.zeros(templateShape)
-        for i in range(self.nPeaks):
-            if args[i] < 0:
-                print("nPeaks %d, nonsensical args[%d], bailing" %(self.nPeaks, i), args)
-                return np.zeros(templateShape)
-            if (args[i]>templateMaxPos):
-                templatePk = np.append(np.zeros(int(args[i]-templateMaxPos)), template)
-            else:
-                templatePk = template[templateMaxPos-args[i]:]
-            if (templateShape-templatePk.shape[0])>0:
-                templatePk = np.append(templatePk, np.zeros(templateShape-templatePk.shape[0]))
-            elif (templateShape-templatePk.shape[0])<0:
-                templatePk = templatePk[:templateShape]
-            templatePkp = np.append(np.array([0]), templatePk[:-1])
-            frac1 = args[i+self.nPeaks]-int(args[i+self.nPeaks])
-            templatep = templatePk*(1.-frac1)+templatePkp*frac1
-            ##        if args[3]==0:
-            ##            return template1*args[i+self.nPeaks]
-            ##    print(args[1], )
-            try:
-                templateSum += templatep*args[i+self.nPeaks]
-            except:
-                "something unknown went wrong, peak %d, bailing" %(i)
-                return np.zeros(templateShape)
-        return templateSum
+        return utility_templateArray(args, self.template, self.nPeaks, templateShape)
 
     def findPars(self, trace):
         """
@@ -154,8 +133,17 @@ class templateFitFunc(DetObjectFunc):
         elif self.fitShape<trace.shape[0]:
             print('templateFitFunc: truncate the input trace!', trace.shape, self.fitShape)
             trace=trace[:self.fitShape]
-
+        if self.invert:
+            trace *= -1.
         ret_dict={}
+        if self.baseline is not None:
+            try:
+                traceBase = np.nanmedian(trace[self.baseline[0]:self.baseline[1]])
+                trace = trace-traceBase
+                ret_dict['base']=traceBase
+            except:
+                pass
+
         if trace.ndim>1:
             print('input data is not a waveform: ', trace.shape)
             return ret_dict
@@ -197,11 +185,11 @@ class templateFitFunc(DetObjectFunc):
                         elif param=='fun':
                             if isinstance(getattr(resObj, param), list):
                                 print 'getattr. fun ',getattr(resObj, param)
-                                fun=getattr(resObj, param)
+                                fun=np.array(getattr(resObj, param))
                             else:
-                                fun=list(getattr(resObj, param))
-                            if len(fun)<self.fitShape:
-                                fun.append([0]*(self.fitShape-len(fun)))
+                                fun=getattr(resObj, param)
+                            if fun.shape[0]<self.fitShape:
+                                fun=np.append(fun, np.array([0]*(self.fitShape-fun.shape[0])))
                             elif len(fun)>self.fitShape:
                                 fun=fun[:self.fitShape]
                             ret_dict[param]=fun

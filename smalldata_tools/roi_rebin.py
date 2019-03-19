@@ -21,6 +21,7 @@ class ROIFunc(DetObjectFunc):
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','ROI')
+        super(ROIFunc, self).__init__(**kwargs)
         ROI = kwargs.get('ROI',None)
         if ROI is None:
             if self._name == 'ROI': self._name='full'
@@ -32,7 +33,7 @@ class ROIFunc(DetObjectFunc):
         if ROI.ndim==1 and ROI.shape[0]>2:
             ROI = ROI.reshape(ROI.shape[0]/2,2)
         self.bound = ROI.squeeze()
-        print 'DEBUG: def ROI', self.bound
+        #print 'DEBUG: def ROI', self.bound
         self.writeArea = kwargs.get('writeArea',False)
         self._calcPars = kwargs.get('calcPars',True)
         self._mask =  kwargs.get('userMask',None)
@@ -44,19 +45,28 @@ class ROIFunc(DetObjectFunc):
             if self._rms.ndim==4:
                 self._rms = self._rms[0]#.squeeze()
             self._rms = self.applyROI(self._rms)
-  
-        if self._mask is not None and self._mask.shape == det.mask.shape:
+        if self._mask is not None and det.mask is not None and self._mask.shape == det.mask.shape:
             self._mask = ~(self._mask.astype(bool)&det.mask.astype(bool))
         else:
             try:
                 self._mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
             except:
-                pass
+                try:
+                    self._mask = ~(np.ones_like(det.ped).astype(bool))
+                except:
+                    self._mask = None
+
         if self._mask is not None:
             try:
                 self._mask = self.applyROI(self._mask)
             except:
-                self._mask = np.ones_like(self._rms)
+                pass
+
+        try:
+            self._x = self.applyROI(det.x)
+            self._y = self.applyROI(det.y)
+        except:
+            pass
 
     def addFunc(self, func):
         if isinstance(func, dropletFunc) and isinstance(self, ROIFunc):
@@ -141,8 +151,7 @@ class ROIFunc(DetObjectFunc):
                     try:
                         ret_dict['%s_%s'%(k,kk)] = np.array(subfuncResults[k][kk])
                     except:
-                        print 'issue...'
-                        #print subfuncResults[k][kk], '%s_%s'%(k,kk), len(subfuncResults[k][kk])
+                        print 'issue with: ',subfuncResults[k][kk], '%s_%s'%(k,kk), len(subfuncResults[k][kk])
 
                 else:
                     ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
@@ -156,6 +165,7 @@ class rebinFunc(DetObjectFunc):
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','rebin')
+        super(rebinFunc, self).__init__(**kwargs)
         self.shape =  kwargs.get('shape',None)
         if self.shape is None:
             print('need shape to rebin data to!')
@@ -179,7 +189,8 @@ class projectionFunc(DetObjectFunc):
         thresRms (def 1e-6): pixels with ADU < thresRms*rms will be set to 0 before summing
         singlePhoton (def False): set all pixels > threshold to 1
         """
-        self._name = kwargs.get('name','projection')
+        self._name = kwargs.get('name','pj_ax_%d'%abs(self.axis))
+        super(projectionFunc, self).__init__(**kwargs)
         self.axis =  kwargs.get('axis',-1)
         self.thresADU =  kwargs.get('thresADU',1e-6)
         self.thresRms =  kwargs.get('thresRms',1e-6)
@@ -211,6 +222,7 @@ class projectionFunc(DetObjectFunc):
 class spectrumFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','spectrum')
+        super(spectrumFunc, self).__init__(**kwargs)
         #need to get bin range
         #need to get ROI ? ROI w/ ROI func before!
         self.bins =  kwargs.get('bins',None)
@@ -250,6 +262,7 @@ class sparsifyFunc(DetObjectFunc):
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','sparse')
+        super(sparsifyFunc, self).__init__(**kwargs)
         self.nData =  kwargs.get('nData',None)
         self._flagMasked = kwargs.get('flagMasked',False)
         self._needProps = kwargs.get('needProps',False)
@@ -318,6 +331,7 @@ class imageFunc(DetObjectFunc):
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','image')
+        super(imageFunc, self).__init__(**kwargs)
         self.coords = kwargs.get('coords',None)
         self.imgShape = kwargs.get('imgShape',None)
         self.correction = kwargs.get('correction',None)

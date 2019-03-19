@@ -23,9 +23,10 @@ class photon(DetObjectFunc):
     thresADU (def: 0.9): fraction of ADU_per_photon in the most neighboring pixels needed to count as a photon 
     """
     def __init__(self, **kwargs):
+        self._name = kwargs.get('name','photon')
+        super(photon, self).__init__(**kwargs)
         self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
         self.thresADU = kwargs.get('thresADU',0.9)
-        self._name = kwargs.get('name','photon')
         self._mask = kwargs.get('mask',None)
 
     def setFromDet(self, det):
