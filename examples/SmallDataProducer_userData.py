@@ -7,8 +7,13 @@ import socket
 import os
 import RegDB.experiment_info
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
-from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
 from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
+from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
+from smalldata_tools.droplet import dropletFunc
+from smalldata_tools.photons import photon
+
 ########################################################## 
 ##
 ## User Input start --> 
@@ -192,8 +197,10 @@ if have_epix:
     #for data w/ > 1 photon energy this is the only thing that will work.
     #Tends to add photons together into single droplet if occupancy
     #is not low, might need photonizing step to get single photon positions
-    epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    epix['droplet'].addDropletSave(maxDroplets=nDrop)
+    droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+    #droplet.add_aduHist() 
+    droplet.addDropletSave(maxDroplets=nDrop)
+    epix.addFund(droplet)
 
     #now add photon algorithms. Only works for single energy photon data
     # ADU_per_photon: expected ADU for photon of expected energy
@@ -203,7 +210,7 @@ if have_epix:
     #        1 return Nphot, x, y arrays
     #        2 store image using photons /event
     if (int(run)==444):
-        epix.addPhotons(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200)
+        epix.addFunc(photon(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200))
 
     dets.append(epix)
 
@@ -211,7 +218,7 @@ ROI_rowland = getROI_rowland(int(run))
 if checkDet(ds.env(), 'cs140_diff'):
     cs140 = DetObject('cs140_diff' ,ds.env(), int(run))#, name='Rowland')
     for iROI,ROI in enumerate(ROI_rowland):
-        cs140.addROI('ROI_%d'%iROI, ROI)
+        cs140.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
     dets.append(cs140)
 
 azIntParams = getAzIntParams(run)
@@ -220,16 +227,17 @@ haveCspad = checkDet(ds.env(), 'cspad')
 if haveCspad:
     cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
     for iROI,ROI in enumerate(ROI_cspad):
-        cspad.addROI('ROI_%d'%iROI, ROI)
+        cspad.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
 
     cspad.azav_eBeam=azIntParams['eBeam']
     if azIntParams.has_key('cspad_center'):
-        cspad.azav_center=azIntParams['cspad_center']
-        cspad.azav_dis_to_sam=azIntParams['cspad_dis_to_sam']
         try:
-            cspad.addAzAv(phiBins=11, Pplane=0)
+            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
+            cspad.addFunc(azav)
         except:
             pass
+
+
     cspad.storeSum(sumAlgo='calib')
     cspad.storeSum(sumAlgo='square')
     dets.append(cspad)
