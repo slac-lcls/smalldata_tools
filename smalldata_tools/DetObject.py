@@ -97,7 +97,41 @@ class DetObjectFunc(object):
         return subFuncResults
 
 
-class DetObject(object):
+def DetObject(srcName, env, run, **kwargs):
+    print 'Getting the detector for: ',srcName
+    det = None
+    try:
+        det = psana.Detector(srcName)
+    except:
+        pass
+    if det is None:
+        if srcName.find('uxi')>=0:
+            return UxiObject(run, **kwargs)
+        else:
+            return None
+    det.alias = srcName
+    detector_classes = {
+        1: CsPad2MObject,
+        2: CsPadObject,
+        5: PulnixObject,
+        6: OpalObject,
+       27: ZylaObject,
+       28: ControlsCameraObject,
+       13: EpixObject,
+       32: Epix10k2MObject,
+       26: JungfrauObject,
+       19: RayonixObject,
+       30: IcarusObject,
+       16: AcqirisObject,
+       98: OceanOpticsObject,
+       99: ImpObject,
+    }
+    cls = detector_classes[det.dettype]
+    return cls(det, env, run, **kwargs)
+    ##should throw an exception here.
+    #return None
+
+class DetObjectClass(object):
     def __init__(self,det,env,run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
         self._src=det.source
@@ -108,51 +142,6 @@ class DetObject(object):
         self.applyMask = kwargs.get('applyMask', 0)
 
         self.dataAccessTime=0.
-
-    @staticmethod
-    def getDetObject(srcName, env, run, **kwargs):
-        print 'getting the camera: ',srcName
-        det = None
-        try:
-            det = psana.Detector(srcName)
-        except:
-            pass
-        if det is None:
-            if srcName.find('uxi')>=0:
-                return UxiObject(run, **kwargs)
-            else:
-                return det
-        det.alias = srcName
-        if det.dettype==1:
-            return CsPad2MObject(det, env, run, **kwargs)
-        elif det.dettype==2:
-            return CsPadObject(det, env, run, **kwargs)
-        elif det.dettype==5:
-            return PulnixObject(det, env, run, **kwargs)
-        elif det.dettype==6:
-            return OpalObject(det, env, run, **kwargs)
-        elif det.dettype==27:
-            return ZylaObject(det, env, run, **kwargs)
-        elif det.dettype==28:
-            return ControlsCameraObject(det, env, run, **kwargs)
-        elif det.dettype==13:
-            return EpixObject(det, env, run, **kwargs)
-        elif det.dettype==32:
-            return Epix10k2MObject(det, env, run, **kwargs)
-        elif det.dettype==26:
-            return JungfrauObject(det, env, run, **kwargs)
-        elif det.dettype==19:
-            return RayonixObject(det, env, run, **kwargs)
-        elif det.dettype==30:
-            return IcarusObject(det, env, run, **kwargs)
-        elif det.dettype==16:
-            return AcqirisObject(det, env, run, **kwargs)
-        elif det.dettype==98:
-            return OceanOpticsObject(det, env, run, **kwargs)
-        elif det.dettype==99:
-            return ImpObject(det, env, run, **kwargs)
-        #should throw an exception here.
-        return None
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
@@ -284,7 +273,7 @@ class DetObject(object):
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
 
 
-class WaveformObject(DetObject): 
+class WaveformObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(WaveformObject, self).__init__(det,env,run, **kwargs)
@@ -355,7 +344,7 @@ class ImpObject(WaveformObject):
     def getData(self, evt):
         super(ImpObject, self).getData(evt)
         
-class CameraObject(DetObject): 
+class CameraObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
         super(CameraObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [0,-1, 30] #none, raw, calib
@@ -901,7 +890,7 @@ class RayonixObject(CameraObject):
             self.cmask = np.ones(self.imgShape)
 
 
-class UxiObject(DetObject):
+class UxiObject(DetObjectClass):
     def __init__(self, run, **kwargs):
         self.det = None
         self._name = kwargs.get('name', 'uxi')
