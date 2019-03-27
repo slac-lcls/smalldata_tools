@@ -11,7 +11,7 @@ import sys
 sys.path.append('/reg/g/xpp/xppcode/python/smalldata_tools/')
 
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
-from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
 
 ##########################################################
 #command line input parameter: definitions & reading
