@@ -1,11 +1,11 @@
 import re
 import sys
 import os
+import time
 import numpy as np
 from collections import namedtuple
 import tables
 import RegDB.experiment_info
-from smalldata_tools.utilities import neighborImg
 
 abspath=(os.path.abspath(os.path.dirname(__file__))).replace('/examples','')
 sys.path.append(abspath)
@@ -45,21 +45,36 @@ def getUxiDict(run):
     print 'xtc begin: ',xtcBeginTime, xtcEndTime
 
     uxiDict={}
-    configDict=fillUxiDict(uxiPath+fname, xtcBeginTime, xtcEndTime, uxiDict)
-    #print configDict
+    try:
+        configDict, minUxi, maxUxi=fillUxiDict(uxiPath+fname, xtcBeginTime, xtcEndTime, uxiDict)
+    except:
+        pass
 
     #print 'DEBUG times: ',xtcBeginTime,minUxi
     if minUxi is None:
         print 'here:',fnamePre
-        configDict=fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
+        configDict, tmp, tmp2 = fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
     if xtcBeginTime<minUxi and os.path.isfile(uxiPath+fnamePre):
         print 'checking the run before....'
-        fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
+        tmp1, tmp2, tmp3 = fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
 
     if xtcEndTime>maxUxi and os.path.isfile(uxiPath+fnamePost):
         print 'checking the run after....'
-        fillUxiDict(uxiPath+fnamePost, xtcBeginTime, xtcEndTime, uxiDict)
+        tmp1, tmp2, tmp3 = fillUxiDict(uxiPath+fnamePost, xtcBeginTime, xtcEndTime, uxiDict)
     
+    if uxiDict=={}:
+        return uxiDict, None
+    fidmask = int('0x1ffff',16)
+    uxiSecs=[]; uxiNsecs=[]; uxiFids=[]
+    for tsec, tnsec, tfid in zip(uxiDict['lcls_ts_secs'], uxiDict['lcls_ts_necs'], uxiDict['lcls_ts_high']):
+        uxiSecs.append(np.int64(tsec))
+        uxiNsecs.append(np.int64(tnsec))
+        uxiFids.append(int(tfid)&int(fidmask))
+
+    uxiDict['lcls_ts_secs'] = np.array(uxiSecs)
+    uxiDict['lcls_ts_necs'] = np.array(uxiNsecs)
+    uxiDict['lcls_ts_fids'] = np.array(uxiFids)
+        
     return uxiDict, configDict
 
 
@@ -81,12 +96,19 @@ def fillUxiDict(fname, xtcBeginTime, xtcEndTime, uxiDict, debug=False):
         inXtc = np.array([(int(ts) >= xtcBeginTime and int(ts) <= xtcEndTime) for ts in dataDictTS['uxi']['lcls_ts_secs']])
         uxiDictAll,configDict = read_uxi(fname, returnConfig=True)    
         for key in uxiDictAll.keys():
+            uxiDictAllValue = uxiDictAll[key]
+            if key.find('frame')<0 and key.find('lcls_ts')<0:
+                if uxiDictAllValue[0].find('.')<0:
+                    uxiDictAllValue = np.array(uxiDictAllValue).astype(int)
+                else:
+                    uxiDictAllValue = np.array(uxiDictAllValue).astype(float)
             if key not in uxiDict.keys():
-                uxiDict[key] = np.array((uxiDictAll[key]))[inXtc]
+                uxiDict[key] = uxiDictAllValue#np.array((uxiDictAll[key]))[inXtc]
             else:
-                uxiDict[key] = np.append(uxiDict[key], np.array((uxiDictAll[key]))[inXtc], axis=0)
+                uxiDict[key] = np.append(uxiDict[key], np.array(uxiDictAllValue)[inXtc], axis=0)
+                #uxiDict[key] = np.append(uxiDict[key], np.array((uxiDictAll[key]))[inXtc], axis=0)
         if debug: print 'check lengths: ',len(uxiDictAll['lcls_ts_secs']),' inXtc: ',inXtc.sum(),' out dict ',len(uxiDict['lcls_ts_secs'])
-    return configDict
+    return configDict, minUxi, maxUxi
 
 def read_uxi(fname, returnConfig=False):
     header = re.compile("#\s+Frame\s+header\s+info:\s+(?P<meta>.*)")
