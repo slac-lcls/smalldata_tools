@@ -607,6 +607,26 @@ class xtcavDetector(defaultDetector):
         #dl['ragged_power']=ragged_power
         return dl
 
+class gmdDetector(defaultDetector):
+    def __init__(self,  name=None):
+        if name is None:
+            self.name = 'GMD'
+        else:
+            self.name = name
+        defaultDetector.__init__(self, 'GMD', self.name)
+
+    def data(self, evt):
+        dl={}
+        raw = self.det.get(evt)
+        if raw is not None:
+            dl['milliJoulesAverage'] = raw.milliJoulesAverage()
+            dl['rawAvgBkg'] = raw.rawAvgBkgd()
+            dl['sumAllPeaksFiltBkgd'] = raw.sumAllPeaksFiltBkgd()
+            dl['sumAllPeaksRawBkgd'] = raw.sumAllPeaksRawBkgd()
+            dl['relativeEnergyPerPulse'] = raw.relativeEnergyPerPulse()
+            dl['milliJoulesPerPulse'] = raw.milliJoulesPerPulse()
+        return dl
+
 #
 # detector classes for running in shared memory mode
 # mpiData fields are noy available here.

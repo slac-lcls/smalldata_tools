@@ -29,8 +29,14 @@ def defaultDetectors(hutch):
 def amoDetectors():
     return []
 
-def sxrDetectors():
-    return []
+def sxrDetectors(beamCodes=[[162],[91]]):
+    dets=[]
+    dets.append(lightStatus(codes=beamCodes))
+    dets.append(controlDetector())
+    dets.append(epicsDetector(PVlist=['GATT:FEE1:310:P_DES','GATT:FEE1:310:R_ACT','GMD_ACQ_RAW']))
+    dets.append(ttDetector(baseName='TTSPEC:'))
+    dets.append(gmdDetector())
+    return dets
 
 def xppDetectors(beamCodes=[[162],[91]]):
     dets=[]
@@ -199,6 +205,7 @@ def getUserData(det):
                         det_dict[fieldName] = np.array(getattr(det.evt,key)[kkey])
                     else:
                         det_dict[fieldName] = getattr(det.evt,key)[kkey]
+                    #print 'local det_dict ',det_dict
             elif isinstance(det.evt.__dict__[key], np.ndarray):
                 if isinstance(det.evt.__dict__[key], np.ma.masked_array):
                     data = det.evt.__dict__[key].data
