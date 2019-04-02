@@ -5,6 +5,7 @@ from scipy import sparse
 from utilities import rebin, getBins
 from DetObject import DetObjectFunc
 from smalldata_tools.droplet import dropletFunc
+#from droplet import dropletFunc
 
 #
 # for now, this works in "raw" coordinates.
@@ -189,9 +190,9 @@ class projectionFunc(DetObjectFunc):
         thresRms (def 1e-6): pixels with ADU < thresRms*rms will be set to 0 before summing
         singlePhoton (def False): set all pixels > threshold to 1
         """
+        self.axis =  kwargs.get('axis',-1)
         self._name = kwargs.get('name','pj_ax_%d'%abs(self.axis))
         super(projectionFunc, self).__init__(**kwargs)
-        self.axis =  kwargs.get('axis',-1)
         self.thresADU =  kwargs.get('thresADU',1e-6)
         self.thresRms =  kwargs.get('thresRms',1e-6)
         self.singlePhoton =  kwargs.get('singlePhoton',False)
