@@ -388,7 +388,6 @@ class SmallDataAna_psana(object):
             if not detname in aliases:
                 continue
 
-            #det.evt = dropObject()
             det.getData(evt)
             imgAr.append(det.evt.dat.copy())
             numEvts-=1
@@ -470,7 +469,6 @@ class SmallDataAna_psana(object):
             if not detname in aliases:
                 continue
 
-            #det.evt = dropObject()
             det.getData(evt)
             data = det.evt.dat.copy()
             if thresADU != 0:
@@ -2187,7 +2185,6 @@ class SmallDataAna_psana(object):
                 evt = runIdx.event(evtt)                #now loop over detectors in this event
                 for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
                     det = self.__dict__[thisdetName]
-                    det.evt = dropObject()
                     det.getData(evt)
                     det.processDetector()
                     
@@ -2250,7 +2247,6 @@ class SmallDataAna_psana(object):
                     #now loop over detectors in this event
                     for thisdetName,thisdetDict,dArray in zip(detNames, (myCube.targetVarsXtc), detOffArrays):
                         det = self.__dict__[thisdetName]
-                        det.evt = dropObject()
                         det.getData(evt)
                         det.processDetector()
                         
