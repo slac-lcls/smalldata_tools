@@ -445,23 +445,39 @@ def cm_uxi(dataFrame, cm_photonThres, cm_maxCorr, cm_minFrac, cm_maskNeighbors):
     if cm_maskNeighbors>0:
         maskImg+=neighborImg(maskImg)
 
-    maskedImg = np.ma.masked_array(dataFrame, ~(maskImg.astype(bool)))
+    imaskedImg = np.ma.masked_array(dataFrame, ~(maskImg.astype(bool)))
+    maskedImg = np.ma.masked_array(dataFrame, (maskImg.astype(bool)))
 
+    #print 'means: ',dataFrame.mean(), maskedImg.mean(), imaskedImg.mean()
+
+    cm_nPixel=[]
     cm_RowMeds=[]
     cm_RowMedsApplied=[]
+    cm_RowMedsMax=[]
     cm_newData=[]
     for frame in maskedImg: 
         rs = frame.reshape(frame.shape[0]*2, frame.shape[1]/2, order='F')
         rsmed = np.ma.median(rs, axis=1)
+        #rsmean = np.ma.mean(rs, axis=1)
         cm_RowMeds.append(rsmed.data.tolist())
         rscount = np.ma.count_masked(rs,axis=1) 
+        cm_nPixel.append(rscount.tolist())
         rsmed[abs(rsmed)>cm_maxCorr]=0   #do not correct more than maxCorr value
+        cm_RowMedsMax.append(rsmed.data.tolist())
+        #print 'B',((1.-cm_minFrac)*frame.shape[1]), rscount[10:]
+        #print 'c', (rscount>((1.-cm_minFrac)*frame.shape[1])).sum()
+        #print 'd', rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]
         rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]=0 #do not correct if too few pixels contribute
+        #print 'rsmed3 ',(rsmed.data==0).sum()
         cm_RowMedsApplied.append(rsmed.data.tolist())
         imgCorr=(rs.data-rsmed[:,None]).reshape(maskedImg[0].shape[0],maskedImg[0].shape[1],order='F')
         cm_newData.append(imgCorr)
 
-    return np.array(cm_newData), np.array(cm_RowMeds), np.array(cm_RowMedsApplied)
+    cmDict={'cm_RowMeds':np.array(cm_RowMeds)}
+    cmDict['cm_RowMedsApplied']=np.array(cm_RowMedsApplied)
+    cmDict['cm_RowMedsMax']=np.array(cm_RowMedsMax)
+    cmDict['cm_nPixel']=np.array(cm_nPixel)
+    return np.array(cm_newData), cmDict
 
 def templateArray(args, template, nPeaks, templateShape):
         template =template#[10:110]
