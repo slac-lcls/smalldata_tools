@@ -20,9 +20,12 @@ def getThermistorTemp(x):
   u = x/16383.0 * 2.5
   i = u / 100000
   r = (2.5 - u)/i
-  l = np.log(r/10000)
-  t = 1.0 / (3.3538646E-03 + 2.5654090E-04 * l + 1.9243889E-06 * (l*l) + 1.0969244E-07 * (l*l*l))
-  return t - 273.15
+  try:
+    l = np.log(r/10000)
+    t = 1.0 / (3.3538646E-03 + 2.5654090E-04 * l + 1.9243889E-06 * (l*l) + 1.0969244E-07 * (l*l*l))
+    return t - 273.15
+  except:
+    return np.nan
 
 #this class is a container which will hold the event based data. It will be created in the getData step.            
 class event(object):
@@ -821,7 +824,7 @@ class Epix10k2MObject(TiledCameraObject):
         try:
             envRows = evt.get(psana.Epix.ArrayV1,psana.Source(self.det.alias)).environmentalRows()
             #envRows = evt.get(psana.Epix.ArrayV1,psana.Source(self.det.alias)).environmentalRows().astype(np.uint16)
-            print 'envRow: iunt16', envRows.shape
+            #print 'envRow: iunt16', envRows.shape
             temp1    = []
             temp1H    = []
             temp2    = []
@@ -851,10 +854,10 @@ class Epix10k2MObject(TiledCameraObject):
                 anatemp.append(moduleRow[1][33]*2.048/4095*(130/(0.882-1.951)) + (0.882/0.0082+100))
                 digtemp.append(moduleRow[1][30]*2.048/4095*(130/(0.882-1.951)) + (0.882/0.0082+100))
 
-            print 'temp1',temp1
-            print 'temp1H',temp1H
-            print 'hum',hum
-            print 'humH',humH
+            #print 'temp1',temp1
+            #print 'temp1H',temp1H
+            #print 'hum',hum
+            #print 'humH',humH
             self.evt.__dict__['env_temp1']  = np.array(temp1) 
             self.evt.__dict__['env_temp2']  = np.array(temp2) 
             self.evt.__dict__['env_temp3']  = np.array(temp3) 
@@ -1000,10 +1003,15 @@ class UxiObject(DetObjectClass):
             self.evt.dat=dataFrame
             return
 
-        corrImg, cmValues, cmValues_used = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
-        self.evt.__dict__['env_cm_RowMed'] = cmValues
-        self.evt.__dict__['env_cm_RowMed_used'] = cmValues_used
+        corrImg, cmDict = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
+        for k, value in cmDict.iteritems():
+          self.evt.__dict__['env_%s'%k] = value
         self.evt.dat = corrImg
+
+        #corrImg, cmValues, cmValues_used = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
+        #self.evt.__dict__['env_cm_RowMed'] = cmValues
+        #self.evt.__dict__['env_cm_RowMed_used'] = cmValues_used
+        #self.evt.dat = corrImg
 
         return
 
