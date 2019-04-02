@@ -103,6 +103,7 @@ def gauss_params_estimate(data) :
     # height
     height = data[mean] - pedestal
     
+    #print 'DEBUG esimate: ',data[mean], pedestal, height
     # Estimate sigma from FWHM, which is 2.36*sigma
     sigma = FWHM(data) / 2.36
 
@@ -121,8 +122,20 @@ def GaussFit(data,xaxis=None, debug=False) :
 
     params_estimate = gauss_params_estimate(data)
     if (params_estimate[1]==0):
-        print 'params_estimate ', params_estimate[0],' ', params_estimate[1]
-        return None
+        print 'params_estimate failed, will return nans.', params_estimate[0],' ', params_estimate[1]
+        fit_results = {'mean':np.nan,
+                       'sigma':np.nan,
+                       'height':np.nan,
+                       'pedestal':np.nan,
+                       'mean_error':np.nan,
+                       'sigma_error':np.nan,
+                       'height_error':np.nan,
+                       'pedestal_error':np.nan,
+                       'mean_estimate':np.nan,
+                       'sigma_estimate':np.nan,
+                       'height_estimate':np.nan,
+                       'pedestal_estimate':np.nan}
+        return fit_results
 
     try:
         fit_params, fit_cov = curve_fit(gauss,xaxis,data,params_estimate)
@@ -142,18 +155,18 @@ def GaussFit(data,xaxis=None, debug=False) :
         fit_params = [-1.,-1.,-1., -1.]
         fit_params_error = [-1.,-1.,-1., -1.]        
 
-    fit_results = {'mean':fit_params[0],
-                   'sigma':fit_params[1],
-                   'height':fit_params[2],
-                   'pedestal':fit_params[3],
-                   'mean_error':fit_params_error[0],
-                   'sigma_error':fit_params_error[1],
-                   'height_error':fit_params_error[2],
-                   'pedestal_error':fit_params_error[3],
-                   'mean_estimate':params_estimate[0],
-                   'sigma_estimate':params_estimate[1],
-                   'height_estimate':params_estimate[2],
-                   'pedestal_estimate':params_estimate[3]}
+    fit_results = {'mean':float(fit_params[0]),
+                   'sigma':float(fit_params[1]),
+                   'height':float(fit_params[2]),
+                   'pedestal':float(fit_params[3]),
+                   'mean_error':float(fit_params_error[0]),
+                   'sigma_error':float(fit_params_error[1]),
+                   'height_error':float(fit_params_error[2]),
+                   'pedestal_error':float(fit_params_error[3]),
+                   'mean_estimate':float(params_estimate[0]),
+                   'sigma_estimate':float(params_estimate[1]),
+                   'height_estimate':float(params_estimate[2]),
+                   'pedestal_estimate':float(params_estimate[3])}
 
     return fit_results
     
