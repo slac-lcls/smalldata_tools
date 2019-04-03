@@ -2,8 +2,8 @@ import os
 import numpy as np
 from scipy import sparse
 
-from utilities import rebin, getBins
-from DetObject import DetObjectFunc
+from smalldata_tools.utilities import rebin, getBins
+from smalldata_tools.DetObject import DetObjectFunc
 from smalldata_tools.droplet import dropletFunc
 #from droplet import dropletFunc
 
