@@ -7,7 +7,6 @@ import os
 import itertools    
 import psana
 import h5py
-from smalldata_tools import dropObject
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -62,11 +61,11 @@ fname=''
 if args.file:
     fname = args.file
 
-from smalldata_tools import SmallDataAna
+from smalldata_tools.SmallDataAna import SmallDataAna
 ana = None
 anaps = None
 try:
-    from smalldata_tools import SmallDataAna_psana
+    from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana
     anaps = SmallDataAna_psana(expname,run,dirname,fname)
 except:
     pass
@@ -106,7 +105,6 @@ if ana is not None:
     cs140_dict = {'source': 'cs140_dump', 'full': 1, 'common_mode':1}
     anaps.addDetInfo(cs140_dict)
     det = anaps.cs140_dump
-    det.evt = dropObject()
 
     #get the average motor positions at scan step to be saved later in hdf5 files w/ cs140 data
     nano_y=cubeData['scan__nano_y'].values/cubeData['nEntries'].values
@@ -145,7 +143,7 @@ if ana is not None:
             evt = runIdx.event(evtt)
             #now loop over detectors in this event
             det.getData(evt)
-            det.processDetector()
+            det.processFuncs()
             cs140_data.append(det.evt.write_full)
             cs140_img.append(det.det.image(run,det.evt.write_full))
 
