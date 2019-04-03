@@ -10,8 +10,10 @@ import RegDB.experiment_info
 import sys
 sys.path.append('/reg/g/xpp/xppcode/python/smalldata_tools/')
 
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
-from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
+from smalldata_tools.utilities import printMsg
+from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
+from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
+
 
 ##########################################################
 #command line input parameter: definitions & reading

@@ -6,9 +6,10 @@ import argparse
 import socket
 import os
 import RegDB.experiment_info
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
-from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData
-from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
+from smalldata_tools.DetObject import DetObject
+from smalldata_tools.utilities import checkDet, printMsg
+from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
+from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
 from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
 from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
@@ -269,7 +270,9 @@ if len(epicsPV)>0:
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name]=getCfgOutput(det)
+    userDataCfg[det._name] = det.params_as_dict()
+for det in raredets:
+    userDataCfg[det._name] = det.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
