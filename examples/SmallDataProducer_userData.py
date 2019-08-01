@@ -269,6 +269,8 @@ if len(epicsPV)>0:
 
 #add config data here
 userDataCfg={}
+for det in defaultDets:
+    userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
 for det in raredets:
@@ -295,7 +297,7 @@ for eventNr,evt in enumerate(ds.events()):
             #this should be a plain dict. Really.
             det.evt = dropObject()
             det.getData(evt)
-            det.processDetector()
+            det.processFuncs()
             userDict[det._name]=getUserData(det)
             try:
                 envData=getUserEnvData(det)
