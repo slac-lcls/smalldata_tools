@@ -14,24 +14,28 @@ from matplotlib import gridspec
 from matplotlib import path
 import itertools
 import os
-import psana
-import SmallDataAna as sda
-from DetObject import DetObject
-from SmallDataUtils import getUserData
-from utilities import printR
-from utilities import addToHdf5
-from utilities import rename_reduceRandomVar
-from utilities_plotting import plotImageBokeh
-from utilities_plotting import hv_image
-from utilities_plotting import hv_image_ctl
-from utilities_plotting import hv_3dimage
 import holoviews as hv
 import bokeh.plotting as bp
-import azimuthalBinning as ab
 from matplotlib import gridspec
+import psana
 import RegDB.experiment_info
-from utilities_FitCenter import FindFitCenter
-from utilities_FitCenter import fitCircle
+import SmallDataAna as sda
+
+from smalldata_tools.DetObject import DetObject
+from smalldata_tools.SmallDataUtils import getUserData
+from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.droplet import dropletFunc
+from smalldata_tools.photons import photon
+from smalldata_tools.utilities import printR
+from smalldata_tools.utilities import addToHdf5
+from smalldata_tools.utilities import rename_reduceRandomVar
+from smalldata_tools.utilities_plotting import plotImageBokeh
+from smalldata_tools.utilities_plotting import hv_image
+from smalldata_tools.utilities_plotting import hv_image_ctl
+from smalldata_tools.utilities_plotting import hv_3dimage
+from smalldata_tools.utilities_FitCenter import FindFitCenter
+from smalldata_tools.utilities_FitCenter import fitCircle
+from smalldata_tools.azimuthalBinning import azimuthalBinning
 from mpi4py import MPI
 import h5py
 comm = MPI.COMM_WORLD
@@ -269,7 +273,7 @@ class SmallDataAna_psana(object):
 
         if detname in self.__dict__.keys():
             printR(rank, 'redefine detector object with different common mode: %d instead of %d'%( common_mode,self.__dict__[detname].common_mode))
-        det = DetObject.getDetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
+        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
         self.__dict__[detname]=det
         if (detname+'_pedestals') in self.__dict__.keys():
             return detname
@@ -283,9 +287,9 @@ class SmallDataAna_psana(object):
         if detnameDict is not None:
             for key in detnameDict.keys():
                 if key=='full' or key=='Full':
-                    self.__dict__[detname].saveFull()
+                    self.__dict__[detname].addFunc(ROIFunc(writeArea=True))
                 if key.find('ROI')==0:
-                    self.__dict__[detname].addROI(key,detnameDict[key],writeArea=True)
+                    self.__dict__[detname].addFunc(ROIFunc(name=key,ROI=detnameDict[key],writeArea=True))
                 if key.find('photon')==0:
                     thres=0.9
                     if key.find('_')>0:
@@ -293,7 +297,7 @@ class SmallDataAna_psana(object):
                             thres=float(key.split('_')[1].replace('p','.'))
                         except:
                             pass
-                    self.__dict__[detname].addPhotons(ADU_per_photon=detnameDict[key], thresADU=thres, retImg=2)
+                    self.__dict__[detname].addFunc(photon(ADU_per_photon=detnameDict[key], thresADU=thres, retImg=2))
 
         return detname
 
@@ -513,7 +517,7 @@ class SmallDataAna_psana(object):
             imgM = np.median(img,axis=0)#.squeeze()
             self.__dict__[data.replace('AvImg_','AvImg_median_')]=imgM
 
-    def getAvImage(self,detname=None, imgname=None):
+    def getAvImage(self,detname=None, imgName=None):
         avImages=[]
         for key in self.__dict__.keys():
             if key.find('AvImg')!=0:
@@ -522,7 +526,7 @@ class SmallDataAna_psana(object):
                 continue
             if key.find('_azint_')>=0:
                 continue
-            if imgname is not None and key.find(imgname)<0:
+            if imgName is not None and key.find(imgName)<0:
                 continue
             if detname is not None and key.find(detname)<0:
                 continue
@@ -576,15 +580,15 @@ class SmallDataAna_psana(object):
             detname = detname[:-1]
         return detname
 
-    def plotAvImage(self,detname=None,imgname=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
-        detname, img, avImage = self.getAvImage(detname=detname, imgname=imgname)
+    def plotAvImage(self,detname=None,imgName=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
+        detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
 
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
             img = (img*mask)
 
-        plotMax = np.percentile(img, limits[1])
-        plotMin = np.percentile(img, limits[0])
+        plotMax = np.nanpercentile(img, limits[1])
+        plotMin = np.nanpercentile(img, limits[0])
         print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         if len(img.shape)>2:
@@ -610,7 +614,7 @@ class SmallDataAna_psana(object):
                 img = image[:debugPlot, :debugPlot]
             else:
                 img = image
-            layout, p, im = plotImageBokeh(img, plot_title=plot_title, plotMaxP=np.percentile(img,99),plotMinP=np.percentile(img,1), plotWidth=700, plotHeight=700)
+            layout, p, im = plotImageBokeh(img, plot_title=plot_title, plotMaxP=np.nanpercentile(img,99),plotMinP=np.nanpercentile(img,1), plotWidth=700, plotHeight=700)
             bp.output_notebook()
             bp.show(layout)
         else:
@@ -693,8 +697,8 @@ class SmallDataAna_psana(object):
         detname = self._getDetName_from_AvImage(avImage)
         img = self.__dict__[avImage]
 
-        plotMax = np.percentile(img, limits[1])
-        plotMin = np.percentile(img, limits[0])
+        plotMax = np.nanpercentile(img, limits[1])
+        plotMin = np.nanpercentile(img, limits[0])
         print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         fig=plt.figure(figsize=(10,6))
@@ -795,7 +799,7 @@ class SmallDataAna_psana(object):
             return combRes
         #plot image in grayscale
         plt.figure(figsize=[12,12])
-        plt.imshow(image, interpolation='none', cmap='gray',clim=[0,np.percentile(img.flatten(),99.5)])
+        plt.imshow(image, interpolation='none', cmap='gray',clim=[0,np.nanpercentile(img.flatten(),99.5)])
         #plot sparse images in blue.
         plt.plot(arSparse.col, arSparse.row,markersize=5,color='#ff9900',marker='.',linestyle='None')
         if combRes==-1:
@@ -896,8 +900,8 @@ class SmallDataAna_psana(object):
                 self.__dict__['_mask_'+avImage] = locmask
                 img = (img*locmask)
 
-        plotMax = np.percentile(img[img!=0], 99.5)
-        plotMin = np.percentile(img[img!=0], 5)
+        plotMax = np.nanpercentile(img[img!=0], 99.5)
+        plotMin = np.nanpercentile(img[img!=0], 5)
         printR(rank, 'plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
@@ -964,7 +968,7 @@ class SmallDataAna_psana(object):
             while not happy:
                 if thresIn is not None:
                     thres = thresIn
-                    thresP = np.percentile(img[img!=0], thres)
+                    thresP = np.nanpercentile(img[img!=0], thres)
                     happy = True
                 else:                    
                     if not plotIt:
@@ -977,7 +981,7 @@ class SmallDataAna_psana(object):
                         plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None')
                     thres = float(raw_input("min percentile % of selected points:\n"))
 
-                    thresP = np.percentile(img[img!=0], thres)
+                    thresP = np.nanpercentile(img[img!=0], thres)
                     print('thresP',thresP)
                     imageThres=image.copy()
                     imageThres[image>thresP]=1
@@ -1011,8 +1015,8 @@ class SmallDataAna_psana(object):
     def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
         detname, img, avImage = self.getAvImage(detname=None)
 
-        plotMax = np.percentile(img, limits[1])
-        plotMin = np.percentile(img, limits[0])
+        plotMax = np.nanpercentile(img, limits[1])
+        plotMin = np.nanpercentile(img, limits[0])
         print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
@@ -1177,7 +1181,7 @@ class SmallDataAna_psana(object):
                     pedResultImg = det.image(self.run,pedResult)
                 else:
                     pedResultImg = pedResult.copy()
-                plt.subplot(gsPed[0]).imshow(pedResultImg,clim=[np.percentile(pedResult,1),np.percentile(pedResult,99)])
+                plt.subplot(gsPed[0]).imshow(pedResultImg,clim=[np.nanpercentile(pedResult,1),np.nanpercentile(pedResult,99)])
                 plt.subplot(gsPed[1]).plot(hstPed[1][:-1],np.log(hstPed[0]),'o')
                 ctot=raw_input("Enter allowed pedestal range (min max)")
                 c = ctot.split(' ');pedMin=float(c[0]);pedMax=float(c[1]);
@@ -1421,7 +1425,7 @@ class SmallDataAna_psana(object):
             det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.1f',addmetad=True)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
-    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=None,ty=None):
+    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0):
         detname, img, avImage = self.getAvImage(detname=detname)
         if dis_to_sam==None:
             dis_to_sam=float(raw_input('please enter the detector distance'))
@@ -1429,15 +1433,17 @@ class SmallDataAna_psana(object):
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
             center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
                     int(centerString.replace('[','').replace(']','').split(',')[1])]
-        self.__dict__[detname].addAzAv(phiBins=phiBins, qBin=qBin, center=center, dis_to_sam=dis_to_sam, eBeam=eBeam, azavName=name, Pplane=Pplane, userMask=userMask,tx=tx,ty=ty)
+
+        azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbins=qBin, tx=tx, ty=ty, name=name)
+        getattr(self,detname).addFunc(azav)
 
     def getAzAvs(self,detname=None):
         if detname is None:
             detname, img, avImage = self.getAvImage(detname=None)   
             if detname is None:
                 return
-        azintArray = [ self.__dict__[detname][key] for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
-        azintNames = [ key for key in self.__dict__[detname].__dict__.keys() if isinstance(self.__dict__[detname][key], ab.azimuthalBinning) ]
+        azintArray = [ getattr(getattr(self,detname),key) for key in getattr(self, detname).__dict__.keys() if isinstance(getattr(getattr(self, detname),key), azimuthalBinning) ]
+        azintNames = [ key for key in getattr(self,detname).__dict__.keys() if isinstance(getattr(getattr(self, detname),key), azimuthalBinning) ]
         return azintNames, azintArray
 
     def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, data=None, imgName=None):
@@ -1475,7 +1481,8 @@ class SmallDataAna_psana(object):
         if plotIt:
             fig=plt.figure(figsize=(8,5))
             if len(azintValues.shape)==1:
-                plt.plot(self.__dict__[detname].__dict__[azintName+'_q'],azintValues,'o')
+                qVals = getattr(getattr(getattr(self,detname), azintName),'q')
+                plt.plot(qVals,azintValues,'o')
             elif len(azintValues.shape)==2:
                 plt.imshow(azintValues,aspect='auto',interpolation='none')
                 plt.colorbar()
@@ -1506,15 +1513,16 @@ class SmallDataAna_psana(object):
             azintValues = self.__dict__['_azint_'+azint]
             fig=plt.figure(figsize=(8,5))
             if len(azintValues.shape)==1:
-                print(azintValues.shape, self.__dict__[detname].__dict__[azint+'_q'].shape)
-                plt.plot(self.__dict__[detname].__dict__[azint+'_q'],azintValues,'o')
+                qVals = getattr(getattr(getattr(self,detname), azint),'q')
+                print(azintValues.shape, qVals.shape)
+                plt.plot(qVals,azintValues,'o')
             elif len(azintValues.shape)==2:
                 plt.imshow(azintValues,aspect='auto',interpolation='none')
                 plt.colorbar()
         except:
             pass
 
-    def AzInt_centerVar(self, detname=None, use_mask=False, center=None, data=None, varCenter=110., zoom=[-1,-1]):
+    def AzInt_centerVar(self, detname=None, use_mask=False, center=None, data=None, varCenter=110., zoom=None, qBin=0.001, phiBins=13, dis_to_sam=1000.):
         if data is not None:
             if detname is None:
                 detname=raw_input('type the name detector alias')
@@ -1529,65 +1537,81 @@ class SmallDataAna_psana(object):
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
             center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
                     int(centerString.replace('[','').replace(']','').split(',')[1])]
-        self.addAzInt(detname=detname, phiBins=13, qBin=0.001, eBeam=9.5, center=[center[0],center[1]], dis_to_sam=1000., name='c00')
-        self.addAzInt(detname=detname, phiBins=13, qBin=0.001, eBeam=9.5, center=[center[0]-varCenter,center[1]], dis_to_sam=1000., name='cm10')
-        self.addAzInt(detname=detname, phiBins=13, qBin=0.001, eBeam=9.5, center=[center[0]+varCenter,center[1]], dis_to_sam=1000., name='cp10')
-        self.addAzInt(detname=detname, phiBins=13, qBin=0.001, eBeam=9.5, center=[center[0],center[1]-varCenter], dis_to_sam=1000., name='c0m1')
-        self.addAzInt(detname=detname, phiBins=13, qBin=0.001, eBeam=9.5, center=[center[0],center[1]+varCenter], dis_to_sam=1000., name='c0p1')
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]], dis_to_sam=dis_to_sam, name='c00')
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]-varCenter,center[1]], dis_to_sam=dis_to_sam, name='cm10')
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]+varCenter,center[1]], dis_to_sam=dis_to_sam, name='cp10')
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]-varCenter], dis_to_sam=dis_to_sam, name='cm01')
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]+varCenter], dis_to_sam=dis_to_sam, name='cp01')
         self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='c00')
         self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cm10')
         self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cp10')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='c0m1')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='c0p1')
+        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cm01')
+        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cp01')
 
+        azintValues_c00 = self.__dict__['_azint_c00']
+        azintValues_cm10 = self.__dict__['_azint_cm10']
+        azintValues_cp10 = self.__dict__['_azint_cp10']
+        azintValues_cm01 = self.__dict__['_azint_cm01']
+        azintValues_cp01 = self.__dict__['_azint_cp01']
+        
         try:
-            azintValues_c00 = self.__dict__['_azint_c00']
-            azintValues_cm10 = self.__dict__['_azint_cm10']
-            azintValues_cp10 = self.__dict__['_azint_cp10']
-            azintValues_c0m1 = self.__dict__['_azint_c0m1']
-            azintValues_c0p1 = self.__dict__['_azint_c0p1']
-
             fig=plt.figure(figsize=(10,6))
             from matplotlib import gridspec
-            ymin=0;ymax=azintValues_c00.shape[1]-1
-            #plt.subplot2grid((3,3),(1,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]))
-            #plt.subplot2grid((3,3),(1,0)).set_title('center= %9.2f, %9.2f'%(center[0]-varCenter,center[1]))
-            #plt.subplot2grid((3,3),(1,2)).set_title('center= %9.2f, %9.2f'%(center[0]+varCenter,center[1]))
-            #plt.subplot2grid((3,3),(0,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]-varCenter))
-            #plt.subplot2grid((3,3),(2,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]+varCenter))
-            plt.subplot2grid((3,3),(1,1)).imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none')
-            plt.subplot2grid((3,3),(1,0)).imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none')
-            plt.subplot2grid((3,3),(1,2)).imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none')
-            plt.subplot2grid((3,3),(0,1)).imshow(azintValues_c0m1[:,ymin:ymax],aspect='auto',interpolation='none')
-            plt.subplot2grid((3,3),(2,1)).imshow(azintValues_c0p1[:,ymin:ymax],aspect='auto',interpolation='none')
+            p33_11 = plt.subplot2grid((3,3),(1,1))
+            p33_10 = plt.subplot2grid((3,3),(1,0))
+            p33_12 = plt.subplot2grid((3,3),(1,2))
+            p33_01 = plt.subplot2grid((3,3),(0,1))
+            p33_21 = plt.subplot2grid((3,3),(2,1))
+        except:
+            print('failed with getting plot ready')
+            return
 
-            print(zoom, (zoom[0]!=zoom[1]))
-            while zoom[0]!=zoom[1]:
-                if zoom[1]<zoom[0] or zoom[0]<0 or zoom[1]<0:
+        while 1:
+            ymin=0;ymax=azintValues_c00.shape[1]-1
+            if zoom is not None:
+                if isinstance(zoom, list) and isinstance(zoom[0], int) and zoom[0]>=0 and zoom[1]>=0 and zoom[0]!=zoom[1]:
+                    ymin=zoom[0]
+                    ymax=zoom[1]
+                else:
                     yString=raw_input('please enter x-boundaries of the zoomed figure as c1,c2 or [c1,c2]:')
                     ymin=int(yString.replace('[','').replace(']','').split(',')[0])
                     ymax=int(yString.replace('[','').replace(']','').split(',')[1])
-                else:
-                    ymin=zoom[0]
-                    ymax=zoom[1]
-                #plt.subplot2grid((3,3),(1,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]))
-                #plt.subplot2grid((3,3),(1,0)).set_title('center= %9.2f, %9.2f'%(center[0]-varCenter,center[1]))
-                #plt.subplot2grid((3,3),(1,2)).set_title('center= %9.2f, %9.2f'%(center[0]+varCenter,center[1]))
-                #plt.subplot2grid((3,3),(0,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]-varCenter))
-                #plt.subplot2grid((3,3),(2,1)).set_title('center= %9.2f, %9.2f'%(center[0],center[1]+varCenter))
-                plt.subplot2grid((3,3),(1,1)).imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none')
-                plt.subplot2grid((3,3),(1,0)).imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none')
-                plt.subplot2grid((3,3),(1,2)).imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none')
-                plt.subplot2grid((3,3),(0,1)).imshow(azintValues_c0m1[:,ymin:ymax],aspect='auto',interpolation='none')
-                plt.subplot2grid((3,3),(2,1)).imshow(azintValues_c0p1[:,ymin:ymax],aspect='auto',interpolation='none')
+            print('we will plot from bin %d to %d '%(ymin, ymax))
+
+            try:
+                maxVal_c00 =  np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_c00[:,ymin:ymax])])
+                maxVal_cm10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm10[:,ymin:ymax])])
+                maxVal_cm01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm01[:,ymin:ymax])])
+                maxVal_cp10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp10[:,ymin:ymax])])
+                maxVal_cp01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp01[:,ymin:ymax])])
+
+                p33_11.imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none')
+                p33_10.imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none')
+                p33_12.imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none')
+                p33_01.imshow(azintValues_cm01[:,ymin:ymax],aspect='auto',interpolation='none')
+                p33_21.imshow(azintValues_cp01[:,ymin:ymax],aspect='auto',interpolation='none')
+                try:
+                    p33_11.plot(maxVal_c00[:,1], maxVal_c00[:,0],'r+')
+                    p33_10.plot(maxVal_cm10[:,1], maxVal_cm10[:,0],'r+')
+                    p33_12.plot(maxVal_cp10[:,1], maxVal_cp10[:,0],'r+')
+                    p33_01.plot(maxVal_cm01[:,1], maxVal_cm01[:,0],'r+')
+                    p33_21.plot(maxVal_cp01[:,1], maxVal_cp01[:,0],'r+')
+                    cMaxVal_c00 = np.nanargmax(azintValues_c00[:,ymin:ymax].sum(axis=0))
+                    p33_11.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    p33_10.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    p33_12.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    p33_01.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    p33_21.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                except:
+                    print('failed at plotting')
+
+                if ymin==0 and ymax==azintValues_c00.shape[1]-1:
+                    break
                 if raw_input("done? (y/n):\n") in ["y","Y"]:
-                    zoom=[-1,-1]
-                else:
-                    yString=raw_input('please enter x-boundaries of the zoomed figure as c1,c2 or [c1,c2] - was: ',zoom)
-                    ymin=int(yString.replace('[','').replace(']','').split(',')[0])
-                    ymax=int(yString.replace('[','').replace(']','').split(',')[1])
-        except:
-            pass
+                    break
+            except:
+                print('failed in try-except.')
+                break
 
     def SelectRegionDroplet(self, detname=None, limits=[5,99.5]):
         avImages=[]
@@ -1609,8 +1633,8 @@ class SmallDataAna_psana(object):
         img = self.__dict__[avImage]
         print(img.shape)
 
-        plotMax = np.percentile(img, limits[1])
-        plotMin = np.percentile(img, limits[0])
+        plotMax = np.nanpercentile(img, limits[1])
+        plotMin = np.nanpercentile(img, limits[0])
         print('plot %s using the %g/%g percentiles as plot min/max: (%g, %g)'%(avImage,limits[0],limits[1],plotMin,plotMax))
 
         needsGeo=False
@@ -1742,8 +1766,8 @@ class SmallDataAna_psana(object):
             ymax=self.__dict__[detname+'_y'].max()
             bounds = (xmin, ymin, xmax, ymax)
             plotwidth=400
-            zPed=(np.percentile(pedImg,5), np.percentile(pedImg,99.5))
-            zRms=(np.percentile(rmsImg,5), np.percentile(rmsImg,99.5))
+            zPed=(np.nanpercentile(pedImg,5), np.nanpercentile(pedImg,99.5))
+            zRms=(np.nanpercentile(rmsImg,5), np.nanpercentile(rmsImg,99.5))
             hstPedO = hv.Overlay([hv.Scatter((0.5*(hst[1][:-1]+hst[1][1:]), np.log(hst[0])),'pedestal','log(nEntries)') for hst in hstPed]).options(width=plotwidth)
             hstRmsO = hv.Overlay([hv.Scatter((0.5*(hst[1][:-1]+hst[1][1:]), np.log(hst[0])),'rms','log(nEntries)') for hst in hstRms]).options(width=plotwidth)
             
@@ -1760,13 +1784,13 @@ class SmallDataAna_psana(object):
             plt.subplot(gsPed[1]).plot(hstPed[i][1][:-1],np.log(hstPed[i][0]),'o')
             plt.subplot(gsPed[3]).plot(hstRms[i][1][:-1],np.log(hstRms[i][0]),'o')
         if det.dettype==26:
-            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals[0],1),np.percentile(pedestals[0],99)])
+            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.nanpercentile(pedestals[0],1),np.nanpercentile(pedestals[0],99)])
             cbar0 = plt.colorbar(im0)
-            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms[0],1),np.percentile(rms[0],99)])
+            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.nanpercentile(rms[0],1),np.nanpercentile(rms[0],99)])
         else:
-            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.percentile(pedestals,1),np.percentile(pedestals,99)])
+            im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.nanpercentile(pedestals,1),np.nanpercentile(pedestals,99)])
             cbar0 = plt.colorbar(im0)
-            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.percentile(rms,1),np.percentile(rms,99)])
+            im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.nanpercentile(rms,1),np.nanpercentile(rms,99)])
         cbar2 = plt.colorbar(im2)
 
     def _fillCalibHisto(self, detname='None', printVal=[-1], pedBinWidth=10, rmsBinWidth=0.1):
@@ -1890,9 +1914,9 @@ class SmallDataAna_psana(object):
         if plotWith=='bokeh_notebook':
             plotwidth=400
             boundsPed = (0, np.array(self.calibhisto['runs']).min(),  allPeds[icurrRun].max(), np.array(self.calibhisto['runs']).max())
-            pedZ = (np.percentile(self.calibhisto['ped2d'],1),np.percentile(self.calibhisto['ped2d'],99.5))
+            pedZ = (np.nanpercentile(self.calibhisto['ped2d'],1),np.nanpercentile(self.calibhisto['ped2d'],99.5))
             boundsRms = (0, np.array(self.calibhisto['runs']).min(),  allRms[icurrRun].max(), np.array(self.calibhisto['runs']).max())
-            rmsZ = (np.percentile(self.calibhisto['rms2d'],1),np.percentile(self.calibhisto['rms2d'],99.5))
+            rmsZ = (np.nanpercentile(self.calibhisto['rms2d'],1),np.nanpercentile(self.calibhisto['rms2d'],99.5))
             runDim=hv.Dimension('run')
 
             #replace norm plots by zoomed plots.
@@ -1922,11 +1946,11 @@ class SmallDataAna_psana(object):
         plt.subplot(gsPed[1]).plot(self.calibhisto['runs'],self.calibhisto['status'],'o')
 
         ch_ped2d = self.calibhisto['ped2d']
-        im0 = plt.subplot(gsPed[2]).imshow(ch_ped2d.T,vmin=np.percentile(ch_ped2d,1),vmax=np.percentile(ch_ped2d,99),interpolation='none',aspect='auto',extent=[0, ch_ped2d.shape[0], self.calibhisto['pedBinLow'],self.calibhisto['pedBinLow']+ch_ped2d.shape[1]*self.calibhisto['pedBinWidth']], origin='lower')
+        im0 = plt.subplot(gsPed[2]).imshow(ch_ped2d.T,vmin=np.nanpercentile(ch_ped2d,1),vmax=np.nanpercentile(ch_ped2d,99),interpolation='none',aspect='auto',extent=[0, ch_ped2d.shape[0], self.calibhisto['pedBinLow'],self.calibhisto['pedBinLow']+ch_ped2d.shape[1]*self.calibhisto['pedBinWidth']], origin='lower')
         cbar0 = plt.colorbar(im0)
 
         ch_rms2d = self.calibhisto['rms2d']
-        im2 = plt.subplot(gsPed[3]).imshow(ch_rms2d.T,vmin=np.percentile(ch_rms2d,1),vmax=np.percentile(ch_rms2d,99),interpolation='none',aspect='auto',extent=[0, ch_rms2d.shape[0], self.calibhisto['rmsBinLow'],self.calibhisto['rmsBinLow']+ch_rms2d.shape[1]*self.calibhisto['rmsBinWidth']], origin='lower')
+        im2 = plt.subplot(gsPed[3]).imshow(ch_rms2d.T,vmin=np.nanpercentile(ch_rms2d,1),vmax=np.nanpercentile(ch_rms2d,99),interpolation='none',aspect='auto',extent=[0, ch_rms2d.shape[0], self.calibhisto['rmsBinLow'],self.calibhisto['rmsBinLow']+ch_rms2d.shape[1]*self.calibhisto['rmsBinWidth']], origin='lower')
         cbar2 = plt.colorbar(im2)
 
 
@@ -1982,10 +2006,10 @@ class SmallDataAna_psana(object):
         gsCM=gridspec.GridSpec(len(common_modes),2)
         for icm,cm in enumerate(common_modes):
             if cm==0:
-                lims=[np.percentile(imgs[icm*2],1),np.percentile(imgs[icm*2],99)]
+                lims=[np.nanpercentile(imgs[icm*2],1),np.nanpercentile(imgs[icm*2],99)]
             else:
-                lims=[np.percentile(imgs[0],1),np.percentile(imgs[0],99)]
-            limsStd=[np.percentile(imgs[1],1),np.percentile(imgs[1],99)]
+                lims=[np.nanpercentile(imgs[0],1),np.nanpercentile(imgs[0],99)]
+            limsStd=[np.nanpercentile(imgs[1],1),np.nanpercentile(imgs[1],99)]
             imC = plt.subplot(gsCM[icm*2]).imshow(imgs[icm*2],clim=lims,interpolation='none',aspect='auto')
             plt.colorbar(imC)
             imCS = plt.subplot(gsCM[icm*2+1]).imshow(imgs[icm*2+1],clim=limsStd,interpolation='none',aspect='auto')
@@ -2152,7 +2176,7 @@ class SmallDataAna_psana(object):
         detIArrays=[]#for photon image
         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
             detShape = self.__dict__[thisdetName].ped.shape
-            if self.__dict__[thisdetName].det.dettype==26:
+            if self.__dict__[thisdetName].isGainswitching:
                 detShape = (self.__dict__[thisdetName].ped[0]).shape
             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
             detShapes.append(csShape)
@@ -2186,13 +2210,13 @@ class SmallDataAna_psana(object):
                 for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
                     det = self.__dict__[thisdetName]
                     det.getData(evt)
-                    det.processDetector()
-                    
+                    det.processFuncs()
+
                     thisDetDataDict=getUserData(det)
                     for key in thisDetDataDict.keys():
-                        if not (key=='full' or key.find('ROI')>=0 or key.find('photon_img')>=0):
+                        if not (key=='full_area' or key.find('ROI')>=0 or key.find('photon_img')>=0):
                             continue
-                        if (key=='full' or key.find('ROI')>=0):
+                        if (key=='full_area' or key.find('ROI')>=0):
                             if thisdetDict.has_key('thresADU'):
                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
                             elif thisdetDict.has_key('thresRms'):
@@ -2252,7 +2276,7 @@ class SmallDataAna_psana(object):
                         
                         thisDetDataDict=getUserData(det)
                         for key in thisDetDataDict.keys():
-                            if not (key=='full' or key.find('ROI')>=0):
+                            if not (key=='full_area' or key.find('ROI')>=0):
                                 continue
                             if thisdetDict.has_key('thresADU'):
                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
@@ -2365,6 +2389,9 @@ class SmallDataAna_psana(object):
                     if det.x is not None:
                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                    if det.ix is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
                 else:
                     if det.det.dettype==26:
                         addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
@@ -2379,10 +2406,13 @@ class SmallDataAna_psana(object):
                     if det.x is not None:
                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                    if det.ix is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
 
 
         comm.Barrier()
-        printR(rank, 'first,last img mean: %g %g '%(np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
+        printR(rank, 'first,last img mean: %s %g %g '%(detName,np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
 
         for cfgVar in myCube.targetVarsCfg:
             addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
