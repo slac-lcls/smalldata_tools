@@ -4,6 +4,7 @@ import numpy as np
 from utilities import cm_epix
 from utilities import cm_uxi
 from read_uxi import getDarks
+import tables
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
 
@@ -261,7 +262,10 @@ class DetObjectClass(object):
 
     def addFunc(self, func):
         func.setFromDet(self) #pass parameters from det (rms, geometry, .....)
-        func.setFromFunc() #pass parameters from itself to children (rms, bounds, .....)            
+        try:
+          func.setFromFunc() #pass parameters from itself to children (rms, bounds, .....)            
+        except:
+          print('Failed to pass parameters to children of ',func._name)
         self.__dict__[func._name] = func
 
     def processFuncs(self):
@@ -355,6 +359,7 @@ class CameraObject(DetObjectClass):
         if self.common_mode not in self._common_mode_list and type(self) is CameraObject:
             print('Common mode %d is not an option for a CameraObject, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[25e-6]
+        self.isGainswitching=False
 
         self.rms = self.det.rms(run)
         self.ped = self.det.pedestals(run)
@@ -402,10 +407,10 @@ class OpalObject(CameraObject):
             fexCfg = env.configStore().get(psana.Camera.FrameFexConfigV1, self._src)
             if fexCfg.forwarding() == fexCfg.Forwarding.values[2]: #make sure we are only doing ROI
                 self.ped = np.zeros([fexCfg.roiEnd().column()-fexCfg.roiBegin().column(), fexCfg.roiEnd().row()-fexCfg.roiBegin().row()]).T
-                if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
-                    #if srcName=='xtcav':
-                    #  self.ped = np.zeros([1024,1024])
-                    self.ped = np.zeros([1024,1024])
+            if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
+                #if srcName=='xtcav':
+                #  self.ped = np.zeros([1024,1024])
+                self.ped = np.zeros([1024,1024])
         self.imgShape = self.ped.shape
         if self.x is None:
             self._get_coords_from_ped()
@@ -524,6 +529,7 @@ class JungfrauObject(TiledCameraObject):
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for Jungfrau, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[75e-6]
+        self.isGainswitching=True
         try:
             self.imgShape = self.det.image(run, self.ped[0])
         except:
@@ -566,6 +572,12 @@ class CsPadObject(TiledCameraObject):
         #mbits=1 #set bad pixels to 0
         if self.common_mode%100==1:
             self.evt.dat = self.det.calib(evt, cmpars=(1,25,40,100,0), mbits=mbits)
+            try:
+                cmValues = self.det.common_mode_correction(self.run, self.det.calib(evt, cmpars=(0), mbits=mbits), cmpars=(1,25,40,100,0), mbits=mbits)
+                self.evt.__dict__['env_cmValues'] = np.array([tile[0][0] for tile in cmValues])
+            except:
+                pass
+
             needGain=False
         elif self.common_mode%100==5:
             self.evt.dat = self.det.calib(evt, cmpars=(5,100), mbits=mbits)
@@ -586,7 +598,7 @@ class CsPad2MObject(CsPadObject):
         #super().__init__(det,env,run, **kwargs)
         super(CsPad2MObject, self).__init__(det,env,run, **kwargs)
         print('cspad alias',det.alias)
-        self._common_mode_list = [0, 1,5,10,-1, 30] #none, zero-peak, unbonded, mixed, raw data, calib
+        self._common_mode_list = [0, 1,5,10,-1,30] #none, zero-peak, unbonded, mixed, raw data, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for a CsPad2M detector, please choose from: '%self.common_mode, self._common_mode_list)
@@ -684,11 +696,12 @@ class Epix10k2MObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [80, 81, 82, 0, -1, 30] # official, sn kludge, ped sub, raw, calib
+        self._common_mode_list = [80, 81, 82, 180, 181, 0, -1, 30] # official, sn kludge, ped sub, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[100e-6]
+        self.isGainswitching=True
 
         epixCfg = env.configStore().get(psana.Epix.Config10ka2MV1, det.source)               
         self.carrierId0 = []
@@ -733,7 +746,26 @@ class Epix10k2MObject(TiledCameraObject):
             self.rms=np.ones_like(self.ped)
         self.imgShape=self.det.image(run, self.ped[0])
         self._gainSwitching = True                
-                
+
+        ##stuff for ghost correction
+        if self.common_mode > 100:
+            #read p0&p1 from h5 files.
+            calibDir = '/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/XcsEndstation.0:Epix10ka2M.0/ghost'%(env.experiment()[:3], env.experiment())
+            ghostFile = tables.open_file('%s/GhostFits_%s_Run%03d.h5'%(calibDir,env.experiment(),run))
+            self.p0 = ghostFile.root.epix10ka2m_OLS_p0.read()
+            self.p1 = ghostFile.root.epix10ka2m_OLS_p1.read()
+            #self.ghostMask = (abs(self.p1-0.0073)<0.002)
+            self.dsIdxRun = psana.DataSource('exp=%s:run=%d:idx'%(env.experiment(),run)).runs().next()
+            self.dsIdxSecs=[]
+            self.dsIdxFiducials=[]
+            self.dsIdxTimes=self.dsIdxRun.times()
+            for evtt in self.dsIdxTimes:
+              self.dsIdxFiducials.append(evtt.fiducial())
+              self.dsIdxSecs.append(evtt.time()>>32)
+            self.dsIdxSecs=np.array(self.dsIdxSecs)
+            self.dsIdxFiducials=np.array(self.dsIdxFiducials)
+            self.preEvtDet=DetObject(self.det.alias,env,run, common_mode=self.common_mode%100)
+
     def getData(self, evt):
         super(Epix10k2MObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
@@ -816,6 +848,37 @@ class Epix10k2MObject(TiledCameraObject):
             self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) #can't reember why I'm doing this. I think for the data type.
             self.evt.dat[:,:,:] = evt_dat[:,:,:]
             
+        if self.common_mode>100: #correct for the ghost image after official calibration
+            print 'DEBUG cm 180: ',np.nanmean(self.evt.dat)
+            #current event info
+            thisFid = evt.get(psana.EventId).fiducials()
+            thisSec = evt.get(psana.EventId).time()[0]
+            #find this in indedx dataset.
+            sameFid = np.argwhere(self.dsIdxFiducials==thisFid)
+            #if we have a choice, check the second field.
+            sameIdx=-1
+            if sameFid.shape[0]==1:
+                sameIdx=sameFid[0][0]
+            else:
+                for thisFid in sameFid:
+                    if thisSec==self.dsIdxSecs[thisFid[0]]:
+                        sameIdx=thisFid[0]
+            if sameIdx<1:
+                print('did not find event or this event is first event...',sameIdx)
+                return None
+            #now get the event
+            try:
+                preEvt = self.dsIdxRun.event(self.dsIdxTimes[sameIdx-1])
+            except:
+                print('DEBUG: failed to get previous event')
+                return None
+            #now get data for this event
+            orgData = self.evt.dat.copy()
+            self.preEvtDet.getData(preEvt)
+            #preData = self.preEvtDet.evt.dat.copy()
+            corrData = self.p0+self.p1*self.preEvtDet.evt.dat
+            self.evt.dat-=corrData
+
         #override gain if desired -- this looks like CsPad.
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
             self.evt.dat*=self.local_gain   #apply own gain
