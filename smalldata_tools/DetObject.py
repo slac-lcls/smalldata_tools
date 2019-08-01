@@ -149,8 +149,9 @@ class DetObjectClass(object):
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
-        parList =  {key:self.__dict__[key] for key in self.__dict__ if (isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple)) and key[0]!='_')}
-        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (isinstance(getattr(self,key), list) and key[0]!='_')})
+        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray)) )}
+        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), tuple) and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray)))}) 
+        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray)))}) 
         #add parameters of function to dict with composite keyt(sf._name, key)
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         for sf in subFuncs:
