@@ -126,8 +126,8 @@ except:
 
 try:    
     if dirname is None:
-        #dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(hutch.lower(),expname)
-        dirname = '/reg/d/psdm/%s/%s/results/arphdf5'%(hutch.lower(),expname)
+        dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(hutch.lower(),expname)
+        #dirname = '/reg/d/psdm/%s/%s/results/arphdf5'%(hutch.lower(),expname)
     directory = os.path.dirname(dirname)
     #I think this is not actually working. Can't do it from script. Need to create first.
     if ds.rank==0 and not os.path.isdir(dirname):
@@ -159,6 +159,14 @@ if len(epicsPV)>0:
 #    defaultDets.append(ttRawDetector(env=ds.env()))
 #except:
 #    pass
+
+#add config data here
+userDataCfg={}
+#look for default data config?
+for det in defaultDets:
+    userDataCfg[det.name] = det.params_as_dict()
+Config={'UserDataCfg':userDataCfg}
+smldata.save(Config)
 
 for eventNr,evt in enumerate(ds.events()):
     printMsg(eventNr, evt.run(), ds.rank, ds.size)
