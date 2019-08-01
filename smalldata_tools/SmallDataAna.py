@@ -1865,6 +1865,8 @@ class SmallDataAna(object):
                 dropDet = cube.dropletProc[dropletBase]['source']
                 if 'damage/%s'%dropDet in self._fields.keys(): 
                     self.Sels['%s_%s'%(cube.cubeName,cube.useFilter)].addCut('damage/%s'%dropDet,0.5,1.5)
+            #call getFilter explicitly as functions in Selection are used here otherwise.
+            self.getFilter('%s_%s'%(cube.cubeName,cube.useFilter))
             cube.useFilter='%s_%s'%(cube.cubeName,cube.useFilter)
 
         return cube, onoff
