@@ -80,8 +80,11 @@ class azimuthalBinning(DetObjectFunc):
             self.x = det.x.flatten()/1e3
             self.y = det.y.flatten()/1e3
 
-    def setFromFunc(self, func):
+    def setFromFunc(self, func=None):
         super(azimuthalBinning,self).setFromFunc()
+        if func is None:
+            self._setup()
+            return
         print 'set params from func ', func.__dict__.keys()
         if func._x is not None: self.x = func._x.flatten()/1e3
         if func._y is not None: self.y = func._y.flatten()/1e3
@@ -178,8 +181,11 @@ class azimuthalBinning(DetObjectFunc):
         self.pbm = pbm #added for debugging of epix10k artifacts.
         self.idxphi = np.digitize(pbm.ravel(),self.phiVec)-1
         if self.idxphi.min()<0:
+            print('pixels will underflow, will put all pixels beyond range into first bin w')
+            self.idxphi[self.idxphi<0]=0 #put all 'underflow' bins in first bin.
+        if self.idxphi.max()>=self.nphi:
             print('pixels will overflow, will put all pixels beyond range into first bin w')
-            self.idxphi[self.idxphi<0]=0 #put all 'overflow' bins in first bin.
+            self.idxphi[self.idxphi==self.nphi]=0 #put all 'overflow' bins in first bin.
         #print 'idxphi: ',self.idxphi.min(), self.idxphi.max(), self.nphi
         self.matrix_q = 4*np.pi/self.lam*np.sin(self.matrix_theta/2)
         q_max = np.nanmax(self.matrix_q[~self._mask])
@@ -201,7 +207,7 @@ class azimuthalBinning(DetObjectFunc):
         # 2D binning!
         self.Cake_idxs = np.ravel_multi_index((self.idxphi,self.idxq),(self.nphi,self.nq))
         self.Cake_idxs[self._mask.ravel()] = 0; # send the masked ones in the first bin
-        
+
         #last_idx = self.idxq.max()
         #print("last index",last_idx)
         self.msg("...done")
