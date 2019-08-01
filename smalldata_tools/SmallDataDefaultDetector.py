@@ -26,6 +26,16 @@ class defaultDetector(object):
         return False
     def _setDebug(self, debug):
         self._debug = debug
+    def params_as_dict(self):
+        """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
+        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
+        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray))) })
+        #remKeys = [key for key in self.__dict__ if (key not in parList)]
+        #print('DEBUG: keys which are not parameters:',remKeys)
+        #for k in remKeys:
+        #    if k[0]!='_':
+        #        print k, self.__dict__[k]
+        return parList
     @abc.abstractmethod
     def data(self,evt):
         """method that should return a dict of values from event"""
@@ -268,13 +278,17 @@ class ttDetector(defaultDetector):
         dl={}
         for ttname,pvname,pv in zip(self.ttNames,self.PVlist,self.pvs):
             dl[ttname]=pv()
-        ttOrg = dl[self.ttNames[1]]
+        ttOrg = dl['FLTPOS']
         if self.ttCalib is None:
             dl['ttCorr']=ttOrg
         else:
             dl['ttCorr']=self.ttCalib[0] + self.ttCalib[1]*ttOrg
             if len(self.ttCalib)>2:
                 dl['ttCorr']+=ttOrg*ttOrg*self.ttCalib[2]
+            #pixel 0 is special:
+            #it indicates that fit was not attempted/unsuccessful
+            if ttOrg == 0:
+                dl['ttCorr']=np.nan
         return dl
 
 class damageDetector(defaultDetector):
@@ -329,6 +343,9 @@ class l3tDetector(object):
 
     def _setDebug(self, debug):
         self._debug = debug
+
+    def params_as_dict(self):
+        return {'name': self.name}
 
     def data(self, evt):
         dl={}
