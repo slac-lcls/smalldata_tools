@@ -804,10 +804,13 @@ def getCMpeak(img, nPeakSel=4, minPeakNum=100, ADUmin=-100, ADUmax=200, step=0.5
 
     return retDict
 
-def image_from_dxy(d,x,y, outShape=None):
+def image_from_dxy(d,x,y, **kwargs):
     if np.array(x).shape!=np.array(y).shape or  np.array(d).shape!=np.array(y).shape:
         print('shapes of data or x/y do not match ',np.array(d).shape, np.array(x).shape, np.array(y).shape)
-    if (x.flatten()[0]-int(x.flatten()[0]))!=0:
+        return None
+
+    outShape = kwargs.pop("outShape", None)
+    if np.abs(x.flatten()[0]-int(x.flatten()[0]))<1e-12: #allow for floating point errors.
         #cspad
         if x.shape==(32,185,388): imgShape=[1689,1689]
         #cs140k
@@ -822,7 +825,10 @@ def image_from_dxy(d,x,y, outShape=None):
         elif len(x.shape)==2:#is already image (and not special detector)
             return d
         else:
-            print('do not know which detector in need of a special geometry this is, cannot determine shape of image')
+            if outShape is None:
+                print('do not know which detector in need of a special geometry this is, cannot determine shape of image')
+            else:
+                imgShape=outShape
             return
         ix = x.copy()
         ix = ix - np.min(ix)
