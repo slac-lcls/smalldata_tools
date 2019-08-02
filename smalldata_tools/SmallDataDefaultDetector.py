@@ -278,10 +278,10 @@ class ttDetector(defaultDetector):
         dl={}
         for ttname,pvname,pv in zip(self.ttNames,self.PVlist,self.pvs):
             dl[ttname]=pv()
-        ttOrg = dl['FLTPOS']
         if self.ttCalib is None:
-            dl['ttCorr']=ttOrg
+            dl['ttCorr']= dl['FLTPOS_PS']
         else:
+            ttOrg = dl['FLTPOS']
             dl['ttCorr']=self.ttCalib[0] + self.ttCalib[1]*ttOrg
             if len(self.ttCalib)>2:
                 dl['ttCorr']+=ttOrg*ttOrg*self.ttCalib[2]
