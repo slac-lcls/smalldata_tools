@@ -137,7 +137,14 @@ def cxiDetectors(beamCodes=[[162],[]]):
     dets.append(damageDetector())
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
+    except:
+        pass
+    try:
         dets.append(encoderDetector('CXI-USB-ENCODER-01','enc'))
+    except:
+        pass
+    try:
+        dets.append(encoderDetector('CxiEndstation.0:USDUSB.0','KbEncoder'))
     except:
         pass
     return dets
