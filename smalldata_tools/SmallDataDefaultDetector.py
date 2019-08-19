@@ -41,10 +41,13 @@ class defaultDetector(object):
         """method that should return a dict of values from event"""
 
 class lightStatus(defaultDetector):
-    def __init__(self, detname='evr0', codes=[[162],[]]):
-        defaultDetector.__init__(self, detname, 'lightStatus')
-        self.xrayCodes = codes[0]
-        self.laserCodes = codes[1]
+    def __init__(self, codes=[[162],[]]):
+        for n in psana.DetNames():
+            if ':Evr.' in n[0]:
+                defaultDetector.__init__(self, n[0], 'lightStatus')
+                self.xrayCodes = codes[0]
+                self.laserCodes = codes[1]
+                break
 
     def data(self,evt):
         xfel_status, laser_status = (1,1) # default if no EVR code matches
