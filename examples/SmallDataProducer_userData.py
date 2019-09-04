@@ -199,8 +199,9 @@ if have_epix:
     #Tends to add photons together into single droplet if occupancy
     #is not low, might need photonizing step to get single photon positions
     droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    #droplet.add_aduHist() 
-    droplet.addDropletSave(maxDroplets=nDrop)
+    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
+    droplet.addFunc(specFunc_300) 
+    #droplet.addDropletSave(maxDroplets=nDrop)
     epix.addFund(droplet)
 
     #now add photon algorithms. Only works for single energy photon data
