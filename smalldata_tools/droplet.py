@@ -184,12 +184,13 @@ class dropletFunc(DetObjectFunc):
             #imgNpix = img.copy(); imgNpix[img>0]=1
             #drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
             ##drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
-            #drop_adu = measurements.sum(img,imgDrop, drop_ind_thres)
+            drop_adu = np.array(measurements.sum(img,imgDrop, drop_ind_thres))
             #drop_pos = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
-            adu_drop = np.delete(adu_drop,vThres)
+            #adu_drop = np.delete(adu_drop,vThres)
             pos_drop = np.array(measurements.center_of_mass(img,imgDrop, drop_ind_thres))
             npix_drop = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
-            dat_dict={'data': adu_drop}
+            dat_dict={'data': drop_adu}#adu_drop}
+            #dat_dict={'data': adu_drop}
             dat_dict['row']=pos_drop[:,0]
             dat_dict['col']=pos_drop[:,1]
             dat_dict['npix']=npix_drop
