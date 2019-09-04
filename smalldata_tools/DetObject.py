@@ -364,6 +364,7 @@ class CameraObject(DetObjectClass):
 
         self.rms = self.det.rms(run)
         self.ped = self.det.pedestals(run)
+        self.gain_mask = self.det.gain_mask(run)
         self.gain = self.det.gain(run)
         self.local_gain = None
         self._getImgShape() #sets self.imgShape
@@ -567,6 +568,11 @@ class CsPadObject(TiledCameraObject):
                  self.imgShape = self.det.image(run, self.ped).shape
             except:
                  self.imgShape = self.ped.shape
+        if self.gain_mask.std()!=0:
+          self.gain_mask = self.gain_mask.astype(float)
+          self.gain_mask*=6.85
+          self.gain_mask[self.gain_mask==0]=1.
+          self.gain*=self.gain_mask
     def getData(self, evt):
         super(CsPadObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
