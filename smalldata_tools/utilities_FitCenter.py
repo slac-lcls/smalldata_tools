@@ -269,24 +269,24 @@ def findPointsInRing(arSparse, center, maxR1, ringInfo, inParams={}):
     print('select points in circles using cKDTree and select good candidates for final fit using RANSAC')
     tree = cKDTree(np.array([arSparse.col, arSparse.row]).T)
     for ir, r in enumerate(maxR1):
-        if len(ringInfo)>=params['nMaxRing']:
+        if len(ringInfo)>=inParams['nMaxRing']:
             break
         thisRingInfo={}
-        rOuter = tree.query_ball_point(center, r+params['deltaR'])
-        rInner = tree.query_ball_point(center, r-params['deltaR'])
+        rOuter = tree.query_ball_point(center, r+inParams['deltaR'])
+        rInner = tree.query_ball_point(center, r-inParams['deltaR'])
         inRing = set(rOuter).symmetric_difference(set(rInner))
         thisRingInfo['rInput']=r
         thisRingInfo['pointsInCircle']=list(inRing)
         print('input radius, #points ',r,len(list(inRing)))
-        if len(list(inRing))<params['minPoints']:
+        if len(list(inRing))<inParams['minPoints']:
             continue
         #use ransac to pick points most likely to belong to circle
-        model_robust, inliers = ransac(np.array([arSparse.row[list(inRing)], arSparse.col[list(inRing)]]).T, CircleModel, min_samples=params['RANSAC_min_samples'], residual_threshold=params['RANSAC_residual_threshold'], max_trials=1000)
+        model_robust, inliers = ransac(np.array([arSparse.row[list(inRing)], arSparse.col[list(inRing)]]).T, CircleModel, min_samples=inParams['RANSAC_min_samples'], residual_threshold=inParams['RANSAC_residual_threshold'], max_trials=1000)
         thisRingInfo['inFrac']=inliers.astype(int).sum()/float(len(list(inRing)))
         thisRingInfo['inliers']=inliers
         thisRingInfo['ransac_result']=model_robust
         print('ring %d, infrac %f, #points %d' %(ir, thisRingInfo['inFrac'], len(thisRingInfo['inliers'])))
-        if thisRingInfo['inFrac']>params['minInFrac'] and thisRingInfo['inliers'].astype(int).sum()>=params['minPoints']:
+        if thisRingInfo['inFrac']>inParams['minInFrac'] and thisRingInfo['inliers'].astype(int).sum()>=inParams['minPoints']:
             ringInfo.append(thisRingInfo)
 
 # --------------------------------------------------------------            
@@ -356,6 +356,7 @@ def FindFitCenter(image, mask, inParams={}):
     print('use hough transform to find center & ring candidates')
     res = iterateCenter(arSparse, [arThres.shape[0], arThres.shape[1]], [1,1401], prec=params['precision'], overfillFactor=params['overFac'], nBinR=params['nBinR'])
     maxR1 =  getMaxR(res, norm=params['norm'], minDr=params['deltaR'])
+    center = [ res['xCen'], res['yCen']]
     print('maxR1: ',maxR1)
 
     ringInfo=[]
