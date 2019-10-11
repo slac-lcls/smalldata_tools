@@ -160,8 +160,9 @@ def reduceVar(vals, sigROI,threshold=-1e25):
 
 def getBins(bindef=[], debug=False):
     #have full list of bin boundaries, just return it
+    if isinstance(bindef, np.ndarray): bindef = bindef.tolist()
     if len(bindef)>3:
-        return bindef
+        return np.array(bindef)
   
     if len(bindef)==3:
         if type(bindef[2]) is int:
