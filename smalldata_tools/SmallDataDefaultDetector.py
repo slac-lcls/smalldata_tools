@@ -42,12 +42,21 @@ class defaultDetector(object):
 
 class lightStatus(defaultDetector):
     def __init__(self, codes=[[162],[]]):
-        for n in psana.DetNames():
-            if ':Evr.' in n[0]:
-                defaultDetector.__init__(self, n[0], 'lightStatus')
-                self.xrayCodes = codes[0]
-                self.laserCodes = codes[1]
-                break
+        evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
+        print('in lightStatus', evrNames)
+        if len(evrNames)<1:
+            return
+        nCodesMax = -1
+        for name in evrNames:
+            nCodes = psana.Detector(name)._fetch_configs()[0].neventcodes()
+            if nCodes > nCodesMax:
+                nCodesMax = nCodes
+                evrName = name
+        if nCodesMax < 0:
+            return
+        defaultDetector.__init__(self, evrName, 'lightStatus')
+        self.xrayCodes = codes[0]
+        self.laserCodes = codes[1]
 
     def data(self,evt):
         xfel_status, laser_status = (1,1) # default if no EVR code matches
