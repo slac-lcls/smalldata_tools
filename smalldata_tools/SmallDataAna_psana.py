@@ -1366,18 +1366,19 @@ class SmallDataAna_psana(object):
             i0List = ['gas_detector/f_22_ENRC']
     
         minFrac = 1e6
-        for i0 in i0List and useFilter is not None:
-            try:
-                i0Median = np.nanmedian(self.sda.getVar(i0))
-                i0Off = np.nanmedian(self.sda.getVar(i0, useFilter))
-            except:
-                print('if not smallData file is available, try pass i0Check=\'\'')
-            if minFrac > i0Off/i0Median:
-                minFrac=i0Off/i0Median
-            print('median value for ',i0,' is ',i0Median,' and for the off events ',i0Off,' offRatio: ',i0Off/i0Median)
-        if minFrac > 0.05 and i0List!=[]:
-            print('This selection seems to lets too many events with beam through, will quit')
-            return
+        if useFilter is not None:
+            for i0 in i0List:
+                try:
+                    i0Median = np.nanmedian(self.sda.getVar(i0))
+                    i0Off = np.nanmedian(self.sda.getVar(i0, useFilter=useFilter))
+                except:
+                    print('if not smallData file is available, try pass i0Check=\'\'')
+                if minFrac > i0Off/i0Median:
+                    minFrac=i0Off/i0Median
+                print('median value for ',i0,' is ',i0Median,' and for the off events ',i0Off,' offRatio: ',i0Off/i0Median)
+            if minFrac > 0.05 and i0List!=[]:
+                print('This selection seems to lets too many events with beam through, will quit')
+                return
 
         self.AvImage(detname,numEvts=numEvts,useFilter=useFilter, common_mode=-1, useMask=False, median=True)
         self.AvImage(detname,numEvts=numEvts,useFilter=useFilter, common_mode=-1, useMask=False, std=True)
@@ -1420,9 +1421,9 @@ class SmallDataAna_psana(object):
         print('save noise file in %s as %s '%(dirname+'pixel_rms/',fname))
         print('save status file in %s as %s '%(dirname+'pixel_status/',fname))
         if useFilter is not None:
-            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.1f',addmetad=True)
+            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_Filter%s_raw_%s'%(useFilter,detname)], fmt='%.3f',addmetad=True)
         else:
-            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.1f',addmetad=True)
+            det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.3f',addmetad=True)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
     def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0):
@@ -1579,17 +1580,16 @@ class SmallDataAna_psana(object):
             print('we will plot from bin %d to %d '%(ymin, ymax))
 
             try:
-                maxVal_c00 =  np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_c00[:,ymin:ymax])])
-                maxVal_cm10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm10[:,ymin:ymax])])
-                maxVal_cm01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm01[:,ymin:ymax])])
-                maxVal_cp10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp10[:,ymin:ymax])])
-                maxVal_cp01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp01[:,ymin:ymax])])
-
                 p33_11.imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none')
                 p33_10.imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none')
                 p33_12.imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none')
                 p33_01.imshow(azintValues_cm01[:,ymin:ymax],aspect='auto',interpolation='none')
                 p33_21.imshow(azintValues_cp01[:,ymin:ymax],aspect='auto',interpolation='none')
+                maxVal_c00 =  np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_c00[:,ymin:ymax])])
+                maxVal_cm10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm10[:,ymin:ymax])])
+                maxVal_cm01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm01[:,ymin:ymax])])
+                maxVal_cp10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp10[:,ymin:ymax])])
+                maxVal_cp01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cp01[:,ymin:ymax])])
                 try:
                     p33_11.plot(maxVal_c00[:,1], maxVal_c00[:,0],'r+')
                     p33_10.plot(maxVal_cm10[:,1], maxVal_cm10[:,0],'r+')
