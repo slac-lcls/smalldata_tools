@@ -188,14 +188,13 @@ else
     echo 'will use queue: ' $QUEUE
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME
+    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
+        mpirun --mca btl ^openib python $PYTHON_EXE \
+	$ARGSTR --run $RUN`
 #    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
-#        mpirun --mca btl ^openib python $PYTHON_EXE \
+#        mpirun python $PYTHON_EXE \
 #	$ARGSTR \
 #        --run $RUN`
-    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/makeCube_$EXP\_$RUN\_%J.out \
-        mpirun python $PYTHON_EXE \
-	$ARGSTR \
-        --run $RUN`
 fi
 
 source /reg/g/psdm/etc/psconda.sh
