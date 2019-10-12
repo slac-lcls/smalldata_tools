@@ -25,11 +25,10 @@ RUN=-1
 #16 works ok for default smalleData
 #also when using MPI, use only one node.....
 #for bigger ROI on short run, 32 jobs is better, 64 did not have gain
+GATHER=5
 #GATHER=100
-#NJOBS=120
-NJOBS=80
-GATHER=20
 #NJOBS=16
+NJOBS=80
 #
 #EXP='xcsx22015'
 EXP='xxx'
@@ -211,7 +210,7 @@ if [ $HAVE_ANA -eq 0 ]; then
 fi
 #above does apparetny not work for everybody
 source /reg/g/psdm/etc/psconda.sh
-#conda activate ana-1.3.47
+#source conda_setup --reldir /reg/neh/home/cpo/ana-1.3.80
 
 if [ $SINGLEJOB -eq 1 ]; then
     echo 'so I will run a new job for run ' $RUN
@@ -227,15 +226,12 @@ if [ $SINGLEJOB -eq 1 ]; then
 else
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME ' using queue: ' $QUEUE
-#    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
-#        mpirun --mca btl ^openib \
-#        python ./SmallDataProducer.py \
-#	$ARGSTR \
-#        --run $RUN`
     CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
-        mpirun python ./examples/SmallDataProducer.py \
-	$ARGSTR \
-        --run $RUN`
+        mpirun --mca btl ^openib python ./examples/SmallDataProducer.py \
+	$ARGSTR --run $RUN`
+#    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
+#        mpirun python ./examples/SmallDataProducer.py \
+#	$ARGSTR --run $RUN`
 fi
 
 echo $CMD
