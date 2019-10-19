@@ -703,7 +703,7 @@ class Epix10k2MObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [80, 81, 82, 180, 181, 0, -1, 30] # official, sn kludge, ped sub, raw, calib
+        self._common_mode_list = [80, 81, 82, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
@@ -778,13 +778,16 @@ class Epix10k2MObject(TiledCameraObject):
         mbits=0 #do not apply mask (would set pixels to zero)
         #mbits=1 #set bad pixels to 0
         if self.common_mode<0:
+          if self.common_mode==-2:
+            self.evt.dat = self.evt.dat
+          else:
             self.evt.dat = self.evt.dat&0x3fff
-            self.evt.gainbit = (self.evt.dat&0xc000>0)
-            try:
-                epixCalRows = evt.get(psana.Epix.ArrayV1, psana.Source(self.det.alias)).calibrationRows()
-                self.evt.__dict__['env_calibRows']  = epixCalRows
-            except:
-                epixCalRows = None
+          #self.evt.gainbit = (self.evt.dat&0xc000>0)
+          try:
+            epixCalRows = evt.get(psana.Epix.ArrayV1, psana.Source(self.det.alias)).calibrationRows()
+            self.evt.__dict__['env_calibRows']  = epixCalRows
+          except:
+            epixCalRows = None
         elif self.common_mode==0:
             ##########
             ### FIX ME epix10ka
