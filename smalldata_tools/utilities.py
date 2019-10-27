@@ -21,6 +21,7 @@ from bisect import insort, bisect_left
  
 import xarray as xr
 from numba import jit
+from numba.types import List
 
 import sys
 
@@ -379,18 +380,31 @@ def get_startOffIdx(evtTime, filterOff, nNbr=3, nMax=-1):
     return np.array(all_startOffIdx)
 
 #speed gain factor 2-3 depending on data (better for single#)
-@jit
-def get_offVar(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
+@jit(forceobj=True)
+def get_offVar_nomean(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
     assert (varArray.shape[0] == filterOff.shape[0])
     assert (varArray[filterOff].shape[0] >= (startOffIdx[-1]+nNbr))
     varOff=[]
     for idx in startOffIdx:
-        if mean:
-            varOff.append((varArray[filterOff][idx:idx+nNbr]).mean())
-        else:
-            varOff.append(varArray[filterOff][idx:idx+nNbr])
+        varOff.append(varArray[filterOff][idx:idx+nNbr])
     return np.array(varOff)
-_ = get_offVar(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr=1)
+_ = get_offVar_nomean(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr=1)
+
+@jit
+def get_offVar_mean(varArray, filterOff, startOffIdx, nNbr=3):
+    assert (varArray.shape[0] == filterOff.shape[0])
+    assert (varArray[filterOff].shape[0] >= (startOffIdx[-1]+nNbr))
+    varOff=[]
+    for idx in startOffIdx:
+        varOff.append((varArray[filterOff][idx:idx+nNbr]).mean())
+    return np.array(varOff)
+_ = get_offVar_mean(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr=1)
+
+def get_offVar(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
+    if mean:
+        get_offVar_mean(varArray, filterOff, startOffIdx, nNbr=nNbr)
+    else:
+        get_offVar_nomean(varArray, filterOff, startOffIdx, nNbr=nNbr)
 
 ###
 # utility functions for droplet stuff

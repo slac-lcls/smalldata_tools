@@ -91,7 +91,7 @@ def fitCircles(x,y,r,yerr=None, guess=None):
 #
 # --------------------------------------------------------------            
 
-@jit
+@jit(forceobj=True)
 def addToHough(x,y,arHough, hough_radii, center_x, center_y, wt=1):
     """
     add a single point in x-y space to hough space 
@@ -110,7 +110,7 @@ def addToHough(x,y,arHough, hough_radii, center_x, center_y, wt=1):
 #do this to force compilation
 _ = addToHough(0,0,np.zeros([2,2,2]),np.arange(2), np.arange(2), np.arange(2))
 
-@jit
+@jit(forceobj=True)
 def transformImage(arSparse,arHough, hough_radii, center_x, center_y):
     """
     transform a sparsified imaged to an array in hough space
