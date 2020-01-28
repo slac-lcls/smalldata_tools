@@ -386,15 +386,15 @@ class CameraObject(DetObjectClass):
         elif self.common_mode==0:
             if not self._gainSwitching:
                 self.evt.dat = self.det.raw_data(evt)-self.ped
-            self._applyMask()
-            if (self.gain is not None) and self.gain.std() != 0 and self.gain.mean() != 1.:
-                if self.gain.shape == self.evt.dat.shape:
-                    self.evt.dat*=self.gain   
+                self._applyMask()
+                if (self.gain is not None) and self.gain.std() != 0 and self.gain.mean() != 1.:
+                    if self.gain.shape == self.evt.dat.shape:
+                        self.evt.dat*=self.gain   
         elif self.common_mode%100==30:
             self.evt.dat = self.det.calib(evt)
 
         #override gain if desired
-        if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [0,30]:
+        if self.local_gain is not None and self.common_mode in [0,30] and self._gainSwitching is False and self.local_gain.shape == self.evt.dat.shape:
             self.evt.dat*=self.local_gain   #apply own gain
 
         
