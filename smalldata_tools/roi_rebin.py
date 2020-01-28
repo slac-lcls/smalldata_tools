@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from scipy import sparse
+import numpy.ma as ma
 
 import time
 from smalldata_tools.utilities import rebin, getBins
@@ -38,7 +39,7 @@ class ROIFunc(DetObjectFunc):
         #print 'DEBUG: def ROI', self.bound
         self.writeArea = kwargs.get('writeArea',False)
         self._calcPars = kwargs.get('calcPars',True)
-        self._mask =  kwargs.get('userMask',None)
+        self.mask =  kwargs.get('userMask',None)
 
     def setFromDet(self, det):
         super(ROIFunc, self).setFromDet(det)
@@ -47,20 +48,20 @@ class ROIFunc(DetObjectFunc):
             if self._rms.ndim==4:
                 self._rms = self._rms[0]#.squeeze()
             self._rms = self.applyROI(self._rms)
-        if self._mask is not None and det.mask is not None and self._mask.shape == det.mask.shape:
-            self._mask = ~(self._mask.astype(bool)&det.mask.astype(bool))
+        if self.mask is not None and det.mask is not None and self.mask.shape == det.mask.shape:
+            self.mask = ~(self.mask.astype(bool)&det.mask.astype(bool))
         else:
             try:
-                self._mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
+                self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
             except:
                 try:
-                    self._mask = ~(np.ones_like(det.ped).astype(bool))
+                    self.mask = ~(np.ones_like(det.ped).astype(bool))
                 except:
-                    self._mask = None
+                    self.mask = None
 
-        if self._mask is not None:
+        if self.mask is not None:
             try:
-                self._mask = self.applyROI(self._mask)
+                self.mask = self.applyROI(self.mask)
             except:
                 pass
 
@@ -73,7 +74,7 @@ class ROIFunc(DetObjectFunc):
     def addFunc(self, func):
         if isinstance(func, dropletFunc) and isinstance(self, ROIFunc):
             try:
-                func.setKeyData('_mask', (~self._mask).astype(np.uint8))
+                func.setKeyData('_mask', (~self.mask).astype(np.uint8))
                 func.setKeyData('_compData', self._rms)
             except:
                 print('failed to set parameters needed to run droplets on ROI')
@@ -107,6 +108,7 @@ class ROIFunc(DetObjectFunc):
         elif self.bound.shape[0]==3:
             subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1],self.bound[2,0]:self.bound[2,1]]
         return subarr.copy()
+
     #calculates center of mass of first 2 dim of array within ROI using the mask
     def centerOfMass(self, array):        
         array=array.squeeze()
@@ -115,22 +117,27 @@ class ROIFunc(DetObjectFunc):
         #why do I need to invert this?
         X, Y = np.meshgrid(np.arange(array.shape[0]), np.arange(array.shape[1]))
         try:
-            imagesums = np.nansum(np.nansum(array,axis=0),axis=0)
-            centroidx = np.nansum(np.nansum(array*X.T,axis=0),axis=0)
-            centroidy = np.nansum(np.nansum(array*Y.T,axis=0),axis=0)
+            imagesums = np.sum(np.sum(array,axis=0),axis=0)
+            centroidx = np.sum(np.sum(array*X.T,axis=0),axis=0)
+            centroidy = np.sum(np.sum(array*Y.T,axis=0),axis=0)
             return centroidx/imagesums,centroidy/imagesums 
         except:
             return np.nan,np.nan
+
     def addNsat(self,highLim=None):
         self.Nsat = highLim
+
     def process(self, data):
         ret_dict = {}
         ROIdata=self.applyROI(data)
-        if self._mask is not None:
-            if ROIdata.dtype == np.uint16:
-                ROIdata[self._mask]=0
-            else:
-                ROIdata[self._mask]=np.nan
+        if self.mask is not None:
+            ROIdata = ma.array(ROIdata, mask=self.mask)
+        else:
+            ROIdata = ma.array(ROIdata)
+            #if ROIdata.dtype == np.uint16:
+            #    ROIdata[self.mask]=0
+            #else:
+            #    ROIdata[self.mask]=np.nan
 ###
 ### this is why processFuns works. For droplet & photon, store dict of ADU, x, y (& more?)
 ### photons: row & col. make droplet use that too.
@@ -138,10 +145,10 @@ class ROIFunc(DetObjectFunc):
         self.dat = ROIdata
 ###
         if self.writeArea:
-            ret_dict['area'] = ROIdata.squeeze()
+            ret_dict['area'] = ROIdata.data.squeeze()
         if self._calcPars:
-            ret_dict['max'] = np.nanmax(ROIdata.astype(np.float64))
-            ret_dict['sum'] = np.nansum(ROIdata.astype(np.float64))
+            ret_dict['max'] = np.max(ROIdata.astype(np.float64))
+            ret_dict['sum'] = np.sum(ROIdata.astype(np.float64))
             ret_dict['com'] = self.centerOfMass(ROIdata)
         if 'Nsat' in self.__dict__.keys():
             ret_dict['nsat'] =  (ROIdata >= self.Nsat).astype(int).sum()
@@ -160,6 +167,7 @@ class ROIFunc(DetObjectFunc):
         #print 'ret_dict ',ret_dict.keys()
         return ret_dict
 
+#DEBUG ME WITH MASKED ARRAY#
 class rebinFunc(DetObjectFunc):
     """
     function to rebin input data to new shape
@@ -180,6 +188,7 @@ class rebinFunc(DetObjectFunc):
         ret_dict = {'data': newArray}
         return ret_dict
 
+#TEST ME WITH MASKED ARRAY#
 class projectionFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         """
@@ -199,28 +208,33 @@ class projectionFunc(DetObjectFunc):
         self.singlePhoton =  kwargs.get('singlePhoton',False)
         self.mean =  kwargs.get('mean',False)
     def process(self,data):
-        if isinstance(data, np.ma.masked_array):
-            array = data.data.copy().squeeze()
-        else:
-            array = data.copy().squeeze()
-        array[array<self.thresADU]=0
+        #if isinstance(data, np.ma.masked_array):
+        #    array = data.data.copy().squeeze()
+        #else:
+        #    array = data.copy().squeeze()
+        if not isinstance(data, np.ma.masked_array):
+            array = data.copy().squeeze()[np.zeros_like(data.squeeze())]
+        array = data.copy().squeeze()
+        array.data[array.data<self.thresADU]=0
         if 'rms' in self.__dict__.keys() and self.rms is not None:
-            array[array<self.thresRms*self.rms.squeeze()]=0
+            array.data[array.data<self.thresRms*self.rms.squeeze()]=0
         if self.singlePhoton:
-            array[array>0]=1
+            array.data[array.data>0]=1
         #array.data = array.data.astype(np.float64)
         if self.mean:
             if self.axis<0:
-                retDict={'data': np.nanmean(array.squeeze())}
+                retDict={'data': np.mean(array)}
             else:
-                retDict={'data': np.nanmean(array.squeeze(),axis=self.axis)}
-        if self.axis<0:
-            retDict={'data': np.nanmean(array.squeeze())}
+                retDict={'data': np.mean(array,axis=self.axis)}
         else:
-            retDict={'data': np.nanmean(array.squeeze(),axis=self.axis)}
+            if self.axis<0:
+                retDict={'data': np.sum(array)}
+            else:
+                retDict={'data': np.sum(array,axis=self.axis)}
         return retDict
 
 #effectitely a projection onto a non-spatial coordinate.
+#TEST ME WITH MASKED ARRAY - WAS ALEADY WRITTEN WITH MASKED ARRAY IN MIND#
 class spectrumFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','spectrum')
@@ -256,6 +270,7 @@ class spectrumFunc(DetObjectFunc):
         return ret_dict
 
 #effectitely a projection onto a non-spatial coordinate.
+#TEST ME WITH MASKED ARRAY  - WAS ALSO WRITTEN FOR MASKED ARRAYS
 class sparsifyFunc(DetObjectFunc):
     """
     Function to sparisify a passed array (2 or 3-d input)
@@ -326,6 +341,7 @@ class sparsifyFunc(DetObjectFunc):
         return ret_dict
 
 
+#DEBUG ME WITH MASKED ARRAY#
 class imageFunc(DetObjectFunc):
     """
     function to cast detector data into a different coordinate system
@@ -412,6 +428,7 @@ class imageFunc(DetObjectFunc):
                 self.mask_img[ones_mask==0]=1
                 self.mask_img = self.mask_img.astype(int)
 
+    #THIS NEEDS DEBUGGING.....MASKED ARRAY? ONLY DIRECT DATA
     def process(self, data):
         #already have dict w/ data
         if  isinstance(data, dict):
@@ -434,15 +451,24 @@ class imageFunc(DetObjectFunc):
             data /= self.correction
 
         if self.coords is None:
+            if isinstance(data, np.ma.masked_array):
+                if data.dtype==np.uint16:
+                    data = data.filled(data, fill_value=0)
+                else:
+                    data = data.filled(data, fill_value=np.nan)
             return {'img': data}
 
-        #use sparse matrix method to create image in new coordinate space. 
-        #also: check if this is special case of multidim.
+        #DEBUG ME: masked pixels should be in extra pixel!
+        ##data will be used as weights in bincount. Thus masked pixels should be set to 0.
+        #if isinstance(data, np.ma.masked_array):            
+        #    print 'fill'
+        #    data = data.filled(data, fill_value=0)
+        #    print 'filled'
         if len(self.coords)==2:
             retDict={}
             ##using the sparse array os slower (1ms versus 0.55ms for bincount)
             ##also, mapping of multiple pixels into one final pixel will not be normalizable
-            ##as a notel the normalization costs about 0.2ms
+            ##as a note the normalization costs about 0.2ms
             #data2d = sparse.coo_matrix((data.flatten(),(self.__dict__['i%s'%self.coords[0]],self.__dict__['i%s'%self.coords[1]])), shape=self.imgShape).todense()            
             #retDict['img_sparse'] = np.array(data2d)
             I=np.bincount(self._multidim_idxs, weights = data.flatten(), minlength=int(self._n_multidim_idxs))
