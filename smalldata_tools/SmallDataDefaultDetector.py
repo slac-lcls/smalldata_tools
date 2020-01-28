@@ -29,7 +29,7 @@ class defaultDetector(object):
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
-        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray))) })
+        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and len(getattr(self,key))>0 and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray))) })
         #remKeys = [key for key in self.__dict__ if (key not in parList)]
         #print('DEBUG: keys which are not parameters:',remKeys)
         #for k in remKeys:
