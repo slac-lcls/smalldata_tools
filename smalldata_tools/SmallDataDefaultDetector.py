@@ -142,7 +142,31 @@ class wave8Detector(defaultDetector):
             if self.saveTime:
                 wftime = self.det.wftime(evt)
                 for itrace,trace in enumerate(wftime):
-                    dl['wftime_ch%02d'%itrace]=trace
+                    dl['wftime_ch%02d'%itrace]=wftime
+        return dl
+
+class impDetector(defaultDetector):
+    def __init__(self, detname, name=None, saveTime=False):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        self.saveTime = saveTime
+        defaultDetector.__init__(self, detname, self.name)
+        cfg = self.det.env.configStore().get(psana.Imp.ConfigV1, psana.Source(detname))
+        self.imp_shape = None
+        if cfg is not None:
+            self.imp_shape = cfg.numberOfSamples()
+
+    def data(self, evt):
+        dl={}
+        wfs = self.det.waveform(evt)
+        if wfs is not None:
+            for itrace in range(wfs.shape[0]):
+                dl['ch%02d'%itrace]=wfs[itrace]
+            if self.saveTime:
+                wftime = self.det.wftime(evt)
+                dl['wftime']=wftime
         return dl
 
 class epicsDetector(defaultDetector):
