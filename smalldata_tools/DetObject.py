@@ -772,6 +772,8 @@ class Epix10k2MObject(TiledCameraObject):
             self.dsIdxSecs=np.array(self.dsIdxSecs)
             self.dsIdxFiducials=np.array(self.dsIdxFiducials)
             self.preEvtDet=DetObject(self.det.alias,env,run, common_mode=self.common_mode%100)
+            ghostmask = (~(np.isnan(self.p0)) & ~(np.isnan(self.p1)))
+            self.mask = (ghostmask&self.mask)
 
     def getData(self, evt):
         super(Epix10k2MObject, self).getData(evt)
