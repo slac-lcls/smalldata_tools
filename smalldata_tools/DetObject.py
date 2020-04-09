@@ -119,6 +119,7 @@ def DetObject(srcName, env, run, **kwargs):
         2: CsPadObject,
         5: PulnixObject,
         6: OpalObject,
+       15: AndOrObject,
        27: ZylaObject,
        28: ControlsCameraObject,
        13: EpixObject,
@@ -465,6 +466,26 @@ class PulnixObject(CameraObject):
         super(PulnixObject, self).__init__(det,env,run, **kwargs)
         yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,self._src)
         self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
+        self.imgShape = self.ped.shape
+        if self.x is None:
+            self._get_coords_from_ped()
+        if self.mask is None or self.mask.shape!=self.imgShape:
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
+
+class AndOrObject(CameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        #super().__init__(det,env,run, **kwargs)
+        super(AndOrObject, self).__init__(det,env,run, **kwargs)
+        andorCfg = env.configStore().get(psana.Andor.ConfigV2,self._src)
+        self.imgShape = (andorCfg.numPixelsY(), andorCfg.numPixelsX())
+        if self.ped is None:
+            self.ped = np.zeros([andorCfg.numPixelsY(), andorCfg.numPixelsX()])
+        if self.imgShape != self.ped.shape:            
+            print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
+            if self.common_mode != -1:
+                print('We will use the raw data for Detector %s in run %s'%(self._name,run))
+            self.common_mode = -1
         self.imgShape = self.ped.shape
         if self.x is None:
             self._get_coords_from_ped()
