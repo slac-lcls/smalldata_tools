@@ -682,7 +682,7 @@ class gmdDetector(defaultDetector):
 
 #
 # detector classes for running in shared memory mode
-# mpiData fields are noy available here.
+# mpiData fields are not available here.
 #
 
 #cheap out and only store the one field we look at for now.
