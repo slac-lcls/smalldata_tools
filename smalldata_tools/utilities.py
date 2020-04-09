@@ -825,7 +825,13 @@ def image_from_dxy(d,x,y, **kwargs):
         return None
 
     outShape = kwargs.pop("outShape", None)
+    #check if inpu arrays are already indices. 
     if np.abs(x.flatten()[0]-int(x.flatten()[0]))<1e-12: #allow for floating point errors.
+        ix = x.astype(int)
+        iy = y.astype(int)
+        ix = ix - np.min(ix)
+        iy = iy - np.min(iy)
+    else:
         #cspad
         if x.shape==(32,185,388): imgShape=[1689,1689]
         #cs140k
@@ -851,9 +857,6 @@ def image_from_dxy(d,x,y, **kwargs):
         iy = y.copy()
         iy = iy - np.min(iy)
         iy = (iy/np.max(iy)*imgShape[1]).astype(int)
-    else:
-        ix=x.astype(int)
-        iy=y.astype(int)
 
     if outShape is None:
         outShape = (np.max(ix)+1, np.max(iy)+1)
