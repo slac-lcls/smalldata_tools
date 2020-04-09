@@ -12,7 +12,7 @@ def fcn(buffer):
     else:
         return 0.
 
-class photon(DetObjectFunc):
+class photonFunc(DetObjectFunc):
     """
     Wrapper for the psana algorithms described at
     
@@ -23,14 +23,14 @@ class photon(DetObjectFunc):
     thresADU (def: 0.9): fraction of ADU_per_photon in the most neighboring pixels needed to count as a photon 
     """
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','photon')
-        super(photon, self).__init__(**kwargs)
+        self._name = kwargs.get('name','photonFunc')
+        super(photonFunc, self).__init__(**kwargs)
         self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
         self.thresADU = kwargs.get('thresADU',0.9)
         self._mask = kwargs.get('mask',None)
 
     def setFromDet(self, det):
-        super(photon, self).setFromDet(det)
+        super(photonFunc, self).setFromDet(det)
         if self._mask is None and det.mask is not None:
             setattr(self, '_mask', det.mask.astype(np.uint8))
 
