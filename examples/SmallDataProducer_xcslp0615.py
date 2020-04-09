@@ -1,15 +1,13 @@
-# importing genereric python modules
+# importing generic python modules
 import numpy as np
-import h5py
 import psana
 import time
 import argparse
 import socket
 import os
-
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
-from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
+import RegDB.experiment_info
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
 ########################################################## 
 ##
 ## User Input start --> 
@@ -18,28 +16,30 @@ from smalldata_tools.roi_rebin import ROI
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
-
-def getROIs(run):
-    if run>=210 and run<220:
-	sigROI = [] #no signal apparent for run 210
-        #np.append(sigROI,[[0,1], [150,200], [150,200]],axis=0)
-    elif run>=220 and run<230:
-	sigROI = [[1,2], [87,146], [6,384]]
+def getAzIntParams(run):
+    ret_dict = {'eBeam': 9.477}
+    ret_dict['cspad_dis_to_sam'] = 110.
+    #if run == 25: #0 in geometry. will need to turn polarization....
+    #    ret_dict['cspad_center'] = [67796.1, 93766.5]
+    #elif run == 24:
+    if run < 27:
+        ret_dict['cspad_center'] = [-93843.9, 67689.1]
     else:
-	sigROI = []
-
-    if len(sigROI)>1:
-        return sigROI, 
-    else:
-        return sigROI
+        ret_dict['cspad_center'] = [-93843.9, 67689.1]
+    return ret_dict
 
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = [] 
+#fix timetool calibration if necessary
+#ttCalib=[0.,2.,0.]
+ttCalib=[]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -81,6 +81,7 @@ if not args.exp:
                 hutch=thisHutch.upper()
     if hutch is None:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        import sys
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
@@ -127,15 +128,22 @@ except:
 ##
 ########################################################## 
 dets=[]
-ROIs = getROIs(int(run))
-haveCspad = checkDet(ds.env(), 'cs140_0')
+azIntParams = getAzIntParams(int(run))
+haveCspad = checkDet(ds.env(), 'cspad')
 if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,roi in enumerate(ROIs):
-        print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
+    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
+
+    cspad.azav_eBeam=azIntParams['eBeam']
+    if azIntParams.has_key('cspad_center'):
+        cspad.azav_center=azIntParams['cspad_center']
+        cspad.azav_dis_to_sam=azIntParams['cspad_dis_to_sam']
+        try:
+            if run == 25:
+                cspad.addAzAv(Pplane=0,phiBins=11)
+            else:
+                cspad.addAzAv(phiBins=11)
+        except:
+            pass
     dets.append(cspad)
 
 ########################################################## 
@@ -143,28 +151,27 @@ if haveCspad:
 ## <-- User Input end
 ##
 ########################################################## 
-#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
-dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
+dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
+
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name] = det.params_as_dict()
-    #print(userDataCfg[det._name].keys())
+    userDataCfg[det._name]=getCfgOutput(det)
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
 for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank)
+    printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
     if eventNr >= maxNevt/ds.size:
         break
@@ -179,11 +186,15 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
+            #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
-            det.processFuncs()
+            det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
@@ -191,10 +202,5 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-#    if args.live:
-#        import time
-#        time.sleep(0.1)
-
-#gather whatever event did not make it to the gather interval
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()

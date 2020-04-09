@@ -6,15 +6,9 @@ import argparse
 import socket
 import os
 import RegDB.experiment_info
-from smalldata_tools.DetObject import DetObject
-from smalldata_tools.utilities import checkDet, printMsg
-from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
-from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photon
-
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
 ########################################################## 
 ##
 ## User Input start --> 
@@ -28,39 +22,49 @@ def getAzIntParams(run):
         run=int(run)
         
     ret_dict = {'eBeam': 9.5}
-    ret_dict['cspad_center'] = [87526.79161840, 92773.3296889500]
-    ret_dict['cspad_dis_to_sam'] = 80.
+    ret_dict['epix10k_center'] = [82.20, -65.675]
+    ret_dict['epix10k_dis_to_sam'] = 56.
+    ret_dict['Pplane'] = 1
     return ret_dict
 
-def getROI_cspad(run):
+def getROI_epix10k(run):
     if isinstance(run,basestring):
         run=int(run)
     if run <=6:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
+        return [ [[0,1], [1,74], [312,381]] ]
     else:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
+        return [ [[0,1], [1,74], [312,381]] ]
 
-def getROI_rowland(run):
+def getPed_epix10k(run):
+    ped = None
+    maxValid=-1
+    fileValid=''
+    for f in os.listdir('./pedestals/'):
+        validRange=f.replace('.data','').split('-')
+        if (validRange[1]=='end' or int(valueRange[1])>int(run)) and int(validRange[0]) > maxValid:
+            maxValid = int(validRange[0])
+            fileValid = f
+    print('I will use pedestal /reg/d/psdm/xcs/xcslt5117/results/smalldata_tools_wEpix10k/pedestals/%s for run %d'%(fileValid,int(run)))
+    ped = np.loadtxt('./pedestals/%s'%fileValid).reshape(16,352,384)
+    return ped
+
+def get_radav_mask(run):
     if isinstance(run,basestring):
         run=int(run)
-
-    if run <= 6:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
+    other_mask = np.loadtxt('Mask_AvImg_epix10ka2m_xcslt5117_Run065.data').reshape(16,352,384)
+    try:
+        cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_2.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_5.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_x.data').reshape(16,352,384)
+    except:
+        cen_edge_mask = np.ones((16,352,384))
+    if run <= 30:
+        fname='Mask_AvImg_epix10ka2m_xcslt5117_Run016.data'
     else:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
+        fname='Mask_AvImg_pedSub_epix10ka2m_xcslt5117_Run064.data'
+    radav_mask=np.loadtxt(fname).reshape(16,352,384)
 
-def getNmaxDrop(run):
-    if isinstance(run,basestring):
-        run=int(run)
-
-    if run >= 10:
-        return 2000
-    else:
-        return 400
+    return radav_mask*cen_edge_mask#*other_mask
 
 ##########################################################
 # run independent parameters 
@@ -178,15 +182,84 @@ if ds.rank==0:
             version=dirn
     print 'Using psana version ',version
 
+########################################################## 
+##
+## User Input start --> 
+##
+########################################################## 
+dets=[]
+
+azIntParams = getAzIntParams(run)
+
+ROI_epix10k = getROI_epix10k(int(run))
+#Ped_epix10k = getPed_epix10k(int(run))
+radav_mask = get_radav_mask(run)
+haveEpix10k = checkDet(ds.env(), 'epix10ka2m')
+if haveEpix10k:
+    #common_mode=-1 # raw
+    #common_mode=0 # pedSub 
+    #common_mode=81 # pedSub w/ gain
+    common_mode=80 # somewhat more official version of calib. Similar to 81.
+    epix10k = DetObject('epix10ka2m' ,ds.env(), int(run), name='epix10ka2m', common_mode=common_mode)
+    #if Ped_epix10k is not None and (common_mode==0 or common_mode==81):
+    #    epix10k.setPed(Ped_epix10k)
+    for iROI,ROI in enumerate(ROI_epix10k):
+        epix10k.addROI('ROI_%d'%iROI, ROI)
+
+    ##saves the full detector in raw data shape
+    #epix10k.saveFull()
+
+    epix10k.azav_eBeam=azIntParams['eBeam']
+    if azIntParams.has_key('epix10k_center'):
+        epix10k.azav_center=azIntParams['epix10k_center']
+        epix10k.azav_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        epix10k.addAzAv(phiBins=11, Pplane=azIntParams['Pplane'])
+
+        #epix10k.radav_eBeam=azIntParams['eBeam']
+        #epix10k.radav_center=azIntParams['epix10k_center']
+        #epix10k.radav_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        #epix10k.addAzAv(phiBins=720, Pplane=azIntParams['Pplane'], userMask=radav_mask, azavName='radav', qBin=0.2)
+
+        #other_mask = np.loadtxt('Mask_AvImg_epix10ka2m_xcslt5117_Run065.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_2.data').reshape(16,352,384)
+        #epix10k.radav2_eBeam=azIntParams['eBeam']
+        #epix10k.radav2_center=azIntParams['epix10k_center']
+        #epix10k.radav2_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        #epix10k.addAzAv(phiBins=720, Pplane=azIntParams['Pplane'], userMask=other_mask*cen_edge_mask,azavName='radav2', qBin=0.2)
+
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge5_center1.data').reshape(16,352,384)
+        cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge3_center1.data').reshape(16,352,384)
+        epix10k.radav3_eBeam=azIntParams['eBeam']
+        epix10k.radav3_center=azIntParams['epix10k_center']
+        epix10k.radav3_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        epix10k.addAzAv(phiBins=720, Pplane=azIntParams['Pplane'], userMask=cen_edge_mask,azavName='radav3', qBin=0.2)
+
+        epix10k.radav4_eBeam=azIntParams['eBeam']
+        epix10k.radav4_center=azIntParams['epix10k_center']
+        epix10k.radav4_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        epix10k.addAzAv(phiBins=720, Pplane=azIntParams['Pplane'], azavName='radav4', qBin=0.2)
+
+        ##pPlane IS 1 (as used above)
+        #if int(run)==63:
+        #    epix10k.radav4_eBeam=azIntParams['eBeam']
+        #    epix10k.radav4_center=azIntParams['epix10k_center']
+        #    epix10k.radav4_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+        #    if azIntParams['Pplane'] == 0:            
+        #        epix10k.addAzAv(phiBins=720, Pplane=1, userMask=cen_edge_mask,azavName='radav4', qBin=0.2)
+        #    else:
+        #        epix10k.addAzAv(phiBins=720, Pplane=0, userMask=cen_edge_mask,azavName='radav4', qBin=0.2)
+    epix10k.storeSum(sumAlgo='calib')
+    #epix10k.storeSum(sumAlgo='square')
+    dets.append(epix10k)
 
 ########################################################## 
 ##
-## Setting up the default detectors
-## needs to be before the user detectors only for epix10k 
-## data that needs ghost corrections and uses a psana 
-## detector that does not take the event as inpu (EPICS PV, tt)
+## <-- User Input end
 ##
 ########################################################## 
+dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+#for now require all area detectors in run to also be present in event.
+
 defaultDets = defaultDetectors(hutch)
 if len(ttCalib)>0:
     setParameter(defaultDets, ttCalib)
@@ -203,89 +276,10 @@ if len(epicsPV)>0:
 #except:
 #    pass
 
-########################################################## 
-##
-## User Input start --> 
-##
-########################################################## 
-dets=[]
-
-epixname='epix_diff'
-nDrop = getNmaxDrop(int(run))
-have_epix = checkDet(ds.env(), epixname)
-if have_epix:
-    #create detector object. needs run for calibration data
-    #common mode: 46 is the "original" to psana method 7(?)
-    #row & column correction on data w/ photons&neighbors removed.
-    epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
-
-    #two threshold droplet finding.
-    #for data w/ > 1 photon energy this is the only thing that will work.
-    #Tends to add photons together into single droplet if occupancy
-    #is not low, might need photonizing step to get single photon positions
-    droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
-    droplet.addFunc(specFunc_300) 
-    #droplet.addDropletSave(maxDroplets=nDrop)
-    epix.addFund(droplet)
-
-    #now add photon algorithms. Only works for single energy photon data
-    # ADU_per_photon: expected ADU for photon of expected energy
-    # thresADU: fraction of photon energy in photon candidate
-                #(2 neighboring pixel)
-    #retImg: 0 (def): only histogram of 0,1,2,3,...,24 photons/pixel is returned
-    #        1 return Nphot, x, y arrays
-    #        2 store image using photons /event
-    if (int(run)==444):
-        epix.addFunc(photon(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200))
-
-    dets.append(epix)
-
-ROI_rowland = getROI_rowland(int(run))
-if checkDet(ds.env(), 'cs140_diff'):
-    cs140 = DetObject('cs140_diff' ,ds.env(), int(run))#, name='Rowland')
-    for iROI,ROI in enumerate(ROI_rowland):
-        cs140.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
-    dets.append(cs140)
-
-azIntParams = getAzIntParams(run)
-ROI_cspad = getROI_cspad(int(run))
-haveCspad = checkDet(ds.env(), 'cspad')
-if haveCspad:
-    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
-    for iROI,ROI in enumerate(ROI_cspad):
-        cspad.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
-
-    cspad.azav_eBeam=azIntParams['eBeam']
-    if azIntParams.has_key('cspad_center'):
-        try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
-            cspad.addFunc(azav)
-        except:
-            pass
-
-
-    cspad.storeSum(sumAlgo='calib')
-    cspad.storeSum(sumAlgo='square')
-    dets.append(cspad)
-
-########################################################## 
-##
-## <-- User Input end
-##
-########################################################## 
-dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
-#for now require all area detectors in run to also be present in event.
-
-
 #add config data here
 userDataCfg={}
-for det in defaultDets:
-    userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
-    userDataCfg[det._name] = det.params_as_dict()
-for det in raredets:
-    userDataCfg[det._name] = det.params_as_dict()
+    userDataCfg[det._name]=getCfgOutput(det)
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
@@ -306,8 +300,9 @@ for eventNr,evt in enumerate(ds.events()):
     for det in dets:
         try:
             #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
-            det.processFuncs()
+            det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
                 envData=getUserEnvData(det)
@@ -320,32 +315,13 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-    #here you can add any data you like: example is a product of the maximumof two area detectors.
-    #try:
-    #    cspadMax = cspad.evt.dat.max()
-    #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
-    #    smldata.event(combDict)
-    #except:
-    #    pass
-
-    #first event.
-    if ds.rank==0 and eventNr==0 and (args.live or args.liveFast):
-        if not args.liveFast:
-            #this saves all fields
-            smldata.connect_redis()
-        else:
-            redisKeys = defaultRedisVars(hutch)
-            redisList=['fiducials','event_time']
-            for key in redisKeys:
-                if key.find('/')>=0 and key in smldata._dlist.keys():
-                    redisList.append(key)
-                else:
-                    for sdkey in smldata._dlist.keys():
-                        if sdkey.find(key)>=0:
-                            redisList.append(sdkey)
-            print 'Saving in REDIS: ',redisList
-            smldata.connect_redis(redisList)
+    #here you can add any data processing you like, just add a dictionay with the relevant information at the end
+    try:
+        mydata = epix10k.evt.dat
+        combDict = {'userValue': np.nanmax(mydata)}
+        smldata.event(combDict)
+    except:
+        pass
 
 sumDict={'Sums': {}}
 for det in dets:

@@ -1,4 +1,4 @@
-# importing genereric python modules
+# importing generic python modules
 import numpy as np
 import h5py
 import psana
@@ -6,45 +6,53 @@ import time
 import argparse
 import socket
 import os
-
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
+import sys
+import RegDB.experiment_info
 from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
-########################################################## 
+from smalldata_tools.utilities import checkDet, printMsg
+from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
+from smalldata_tools.SmallDataDefaultDetector import epicsDetector
+from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
+##########################################################
 ##
-## User Input start --> 
+## User Input start -->
 ##
-########################################################## 
+##########################################################
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
+# none for now, start w/ full image saving to see if
+# start works with the new smallData
+#
+det_diffpat = 'cspad'
 
-def getROIs(run):
-    if run>=210 and run<220:
-	sigROI = [] #no signal apparent for run 210
-        #np.append(sigROI,[[0,1], [150,200], [150,200]],axis=0)
-    elif run>=220 and run<230:
-	sigROI = [[1,2], [87,146], [6,384]]
-    else:
-	sigROI = []
+def error_function(image, master_file, background=1, max_noise=1, default_error=1E3):
+    # Filter out to noisy images
+    # got strange error "divide by zero", should not be possible
+    noise_to_signal = np.nansum(image) *1.0 / (np.nansum( np.maximum(0,1.0*image-background) ) + 1)
+    if (noise_to_signal > max_noise):
+        return default_error #, noise_to_signal
 
-    if len(sigROI)>1:
-        return sigROI, 
-    else:
-        return sigROI
+
+    # subtract background and normalize
+    cleaned_image = 1.0 * np.maximum(0.0, 1.0*image-background)
+    cleaned_image /= np.nansum( cleaned_image )
+
+    difference = np.nansum( (cleaned_image-master_file)**2 )
+    return difference #, noise_to_signal
 
 ##########################################################
-# run independent parameters 
+# run independent parameters
 ##########################################################
 #event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
-epicsPV = [] 
-########################################################## 
+#epicsPV = ['slit_s1_hw']
+epicsPV = []
+##########################################################
 ##
 ## <-- User Input end
 ##
-########################################################## 
+##########################################################
 
 
 ##########################################################
@@ -60,15 +68,14 @@ parser.add_argument("--nevt", help="number of events", type=int)
 parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/smalldata)")
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
-parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
 args = parser.parse_args()
-hostname=socket.gethostname()
 if not args.run:
     run=raw_input("Run Number:\n")
 else:
     run=args.run
 if not args.exp:
     hutches=['amo','sxr','xpp','xcs','mfx','cxi','mec']
+    hostname=socket.gethostname()
     hutch=None
     for thisHutch in hutches:
         if hostname.find(thisHutch)>=0:
@@ -108,82 +115,81 @@ except:
     import sys
     sys.exit()
 
-try:    
+try:
     if dirname is None:
         dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(hutch.lower(),expname)
     smldataFile = '%s/%s_Run%03d.h5'%(dirname,expname,int(run))
 
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
-    if args.live:
-        smldata.connect_redis()
 except:
     print 'failed making the output file ',smldataFile
     import sys
     sys.exit()
 
-########################################################## 
+##########################################################
 ##
-## User Input start --> 
+## User Input start -->
 ##
-########################################################## 
+##########################################################
 dets=[]
-ROIs = getROIs(int(run))
-haveCspad = checkDet(ds.env(), 'cs140_0')
-if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,roi in enumerate(ROIs):
-        print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
-    dets.append(cspad)
 
-########################################################## 
+have_diffpat = checkDet(ds.env(), det_diffpat)
+if have_diffpat:
+    diffpat = DetObject(det_diffpat, ds.env(), int(run), name=det_diffpat, common_mode=0)
+    fullROI_write = ROIFunc(writeArea=True)
+    fullROI = ROIFunc()
+    fullROI.addFunc(imageFunc(coords=['x','y']))
+    #diffpat.addFunc(fullROI)
+    diffpat.addFunc(fullROI_write)
+    dets.append(diffpat)
+
+##########################################################
 ##
 ## <-- User Input end
 ##
-########################################################## 
-#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+##########################################################
 dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
-#for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
 #add config data here
 userDataCfg={}
+for det in defaultDets:
+    userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
-    #print(userDataCfg[det._name].keys())
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
+
+noise_signal = 0
 for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank)
+    printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
     if eventNr >= maxNevt/ds.size:
         break
 
     #add default data
     defData = detData(defaultDets, evt)
+
     #for key in defData.keys():
     #    print eventNr, key, defData[key]
     smldata.event(defData)
 
-    #detector data using DetObject 
+    #detector data using DetObject
     userDict = {}
     for det in dets:
         try:
+            #this should be a plain dict. Really.
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
@@ -191,10 +197,5 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-#    if args.live:
-#        import time
-#        time.sleep(0.1)
-
 #gather whatever event did not make it to the gather interval
-print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()

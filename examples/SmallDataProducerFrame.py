@@ -15,6 +15,11 @@ from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
 from smalldata_tools.photons import photon
 
+from smalldata_tools.SmallDataProducer_new import addTimetoolTraces
+from smalldata_tools.SmallDataProducer_new import addEpicsPV_shotbyshot
+from smalldata_tools.SmallDataProducer_new import ttCalib
+from smalldata_tools.SmallDataProducer_new import aioParams
+
 ########################################################## 
 ##
 ## User Input start --> 
@@ -62,19 +67,6 @@ def getNmaxDrop(run):
     else:
         return 400
 
-##########################################################
-# run independent parameters 
-##########################################################
-#aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
-epicsPV = []
-#fix timetool calibration if necessary
-#ttCalib=[0.,2.,0.]
-ttCalib=[]
-#ttCalib=[1.860828, -0.002950]
-#decide which analog input to save & give them nice names
-#aioParams=[[1],['laser']]
-aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -178,31 +170,6 @@ if ds.rank==0:
             version=dirn
     print 'Using psana version ',version
 
-
-########################################################## 
-##
-## Setting up the default detectors
-## needs to be before the user detectors only for epix10k 
-## data that needs ghost corrections and uses a psana 
-## detector that does not take the event as inpu (EPICS PV, tt)
-##
-########################################################## 
-defaultDets = defaultDetectors(hutch)
-if len(ttCalib)>0:
-    setParameter(defaultDets, ttCalib)
-if len(aioParams)>0:
-    setParameter(defaultDets, aioParams, 'ai')
-if len(epicsPV)>0:
-    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-
-##adding wave8 traces:
-#defaultDets.append(wave8Detector('Wave8WF'))
-##adding raw timetool traces:
-#try:
-#    defaultDets.append(ttRawDetector(env=ds.env()))
-#except:
-#    pass
-
 ########################################################## 
 ##
 ## User Input start --> 
@@ -224,9 +191,8 @@ if have_epix:
     #Tends to add photons together into single droplet if occupancy
     #is not low, might need photonizing step to get single photon positions
     droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
-    droplet.addFunc(specFunc_300) 
-    #droplet.addDropletSave(maxDroplets=nDrop)
+    #droplet.add_aduHist() 
+    droplet.addDropletSave(maxDroplets=nDrop)
     epix.addFund(droplet)
 
     #now add photon algorithms. Only works for single energy photon data
@@ -277,6 +243,24 @@ if haveCspad:
 dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
+defaultDets = defaultDetectors(hutch)
+epicsPV = addEpicsPV_shotbyshot()
+ttCalib = ttCalib()
+aioParams = aioParams()
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
+if len(epicsPV)>0:
+    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
+##adding raw timetool traces:
+#try:
+#    defaultDets.append(ttRawDetector(env=ds.env()))
+#except:
+#    pass
 
 #add config data here
 userDataCfg={}
@@ -306,6 +290,7 @@ for eventNr,evt in enumerate(ds.events()):
     for det in dets:
         try:
             #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)

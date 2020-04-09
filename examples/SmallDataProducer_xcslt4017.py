@@ -11,10 +11,10 @@ from smalldata_tools.utilities import checkDet, printMsg
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
 from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
 from smalldata_tools.photons import photon
-
+from smalldata_tools.read_uxi import getUxiDict
+from smalldata_tools.azimuthalBinning import azimuthalBinning
 ########################################################## 
 ##
 ## User Input start --> 
@@ -28,39 +28,36 @@ def getAzIntParams(run):
         run=int(run)
         
     ret_dict = {'eBeam': 9.5}
-    ret_dict['cspad_center'] = [87526.79161840, 92773.3296889500]
-    ret_dict['cspad_dis_to_sam'] = 80.
+    #ret_dict['epix10k_center'] = [82.20, -65.675] #from original, gets stored differently now?
+    #ret_dict['epix10k_center'] = [-812.822983, 95.851106] # threshole with 99.5%
+    ret_dict['epix10k_center'] = [-790.0, 79.9] #auto-center
+    ret_dict['epix10k_dis_to_sam'] = 54.7#56.
+    ret_dict['Pplane'] = 1
     return ret_dict
 
-def getROI_cspad(run):
+def getROI_epix10k(run):
     if isinstance(run,basestring):
         run=int(run)
     if run <=6:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
+        return [ [[0,1], [1,74], [312,381]] ]
     else:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
+        return [ [[0,1], [1,74], [312,381]] ]
 
-def getROI_rowland(run):
+def get_radav_mask(run):
     if isinstance(run,basestring):
         run=int(run)
+    try:
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_1.data').reshape(16,352,384)
+        cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_2.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_3.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_4.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_5.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_10.data').reshape(16,352,384)
+        #cen_edge_mask = np.loadtxt('Mask_epix10ka2m_edge_center_x.data').reshape(16,352,384)
+    except:
+        cen_edge_mask = np.ones((16,352,384))
+    return cen_edge_mask
 
-    if run <= 6:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
-    else:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
-
-def getNmaxDrop(run):
-    if isinstance(run,basestring):
-        run=int(run)
-
-    if run >= 10:
-        return 2000
-    else:
-        return 400
 
 ##########################################################
 # run independent parameters 
@@ -179,14 +176,6 @@ if ds.rank==0:
     print 'Using psana version ',version
 
 
-########################################################## 
-##
-## Setting up the default detectors
-## needs to be before the user detectors only for epix10k 
-## data that needs ghost corrections and uses a psana 
-## detector that does not take the event as inpu (EPICS PV, tt)
-##
-########################################################## 
 defaultDets = defaultDetectors(hutch)
 if len(ttCalib)>0:
     setParameter(defaultDets, ttCalib)
@@ -210,142 +199,124 @@ if len(epicsPV)>0:
 ########################################################## 
 dets=[]
 
-epixname='epix_diff'
-nDrop = getNmaxDrop(int(run))
-have_epix = checkDet(ds.env(), epixname)
-if have_epix:
-    #create detector object. needs run for calibration data
-    #common mode: 46 is the "original" to psana method 7(?)
-    #row & column correction on data w/ photons&neighbors removed.
-    epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
-
-    #two threshold droplet finding.
-    #for data w/ > 1 photon energy this is the only thing that will work.
-    #Tends to add photons together into single droplet if occupancy
-    #is not low, might need photonizing step to get single photon positions
-    droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
-    droplet.addFunc(specFunc_300) 
-    #droplet.addDropletSave(maxDroplets=nDrop)
-    epix.addFund(droplet)
-
-    #now add photon algorithms. Only works for single energy photon data
-    # ADU_per_photon: expected ADU for photon of expected energy
-    # thresADU: fraction of photon energy in photon candidate
-                #(2 neighboring pixel)
-    #retImg: 0 (def): only histogram of 0,1,2,3,...,24 photons/pixel is returned
-    #        1 return Nphot, x, y arrays
-    #        2 store image using photons /event
-    if (int(run)==444):
-        epix.addFunc(photon(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200))
-
-    dets.append(epix)
-
-ROI_rowland = getROI_rowland(int(run))
-if checkDet(ds.env(), 'cs140_diff'):
-    cs140 = DetObject('cs140_diff' ,ds.env(), int(run))#, name='Rowland')
-    for iROI,ROI in enumerate(ROI_rowland):
-        cs140.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
-    dets.append(cs140)
-
 azIntParams = getAzIntParams(run)
-ROI_cspad = getROI_cspad(int(run))
-haveCspad = checkDet(ds.env(), 'cspad')
-if haveCspad:
-    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
-    for iROI,ROI in enumerate(ROI_cspad):
-        cspad.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
 
-    cspad.azav_eBeam=azIntParams['eBeam']
-    if azIntParams.has_key('cspad_center'):
-        try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
-            cspad.addFunc(azav)
-        except:
-            pass
+ROI_epix10k = getROI_epix10k(int(run))
+edge_mask=get_radav_mask(run)
+haveEpix10k = checkDet(ds.env(), 'epix10ka2m')
+if haveEpix10k:
+    #common_mode=-1 # raw
+    #common_mode=0 # pedSub 
+    #common_mode=81 # pedSub w/ gain
+    #common_mode=80 # somewhat more official version of calib. Similar to 81.
+    common_mode=180 # official with ghost correction
+    epix10k = DetObject('epix10ka2m' ,ds.env(), int(run), name='epix10ka2m', common_mode=common_mode)
+    #if (common_mode==0 or common_mode==81):
+    #    Ped_epix10k = getPed_epix10k(int(run))
+    #    if Ped_epix10k is not None:
+    #        epix10k.setPed(Ped_epix10k)
+    epix10k.addFunc(ROIFunc(writeArea=True))
+    for iROI,ROI in enumerate(ROI_epix10k):
+        epix10k.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
 
+    center=azIntParams['epix10k_center']
+    azav_dis_to_sam=azIntParams['epix10k_dis_to_sam']
+    azav_eBeam=azIntParams['eBeam']
+    if center!=[]:
+        #I'm inverting the center here. Not sure why?
+        #azav = azimuthalBinning(center=[center[1], center[0]], dis_to_sam=azav_dis_to_sam,  phiBins=1, eBeam=azav_eBeam, Pplane=azIntParams['Pplane'],userMask=edge_mask)
+        #azav = azimuthalBinning(center=[center[1], center[0]], dis_to_sam=azav_dis_to_sam,  phiBins=11, eBeam=azav_eBeam, Pplane=azIntParams['Pplane'],userMask=edge_mask)
+        #I'll stop to invert this. 
+        azav = azimuthalBinning(center=center, dis_to_sam=azav_dis_to_sam,  phiBins=11, eBeam=azav_eBeam, Pplane=azIntParams['Pplane'],userMask=edge_mask)
+        epix10k.addFunc(azav)
+        print 'MASK DEBUG azavA: ',azav._mask.shape
+    # save full detector
+    #epix10k.addFunc(ROIFunc(writeArea=True))
 
-    cspad.storeSum(sumAlgo='calib')
-    cspad.storeSum(sumAlgo='square')
-    dets.append(cspad)
+    ##add two azav, no phi bins w/ user mask for gain  ranges?
+    #load hdf5 file, get gain/pixel setting, save == 0.01 and != 0.01 as masks in npz file.
+    #masks = np.load(fname)
+
+    #epix10k.storeSum(sumAlgo='calib')
+    #snelson - comment out for reproc tt test
+    dets.append(epix10k)
+    print 'MASK DEBUG azavB: ',azav._mask.shape
+    ##epix10kRaw = DetObject('epix10ka2m' ,ds.env(), int(run), name='epix10ka2m', common_mode=-1)
+    ###saves the full detector in raw data shape
+    ##epix10kRaw.addFunc(ROIFunc(writeArea=True))
+    ##dets.append(epix10kRaw)
+
+    azav80 = azimuthalBinning(center=center, dis_to_sam=azav_dis_to_sam,  phiBins=11, eBeam=azav_eBeam, Pplane=azIntParams['Pplane'],userMask=edge_mask)
+    epix10k80 = DetObject('epix10ka2m' ,ds.env(), int(run), name='epix10ka2m80', common_mode=80)
+    print 'MASK DEBUG azavC: ',azav80._mask.shape
+    if center!=[]:
+        epix10k80.addFunc(azav80)
+    dets.append(epix10k80)
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
 #for now require all area detectors in run to also be present in event.
-
 
 #add config data here
 userDataCfg={}
+#look for default data config?
 for det in defaultDets:
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
-for det in raredets:
-    userDataCfg[det._name] = det.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
-for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank, ds.size)
+eventNr=0
+stepNr=-1 #to start counting from 0.
+for step in ds.steps():
+    stepNr += 1
 
-    if eventNr >= maxNevt/ds.size:
-        break
+    for evt in step.events():
+        if eventNr >= maxNevt/ds.size:
+            break
 
-    #add default data
-    defData = detData(defaultDets, evt)
-    #for key in defData.keys():
-    #    print eventNr, key, defData[key]
-    smldata.event(defData)
+        eventNr += 1
+        smldata.event({'scan':{'stepNr': stepNr}})
 
-    #detector data using DetObject 
-    userDict = {}
-    for det in dets:
-        try:
-            #this should be a plain dict. Really.
-            det.getData(evt)
-            det.processFuncs()
-            userDict[det._name]=getUserData(det)
+        #add default data
+        defData = detData(defaultDets, evt)
+        #for key in defData.keys():
+        #    print eventNr, key, defData[key]
+        smldata.event(defData)
+        
+        #detector data using DetObject 
+        userDict = {}
+        for det in dets:
             try:
-                envData=getUserEnvData(det)
-                if len(envData.keys())>0:
-                    userDict[det._name+'_env']=envData
+                #this should be a plain dict. Really.
+                det.getData(evt)
+                det.processFuncs()
+                userDict[det._name]=getUserData(det)
+                #print 'keys: ',userDict[det._name].keys()
+                try:
+                    envData=getUserEnvData(det)
+                    if len(envData.keys())>0:
+                        userDict[det._name+'_env']=envData
+                except:
+                    pass
+                #print userDict[det._name]
+                #print('data-ROI: ',userDict['epix10ka2m']['full'])
             except:
                 pass
-            #print userDict[det._name]
+        smldata.event(userDict)
+
+        #here you can add any data processing you like, just add a dictionay with the relevant information at the end
+        try:
+            mydata = epix10k.evt.dat
+            combDict = {'userValue': np.nanmax(mydata)}
+            smldata.event(combDict)
         except:
             pass
-    smldata.event(userDict)
-
-    #here you can add any data you like: example is a product of the maximumof two area detectors.
-    #try:
-    #    cspadMax = cspad.evt.dat.max()
-    #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
-    #    smldata.event(combDict)
-    #except:
-    #    pass
-
-    #first event.
-    if ds.rank==0 and eventNr==0 and (args.live or args.liveFast):
-        if not args.liveFast:
-            #this saves all fields
-            smldata.connect_redis()
-        else:
-            redisKeys = defaultRedisVars(hutch)
-            redisList=['fiducials','event_time']
-            for key in redisKeys:
-                if key.find('/')>=0 and key in smldata._dlist.keys():
-                    redisList.append(key)
-                else:
-                    for sdkey in smldata._dlist.keys():
-                        if sdkey.find(key)>=0:
-                            redisList.append(sdkey)
-            print 'Saving in REDIS: ',redisList
-            smldata.connect_redis(redisList)
 
 sumDict={'Sums': {}}
 for det in dets:

@@ -5,16 +5,20 @@ import time
 import argparse
 import socket
 import os
-import RegDB.experiment_info
+import logging
+
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.utilities import checkDet, printMsg
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
-from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photon
+from smalldata_tools.SmallDataDefaultDetector import epicsDetector
+from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 
+#from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData
+#from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+#from smalldata_tools import ttRawDetector,wave8Detector,setParameter
+from smalldata_tools.DetObject import DetObject
+from smalldata_tools.droplet import dropletFunc
+from smalldata_tools.photons import photonFunc
 ########################################################## 
 ##
 ## User Input start --> 
@@ -23,54 +27,25 @@ from smalldata_tools.photons import photon
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
-def getAzIntParams(run):
-    if isinstance(run,basestring):
-        run=int(run)
-        
-    ret_dict = {'eBeam': 9.5}
-    ret_dict['cspad_center'] = [87526.79161840, 92773.3296889500]
-    ret_dict['cspad_dis_to_sam'] = 80.
-    return ret_dict
-
-def getROI_cspad(run):
-    if isinstance(run,basestring):
-        run=int(run)
-    if run <=6:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
-    else:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
-
-def getROI_rowland(run):
-    if isinstance(run,basestring):
-        run=int(run)
-
-    if run <= 6:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
-    else:
-        return [[[0,1], [25, 275], [516, 556]], 
-                [[0,1], [25, 275], [460, 500]]]
 
 def getNmaxDrop(run):
     if isinstance(run,basestring):
         run=int(run)
 
-    if run >= 10:
-        return 2000
+    if run == 103:
+        return 15000
     else:
-        return 400
+        return 10
 
 ##########################################################
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
+#epicsPV = ['ccm_alio_position07']
 epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
-ttCalib=[]
+ttCalib=[]#1.860828, -0.002950]
 #ttCalib=[1.860828, -0.002950]
 #decide which analog input to save & give them nice names
 #aioParams=[[1],['laser']]
@@ -121,10 +96,24 @@ if not args.exp:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
         import sys
         sys.exit()
-    expname=RegDB.experiment_info.active_experiment(hutch)[1]
+
+    ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    station = 0
+    resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": station})
+    expname = resp.json().get("value", {}).get("name")
+    if (hutch == 'cxi'):
+        print('We will assume you are using the experiment for the primary CXI station (%s), is you are using the SSC please pass the experiment name using -e <expname>'%expname)
+
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
     #data gets removed from ffb faster now, please check if data is still available
-    isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
+    rundoc = requests.get(ws_url + "/lgbk/" + exp  + "/ws/current_run").json()["value"]
+    isLive = False
+    if not rundoc:
+        logger.error("Invalid response from server")
+        if not rundoc.get('end_time', None):
+            isLive = True
     if not isLive:
         xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
         xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
@@ -173,36 +162,10 @@ except:
 
 if ds.rank==0:
     version='unable to detect psana version'
-    for dirn in psana.__file__.split('/'):
+    for dirn in psana.__file__:
         if dirn.find('ana-')>=0:
             version=dirn
     print 'Using psana version ',version
-
-
-########################################################## 
-##
-## Setting up the default detectors
-## needs to be before the user detectors only for epix10k 
-## data that needs ghost corrections and uses a psana 
-## detector that does not take the event as inpu (EPICS PV, tt)
-##
-########################################################## 
-defaultDets = defaultDetectors(hutch)
-if len(ttCalib)>0:
-    setParameter(defaultDets, ttCalib)
-if len(aioParams)>0:
-    setParameter(defaultDets, aioParams, 'ai')
-if len(epicsPV)>0:
-    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-
-##adding wave8 traces:
-#defaultDets.append(wave8Detector('Wave8WF'))
-##adding raw timetool traces:
-#try:
-#    defaultDets.append(ttRawDetector(env=ds.env()))
-#except:
-#    pass
-
 ########################################################## 
 ##
 ## User Input start --> 
@@ -210,82 +173,81 @@ if len(epicsPV)>0:
 ########################################################## 
 dets=[]
 
-epixname='epix_diff'
 nDrop = getNmaxDrop(int(run))
-have_epix = checkDet(ds.env(), epixname)
-if have_epix:
-    #create detector object. needs run for calibration data
-    #common mode: 46 is the "original" to psana method 7(?)
-    #row & column correction on data w/ photons&neighbors removed.
-    epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
+have_andor = checkDet(ds.env(), 'andor')
+if have_andor:
+    andor = DetObject('andor' ,ds.env(), int(run), common_mode=0)
+    
+    roi = ROIFunc(writeArea=True)
+    roi.addFunc(spectrumFunc(bins=[-50,550,2.5]))
+    andor.addFunc(roi)
 
-    #two threshold droplet finding.
-    #for data w/ > 1 photon energy this is the only thing that will work.
-    #Tends to add photons together into single droplet if occupancy
-    #is not low, might need photonizing step to get single photon positions
-    droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
-    droplet.addFunc(specFunc_300) 
-    #droplet.addDropletSave(maxDroplets=nDrop)
-    epix.addFund(droplet)
+    photon = photonFunc(ADU_per_photon=350)
+    ##photon.addFunc(ROIFunc(ROI=[[0,1e6],[0,1e6]], writeArea=True))
+    ##photon.addFunc(spectrumFunc(bins=[0,10,1.]))
+    ##photon.addFunc(projectionFunc(axis=0))
+    photon.addFunc(sparsifyFunc(nData=100))
+    andor.addFunc(photon)
 
-    #now add photon algorithms. Only works for single energy photon data
-    # ADU_per_photon: expected ADU for photon of expected energy
-    # thresADU: fraction of photon energy in photon candidate
-                #(2 neighboring pixel)
-    #retImg: 0 (def): only histogram of 0,1,2,3,...,24 photons/pixel is returned
-    #        1 return Nphot, x, y arrays
-    #        2 store image using photons /event
-    if (int(run)==444):
-        epix.addFunc(photon(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200))
+    droplet = dropletFunc(threshold=30, thresholdLow=30, useRms=False, name='droplet30ADU')
+    ##droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+    droplet.addFunc(sparsifyFunc(nData=350))#, needProps=True))
+    droplet.addFunc(spectrumFunc(bins=[0,3500,10.]))
+    andor.addFunc(droplet)
 
-    dets.append(epix)
+    droplet = dropletFunc(threshold=10, thresholdLow=4)
+    droplet.addFunc(sparsifyFunc(nData=350))#, needProps=True))
+    droplet.addFunc(spectrumFunc(bins=[0,3500,10.]))
+    andor.addFunc(droplet)
 
-ROI_rowland = getROI_rowland(int(run))
-if checkDet(ds.env(), 'cs140_diff'):
-    cs140 = DetObject('cs140_diff' ,ds.env(), int(run))#, name='Rowland')
-    for iROI,ROI in enumerate(ROI_rowland):
-        cs140.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
-    dets.append(cs140)
+    droplet = dropletFunc(threshold=4, thresholdLow=4, name='droplet44')
+    droplet.addFunc(sparsifyFunc(nData=350))#, needProps=True))
+    droplet.addFunc(spectrumFunc(bins=[0,3500,10.]))
+    andor.addFunc(droplet)
 
-azIntParams = getAzIntParams(run)
-ROI_cspad = getROI_cspad(int(run))
-haveCspad = checkDet(ds.env(), 'cspad')
-if haveCspad:
-    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
-    for iROI,ROI in enumerate(ROI_cspad):
-        cspad.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
+    droplet = dropletFunc(threshold=10, thresholdLow=10, name='droplet1010')
+    droplet.addFunc(sparsifyFunc(nData=600))#, needProps=True))
+    droplet.addFunc(spectrumFunc(bins=[0,3500,10.]))
+    andor.addFunc(droplet)
+    
+    dets.append(andor)
 
-    cspad.azav_eBeam=azIntParams['eBeam']
-    if azIntParams.has_key('cspad_center'):
-        try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
-            cspad.addFunc(azav)
-        except:
-            pass
+acqirisName = 'Acq02'
+haveAcqiris = checkDet(ds.env(), acqirisName)
+if haveAcqiris:
+    acqiris = DetObject(acqirisName ,ds.env(), int(run), name=acqirisName)
+    fullArea=ROIFunc(writeArea=True)
+    acqiris.addFunc(fullArea)
+    dets.append(acqiris)
 
-
-    cspad.storeSum(sumAlgo='calib')
-    cspad.storeSum(sumAlgo='square')
-    dets.append(cspad)
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
 #for now require all area detectors in run to also be present in event.
 
+defaultDets = defaultDetectors(hutch)
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
+if len(epicsPV)>0:
+    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+##adding raw timetool traces:
+#defaultDets.append(ttRawDetector(env=ds.env()))
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 
 #add config data here
 userDataCfg={}
-for det in defaultDets:
-    userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
-for det in raredets:
-    userDataCfg[det._name] = det.params_as_dict()
+    #print userDataCfg[det._name].keys()
+    #for k in userDataCfg[det._name].keys():
+    #    print k, userDataCfg[det._name][k]
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
@@ -305,7 +267,6 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
-            #this should be a plain dict. Really.
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
@@ -322,9 +283,9 @@ for eventNr,evt in enumerate(ds.events()):
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.
     #try:
-    #    cspadMax = cspad.evt.dat.max()
+    #    cs140_robMax = cs140_rob.evt.dat.max()
     #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
+    #    combDict = {'userValue': cs140_robMax*epix_vonHamosMax}
     #    smldata.event(combDict)
     #except:
     #    pass
@@ -346,14 +307,6 @@ for eventNr,evt in enumerate(ds.events()):
                             redisList.append(sdkey)
             print 'Saving in REDIS: ',redisList
             smldata.connect_redis(redisList)
-
-sumDict={'Sums': {}}
-for det in dets:
-    for key in det.storeSum().keys():
-        sumData=smldata.sum(det.storeSum()[key])
-        sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
-if len(sumDict['Sums'].keys())>0:
-    smldata.save(sumDict)
 
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()

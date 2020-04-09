@@ -1,15 +1,14 @@
-# importing genereric python modules
+# importing generic python modules
 import numpy as np
-import h5py
 import psana
 import time
 import argparse
 import socket
 import os
-
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
-from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
+import RegDB.experiment_info
+from smalldata_tools import defaultDetectors,defaultRedisVars
+from smalldata_tools import epicsDetector,printMsg,detData,DetObject,checkDet
+from smalldata_tools import getCfgOutput,getUserData,getUserEnvData,dropObject
 ########################################################## 
 ##
 ## User Input start --> 
@@ -18,25 +17,20 @@ from smalldata_tools.roi_rebin import ROI
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
+def getAzIntParams(run):
+    ret_dict = {'eBeam': 9.477}
+    ret_dict['cspad_center'] = [87986.435880, 92451.493297]#originally [87697.946016760892, 94865.383526655729] (the default)
+    ret_dict['cspad_dis_to_sam'] = 55.
+    return ret_dict
 
-def getROIs(run):
-    if run>=210 and run<220:
-	sigROI = [] #no signal apparent for run 210
-        #np.append(sigROI,[[0,1], [150,200], [150,200]],axis=0)
-    elif run>=220 and run<230:
-	sigROI = [[1,2], [87,146], [6,384]]
+def getNmaxDrop(run):
+    if run >= 10:
+        return 2000, 100
     else:
-	sigROI = []
-
-    if len(sigROI)>1:
-        return sigROI, 
-    else:
-        return sigROI
-
+        return 400,400
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = [] 
@@ -61,6 +55,7 @@ parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/sm
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
+parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
 args = parser.parse_args()
 hostname=socket.gethostname()
 if not args.run:
@@ -81,6 +76,7 @@ if not args.exp:
                 hutch=thisHutch.upper()
     if hutch is None:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        import sys
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
@@ -112,10 +108,8 @@ try:
     if dirname is None:
         dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(hutch.lower(),expname)
     smldataFile = '%s/%s_Run%03d.h5'%(dirname,expname,int(run))
-
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
-    if args.live:
-        smldata.connect_redis()
+
 except:
     print 'failed making the output file ',smldataFile
     import sys
@@ -126,25 +120,49 @@ except:
 ## User Input start --> 
 ##
 ########################################################## 
+#ttCalib=[0.,2.,0.]
+#setParameter(defaultDets, ttCalib, 'tt')
+##this gives the analog input channels friendlier names
+#aioParams=[[1],['laser']]
+#setParameter(defaultDets, aioParams, 'ai')
+
+nDrop = getNmaxDrop(int(run))
+azIntParams = getAzIntParams(run)
+epixnames = ['epix_vonHamos']
 dets=[]
-ROIs = getROIs(int(run))
-haveCspad = checkDet(ds.env(), 'cs140_0')
+for iepix,epixname in enumerate(epixnames):
+    have_epix = checkDet(ds.env(), epixname)
+    if have_epix:
+        print 'creating epix detector object  for epix ',epixname
+        epix = DetObject(epixname ,ds.env(), int(run), name=epixname,common_mode=46)
+
+        epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+        epix['droplet'].addAduHist([0.,1500.])
+        epix['droplet'].addDropletSave(maxDroplets=nDrop[iepix])
+
+        dets.append(epix)
+
+haveCspad = checkDet(ds.env(), 'cspad')
 if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,roi in enumerate(ROIs):
-        print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
+    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
+
+    cspad.azav_eBeam=azIntParams['eBeam']
+    if azIntParams.has_key('cspad_center'):
+        cspad.azav_center=azIntParams['cspad_center']
+        cspad.azav_dis_to_sam=azIntParams['cspad_dis_to_sam']
+        try:
+            cspad.addAzAv(phiBins=7)
+        except:
+            pass
     dets.append(cspad)
+
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
-dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
+dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
@@ -158,8 +176,7 @@ if len(epicsPV)>0:
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name] = det.params_as_dict()
-    #print(userDataCfg[det._name].keys())
+    userDataCfg[det._name]=getCfgOutput(det)
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
@@ -179,11 +196,15 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
+            #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
-            det.processFuncs()
+            det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
@@ -191,10 +212,23 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-#    if args.live:
-#        import time
-#        time.sleep(0.1)
-
-#gather whatever event did not make it to the gather interval
+    #first event.
+    if ds.rank==0 and eventNr==0 and (args.live or args.liveFast):
+        if not args.liveFast:
+            #this saves all fields
+            smldata.connect_redis()
+        else:
+            redisKeys = defaultRedisVars(hutch)
+            redisList=['fiducials','event_time']
+            for key in redisKeys:
+                if key.find('/')>=0 and key in smldata._dlist.keys():
+                    redisList.append(key)
+                else:
+                    for sdkey in smldata._dlist.keys():
+                        if sdkey.find(key)>=0:
+                            redisList.append(sdkey)
+            print 'Saving in REDIS: ',redisList
+            smldata.connect_redis(redisList)
+                        
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()

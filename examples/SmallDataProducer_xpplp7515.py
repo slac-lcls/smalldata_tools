@@ -1,15 +1,14 @@
-# importing genereric python modules
+# importing generic python modules
 import numpy as np
-import h5py
 import psana
 import time
 import argparse
 import socket
 import os
-
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
-from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
+import RegDB.experiment_info
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
 ########################################################## 
 ##
 ## User Input start --> 
@@ -18,28 +17,44 @@ from smalldata_tools.roi_rebin import ROI
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
-
 def getROIs(run):
-    if run>=210 and run<220:
-	sigROI = [] #no signal apparent for run 210
-        #np.append(sigROI,[[0,1], [150,200], [150,200]],axis=0)
-    elif run>=220 and run<230:
-	sigROI = [[1,2], [87,146], [6,384]]
-    else:
-	sigROI = []
+    if isinstance(run,basestring):
+        run=int(run)
 
-    if len(sigROI)>1:
-        return sigROI, 
+    return [[280, 330], [400, 450]]
+
+def getNmaxDrop(run):
+    if isinstance(run,basestring):
+        run=int(run)
+
+    if run >= 47:
+        return 300 # used 1000 up to run 87
     else:
-        return sigROI
+        return 25
+
+def getNmaxPhotPix(run):
+    if isinstance(run,basestring):
+        run=int(run)
+
+    if run >= 47:
+        return 200
+    else:
+        return 25
 
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
+acqROI = [0,8000]
 #epicsPV = ['slit_s1_hw'] 
-epicsPV = [] 
+epicsPV = ['ath', 'atth', 'achi', 'az', 'detz']
+epicsPV += ['samrot', 'huber_botArc', 'huber_topArc', 'huberx', 'hubery', 'samx', 'samy', 'samz']
+#fix timetool calibration if necessary
+#ttCalib=[0.,2.,0.]
+ttCalib=[]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -81,9 +96,19 @@ if not args.exp:
                 hutch=thisHutch.upper()
     if hutch is None:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        import sys
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
+    #data gets removed from ffb faster now, please check if data is still available
+    isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
+    if not isLive:
+        xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
+        xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
+        import glob
+        presentXtc=glob.glob('%s'%xtcname)
+        if len(presentXtc)==0:
+            dsname='exp='+expname+':run='+run+':smd'
 else:
     expname=args.exp
     hutch=expname[0:3]
@@ -126,45 +151,65 @@ except:
 ## User Input start --> 
 ##
 ########################################################## 
+#ttCalib=[0.,2.,0.]
+#setParameter(defaultDets, ttCalib, 'tt')
+##this gives the analog input channels friendlier names
+#aioParams=[[1],['laser']]
+#setParameter(defaultDets, aioParams, 'ai')
+
+nDrop = getNmaxDrop(int(run))
+nPhot = getNmaxPhotPix(int(run))
+ROI = getROIs(int(run))
+epixname = 'epix'
 dets=[]
-ROIs = getROIs(int(run))
-haveCspad = checkDet(ds.env(), 'cs140_0')
-if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,roi in enumerate(ROIs):
-        print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
-    dets.append(cspad)
+have_epix = checkDet(ds.env(), epixname)
+if have_epix:
+    print 'creating epix detector object  for epix ',epixname
+    epix = DetObject(epixname ,ds.env(), int(run), name=epixname,common_mode=46)
+    
+    #epix.addROI('ROI', ROI) #saves sum, maxpixel, com
+    #epix.addROI('ROI', ROI, writeArea=True) #saves all pixels in ROI & sum, maxpixel, com
+    epix.addROI('full', [[0,705],[0,769]], writeArea=True) #saves all pixels in ROI & sum, maxpixel, com
+
+    #nphotRet is number of pixels in the sparified image. If you have 30 photons in a 10 pixel area, then 
+    #you'd only need to set nphotRet to 10
+    epix.addPhotons3(ADU_per_photon=200, retImg=True, nphotRet=nPhot,thresADU=0.9,name='photons',maxMethod=1)
+
+    epix.addDroplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+    epix['droplet'].add_aduHist([0.,250.,5.])
+    epix['droplet'].addDropletSave(maxDroplets=nDrop, thresADU=[120.,np.nan])
+    
+    dets.append(epix)
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
-dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
+dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+##adding raw timetool traces:
+#defaultDets.append(ttRawDetector(env=ds.env()))
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
 
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name] = det.params_as_dict()
-    #print(userDataCfg[det._name].keys())
+    userDataCfg[det._name]=getCfgOutput(det)
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
 for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank)
+    printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
     if eventNr >= maxNevt/ds.size:
         break
@@ -179,11 +224,15 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
+            #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
-            det.processFuncs()
+            det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
@@ -191,10 +240,14 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-#    if args.live:
-#        import time
-#        time.sleep(0.1)
+    ##here you can add any data you like: example is a product of the maximumof two area detectors.
+    #try:
+    #    cspadMax = cspad.evt.dat.max()
+    #    epix_vonHamosMax = epix.evt.dat.max()
+    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
+    #    smldata.event(combDict)
+    #except:
+    #    pass
 
-#gather whatever event did not make it to the gather interval
 print 'rank %d on %s is finished'%(ds.rank, hostname)
 smldata.save()

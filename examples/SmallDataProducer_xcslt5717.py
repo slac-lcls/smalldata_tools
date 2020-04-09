@@ -1,15 +1,14 @@
-# importing genereric python modules
+# importing generic python modules
 import numpy as np
-import h5py
 import psana
 import time
 import argparse
 import socket
 import os
-
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
-from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
+import RegDB.experiment_info
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject
+from smalldata_tools import checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import ttRawDetector,wave8Detector,defaultRedisVars,setParameter
 ########################################################## 
 ##
 ## User Input start --> 
@@ -17,29 +16,29 @@ from smalldata_tools.roi_rebin import ROI
 ########################################################## 
 ##########################################################
 # functions for run dependant parameters
-##########################################################
-
-def getROIs(run):
-    if run>=210 and run<220:
-	sigROI = [] #no signal apparent for run 210
-        #np.append(sigROI,[[0,1], [150,200], [150,200]],axis=0)
-    elif run>=220 and run<230:
-	sigROI = [[1,2], [87,146], [6,384]]
+##########################################################d
+def getROI_jungfrau(run):
+    if isinstance(run,basestring):
+        run=int(run)
+    if run <= 11:
+        return  [ [[271,419], [645,748]] ]
+    elif run <= 21:
+        return  [ [[0,512], [0,1024]] ]
     else:
-	sigROI = []
-
-    if len(sigROI)>1:
-        return sigROI, 
-    else:
-        return sigROI
+        return  [ [[0,512], [0,1024]] ]
 
 ##########################################################
 # run independent parameters 
 ##########################################################
-#event codes which signify no xray/laser
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
-epicsPV = [] 
+epicsPV = []
+#fix timetool calibration if necessary
+ttCalib=[]
+#ttCalib=[1.860828, -0.002950]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
 ########################################################## 
 ##
 ## <-- User Input end
@@ -61,7 +60,10 @@ parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/sm
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
+parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
+parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
+
 hostname=socket.gethostname()
 if not args.run:
     run=raw_input("Run Number:\n")
@@ -81,9 +83,19 @@ if not args.exp:
                 hutch=thisHutch.upper()
     if hutch is None:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        import sys
         sys.exit()
     expname=RegDB.experiment_info.active_experiment(hutch)[1]
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
+    #data gets removed from ffb faster now, please check if data is still available
+    isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
+    if not isLive:
+        xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
+        xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
+        import glob
+        presentXtc=glob.glob('%s'%xtcname)
+        if len(presentXtc)==0:
+            dsname='exp='+expname+':run='+run+':smd'
 else:
     expname=args.exp
     hutch=expname[0:3]
@@ -98,6 +110,9 @@ if args.dir:
     dirname=args.dir
     if dirname[-1]=='/':
         dirname=dirname[:-1]
+
+if args.norecorder:
+    dsname=dsname+':stream=0-79'
 
 debug = True
 time_ev_sum = 0.
@@ -114,57 +129,66 @@ try:
     smldataFile = '%s/%s_Run%03d.h5'%(dirname,expname,int(run))
 
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
-    if args.live:
-        smldata.connect_redis()
+
 except:
     print 'failed making the output file ',smldataFile
     import sys
     sys.exit()
 
+if ds.rank==0:
+    version='unable to detect psana version'
+    for dirn in psana.__file__:
+        if dirn.find('ana-')>=0:
+            version=dirn
+    print 'Using psana version ',version
 ########################################################## 
 ##
 ## User Input start --> 
 ##
 ########################################################## 
 dets=[]
-ROIs = getROIs(int(run))
-haveCspad = checkDet(ds.env(), 'cs140_0')
-if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,roi in enumerate(ROIs):
-        print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
-    dets.append(cspad)
+
+jROI = getROI_jungfrau(run)
+jungfrauname='jungfrau512k'
+have_jungfrau = checkDet(ds.env(), jungfrauname)
+if have_jungfrau:
+    #create detector object. needs run for calibration data
+    #optinally try common mode method 0 (only pedestal subtraction)
+    jungfrau = DetObject(jungfrauname ,ds.env(), int(run), common_mode=7)
+    jungfrau.addPhotons(ADU_per_photon=8.8, thresADU=0.9, retImg=2)
+    jungfrau.saveFull()
+    dets.append(jungfrau)
+
+    jungfrauPS = DetObject(jungfrauname ,ds.env(), int(run), common_mode=0, name='jungfrauPS')
+    jungfrauPS.addPhotons(ADU_per_photon=8.8, thresADU=0.9, retImg=2)
+    jungfrauPS.saveFull()
+    dets.append(jungfrauPS)
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
-dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
+dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
-#ttCalib=[0.,2.,0.]
-#setParameter(defaultDets, ttCalib)
-#aioParams=[[1],['laser']]
-#setParameter(defaultDets, aioParams, 'ai')
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
 if len(epicsPV)>0:
     defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name] = det.params_as_dict()
-    #print(userDataCfg[det._name].keys())
+    userDataCfg[det._name]=getCfgOutput(det)
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
 for eventNr,evt in enumerate(ds.events()):
-    printMsg(eventNr, evt.run(), ds.rank)
+    printMsg(eventNr, evt.run(), ds.rank, ds.size)
 
     if eventNr >= maxNevt/ds.size:
         break
@@ -179,11 +203,15 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
+            #this should be a plain dict. Really.
+            det.evt = dropObject()
             det.getData(evt)
-            det.processFuncs()
+            det.processDetector()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
             except:
                 pass
             #print userDict[det._name]
@@ -191,10 +219,20 @@ for eventNr,evt in enumerate(ds.events()):
             pass
     smldata.event(userDict)
 
-#    if args.live:
-#        import time
-#        time.sleep(0.1)
+    #here you can add any data you like: example is a product of the maximumof two area detectors.
+    #try:
+    #    if jungfrauImg is None:
+    #        jungfrauImg = jungfrau.evt.dat.squeeze()
+    #    else:
+    #        jungfrauImg += jungfrau.evt.dat.squeeze()
+    #except:
+    #    pass
 
-#gather whatever event did not make it to the gather interval
-print 'rank %d on %s is finished'%(ds.rank, hostname)
+#
+# run 20 has photons.
+#
+
+#runsum=smldata.sum(jungfrauImg)
+#smldata.save(jungfrauImg=runsum)
 smldata.save()
+print 'rank %d on %s is finished'%(ds.rank, hostname)
