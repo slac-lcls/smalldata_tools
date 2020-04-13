@@ -215,11 +215,11 @@ source /reg/g/psdm/etc/psconda.sh
 if [ $SINGLEJOB -eq 1 ]; then
     echo 'so I will run a new job for run ' $RUN
     if [ $NJOBS -le 8 ]; then
-	CMD=`echo mpirun -n $NJOBS python ./examples/SmallDataProducer.py \
+	CMD=`echo mpirun -n $NJOBS python ./examples/SmallDataProducer_userData.py \
 	$ARGSTR \
         --run $RUN`
     else
-	CMD=`echo python ./examples/SmallDataProducer.py \
+	CMD=`echo python ./examples/SmallDataProducer_userData.py \
 	$ARGSTR \
         --run $RUN`
     fi
@@ -227,7 +227,7 @@ else
     CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
     echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME ' using queue: ' $QUEUE
     CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
-        mpirun --mca btl ^openib python ./examples/SmallDataProducer.py \
+        mpirun --mca btl ^openib python ./examples/SmallDataProducer_userData.py \
 	$ARGSTR --run $RUN`
 #    CMD=`echo bsub -n $NJOBS -q $QUEUE -o $LOGDIR/smallData_$EXP\_$RUN\_%J.out \
 #        mpirun python ./examples/SmallDataProducer.py \

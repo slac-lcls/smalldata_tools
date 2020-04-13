@@ -13,7 +13,8 @@ from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detecto
 from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
 from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photon
+from smalldata_tools.photons import photonFunc
+from smalldata_tools.azimuthalBinning import azimuthalBinning
 
 ########################################################## 
 ##
@@ -259,10 +260,10 @@ if haveCspad:
     cspad.azav_eBeam=azIntParams['eBeam']
     if azIntParams.has_key('cspad_center'):
         try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
+            azav = azimuthalBinning(center=azIntParams['cspad_center'], dis_to_sam=azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
             cspad.addFunc(azav)
         except:
-            pass
+	     pass
 
 
     cspad.storeSum(sumAlgo='calib')
@@ -284,8 +285,8 @@ for det in defaultDets:
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
-for det in raredets:
-    userDataCfg[det._name] = det.params_as_dict()
+#for det in raredets:
+#    userDataCfg[det._name] = det.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
