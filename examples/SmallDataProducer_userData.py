@@ -263,7 +263,7 @@ if haveCspad:
             azav = azimuthalBinning(center=azIntParams['cspad_center'], dis_to_sam=azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
             cspad.addFunc(azav)
         except:
-	     pass
+	        pass
 
 
     cspad.storeSum(sumAlgo='calib')
