@@ -13,7 +13,8 @@ from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detecto
 from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
 from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photon
+from smalldata_tools.photons import photonFunc
+from smalldata_tools.azimuthalBinning import azimuthalBinning
 
 ########################################################## 
 ##
@@ -178,6 +179,31 @@ if ds.rank==0:
             version=dirn
     print 'Using psana version ',version
 
+
+########################################################## 
+##
+## Setting up the default detectors
+## needs to be before the user detectors only for epix10k 
+## data that needs ghost corrections and uses a psana 
+## detector that does not take the event as inpu (EPICS PV, tt)
+##
+########################################################## 
+defaultDets = defaultDetectors(hutch)
+if len(ttCalib)>0:
+    setParameter(defaultDets, ttCalib)
+if len(aioParams)>0:
+    setParameter(defaultDets, aioParams, 'ai')
+if len(epicsPV)>0:
+    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+##adding wave8 traces:
+#defaultDets.append(wave8Detector('Wave8WF'))
+##adding raw timetool traces:
+#try:
+#    defaultDets.append(ttRawDetector(env=ds.env()))
+#except:
+#    pass
+
 ########################################################## 
 ##
 ## User Input start --> 
@@ -234,10 +260,10 @@ if haveCspad:
     cspad.azav_eBeam=azIntParams['eBeam']
     if azIntParams.has_key('cspad_center'):
         try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
+            azav = azimuthalBinning(center=azIntParams['cspad_center'], dis_to_sam=azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
             cspad.addFunc(azav)
         except:
-            pass
+	        pass
 
 
     cspad.storeSum(sumAlgo='calib')
@@ -252,21 +278,6 @@ if haveCspad:
 dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
 #for now require all area detectors in run to also be present in event.
 
-defaultDets = defaultDetectors(hutch)
-if len(ttCalib)>0:
-    setParameter(defaultDets, ttCalib)
-if len(aioParams)>0:
-    setParameter(defaultDets, aioParams, 'ai')
-if len(epicsPV)>0:
-    defaultDets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-
-##adding wave8 traces:
-#defaultDets.append(wave8Detector('Wave8WF'))
-##adding raw timetool traces:
-#try:
-#    defaultDets.append(ttRawDetector(env=ds.env()))
-#except:
-#    pass
 
 #add config data here
 userDataCfg={}
@@ -274,8 +285,8 @@ for det in defaultDets:
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     userDataCfg[det._name] = det.params_as_dict()
-for det in raredets:
-    userDataCfg[det._name] = det.params_as_dict()
+#for det in raredets:
+#    userDataCfg[det._name] = det.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
@@ -296,7 +307,6 @@ for eventNr,evt in enumerate(ds.events()):
     for det in dets:
         try:
             #this should be a plain dict. Really.
-            det.evt = dropObject()
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)

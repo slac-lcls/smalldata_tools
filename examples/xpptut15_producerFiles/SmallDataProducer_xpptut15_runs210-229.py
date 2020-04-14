@@ -7,7 +7,9 @@ import argparse
 import socket
 import os
 
-from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,DetObject,checkDet,getCfgOutput,getUserData,getUserEnvData,dropObject
+from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
+from smalldata_tools.DetObject import DetObject
+from smalldata_tools.roi_rebin import ROI
 ########################################################## 
 ##
 ## User Input start --> 
@@ -128,9 +130,12 @@ dets=[]
 ROIs = getROIs(int(run))
 haveCspad = checkDet(ds.env(), 'cs140_0')
 if haveCspad:
-    cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
-    for iROI,ROI in enumerate(ROIs):
-        cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
+    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
+    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
+    for iROI,roi in enumerate(ROIs):
+        print 'adding func'
+        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
+    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
     dets.append(cspad)
 
 ########################################################## 
@@ -138,7 +143,8 @@ if haveCspad:
 ## <-- User Input end
 ##
 ########################################################## 
-dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+#dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+dets = [ det for det in dets if checkDet(ds.env(), det.det.alias)]
 #for now require all area detectors in run to also be present in event.
 
 defaultDets = defaultDetectors(hutch)
@@ -152,7 +158,8 @@ if len(epicsPV)>0:
 #add config data here
 userDataCfg={}
 for det in dets:
-    userDataCfg[det._name]=getCfgOutput(det)
+    userDataCfg[det._name] = det.params_as_dict()
+    #print(userDataCfg[det._name].keys())
 Config={'UserDataCfg':userDataCfg}
 smldata.save(Config)
 
@@ -172,13 +179,11 @@ for eventNr,evt in enumerate(ds.events()):
     userDict = {}
     for det in dets:
         try:
-            #this should be a plain dict. Really.
-            det.evt = dropObject()
             det.getData(evt)
-            det.processDetector()
+            det.processFuncs()
             userDict[det._name]=getUserData(det)
             try:
-                userDict[det._name+'_env']=getUserEnvData(det)
+                userDict[det._name+'_env']=getUserEnvData(det) #need epix data to try
             except:
                 pass
             #print userDict[det._name]

@@ -5,6 +5,11 @@ from matplotlib import pyplot as plt
 import socket
 import os
 import time
+#temporary 'fix'?
+#try:
+#    import xarray as xr
+#except:
+#    import xarray as xr
 from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.utilities import hist2d,rebin,addToHdf5
 from IPython.terminal.prompts import Prompts,Token
@@ -200,13 +205,31 @@ if ana is not None:
     #anaps.AvImage('icarus_pink',numEvts=10)                        
     #anaps.AvImage('jungfrau512k',numEvts=10)
 
-    xoff = ana.getVar('lightStatus/xray')
-    pre_xoff = np.append([0], xoff[0:-1])
-    ana.addVar('pre_xoff',pre_xoff)
-    ana.addCut('pre_xoff',-0.5,0.5,'pre_xoff')
+    #xoff = ana.getVar('lightStatus/xray')
+    #pre_xoff = np.append([0], xoff[0:-1])
+    #ana.addVar('pre_xoff',pre_xoff)
+    #ana.addCut('pre_xoff',-0.5,0.5,'pre_xoff')
 
-    offsel = ana.getFilter('xoff')
-    print 'we have %d off events'%(offsel.sum())
+    #offsel = ana.getFilter('xoff')
+    #print 'we have %d off events'%(offsel.sum())
 
+    #fids = ana.getVar('fiducials')
+    #epixDict = {'source':'epix10ka2m','common_mode':180,'full':1}
+    #ana.addCut('ipm5/sum',200,1e6,'good')
+    #ana.addCube('ringCube','fiducials',[fids.min(), fids.max(), fids.shape[0]/120],useFilter='good')
+    #ana.addToCube('ringCube',['ipm5/sum', epixDict])
+    #cd = ana.makeCubeData('ringCube')#, toHdf5='h5', onoff=0)
+    
+    #detector monitoring
+    #ana.addCut('gas_detector/f_22_ENRC',-0.5,0.15,'xoff_gdet')
+    #anaps.makePedestal('epix',i0Check='ipm',dirname='/reg/d/psdm/xpp/xpplp7515/results/detector_monitoring_new/', useFilter='xoff_gdet', numEvts=1000)
+
+    ana.addCut('lightStatus/xray',0.5,1.5,'on')
+    ana.addCut('lightStatus/laser',0.5,1.5,'on')
+    #xcslq0815, run 150: jet issues.
+    ana.addCut('lightStatus/xray',0.5,1.5,'good')
+    ana.addCut('ipm5/sum',0.2,2.0,'good')
+
+    
 t1 = time.time()
 print 'this took %g seconds '%(t1-t0)
