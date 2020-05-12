@@ -20,7 +20,6 @@ class myPrompt(Prompts):
         return [(Token.Prompt, 'SDAna In ['), (Token.PromptNum, str(self.shell.execution_count)), (Token.Prompt, ']: ' ),]
     def out_prompt_tokens(self):
         return [(Token.Prompt, 'SDAna Out ['), (Token.PromptNum, str(self.shell.execution_count)), (Token.Prompt, ']: ' ),]
-        #return [(Token.Prompt, 'LDAna Out:' ),]
 
 ip=get_ipython()
 ip.prompts = myPrompt(ip)
@@ -226,9 +225,6 @@ if ana is not None:
 
     ana.addCut('lightStatus/xray',0.5,1.5,'on')
     ana.addCut('lightStatus/laser',0.5,1.5,'on')
-    #xcslq0815, run 150: jet issues.
-    ana.addCut('lightStatus/xray',0.5,1.5,'good')
-    ana.addCut('ipm5/sum',0.2,2.0,'good')
 
     
 t1 = time.time()
