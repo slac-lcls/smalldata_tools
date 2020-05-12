@@ -226,11 +226,8 @@ class SmallDataAna(object):
     class to deal with data in smallData hdf5 file. 
     Most functions assume standard variables to be present
     """
-    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, liveList=None, plotWith='matplotlib'):
+    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, plotWith='matplotlib'):
         self._fields={}
-        self._live_fields=[]
-        if isinstance(liveList, list) and intable=='redis':
-            self._live_fields=liveList
         self.expname=expname
         self.run=run
         self.runLabel='Run%03d'%run
@@ -260,49 +257,13 @@ class SmallDataAna(object):
                 self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
-        if intable != 'redis':
-            print('and now open in dir: ',self.dirname,' to open file ',self.fname)
+        print('and now open in dir: ',self.dirname,' to open file ',self.fname)
 
         self.Sels = {}
         self.cubes = {}
         self.jobIds=[]
-        self._isRedis=False
-        if run == -1 or (intable is not None and intable == 'redis'):
-            self.fh5=client.ExptClient(expname, host='psdb3')
-            self._isRedis=True
-            plot_dirname='/reg/neh/operator/%sopr/experiments/%s/smalldata_plots/'%(self.hutch,self.expname)
-            if not path.isdir(plot_dirname):
-                try:
-                    makedirs(plot_dirname)
-                    self.plot_dirname = plot_dirname
-                except:
-                    pass
-            try:
-                import RegDB.experiment_info
-                currRun=RegDB.experiment_info.experiment_runs(self.expname[:3].upper)[-1]['num']
-                self.runLabel='Run%03d'%currRun
-            except:
-                try:
-                    runs = self.fh5.runs()
-                    lastRun=-1
-                    while len(runs)>0:
-                        thisRun = runs.pop()
-                        lastRun = max(thisRun, lastRun)
-                    self.runLabel='Run%03d'%int(lastRun)
-                except:
-                    self.runLabel='RunFromRedis'
-        elif intable is not None:
-            if intable == 'redis':
-                self.fh5=client.ExptClient(expname, host='psdb3')
-                self._isRedis=True
-                plot_dirname='/reg/neh/operator/%sopr/experiments/%s/smalldata_plots/'%(self.hutch,self.expname)
-                if not path.isdir(plot_dirname):
-                    try:
-                        makedirs(plot_dirname)
-                        self.plot_dirname = plot_dirname
-                    except:
-                        pass
-            elif isinstance(intable, basestring) and path.isfile(intable):
+        if intable is not None:
+            if isinstance(intable, basestring) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
                 print('pass unknown input parameter or file cannot be found: ',intable)
@@ -314,50 +275,37 @@ class SmallDataAna(object):
             return None
 
         self.xrData = {}
-        #keep keys in here. Start w/ Keys from original hdf5/table/REDIS
+        #keep keys in here. Start w/ Keys from original hdf5/table
         self.Keys(printKeys=False, areaDet=False, cfgOnly=False, returnShape=True)
-        #check that required live fields are actually present
-        for key in self._live_fields:
-            if not key in self._fields.keys():
-                print('cannot find required variable %s, will return None!'%key)
-                return None
         self.ttCorr, self.ttBaseStr = self._getTTstr()
 
         #keep an Xarray that will become bigger on request.
         #start w/ certain fields (all 1-d & ipm channels)?
-        if 'event_time' in self._fields.keys():
-            #cannot use getVar as getVar is using the presence of self._tStamp
-            if self._isRedis:
-                evttime = self.fh5.fetch_data(self.run,['event_time'])['event_time']
-                if len(evttime)<1:
-                    print('read from REDIS, found no entries for run ',self.run,', cannot make SmallData object')
-                    return None
-                print('read data for run %d from REDIS, have %d events'%(self.run,len(evttime)))
-            else:
+        try:
+            if 'event_time' in self._fields.keys():
+                #cannot use getVar as getVar is using the presence of self._tStamp
                 evttime = self.fh5.get_node('/event_time').read()
-            self._fields['event_time'][1]='inXr'
-            evttime_sec = evttime >> 32
-            evttime_nsec = evttime - (evttime_sec << 32)
-            self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
-            #self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
-            self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='event_time')
-        elif not self._isRedis:
-            timeData = self.fh5.get_node('/EvtID','time').read()
-            if timeData is None:
-                print('could not find eventtime data ',self._fields.keys())
-            #evt_id.time()[0] << 32 | evt_id.time()[1] 
+                self._fields['event_time'][1]='inXr'
+                evttime_sec = evttime >> 32
+                evttime_nsec = evttime - (evttime_sec << 32)
+                self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
+                #self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
+                self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='event_time')
             else:
-                evttime = (timeData[:,0].astype(np.int64) << 32 | timeData[:,1])
-                self._tStamp = np.array([np.datetime64(int(ttime[0]*1e9+ttime[1]), 'ns') for ttime in timeData])
-                self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='EvtID__time') 
-                self._fields['EvtID/time'][1]='inXr'
-        else:
+                timeData = self.fh5.get_node('/EvtID','time').read()
+                if timeData is None:
+                    print('could not find eventtime data ',self._fields.keys())
+                    #evt_id.time()[0] << 32 | evt_id.time()[1] 
+                else:
+                    evttime = (timeData[:,0].astype(np.int64) << 32 | timeData[:,1])
+                    self._tStamp = np.array([np.datetime64(int(ttime[0]*1e9+ttime[1]), 'ns') for ttime in timeData])
+                    self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='EvtID__time') 
+                    self._fields['EvtID/time'][1]='inXr'
+        except:
             print('could not create xarray')
             return
         self._addXarray()
-        #there won't be any xarray files of correct size when running "live"
-        if not self._isRedis:
-            self._readXarrayData()
+        self._readXarrayData()
 
         self._delay_ttCorr=None
         self._delay_addLxt=None
@@ -374,34 +322,13 @@ class SmallDataAna(object):
             self._writeNewData()
         return
 
-    def addToLive(self, liveKeys=[]):
-        if isinstance(liveKeys, basestring):
-            if liveKeys in self._fields.keys():
-                self._live_fields.append(liveKeys)
-        else:
-            for key in liveKeys:
-                if key in self._fields.keys():
-                    self._live_fields.append(key)
-
     def _getXarrayDims(self,key,tleaf_name=None, setNevt=-1):
         """ helper function to get the shape of data from hdf5 file"""
         coords=None
         dims=None
         try:
-            if self._isRedis:
-                dataShapeIn = self.fh5.keyinfo(run=self.run)[key][0]
-                if setNevt<0:
-                    setNevt = self._tStamp.shape[0]
-                dataShape = [setNevt]
-                for shp in dataShapeIn:
-                    dataShape.append(shp)
-                dataShape = tuple(dataShape)
-                #dataShape = self.fh5.keyinfo(run=-1)[key]
-                if tleaf_name is None:
-                    tleaf_name = key
-            else:                
-                dataShape = self.fh5.get_node(key,tleaf_name).shape
-                setNevt = dataShape[0]
+            dataShape = self.fh5.get_node(key,tleaf_name).shape
+            setNevt = dataShape[0]
         except:
             return np.array(0), coords, dims
         if len(dataShape)==1:
@@ -446,72 +373,12 @@ class SmallDataAna(object):
 
         return dataShape, coords, dims
 
-    def _updateXarray_fromREDIS(self):
-        if not self._isRedis:
-            return
-        #redisInfo = self.fh5.keyinfo(run=-1)
-        keys_for_xarray=[]
-        if len(self._live_fields)>0:
-            keys_for_xarray = self._live_fields
-        else:
-            redisInfo = self.fh5.keyinfo(run=self.run)
-            for key in redisInfo.keys():
-                #1-dim date
-                if len(redisInfo[key][0])<=2:
-                    keys_for_xarray.append(key)
-        #print('DEBUG ',keys_for_xarray)
-        nEvts = self.fh5.fetch_data(run=self.run, keys=['event_time'])['event_time'].shape[0]
-        nEvts_in_Xarray = -1
-        try:
-            nEvts_in_Xarray = self.xrData['event_time'].shape[0]
-            #print('DEBUG:---events--',nEvts_in_Xarray, nEvts)
-            if nEvts == nEvts_in_Xarray:
-                #print('DEBUG: no update needed')
-                return
-        except:
-            pass
-
-        #FIX ME: don't know how to deal with added datasets on update here. Bummer
-        #KLUDGE ME: for now, just need to put all that code into the update function for the notebook
-        keys_for_xarray.append('event_time')
-        data_for_xarray = self.fh5.fetch_data(self.run,keys=keys_for_xarray)
-        evttime = data_for_xarray['event_time']
-        #print('update from %d events to %d '%(nEvts_in_Xarray, evttime.shape[0]))
-        self._fields['event_time'][1]='inXr'
-        evttime_sec = evttime >> 32
-        evttime_nsec = evttime - (evttime_sec << 32)
-        self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
-        #print('DEBUG: ',self._tStamp.shape,data_for_xarray['event_time'].shape,' -- ',data_for_xarray['ipm2/sum'].shape)
-        minNevt=data_for_xarray[keys_for_xarray[0]].shape[0]
-        for key in keys_for_xarray:
-            if data_for_xarray[key].shape[0]<minNevt:
-                #print('DEBUG: mismatched data...',key)
-                minNevt=data_for_xarray[key].shape[0]
-        self.xrData = xr.DataArray(evttime[:minNevt], coords={'time': self._tStamp[:minNevt]}, dims=('time'),name='event_time')
-        for key in keys_for_xarray:
-            if key == 'event_time':
-                continue
-            dataShape, coords, dims = self._getXarrayDims(key, setNevt=minNevt)
-            tArrName = key.replace('/','__')
-            self.xrData = xr.merge([self.xrData, xr.DataArray(data_for_xarray[key].squeeze()[:minNevt], coords=coords, dims=dims,name=tArrName) ])
-        #now make xarray summary reflect new smaller xarray.
-        for key in self._fields.keys():
-            if key in keys_for_xarray:
-                self._fields[key][1]='inXr'
-            else:
-                self._fields[key][1]='onDisk'
-
-        return
 
 ###
 # function to deal with extra variables added to smallData
 ###
     def _addXarray(self):
         """  add xarray object to main class instance as xrData """
-        #filling info from redis.
-        if self._isRedis:
-            self._updateXarray_fromREDIS()
-            return
         #methods for h5-files.
         for node in self.fh5.root._f_list_nodes():
             key = node._v_pathname
@@ -560,7 +427,6 @@ class SmallDataAna(object):
             print('have more events, only attach ones matching time stamps')
             data=data[self._tStamp.shape[0]]
 
-        #if not self._isRedis and name[0]!='/': name='/'+name
         name = name.replace('__','/')
         if name not in self._fields.keys():
             #print('DEBUG: add a new variable to Xarray: ',name)
@@ -617,9 +483,6 @@ class SmallDataAna(object):
         """
         write newly created fields to netcdf files that can be loaded in future sessions
         """
-        #do not write files for REDIS (as you are likely auto-updating...)
-        if self._isRedis:
-            return
         print('save derived data to be loaded next time:')
         for key in self._fields.keys():
             #delay is special: make sure it gets redefined on each new SmallDataAna creation 
@@ -751,7 +614,7 @@ class SmallDataAna(object):
         else:
             fh5 = inh5        
 
-        #DEBUG ME - do not go back to hdf5 or redis if fields are already loaded.
+        #DEBUG ME - do not go back to hdf5 or if fields are already loaded.
         if len(self._fields.keys())>0 and not returnShape:
             keys=self._fields.keys()
             for key in keys:
@@ -759,12 +622,6 @@ class SmallDataAna(object):
                     keyShapes.append(self._fields[key][0])
                 except:
                     keyShapes.append((0,))
-        elif self._isRedis:
-            #redisInfo = self.fh5.keyinfo(run=-1)
-            redisInfo = self.fh5.keyinfo(run=self.run)
-            for key in redisInfo.keys():
-                keys.append(key)
-                keyShapes.append(redisInfo[key][0])
         elif fh5:
             for node in fh5.root._f_list_nodes() :
                 key = node._v_pathname
@@ -1064,33 +921,27 @@ class SmallDataAna(object):
         #if only few events are picked, just get those events.
         try:
             if Filter is None:
-                if not self._isRedis:
-                    if len(plotvar.split('/'))>1:
-                        #this can fail when the data is too large. better debugging?
-                        #print('DEBUG B ',('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
-                        #print('node: ',self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
-                        vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
-                    else:
-                        vals = self.fh5.get_node('/'+plotvar).read()
+                if len(plotvar.split('/'))>1:
+                    #this can fail when the data is too large. better debugging?
+                    #print('DEBUG B ',('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
+                    #print('node: ',self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]))
+                    vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()
                 else:
-                    vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar]
+                    vals = self.fh5.get_node('/'+plotvar).read()
                 if vals.shape[0]==self._tStamp.shape[0]:
                     tArrName = plotvar.replace('/','__')
                     if addToXarray:
                         print('add me to xarray...',plotvar)
                         self.addVar(tArrName, vals)
             else:
-                if not self._isRedis:
-                    if len(plotvar.split('/'))>1:
-                        #seems like this is not how it works.
-                        #vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__[Filter]
-                        vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()[Filter]
-                    else:
-                        #seems like this is not how it works.
-                        #vals = self.fh5.get_node('/'+plotvar).__getitem__(Filter)
-                        vals = self.fh5.get_node('/'+plotvar).read()[Filter]
+                if len(plotvar.split('/'))>1:
+                    #seems like this is not how it works.
+                    #vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).__getitem__[Filter]
+                    vals = self.fh5.get_node('/'+'/'.join(plotvar.split('/')[:-1]),plotvar.split('/')[-1]).read()[Filter]
                 else:
-                    vals = self.fh5.fetch_data(run=self.run,keys=[plotvar])[plotvar][Filter]
+                    #seems like this is not how it works.
+                    #vals = self.fh5.get_node('/'+plotvar).__getitem__(Filter)
+                    vals = self.fh5.get_node('/'+plotvar).read()[Filter]
             return vals.squeeze()
         except:
             print('failed to get data for ',plotvar)

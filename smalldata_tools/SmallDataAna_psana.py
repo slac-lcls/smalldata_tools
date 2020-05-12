@@ -25,7 +25,7 @@ from smalldata_tools.DetObject import DetObject
 from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
 from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photon
+from smalldata_tools.photons import photonFunc
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar

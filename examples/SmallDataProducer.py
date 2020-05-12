@@ -28,8 +28,6 @@ parser.add_argument("--nevt", help="number of events", type=int)
 parser.add_argument("--dir", help="directory for output files (def <exp>/hdf5/smalldata)")
 parser.add_argument("--offline", help="run offline (def for current exp from ffb)")
 parser.add_argument("--gather", help="gather interval (def 100)", type=int)
-parser.add_argument("--live", help="add data to redis database (quasi-live feedback)", action='store_true')
-parser.add_argument("--liveFast", help="add data to redis database (quasi-live feedback)", action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
 
