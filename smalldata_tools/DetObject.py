@@ -975,11 +975,19 @@ class RayonixObject(CameraObject):
         super(RayonixObject, self).__init__(det,env,run, **kwargs)
         self.common_mode = kwargs.get('common_mode', -1)
         #this is NOT correct for the new, bigger rayonix. Fix me.
-        binning=env.configStore().get(psana.Rayonix.ConfigV2,psana.Source('rayonix')).binning_s()
-        self.pixelsize=[170e-3/3840*binning] #needs to change for bigger rayonix.
-        npix = int(170e-3/self.pixelsize[0])
-        self.ped = np.zeros([npix, npix])
-        self.imgShape = [npix, npix]
+        rcfg = env.configStore().get(psana.Rayonix.ConfigV2,psana.Source('%s'%det.name))
+        binning=rcfg.binning_s()
+        try:
+          self.pixelsize=[rcfg.pixelWidth(),rcfg.pixelHeight()]
+        except:
+          self.pixelsize=[170e-3/3840*binning] #needs to change for bigger rayonix.
+        try:
+          self.ped = np.zeros([rcfg.width(), rcfg.height()])
+          self.imgShape = [rcfg.width(), rcfg.height()]
+        except: 
+          npix = int(170e-3/self.pixelsize[0])
+          self.ped = np.zeros([npix, npix])
+          self.imgShape = [npix, npix]
         if self.x is None:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
