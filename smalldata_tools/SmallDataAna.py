@@ -1269,7 +1269,7 @@ class SmallDataAna(object):
                     scanValues.append([])
         if len(scanVarName)==0:return '',[]
         elif len(scanVarName)==1:return scanVarName[0],scanValues[0]
-        else: return scanVarName,scan
+        else: return scanVarName,scanValues
 
 
     #FIX ME FOR SURE!

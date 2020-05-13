@@ -9,7 +9,7 @@ import os
 
 from smalldata_tools import defaultDetectors,epicsDetector,printMsg,detData,checkDet,getCfgOutput,getUserData,getUserEnvData
 from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROI
+from smalldata_tools.roi_rebin import ROIFunc
 ########################################################## 
 ##
 ## User Input start --> 
@@ -130,12 +130,10 @@ dets=[]
 ROIs = getROIs(int(run))
 haveCspad = checkDet(ds.env(), 'cs140_0')
 if haveCspad:
-    cspad = DetObject.getDetObject('cs140_0', ds.env(), int(run))
-    #cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
+    cspad = DetObject('cs140_0' ,ds.env(), int(run), name='cs140_0')
     for iROI,roi in enumerate(ROIs):
         print 'adding func'
-        cspad.addFunc(ROI(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
-    #    cspad.addROI('ROI_%d'%iROI, ROI, writeArea=True)
+        cspad.addFunc(ROIFunc(name='ROI_%d'%iROI, ROI=roi, writeArea=True))
     dets.append(cspad)
 
 ########################################################## 
