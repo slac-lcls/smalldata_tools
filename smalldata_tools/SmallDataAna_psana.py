@@ -18,7 +18,8 @@ import holoviews as hv
 import bokeh.plotting as bp
 from matplotlib import gridspec
 import psana
-import RegDB.experiment_info
+import logging
+import requests
 import SmallDataAna as sda
 
 from smalldata_tools.DetObject import DetObject
@@ -49,14 +50,25 @@ class SmallDataAna_psana(object):
         self.hutch=expname[0:3]
         self.plotWith=plotWith
         self.sda=None
-        currExpname = RegDB.experiment_info.active_experiment(self.hutch.upper())[1]
+
+        ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        if self.hutch == 'cxi':
+            print('Will assume the first CXI station, if this is wrong, please  -e <expname> on commandline')
+        resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": self.hutch.upper(), 
+                                                                                          "station": 0})
+        currExpname = resp.json().get("value", {}).get("name")
         if expname==currExpname:
-            lastRun = RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['num']
+            rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
+            if not rundoc:
+                logger.error("Invalid response from server")
+            lastRun = int(rundoc['num'])
             if self.run > lastRun:
                 printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run))
                 return None
             
-            isLive = (RegDB.experiment_info.experiment_runs(self.hutch.upper())[-1]['end_time_unix'] is None)
+            isLive = rundoc.get('end_time', None)
             self.dsname='exp=%s:run=%i:smd'%(expname,run)
             xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
             idxname=xtcdirname+'/index/e*-r%04d-*'%int(run)

@@ -13,7 +13,6 @@ from matplotlib import pyplot as plt
 import resource
 from itertools import izip, count
 import psana
-import RegDB.experiment_info
 
 from collections import deque
 from itertools import islice
@@ -230,12 +229,6 @@ def printMsg(eventNr, run, rank=0, size=1):
       if rank == 0:
         usage = resource.getrusage(resource.RUSAGE_SELF)
         print("*** In Event: run", run, ",event# in single job =", eventNr,', total about ',eventNr*size,' memory used: ',usage[2]*resource.getpagesize()/1000000.,' at ',time.strftime('%X'))
-
-def getExpName(env):  
-    if (env.jobName()).find('shmem')>=0:
-        return RegDB.experiment_info.active_experiment('XPP')[1]
-    else:
-        return env.experiment()
 
 ##########################################################################################
 ###  helper classes & functions

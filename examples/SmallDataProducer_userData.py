@@ -5,7 +5,9 @@ import time
 import argparse
 import socket
 import os
-import RegDB.experiment_info
+import logging 
+import requests
+
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.utilities import checkDet, printMsg
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData, detData, defaultDetectors
@@ -99,6 +101,10 @@ parser.add_argument("--gather", help="gather interval (def 100)", type=int)
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
 
+ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 hostname=socket.gethostname()
 if not args.run:
     run=raw_input("Run Number:\n")
@@ -120,10 +126,16 @@ if not args.exp:
         print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
         import sys
         sys.exit()
-    expname=RegDB.experiment_info.active_experiment(hutch)[1]
+    if hutch == 'cxi':
+        print('Will assume the first station, if this is wrong, please  -e <expname> on commandline')    
+    resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch.upper(), "station": 0})
+    expname = resp.json().get("value", {}).get("name")
     dsname='exp='+expname+':run='+run+':smd:dir=/reg/d/ffb/%s/%s/xtc:live'%(hutch.lower(),expname)
     #data gets removed from ffb faster now, please check if data is still available
-    isLive = (RegDB.experiment_info.experiment_runs(hutch)[-1]['end_time_unix'] is None)
+    rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
+    if not rundoc:
+        logger.error("Invalid response from server")
+    isLive = rundoc.get('end_time', None)
     if not isLive:
         xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
         xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
@@ -135,6 +147,9 @@ else:
     expname=args.exp
     hutch=expname[0:3]
     dsname='exp='+expname+':run='+run+':smd'
+
+    resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch.upper(), "station": 0})
+    expnameC = resp.json().get("value", {}).get("name")
 if args.offline:
     dsname='exp='+expname+':run='+run+':smd'
 if args.gather:
