@@ -9,6 +9,7 @@ from scipy import optimize
 from scipy import ndimage
 from scipy import signal
 from scipy import sparse
+from scipt.stats import gaussian_kde
 from matplotlib import pyplot as plt
 import resource
 from itertools import izip, count
@@ -856,3 +857,38 @@ def image_from_dxy(d,x,y, **kwargs):
         
     img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
     return img
+
+
+def KdeCuts(values, bandwidth='scott', percentile=[0.1,99.9], nBins=1000):
+    kde = gaussian_kde(values, bw_method=bandwidth)
+    xValues = np.linspace(np.percentile(values,percentile[0]),np.percentile(values,percentile[1]), nBins)
+    kde_yValues = kde.evaluate(xValues)
+    retDict={'x': xValues, 'y': kde_yValues}
+    #find maximum point
+    kde_yMax = kde_yValues.max()
+    kde_xMaxIdx = np.argmax(kde_yValues)
+    kde_xMax = xValues[kde_xMaxIdx]
+    retDict['maxPt']=(kde_xMax, kde_yMax)
+    #minimum, maximum points
+    retDict['firstPt'] = (xValues[0], kde_yValues[0])
+    retDict['lastPt'] = (xValues[-1], kde_yValues[-1])
+    #distance to lines - left
+    kde_left_dist =  [ dist_to_segment(retDict['firstPt'], retDict['maxPt'], xpt, ypt) for xpt, ypt in zip(xValues[:kde_xMaxIdx],kde_yValues[:kde_xMaxIdx])]
+    leftMaxDistIdx = np.argmax(kde_left_dist)
+    leftMaxDistX = xValues[leftMaxDistIdx]
+    leftMaxDistVal = kde_yValues[leftMaxDistIdx]
+    leftMaxDistLineVal = retDict['firstPt'][1] + (retDict['maxPt'][1]-retDict['firstPt'][1])/(retDict['maxPt'][0]-retDict['firstPt'][0])*(leftMaxDistX-retDict['firstPt'][0])
+    retDict['leftMaxDist']=[leftMaxDistX, leftMaxDistLineVal, leftMaxDistVal, np.max(kde_left_dist)]
+    #distance to lines - right
+    kde_right_dist = [ dist_to_segment(retDict['maxPt'], retDict['lastPt'], xpt, ypt) for xpt, ypt in zip(xValues[kde_xMaxIdx:],kde_yValues[kde_xMaxIdx:])]
+    rightMaxDistIdx = np.argmax(kde_right_dist)+kde_xMaxIdx
+    rightMaxDistX = xValues[rightMaxDistIdx]
+    rightMaxDistVal = kde_yValues[rightMaxDistIdx]
+    mRight = (retDict['lastPt'][1]-retDict['maxPt'][1])/(retDict['lastPt'][0]-retDict['maxPt'][0])
+    rightMaxDistLineVal = retDict['maxPt'][1] + mRight*(rightMaxDistX-retDict['maxPt'][0])
+    retDict['rightMaxDist']=[rightMaxDistX, rightMaxDistLineVal, rightMaxDistVal, np.max(kde_right_dist) ]
+    alphaRight = np.arctan((-1)*1/mRight)
+    dxRight=np.max(kde_right_dist)*np.cos(alphaRight)
+    dyRight=np.max(kde_right_dist)*np.sin(alphaRight)
+    retDict['rightMaxDistToLine']=[dxRight, dyRight]
+    return retDict
