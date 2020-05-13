@@ -124,6 +124,10 @@ def mfxDetectors(beamCodes=[[162],[]]):
         dets.append(encoderDetector('MFX-USB-ENCODER-01','enc'))
     except:
         pass
+    dets.append(epicsDetector(PVlist=['atten_trans1','atten_trans3',
+                                      'fee_Attenuator_transmission',
+                                      'lens_energy',
+                                      'BeamMonitor_target','Dg1Ipm_target']))
     return dets
 
 def cxiDetectors(beamCodes=[[162],[]]):
