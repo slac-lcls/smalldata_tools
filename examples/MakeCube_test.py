@@ -45,8 +45,15 @@ if not args.exp:
         else:
             sys.exit()
     try:
-        import RegDB.experiment_info
-        expname=RegDB.experiment_info.active_experiment(hutch)[1]
+        import logging
+        import requests
+        ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        if hutch == 'CXI':
+            print('Will assume the first CXI station, if this is wrong, please  -e <expname> on commandline')
+        resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
+        expname = resp.json().get("value", {}).get("name")
     except:
         print 'could not determine experiment name, will quit'
         sys.exit()

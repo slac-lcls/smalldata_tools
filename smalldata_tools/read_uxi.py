@@ -5,7 +5,15 @@ import time
 import numpy as np
 from collections import namedtuple
 import tables
-import RegDB.experiment_info
+import requests
+from datetime import datetime
+from krtc import KerberosTicket
+try:
+    #python3
+    from urllib.parse import urlparse
+except:
+    #python 2
+    from urlparse import urlparse
 
 abspath=(os.path.abspath(os.path.dirname(__file__))).replace('/examples','')
 sys.path.append(abspath)
@@ -22,13 +30,27 @@ def getUxiDict(run):
     ##
     # get timestamp range for xtc file (???)
     ##
-    runsDict = RegDB.experiment_info.experiment_runs('xcs','xcsx31116')
     xtcBeginTime=None
     xtcEndTime=None
-    for thisRun in runsDict:
+    args_url = "https://pswww.slac.stanford.edu/ws-kerb/lgbk/"
+    ws_url = args_url + "/lgbk/{0}/ws/runs".format('xcsx31116')
+    krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
+    r = requests.get(ws_url, headers=krbheaders)
+    runDict = (r.json()["value"])
+    #print(json.dumps(r.json()["value"], sort_keys=True, indent=4))
+    xtcEndTime=-1
+    for thisRun in runDict:
         if thisRun['num']==int(run):
-            xtcBeginTime = int(thisRun['begin_time_unix'])
-            xtcEndTime = int(thisRun['end_time_unix'])
+            #print(thisRun['num'], thisRun['begin_time'], thisRun['end_time'])
+            xtcBeginTimeStr = (thisRun['begin_time'].split('+')[0]).replace('T',' ')
+            xtcEndTimeStr = (thisRun['end_time'].split('+')[0]).replace('T',' ')
+            xtcBeginTime = int((datetime.strptime(xtcBeginTimeStr, '%Y-%m-%d %H:%M:%S')-datetime.utcfromtimestamp(0)).total_seconds())
+            xtcEndTime = int((datetime.strptime(xtcEndTimeStr, '%Y-%m-%d %H:%M:%S')-datetime.utcfromtimestamp(0)).total_seconds())
+
+    if xtcEndTime<0:
+        print('something went wrong with getting the xtc time from the run database')
+        return None
+
     ##
     # put some UXI stuff here.
     ##
