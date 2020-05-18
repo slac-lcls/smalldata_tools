@@ -91,26 +91,28 @@ def fitCircles(x,y,r,yerr=None, guess=None):
 #
 # --------------------------------------------------------------            
 
-@jit(forceobj=True)
+@jit
 def addToHough(x,y,arHough, hough_radii, center_x, center_y, wt=1):
     """
     add a single point in x-y space to hough space 
     """
     dr=hough_radii[1]-hough_radii[0]
+    r_hi = hough_radii[0]**2
+    r_low = hough_radii[-1]**2
     for icx,cx in enumerate(center_x):
-        dx = (x-cx)*(x-cx)
-        if dx < hough_radii[0]*hough_radii[0] or  dx > hough_radii[-1]*hough_radii[-1]:
+        dx = (x-cx)**2
+        if dx < r_hi or  dx > r_low:
             continue
         for icy,cy in enumerate(center_y):
-            dy = (y-cy)*(y-cy)
-            r = np.sqrt(dx+dy)
+            dy = (y-cy)**2
+            r = (dx+dy)**0.5
             ir = int((r-hough_radii[0])/dr)
-            if ir>=0 and ir < hough_radii.shape[0]:
+            if ir >= 0 and ir < hough_radii.shape[0]:
                 arHough[ir, icx, icy]+=wt
 #do this to force compilation
 _ = addToHough(0,0,np.zeros([2,2,2]),np.arange(2), np.arange(2), np.arange(2))
 
-@jit(forceobj=True)
+@jit
 def transformImage(arSparse,arHough, hough_radii, center_x, center_y):
     """
     transform a sparsified imaged to an array in hough space
@@ -118,7 +120,7 @@ def transformImage(arSparse,arHough, hough_radii, center_x, center_y):
     assert arHough.shape[0]==hough_radii.shape[0]
     assert arHough.shape[1]==center_x.shape[0]
     assert arHough.shape[2]==center_y.shape[0]
-    for trow,tcol,tdat in itertools.izip(arSparse.row, arSparse.col,arSparse.data):
+    for trow,tcol,tdat in zip(arSparse.row, arSparse.col,arSparse.data):
         addToHough(trow,tcol, arHough,  hough_radii, center_x, center_y, tdat)
 #do this to force compilation
 _img = np.zeros((10, 10), dtype=np.uint8)
