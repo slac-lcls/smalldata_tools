@@ -117,11 +117,11 @@ def transformImage(arSparse,arHough, hough_radii, center_x, center_y):
     """
     transform a sparsified imaged to an array in hough space
     """
-    assert arHough.shape[0]==hough_radii.shape[0]
-    assert arHough.shape[1]==center_x.shape[0]
-    assert arHough.shape[2]==center_y.shape[0]
-    for trow,tcol,tdat in zip(arSparse.row, arSparse.col,arSparse.data):
-        addToHough(trow,tcol, arHough,  hough_radii, center_x, center_y, tdat)
+    assert arHough.shape[0] == hough_radii.shape[0]
+    assert arHough.shape[1] == center_x.shape[0]
+    assert arHough.shape[2] == center_y.shape[0]
+    for trow, tcol, tdat in zip(arSparse.row, arSparse.col, arSparse.data):
+        addToHough(trow, tcol, arHough,  hough_radii, center_x, center_y, tdat)
 #do this to force compilation
 _img = np.zeros((10, 10), dtype=np.uint8)
 _arHough = np.zeros((10, 10, 10), dtype=np.uint8)
@@ -381,4 +381,3 @@ def FindFitCenter(image, mask, inParams={}):
     except:
         print('combined fit failed')
         return -1, ringInfo, arSparse
-        
