@@ -92,23 +92,23 @@ def fitCircles(x,y,r,yerr=None, guess=None):
 # --------------------------------------------------------------            
 
 @jit
-def addToHough(x,y,arHough, hough_radii, center_x, center_y, wt=1):
+def addToHough(x, y, arHough, hough_radii, center_x, center_y, wt=1):
     """
     add a single point in x-y space to hough space 
     """
-    dr=hough_radii[1]-hough_radii[0]
-    r_hi = hough_radii[0]**2
-    r_low = hough_radii[-1]**2
+    dr = hough_radii[1] - hough_radii[0]
+    r_hi = hough_radii[0] ** 2
+    r_low = hough_radii[-1] ** 2
     for icx,cx in enumerate(center_x):
-        dx = (x-cx)**2
+        dx = (x-cx) ** 2
         if dx < r_hi or  dx > r_low:
             continue
         for icy,cy in enumerate(center_y):
-            dy = (y-cy)**2
-            r = (dx+dy)**0.5
-            ir = int((r-hough_radii[0])/dr)
+            dy = (y-cy) ** 2
+            r = (dx+dy) ** 0.5
+            ir = int((r - hough_radii[0]) / dr)
             if ir >= 0 and ir < hough_radii.shape[0]:
-                arHough[ir, icx, icy]+=wt
+                arHough[ir, icx, icy] += wt
 #do this to force compilation
 _ = addToHough(0,0,np.zeros([2,2,2]),np.arange(2), np.arange(2), np.arange(2))
 
@@ -381,3 +381,4 @@ def FindFitCenter(image, mask, inParams={}):
     except:
         print('combined fit failed')
         return -1, ringInfo, arSparse
+        
