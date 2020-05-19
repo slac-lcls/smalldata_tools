@@ -113,14 +113,14 @@ def addToHough(x, y, arHough, hough_radii, center_x, center_y, wt=1):
 _ = addToHough(0,0,np.zeros([2,2,2]),np.arange(2), np.arange(2), np.arange(2))
 
 @jit
-def transformImage(arSparse,arHough, hough_radii, center_x, center_y):
+def transformImage(zip_obj, arHough, hough_radii, center_x, center_y):
     """
     transform a sparsified imaged to an array in hough space
     """
     assert arHough.shape[0] == hough_radii.shape[0]
     assert arHough.shape[1] == center_x.shape[0]
     assert arHough.shape[2] == center_y.shape[0]
-    for trow, tcol, tdat in zip(arSparse.row, arSparse.col, arSparse.data):
+    for trow, tcol, tdat in zip_obj:
         addToHough(trow, tcol, arHough,  hough_radii, center_x, center_y, tdat)
 #do this to force compilation
 _img = np.zeros((10, 10), dtype=np.uint8)
@@ -128,7 +128,8 @@ _arHough = np.zeros((10, 10, 10), dtype=np.uint8)
 _rr, _cc = circle_perimeter(4, 4, 3)
 _img[_rr, _cc] = 1
 _imgSparse = sparse.coo_matrix(_img)
-transformImage(_imgSparse,_arHough, np.arange(10), np.arange(10), np.arange(10))
+_zip_obj = zip(_imgSparse.row, _imgSparse.col, _imgSparse.data)
+transformImage(_zip_obj, _arHough, np.arange(10), np.arange(10), np.arange(10))
 
 def findCenter(arSparse, rBound, xcenBound, ycenBound, nbin=100, retHoughArray=False, nBinR=None):
     """
@@ -149,7 +150,8 @@ def findCenter(arSparse, rBound, xcenBound, ycenBound, nbin=100, retHoughArray=F
     centerx = np.arange(xcenBound[0],xcenBound[1],(xcenBound[1]-xcenBound[0])/nbin)
     centery = np.arange(ycenBound[0],ycenBound[1],(ycenBound[1]-ycenBound[0])/nbin)
     arHough = np.zeros([radii.shape[0], centerx.shape[0], centery.shape[0]])
-    transformImage(arSparse, arHough, radii, centerx, centery)
+    zip_obj = zip(arSparse.row, arSparse.col, arSparse.data)
+    transformImage(zip_obj, arHough, radii, centerx, centery)
     maxdim0 = [ arHough[i,:,:].max() for i in range(arHough.shape[0])]
     maxdim1 = [ arHough[:,i,:].max() for i in range(arHough.shape[1])]
     maxdim2 = [ arHough[:,:,i].max() for i in range(arHough.shape[2])]
