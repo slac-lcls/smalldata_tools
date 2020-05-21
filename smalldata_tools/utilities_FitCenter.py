@@ -1,385 +1,360 @@
 import numpy as np
-import itertools
 from skimage import feature
-from numba import jit
-from scipy import sparse
-from scipy import optimize
-from skimage.draw import circle_perimeter
+from scipy import sparse, optimize
 from skimage.measure import (CircleModel, ransac)
 from scipy.signal import argrelextrema
 from scipy.spatial import cKDTree
+from numba import jit
 
-def applyCanny(ar, mask, sigma=1, thres=0.9, thresH=0.995):
+def find_edges(image, mask, sigma=4, hi_thresh=0.98, low_thresh=0.92):
+    """Run the canny edge detection, probably doesn't need to live here
+
+    Parameters
+    ----------
+    image: ndarray
+        Scattering ring image to detect edges on
+    mask: ndarray
+        image mask with True/False values indicating whether to include in analysis
+    sigma: float
+        Standard deviation of the Gaussian filter
+    hi_thresh: float
+        Between 0 and 1. Upper bound for hysteresis thresholding (linking edges)
+    low_thresh: float
+        Between 0 and 1. Lower bound for hysteresis thresholding (linking edges)
+
+    Returns
+    -------
+    edges: ndarray
+        binary edges map of image
+    sparse_edges: ndarray
+        sparsified map of edges
     """
-    use canny to find edges in image to be used in hough algorithm 
-    """      
-    if thres==-999:
-        arThres = feature.canny(ar, sigma=sigma,mask=mask)
-    else:
-        arThres = feature.canny(ar, sigma=sigma,mask=mask, low_threshold=thres, high_threshold=thresH, use_quantiles=True)
-    return arThres,sparse.coo_matrix(arThres)
-
-def fitCircle(x,y,yerr=None, guess=None):
-    """
-    fit a single circle. Transform input to lists to that fitCircles can be used.
-    """  
-    x = [x]
-    y = [y]
-    rGuess = (np.nanmax(x)-np.nanmin(x)+np.nanmax(y)-np.nanmin(y))/4. #largest differences/2/2
-    r = [rGuess]
-    fitRes = fitCircles(x,y,r,yerr=None, guess=None)
-    #have only one circle.
-    fitRes['R']=fitRes['R'][0]
-    fitRes['residu']=fitRes['residu'][0]
-    return fitRes
-
-def fitCircles(x,y,r,yerr=None, guess=None):
-  """
-  simultanous least squares fitting of multiple concentric rings.
-  """  
-  def calc_R(x,y, par):
-      xc,yc = par
-      return np.sqrt((x-xc)**2 + (y-yc)**2)
-
-  def f(par,x,y):
-      Ri = calc_R(x,y,par)
-      return Ri - Ri.mean()
-
-  def f_global(par,Mat_r,Mat_x,Mat_y):
-      err = []
-      for r,x,y in zip( Mat_r, Mat_x, Mat_y):
-          errLocal = f(par,x,y)
-          err = np.concatenate((err, errLocal))          
-      return err
-
-  if guess is None or len(guess)!=2:
-      x_m = np.mean(x[0])
-      y_m = np.mean(y[0])
-  else:
-      x_m = guess[0]
-      y_m = guess[1]
-      
-  center_estimate = x_m, y_m
-  fitRes={}  
-  if yerr is not None:      
-      center, C, info, msg, success  = optimize.leastsq(f_global, center_estimate, args=(r,x,y), full_output=True)
-      fitRes['C'] = C
-      fitRes['info'] = info
-      fitRes['msg'] = msg
-      fitRes['success'] = success
-  else:
-      center, ier = optimize.leastsq(f_global, center_estimate, args=(r,x,y))
-      #print(center)
-      fitRes['ier'] = ier
-  xc, yc = center
-  fitRes['xCen'] = xc
-  fitRes['yCen'] = yc
-  ##now this will be a list.
-  Rs=[]
-  Resids=[]
-  for thisr, thisx, thisy in zip(r,x,y):
-      Ri     = calc_R(thisx, thisy, center)
-      Rs.append(Ri.mean())
-      Resids.append(np.sum((Ri - Ri.mean())**2))
-  fitRes['residu'] = Resids
-  fitRes['R']      = Rs
-  return fitRes
-
-# --------------------------------------------------------------            
-#
-# Hough Transform implementation.
-#
-# --------------------------------------------------------------            
-
-@jit
-def addToHough(x, y, arHough, hough_radii, center_x, center_y, wt=1):
-    """
-    add a single point in x-y space to hough space 
-    """
-    dr = hough_radii[1] - hough_radii[0]
-    r_hi = hough_radii[0] ** 2
-    r_low = hough_radii[-1] ** 2
-    for icx,cx in enumerate(center_x):
-        dx = (x-cx) ** 2
-        if dx < r_hi or  dx > r_low:
-            continue
-        for icy,cy in enumerate(center_y):
-            dy = (y-cy) ** 2
-            r = (dx+dy) ** 0.5
-            ir = int((r - hough_radii[0]) / dr)
-            if ir >= 0 and ir < hough_radii.shape[0]:
-                arHough[ir, icx, icy] += wt
-#do this to force compilation
-_ = addToHough(0,0,np.zeros([2,2,2]),np.arange(2), np.arange(2), np.arange(2))
-
-@jit
-def transformImage(zip_obj, arHough, hough_radii, center_x, center_y):
-    """
-    transform a sparsified imaged to an array in hough space
-    """
-    assert arHough.shape[0] == hough_radii.shape[0]
-    assert arHough.shape[1] == center_x.shape[0]
-    assert arHough.shape[2] == center_y.shape[0]
-    for trow, tcol, tdat in zip_obj:
-        addToHough(trow, tcol, arHough,  hough_radii, center_x, center_y, tdat)
-#do this to force compilation
-_img = np.zeros((10, 10), dtype=np.uint8)
-_arHough = np.zeros((10, 10, 10), dtype=np.uint8)
-_rr, _cc = circle_perimeter(4, 4, 3)
-_img[_rr, _cc] = 1
-_imgSparse = sparse.coo_matrix(_img)
-_zip_obj = zip(_imgSparse.row, _imgSparse.col, _imgSparse.data)
-transformImage(_zip_obj, _arHough, np.arange(10), np.arange(10), np.arange(10))
-
-def findCenter(arSparse, rBound, xcenBound, ycenBound, nbin=100, retHoughArray=False, nBinR=None):
-    """
-    find the beam center via hough transform, given a sparsified imaged 
-    input: arSparse, rBound, xcenBound, ycenBound, nbin=100, retHoughArray=False, nBinR=None):
-           arSparse  (sparsified image)
-           rBound    ([r_min, r_max])
-           xcenBound ([x_center_ min, x_center_max])
-           ycenBound ([y_center_ min, y_center_max])
-           nbin      (number of bins for center coordinates in hough space - default 100)
-           nBinR     (number of bins for radius in hough space - defaults to nbin)
-           retHoughArray (return the full filled array in hough space, other return projections, 
-                          defaults to False)
-    """
-    if nBinR is None:
-        nBinR = nbin
-    radii = np.arange(rBound[0], rBound[1],(rBound[1]-rBound[0])/nBinR)
-    centerx = np.arange(xcenBound[0],xcenBound[1],(xcenBound[1]-xcenBound[0])/nbin)
-    centery = np.arange(ycenBound[0],ycenBound[1],(ycenBound[1]-ycenBound[0])/nbin)
-    arHough = np.zeros([radii.shape[0], centerx.shape[0], centery.shape[0]])
-    zip_obj = zip(arSparse.row, arSparse.col, arSparse.data)
-    transformImage(zip_obj, arHough, radii, centerx, centery)
-    maxdim0 = [ arHough[i,:,:].max() for i in range(arHough.shape[0])]
-    maxdim1 = [ arHough[:,i,:].max() for i in range(arHough.shape[1])]
-    maxdim2 = [ arHough[:,:,i].max() for i in range(arHough.shape[2])]
-    fitRes={}
-    fitRes['R'] = radii[np.array(maxdim0).argmax()]
-    fitRes['xCen'] = centerx[np.array(maxdim1).argmax()]
-    fitRes['yCen'] = centery[np.array(maxdim2).argmax()]
-    fitRes['radii'] = radii
-    fitRes['centerx'] = centerx
-    fitRes['centery'] = centery
-    if retHoughArray:
-        fitRes['houghArray'] = arHough
-    else:
-        fitRes['houghArray_projR'] = maxdim0
-        fitRes['houghArray_projX'] = maxdim1
-        fitRes['houghArray_projY'] = maxdim2
-    return fitRes
-
-def iterateCenter(arSparse, ar_shape, rRange, nbin=100, prec=1, redFac=5., retHoughArray=False, printProgress=False, overfillFactor=1, nBinR=None):
-    """
-    use hough method to find the center iteratively ro keep computing time dowb compared to a 
-    very large 3-d hough space.
-    input: arSparse, ar_shape, rRange, nbin=100, prec=1, redFac=5., retHoughArray=False, printProgress=False, overfillFactor=1, nBinR=Non
-           arSparse (sparsified image)
-           ar_shape (shape of the original image in #pixel)
-           rRange   ()
-           nbin     (number of bins for center coordinates in hough space - default 100)
-    """
-    xRange=[ar_shape[0]*(1.-overfillFactor),ar_shape[0]*overfillFactor]
-    yRange=[ar_shape[1]*(1.-overfillFactor),ar_shape[1]*overfillFactor]
-    fitRes = findCenter(arSparse, rRange, xRange, yRange, nbin=nbin, retHoughArray=retHoughArray, nBinR=nBinR)
-    while (fitRes['centerx'][1]-fitRes['centerx'][0]) > prec:
-        maxR = fitRes['R']
-        maxX = fitRes['xCen']
-        maxY = fitRes['yCen']
-        rSizeX = (xRange[1]-xRange[0])/redFac
-        rSizeY = (yRange[1]-yRange[0])/redFac
-        xRange=[maxX-rSizeX*0.5, maxX+rSizeX*0.5]
-        yRange=[maxY-rSizeY*0.5, maxY+rSizeY*0.5]
-        if printProgress:
-            print('finding the center in ranges: ',rRange, xRange, yRange)
-        fitRes = findCenter(arSparse, rRange, xRange, yRange, nbin=nbin, retHoughArray=retHoughArray, nBinR=nBinR)
-        if printProgress:
-            print('found center: ',maxX, maxY, maxR)
-
-    temp = fitRes['xCen']
-    fitRes['xCen'] = fitRes['yCen']
-    fitRes['yCen'] = temp
-    return fitRes
-
-# --------------------------------------------------------------            
-#
-# select maxima
-#
-# --------------------------------------------------------------            
-
-def getMaxR(fitRes, norm=False, minDr=-1):
-    """
-    sort the radii of the circle found in hough transform step.
-    arguments: fitRes, (opt: norm, minDr)
-               fitRes: result of iterateCenter (as dictionary)
-               norm: normalize the height of the peak in hough space by the radius
-               minDr: request circles to be apart by at least minDr pixels
-    """
-    try:
-        radii = fitRes['radii']
-        rRes = fitRes['houghArray_projR']
-    except:
-        print('the passed fit Result does not have the necessary keys')
-        return[]
-
-    if norm:
-        maxR = argrelextrema(np.array(rRes)/radii, np.greater)
-    else:
-        maxR = argrelextrema(np.array(rRes), np.greater)
-    print('maxR: ',maxR)
-    maxRadii = radii[maxR[0]]
-    if maxRadii.shape[0]==0:
-        print('no maxima could be found!')
-        return []
-    resAtRadii = np.array(rRes)[maxR[0]]
-    resAtRadii,maxRadii = (list(x) for x in zip(*sorted(zip( resAtRadii, maxRadii))))
-
-    #print('DEBUG: ',maxRadii)
-    #print('DEBUG: ',resAtRadii)
+    edges = feature.canny(image, mask=mask.astype(bool), sigma=4 , low_threshold=0.92, \
+                      high_threshold=0.98, use_quantiles=True)
+    sparse_edges = sparse.coo_matrix(edges)
     
-    nrad=[]
-    #loop inverse!
-    for rad in reversed(maxRadii):
-        thisminDr=1e6
+    return edges, sparse_edges
+
+@jit(cache=True, nopython=True)
+def _transform_hough_array(ar_hough, radii, zip_obj, center_x, center_y, dr, r_low, r_hi):
+    """Transform Hough array on each iteration after narrowing search ranges
+    Parameters
+    ----------
+    ar_hough: ndarray
+        Initial Hough array to transform
+    radii: np.array
+        All the radii values from r ranges to check
+    zip_obj: zipped object of np.arrays
+        Used to iterate through the sparse_edges x, y, and data values
+    center_x: np.array
+        The x values of possible centers to iterate through
+    center_y: np.array
+        The x values of possible centers to iterate through
+    dr: int
+        The size of each radial step
+    r_low: int
+        The lower threshold for including in hough transform
+    r_hi: int
+        The upper threshold for including in hough transform
+    """
+    for row, col, data in zip_obj:
+        for ix, cx in enumerate(center_x):
+            dx = (row - cx) ** 2
+            if dx < r_low or  dx > r_hi:
+                # skip iteration if outside bounds
+                continue
+            for iy, cy in enumerate(center_y):
+                dy = (col - cy) ** 2
+                r = (dx + dy) ** 0.5
+                ir = int((r - radii[0]) / dr)
+                if ir >= 0 and ir < radii.shape[0]:
+                    ar_hough[ir, ix, iy] += data
+
+def _max_from_hough(ar_hough, radii, center_x, center_y):
+    """Get maximum value from hough space for r, x, and y helper function
+    
+    Parameters
+    ----------
+    ar_hough: ndarray
+        transformed hough array
+    radii: np.array
+        radii included in search
+    center_x: np.array
+        The x values of possible centers to iterate through
+    center_y: np.array
+        The x values of possible centers to iterate through
+
+    Returns
+    -------
+    r_max: float
+        max radius found in hough array radial plane
+    x_max: float
+        max x val found in hough array x plane
+    y_max: float
+        max y val found in hough array y plane
+    maxdim_r: list(float)
+        maximum values in radial plane along 0 axis of hough array
+    """
+    maxdim_r = [ar_hough[i,:,:].max() for i in range(ar_hough.shape[0])]
+    maxdim_x = [ar_hough[:,i,:].max() for i in range(ar_hough.shape[1])]
+    maxdim_y = [ar_hough[:,:,i].max() for i in range(ar_hough.shape[2])]
+
+    r_max = radii[np.array(maxdim_r).argmax()]
+    x_max = center_x[np.array(maxdim_x).argmax()]
+    y_max = center_y[np.array(maxdim_y).argmax()]
+
+    return r_max, x_max, y_max, maxdim_r
+
+def iterate_center(sparse_edges, overfill=1.5, r_range=[1, 1401], r_bin=280, c_bin=100, \
+    prec=1, red_factor=5., norm=False, min_dr=-1):
+    """Iterate through center finding until we are within defined precision, the main loop
+    
+    Parameters
+    ----------
+    sparse_edges: ndarray
+        sparsified map of edges
+    overfill: float
+        mutliplier to extend range of search in x and y
+    r_range: list(int)
+        bounds for radial search
+    r_bin: int
+        divider used create number of bins for radial search
+    c_bin: int
+        divider used create number of bins for center search
+    prec: float
+        threshold for finishing center search
+    red_factor: float
+        factor we reduce search range by on each iteration
+    norm: bool
+        should we normalize extrema search for r values
+    min_dr: int
+        minimum delta r we need to include radius in final radius list
+
+    Returns
+    -------
+    r_vals: list(int)
+        accepted radii that pass threshold test
+    x: float
+        center x position
+    y: float
+        center y position
+    """
+    x_range = [sparse_edges.shape[0] * (1. - overfill), sparse_edges.shape[0] * overfill]
+    y_range = [sparse_edges.shape[1] * (1. - overfill), sparse_edges.shape[1] * overfill]
+    radii = np.arange(r_range[0], r_range[1], (r_range[1] - r_range[0]) / r_bin)
+    dr = radii[1] - radii[0]
+    r_low = radii[0] ** 2
+    r_hi = radii[-1] ** 2
+    center_x = np.arange(x_range[0], x_range[1], (x_range[1] - x_range[0]) / c_bin)
+    center_y = np.arange(y_range[0], y_range[1], (y_range[1] - y_range[0]) / c_bin)
+    ar_hough = np.zeros([radii.shape[0], center_x.shape[0], center_y.shape[0]])
+    zip_obj = zip(sparse_edges.row, sparse_edges.col, sparse_edges.data)
+    _transform_hough_array(ar_hough, radii, zip_obj, center_x, center_y, dr, r_low, r_hi)
+    r, x, y, maxdim_r = _max_from_hough(ar_hough, radii, center_x, center_y)
+
+    while (center_x[1] - center_x[0]) > prec:
+        r_size_x = (x_range[1] - x_range[0]) / red_factor
+        r_size_y = (y_range[1] - y_range[0]) / red_factor
+        x_range = [x - r_size_x * 0.5, x + r_size_x * 0.5]
+        y_range = [y - r_size_y * 0.5, y + r_size_y * 0.5]
+        center_x = np.arange(x_range[0], x_range[1], (x_range[1] - x_range[0]) / c_bin)
+        center_y = np.arange(y_range[0], y_range[1], (y_range[1] - y_range[0]) / c_bin)
+        ar_hough = np.zeros([radii.shape[0], center_x.shape[0], center_y.shape[0]])
+        _transform_hough_array(ar_hough, radii, zip_obj, center_x, center_y, dr, r_low, r_hi)
+        r, x, y, maxdim_r = _max_from_hough(ar_hough, radii, center_x, center_y)
+
+    x, y = y, x
+    r_vals = _calc_r_vals(radii, maxdim_r, norm, min_dr)
+    return r_vals, x, y
+
+def _calc_r_vals(radii, maxdim_r, norm, min_dr):
+    """Get the radii for the circles, helper function
+    
+    Parameters
+    ----------
+    radii: np.array
+        possible radii values to check
+    maxdim_r: list(float)
+        maximum values in radial plane along 0 axis of hough array
+    norm: bool
+        should we normalize extrema search for r values
+    min_dr: int
+        minimum delta r we need to include radius in final radius list
+
+    Returns
+    -------
+    nrad: list(int)
+        All radii that pass threshold test
+    """
+    if norm:
+        r_max = argrelextrema(np.array(maxdim_r) / radii, np.greater)
+    else:
+        r_max = argrelextrema(np.array(maxdim_r), np.greater)
+
+    max_radii = radii[r_max[0]]
+
+    if max_radii.shape[0] == 0:
+        print('could not find a maxima in radii')
+        return []
+
+    res_at_radii = np.array(maxdim_r)[r_max[0]]
+    res_at_radii, max_radii = (list(x) for x in zip(*sorted(zip(res_at_radii, max_radii))))
+
+    nrad = []
+    for rad in reversed(max_radii):
+        cur_min_dr = 1e6
         for irrad in nrad:
-            if np.abs(rad-irrad)<thisminDr:
-                thisminDr = np.fabs(rad-irrad)
-        if thisminDr>minDr:
+            diff_val = np.abs(rad - irrad)
+            if diff_val < cur_min_dr:
+                cur_min_dr = diff_val
+        if cur_min_dr > min_dr:
             nrad.append(rad)
 
-    #return maxRadii
     return nrad
 
-def findPointsInRing(arSparse, center, maxR1, ringInfo, inParams={}):
+def _fit_circles(x, y, r, yerr=False, guess=None):
     """
-    create list of points for each ring. 
-    use cKDTree first to select points in 'donot' region arund input radius, 
-         then use RANSAC to throw out points that do not fit with CircleModel
-    parameters: arSparse, maxR1, (opt params={})
-        arSparse: sparified image
-        center: beam center found in Hough step  [xCenter, yCenter]
-        maxR1: list of round maximu in Hough step
-        ringInfo: list of rings
-        params:
-            nMaxRing: maximum number of rings to use in final fit, def 6
-            deltaR: require new circle to be at least deltaR pixels away from last circle, def 5
-            minPoints: minimum absolute number of points in circle to be considered for final fit, def 40
-            minInFrac #require frav of points to pass RANSAC, def 0.45 (45%)
-            RANSAC_residual_threshold: allowed max residual to consider point being 'in' (def 2)
-            RANSAC_min_sample: minimu number of samples to be drawn (def 10)
+    simultanous least squares fitting of multiple concentric rings, helper function
+
+    Parameters
+    ----------
+    x: float
+        center in x
+    y: float
+        center in y
+    r: list(int)
+        accepted radii
+    yerr: bool
+        whether or not to get verbose output from scipy.optimize fit
+    guess: list(float)
+        provide a guess for the center
+
+    Returns
+    -------
+    fit_res: dict
+        all the parameters from least squares fit
+    """  
+    def calc_r(x, y, par):
+        xc, yc = par
+        return np.sqrt((x - xc) ** 2 + (y - yc) ** 2)
+
+    def f(par, x, y):
+        ri = calc_r(x, y, par)
+        return ri - ri.mean()
+
+    def f_global(par, mat_r, mat_x, mat_y):
+        err = []
+        for r, x, y in zip(mat_r, mat_x, mat_y):
+            err_local = f(par, x, y)
+            err = np.concatenate((err, err_local))          
+        return err
+
+    if guess is None or len(guess) != 2:
+        x_m = np.mean(x[0])
+        y_m = np.mean(y[0])
+    else:
+        x_m = guess[0]
+        y_m = guess[1]
+        
+    center_estimate = x_m, y_m
+    fit_res = {}  
+    if yerr:      
+        center, C, info, msg, success  = optimize.leastsq(f_global, \
+            center_estimate, args=(r, x, y), full_output=True)
+        fit_res['C'] = C
+        fit_res['info'] = info
+        fit_res['msg'] = msg
+        fit_res['success'] = success
+    else:
+        center, ier = optimize.leastsq(f_global, center_estimate, args=(r, x, y))
+        fit_res['ier'] = ier
+    xc, yc = center
+    fit_res['x_cen'] = xc
+    fit_res['y_cen'] = yc
+    rs=[]
+    resids=[]
+    for thisr, thisx, thisy in zip(r,x,y):
+        ri     = calc_r(thisx, thisy, center)
+        rs.append(ri.mean())
+        resids.append(np.sum((ri - ri.mean()) ** 2))
+    fit_res['residu'] = resids
+    fit_res['R']      = rs
+
+    return fit_res
+
+def ransac_result(sparse_edges, center, r_vals, n_max=10, delta_r=5, min_points=40, \
+    min_samples=10, res_thresh=2, min_frac=0.45):
+    """Find the number of edges inside proposed ring, if exceeds threshold, use ransac
+    to fit the circle
+
+    Parameters
+    ----------
+    sparse_edges: ndarray
+        sparsified map of edges
+    center: list(float)
+        first element is center x value, second is y value
+    r_vals: list(int)
+        accepted radial guesses
+    n_max: int
+        maximum number of rings to check
+    delta_r: int
+        radial step size used in tree query
+    min_points: int
+        minimum absolute number of points in circle to be considered for final fit
+    min_samples: int
+        minimum number of samples to be drawn
+    res_thresh: int
+        allowed max residual to consider point being 'in'
+    min_frac: float
+        require fraction of points to pass RANSAC
+
+    Returns
+    -------
+    comb_res: dict
+        result from combined circle fitting
+    ring_info: dict
+        information about each ring that passed ransac fit
+    sparse_edges: ndarray
+        sparsified map of edges
     """
-    #use cKDTree to select points in ring of width 2*deltaR around circle
-    print('select points in circles using cKDTree and select good candidates for final fit using RANSAC')
-    tree = cKDTree(np.array([arSparse.col, arSparse.row]).T)
-    for ir, r in enumerate(maxR1):
-        if len(ringInfo)>=inParams['nMaxRing']:
+    tree = cKDTree(np.array([sparse_edges.col, sparse_edges.row]).T)
+    ring_info = []
+    for ir, r in enumerate(r_vals):
+        if len(ring_info) >= n_max:
             break
-        thisRingInfo={}
-        rOuter = tree.query_ball_point(center, r+inParams['deltaR'])
-        rInner = tree.query_ball_point(center, r-inParams['deltaR'])
-        inRing = set(rOuter).symmetric_difference(set(rInner))
-        thisRingInfo['rInput']=r
-        thisRingInfo['pointsInCircle']=list(inRing)
-        print('input radius, #points ',r,len(list(inRing)))
-        if len(list(inRing))<inParams['minPoints']:
+
+        cur_ring_info = {}
+        r_outer = tree.query_ball_point(center, r + delta_r)
+        r_inner = tree.query_ball_point(center, r - delta_r)
+        in_ring = set(r_outer).symmetric_difference(set(r_inner))
+        cur_ring_info['r_input'] = r
+        cur_ring_info['points_in_circle'] = list(in_ring)
+
+        if len(list(in_ring)) < min_points:
             continue
-        #use ransac to pick points most likely to belong to circle
-        model_robust, inliers = ransac(np.array([arSparse.row[list(inRing)], arSparse.col[list(inRing)]]).T, CircleModel, min_samples=inParams['RANSAC_min_samples'], residual_threshold=inParams['RANSAC_residual_threshold'], max_trials=1000)
-        thisRingInfo['inFrac']=inliers.astype(int).sum()/float(len(list(inRing)))
-        thisRingInfo['inliers']=inliers
-        thisRingInfo['ransac_result']=model_robust
-        print('ring %d, infrac %f, #points %d' %(ir, thisRingInfo['inFrac'], len(thisRingInfo['inliers'])))
-        if thisRingInfo['inFrac']>inParams['minInFrac'] and thisRingInfo['inliers'].astype(int).sum()>=inParams['minPoints']:
-            ringInfo.append(thisRingInfo)
 
-# --------------------------------------------------------------            
-#
-# main function.
-#
-# --------------------------------------------------------------            
+        model, inliers = ransac(np.array([sparse_edges.row[list(in_ring)], sparse_edges.col[list(in_ring)]]).T, \
+            CircleModel, min_samples=min_samples, residual_threshold=res_thresh, max_trials=1000)
+        
+        cur_ring_info['in_frac'] = inliers.astype(int).sum() / float(len(list(in_ring)))
+        cur_ring_info['inliers'] = inliers
+        cur_ring_info['ransac_result'] = model
 
-def FindFitCenter(image, mask, inParams={}):
-    """
-    main function to find the beam center
-    arguments: image, mask (opt: inParams)
-               image to use to find beam center (2-d)
-               mask to be used (also 2-d)
-               inParams: dictionary of parameters used in findcing the ebam center
-    inParams:
-             #edge finding:
-             sigma          #gaussian blurring for canny algorithm, def 1
-             low_threshold  #threshold for only strongest features, using quantiles, def 0.95
-             high_threshold #threshold for only strongest features, using quantiles, def 0.0995
-             #parameters for hough center finding
-             precision #bin size in pixel for center in hough array, def 1
-             nBinR     #number of bins for center, def 280
-             overFac   #allow beam center to be out of the image by a factor of x, def 1.5 (50%)
-             #parameters to find best rings
-             norm      #normalize number of points/circle by its radius (point density), def True
-             deltaR    #require new circle to be at least deltaR pixels away from last circle, def 5
-             nMaxRing  #max number of rings to consider, def 6
-             minInFrac #require 45% of points to pass RANSAC, def 0.45 
-             minPoints #minimum absolute number of points in circle to be considered for final fit, def 40
-             RANSAC_residual_threshold #allowed max residual to consider point being 'in' (def 2)
-             RANSAC_min_sample         #minimum number of samples to be drawn (def 10)
-    """
-    ar = image
-    if len(ar.shape)!=2 or len(mask.shape)!=2:
-        print('image or mask are not 2-d arrays, cannot find centers')
-        return
+        if cur_ring_info['in_frac'] > min_frac and inliers.astype(int).sum() >= min_points:
+            ring_info.append(cur_ring_info)
 
-    #parameters found to be typcially right
-    #parameters for canny
-    params={'sigma':1}      
-    params['low_threshold']=0.95  
-    params['high_threshold']=0.995
-    #parameters for hough center finding
-    params['precision']=1  
-    params['nBinR']=280    
-    params['overFac']=1.5   
-    #parameters to find best rings
-    params['norm']=True    
-    params['deltaR']=5     
-    params['nMaxRing'] = 6 
-    params['minPoints']=40 
-    params['RANSAC_min_samples']=10 
-    params['RANSAC_residual_threshold']=2 
-    params['minInFrac']=0.45 
+    all_x = []
+    all_y = []
+    all_r = []
 
-    for inkey in inParams:
-        try:
-            params[inkey]=inParams[inkey]
-        except:
-            print('fit parameters do not have key ',inkey,', available are: ',params.keys())
-            pass
+    for ir, cur_ring_info in enumerate(ring_info):
+        all_r.append(ir)
+        all_x.append(sparse_edges.col[cur_ring_info['points_in_circle']])
+        all_y.append(sparse_edges.row[cur_ring_info['points_in_circle']])
 
-    print('now find edges')
-    arThres,arSparse = applyCanny(ar, mask.astype(bool), sigma=params['sigma'], thres=params['low_threshold'], thresH=params['high_threshold'])
-
-    print('use hough transform to find center & ring candidates')
-    res = iterateCenter(arSparse, [arThres.shape[0], arThres.shape[1]], [1,1401], prec=params['precision'], overfillFactor=params['overFac'], nBinR=params['nBinR'])
-    maxR1 =  getMaxR(res, norm=params['norm'], minDr=params['deltaR'])
-    center = [ res['xCen'], res['yCen']]
-    print('maxR1: ',maxR1)
-
-    ringInfo=[]
-    if len(maxR1) == 0:
-        return -1, ringInfo, arSparse
-
-    findPointsInRing(arSparse, center, maxR1, ringInfo, params)
- 
-    print('now prepare for the final fit')
-    allX=[]
-    allY=[]
-    allR=[]
-    for ir,thisRingInfo in enumerate(ringInfo):
-        allR.append(ir)
-        allX.append(arSparse.col[thisRingInfo['pointsInCircle']])
-        allY.append(arSparse.row[thisRingInfo['pointsInCircle']])
     try:
-        combRes = fitCircles(allX,allY,allR,yerr=True)
-        return combRes, ringInfo, arSparse
-    except:
-        print('combined fit failed')
-        return -1, ringInfo, arSparse
+        comb_res = _fit_circles(all_x, all_y, all_r, yerr=True)
+        return comb_res, ring_info, sparse_edges
+    except Exception as e:
+        print('Exception encountered during fitting: {0}'.format(e))
+        return -1, ring_info, sparse_edges
