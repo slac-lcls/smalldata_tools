@@ -112,6 +112,7 @@ logger.debug('Analayzing data for EXP:{0} - RUN:{1}'.format(args.exp, args.run))
 hutch = exp[:3].upper()
 if hutch not in HUTCHES:
     logger.debug('Could not find {0} in list of available hutches'.format(hutch))
+	sys.exit()	
 
 # Get current exp and run
 cur_exp = get_cur_exp(hutch, station)
