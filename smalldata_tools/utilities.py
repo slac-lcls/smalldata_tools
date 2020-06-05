@@ -9,7 +9,7 @@ from scipy import optimize
 from scipy import ndimage
 from scipy import signal
 from scipy import sparse
-from scipt.stats import gaussian_kde
+from scipy.stats import gaussian_kde
 from matplotlib import pyplot as plt
 import resource
 from itertools import izip, count
