@@ -6,7 +6,7 @@ from scipy.signal import argrelextrema
 from scipy.spatial import cKDTree
 from numba import jit
 
-def find_edges(image, mask, sigma=4, hi_thresh=0.98, low_thresh=0.92):
+def find_edges(image, mask, sigma, hi_thresh, low_thresh):
     """Run the canny edge detection, probably doesn't need to live here
 
     Parameters
@@ -105,8 +105,7 @@ def _max_from_hough(ar_hough, radii, center_x, center_y):
 
     return r_max, x_max, y_max, maxdim_r
 
-def iterate_center(sparse_edges, overfill=1.5, r_range=[1, 1401], r_bin=280, c_bin=100, \
-    prec=1, red_factor=5., norm=False, min_dr=-1):
+def iterate_center(sparse_edges, overfill, r_range, r_bin, c_bin, prec, red_factor, norm, min_dr):
     """Iterate through center finding until we are within defined precision, the main loop
     
     Parameters
@@ -282,8 +281,7 @@ def _fit_circles(x, y, r, yerr=False, guess=None):
 
     return fit_res
 
-def ransac_result(sparse_edges, center, r_vals, n_max=10, delta_r=5, min_points=40, \
-    min_samples=10, res_thresh=2, min_frac=0.45):
+def ransac_result(sparse_edges, center, r_vals, n_max, delta_r, min_points, min_samples, res_thresh, min_frac):
     """Find the number of edges inside proposed ring, if exceeds threshold, use ransac
     to fit the circle
 
@@ -358,3 +356,50 @@ def ransac_result(sparse_edges, center, r_vals, n_max=10, delta_r=5, min_points=
     except Exception as e:
         print('Exception encountered during fitting: {0}'.format(e))
         return -1, ring_info, sparse_edges
+
+def FindFitCenter(image, mask, **kwargs):
+	"""arguments: image, mask (opt: inParams)
+		image to use to find beam center (2-d)
+		mask to be used (also 2-d)
+		
+		kwargs: dictionary of parameters used in finding the ebam center
+			kwargs:
+			#edge finding:
+			sigma          #gaussian blurring for canny algorithm, def 1
+			low_threshold  #threshold for only strongest features, using quantiles, def 0.92
+			high_threshold #threshold for only strongest features, using quantiles, def 0.98
+			#parameters for hough center finding
+			precision #bin size in pixel for center in hough array, def 1
+			nBinR     #number of bins for center, def 280
+			overFac   #allow beam center to be out of the image by a factor of x, def 1.5 (50%)
+			#parameters to find best rings
+			norm      #normalize number of points/circle by its radius (point density), def True
+			deltaR    #require new circle to be at least deltaR pixels away from last circle, def 5
+			nMaxRing  #max number of rings to consider, def 6
+			minInFrac #require 45% of points to pass RANSAC, def 0.45 
+			minPoints #minimum absolute number of points in circle to be considered for final fit, def 40				
+			RANSAC_residual_threshold #allowed max residual to consider point being 'in' (def 2)
+			RANSAC_min_sample         #minimum number of samples to be drawn (def 10)
+	"""
+	sigma = kwargs.get('sigma', 4)
+	hi_thresh = kwargs.get('high_threshold', 0.98)
+	low_thresh = kwargs.get('low_threshold', 0.92)
+	overfill = kwargs.get('overFac', 1.5)
+	r_range = kwargs.get('r_range', [1, 1401])
+	r_bin = kwargs.get('nBinR', 280)
+	c_bin = kwargs.get('cBin', 100)
+	prec = kwargs.get('precision', 1)
+	red_factor = kwargs.get('deltaR', 5)
+	norm = kwargs.get('norm', True)
+	min_dr = kwargs.get('min_dr', -1)	
+	n_max = kwargs.get('nMaxRing', 10)
+	min_points = kwargs.get('minPoints', 40)
+	min_samples = kwargs.get('RANSAC_min_sample', 10)
+	res_thresh = kwargs.get('RANSAC_residual_threshold', 2)
+	min_frac = kwargs.get('minInFrac', 0.45)
+
+	edges, sparse_edges = find_edges(image, mask, sigma, hi_thresh, low_thresh)
+	r_vals, x, y = iterate_center(sparse_edges, overfill, r_range, r_bin, c_bin, prec, red_factor, norm, min_dr)
+	res, ring_info, edges = ransac_result(sparse_edges, [x, y], r_vals, n_max, red_factor, min_points, min_samples, res_thresh, min_frac)
+	
+	return res, ring_info, edges
