@@ -79,6 +79,48 @@ def fit_line(ave_azav):
 
 	return m, b
 
+def calc_intensity_bounds(f, i_mon, low, hi):
+	"""Calculate lower and upper bounds to be used in jet tracking
+	and generate indices of events to be used in calibration
+
+	Parameters
+	----------
+	f: h5py File Object
+		The smalldata file to be analyzed
+	i_mon: str
+		The name of the intensity monitor we'll use
+	low: float
+		The number of sigmas below mean to include
+	hi: float
+		The number of sigmas above mean to include
+
+	Returns
+	-------
+	i_low: float
+		lower bound for intensity data
+	i_hi: float
+		upper bound for intensity data
+	i_dat: np.ndarray
+		The intensity data
+	"""
+	# Set intensity monitor get data and set nan to 0.0
+	if GDET_KEY not in f.keys():
+		raise KeyError('Could not find intensity monitor key')
+
+	logger.debug('Getting intensity data for {i_mon}')
+	i_dat = np.array(f[GDET_KEY][i_mon])
+	i_dat = np.nan_to_num(i_dat, copy=False)
+
+	# Get upper and lower bounds
+	mean = i_dat.mean()
+	diff = i_dat - mean
+	std = (np.dot(diff, diff) / i_dat.size) ** 0.5
+	i_low = round(mean - low * std, 2)
+	i_hi = round(mean + hi * std, 2)
+	logger.debug(f'Lower:Upper bounds for intensity monitor: {i_low}:{i_hi}')
+
+	return i_dat, i_low, i_hi
+
 
 class JTCal:
 	def __init__(self, exp, run):
@@ -90,9 +132,13 @@ class JTCal:
 		self._i_mon = None
 		self._i_low = None
 		self._i_hi = None
+		self._azav_use = None
 		self._ave_azav = None
 		self._peak = None
 		self._intensity = None
+		self._rad_start = None
+		self._rad_end = None
+		self._idat_ave = None
 		if not os.path.isfile(self.sd_file):
 			raise OSError('hdf5 file does not exist')
 		self.f = h5py.File(self.sd_file, 'r')
@@ -267,36 +313,49 @@ class JTCal:
 	def results(self):
 		"""Get results from calibration calculations"""
 		res_dict = {
-			'q_peak': self.peak,
-            'intensity': self.intensity
+			'bin_peak': self.peak,
+            'intensity': self.intensity,
+			'bin_peak_min': self.rad_start,
+			'bin_peak_max': self.rad_end
 		}
 		
 		return res_dict
 
-	def calc_intensity_bounds(self, i_mon, low, hi):
-		"""Calculate lower and upper bounds to be used in jet tracking
-		and generate indices of events to be used in calibration
-		"""
-		# Set intensity monitor get data and set nan to 0.0
-		self.i_mon = i_mon
-		if GDET_KEY not in self.f.keys():
-			raise KeyError('Could not find intensity monitor key')
-		
-		logger.debug('Getting intensity data for {i_mon}')
-		i_dat = np.array(self._f[GDET_KEY][self.i_mon])
-		self.i_dat = np.nan_to_num(i_dat, copy=False)
-		
-		# Get upper and lower bounds
-		mean = self.i_dat.mean()
-		diff = self.i_dat - mean
-		std = (np.dot(diff, diff) / self.i_dat.size) ** 0.5
-		self.i_low = round(mean - low * std, 2)
-		self.i_hi = round(mean + hi * std, 2)
-		logger.debug(f'Lower:Upper bounds for intensity monitor: {self.i_low}:{self.i_hi}')
+	@property
+	def rad_start(self):
+		"""Starting value for intensity integration on azav array"""
+		return self._rad_start
 
-		# Get indices of events to use
-		self.idxs_use = np.where((self.i_dat >= self.i_low) & (self.i_dat <= self.i_hi))
-		self.i_dat = self.i_dat[self.idxs_use]
+	@rad_start.setter
+	def rad_start(self, rad_start):
+		self._rad_start = rad_start
+
+	@property
+	def rad_end(self):
+		"""Ending value for intensity integration on azav array"""
+		return self._rad_end
+
+	@rad_end.setter
+	def rad_end(self, rad_end):
+		self._rad_end = rad_end
+
+	@property
+	def i_dat_mean(self):
+		return self.i_dat.mean()
+
+	@property
+	def azav_use(self):
+		"""Get the azimuthal avarage arrays of used indices"""
+		return self._azav_use
+
+	@azav_use.setter
+	def azav_use(self, azav_use):
+		self._azav_use = azav_use
+
+	def calc_i_dat_events(self, i_dat, i_low, i_hi):
+		"""Get the indices of events to use and the intensity data from those events"""
+		self.idxs_use = np.where((i_dat >= i_low) & (i_dat <= i_hi))
+		self.i_dat = i_dat[self.idxs_use]
 
 	def det_azav(self):
 		"""Get the average azimuthally q binned array from used events"""
@@ -310,8 +369,8 @@ class JTCal:
 		logger.debug(f'Getting azimuthal values for detector: {det}')
 		det_group = self.f[det]
 		azav = np.array(det_group[AZAV_KEY])
-		azav = azav[self.idxs_use]
-		self.ave_azav = (azav.sum(axis=0) / len(azav))[0]
+		self.azav_use = azav[self.idxs_use]
+		self.ave_azav = (self.azav_use.sum(axis=0) / len(self.azav_use))[0]
 		logger.debug('Found average azimuthal average array from all events')
 
 	def calc_peak_and_intensity(self):
@@ -331,9 +390,9 @@ class JTCal:
 		# Fit Gaussian and get center and integrated intensity
 		popt, _ = curve_fit(gaussian, x, self.ave_azav, p0=[max(self.ave_azav), mean, std, m, b])
 		self.peak = int(round(popt[1]))
-		start = self.peak - RADIAL_RANGE
-		end = self.peak + RADIAL_RANGE
-		self.intensity = round(self.ave_azav[start:end].sum(axis=0) / self.i_dat.mean(), 2)
+		self.rad_start = self.peak - RADIAL_RANGE
+		self.rad_end = self.peak + RADIAL_RANGE
+		self.intensity = round(self.ave_azav[self.rad_start:self.rad_end].sum(axis=0) / self.i_dat.mean(), 2)
 		logger.debug(f'Peak found at {self.peak}, with and intensity of {self.intensity}')
 
 	def write_file(self):
@@ -363,18 +422,31 @@ class JTCal:
 
 		return fig
 
+	def idat_vs_peak_fig(self):
+		"""Generate scatter plot of intensity vs peak of azav array"""
+		fig = figure(
+			title=f'Intensity vs peak value',
+			x_axis_label='Intensity Values',
+			y_axis_label='Azimuthal Average Peak'
+		)
+		intensity_data = self.i_dat
+		peak_vals = [azav[self.peak] for azav in self.azav_use[0]]
+		fig.scatter(intensity_data, peak_vals)
+
+		return fig
+
 	def azav_fig(self):
 		"""Generate the azav fig for html file"""
 		x_vals = np.arange(len(self.ave_azav))
 		fig = figure(
-			title=f'Average Azimuthal Q Binned Array: Center - {self.peak}, intensity - {round(self.intensity, 2)}',
-			x_axis_label='Q Value',
+			title=f'Average Azimuthal Binned Array: Center - {self.peak}, min/max - {self.rad_start}/{self.rad_end}, intensity - {round(self.intensity, 2)}',
+			x_axis_label='Bins',
 			y_axis_label='Intensity',
 		)
 		
 		peak_line = Span(location=self.peak, dimension='height', line_color='green', line_width=2)
-		lower_line = Span(location=self.peak-RADIAL_RANGE, dimension='height', line_color='black')
-		upper_line = Span(location=self.peak+RADIAL_RANGE, dimension='height', line_color='black')
+		lower_line = Span(location=self.rad_start, dimension='height', line_color='black')
+		upper_line = Span(location=self.rad_end, dimension='height', line_color='black')
 		ave_azav_curve = fig.scatter(x_vals, self.ave_azav)
 		fig.renderers.extend([peak_line, lower_line, upper_line])
 
@@ -389,22 +461,29 @@ class JTCal:
 		"""Generate the html file for reporting"""
 		gspec = pn.GridSpec(sizing_mode='stretch_both', max_height=1000)
 		gspec[0:3, 0:3] = self.intensity_fig()
-		gspec[4:6, 0:3] = self.azav_fig()		
+		gspec[4:6, 0:3] = self.azav_fig()
+		gspec[7:9, 0:3] = self.idat_vs_peak_fig()		
 		gspec.save('report.html')
 
 if __name__ == '__main__':
 	# This needs to be run as script
+	exp = os.environ.get('EXPERIMENT', 'cxilr6716')
+	run = os.environ.get('RUN_NUM', '139')
 	parser = ArgumentParser()
-	parser.add_argument('--exp', type=str, default=(os.environ['EXPERIMENT']))
-	parser.add_argument('--run', type=str, default=(os.environ['RUN_NUM']))
+	parser.add_argument('--exp', type=str, default=exp)
+	parser.add_argument('--run', type=str, default=run)
 	parser.add_argument('--imon', type=str, default='f_21_ENRC')
 	parser.add_argument('--sig_low', type=float, default=1.5)
 	parser.add_argument('--sig_hi', type=float, default=1.5)
 	args = parser.parse_args()
 
+	print('here is exp ', args)
+
 	j = JTCal(args.exp, args.run)
-	j.calc_intensity_bounds(args.imon, args.sig_low, args.sig_hi)
+	i_dat, low, hi = calc_intensity_bounds(j.f, args.imon, args.sig_low, args.sig_hi)
+	j.calc_i_dat_events(i_dat, low, hi)
 	j.det_azav()
 	j.calc_peak_and_intensity()
 	j.write_file()
 	j.generate_html_file()
+	j.idat_vs_peak_fig()
