@@ -113,8 +113,8 @@ def calc_intensity_bounds(f, i_mon, low, hi):
 
 	# Get upper and lower bounds
 	mean = i_dat.mean()
-	diff = i_dat - mean
-	std = (np.dot(diff, diff) / i_dat.size) ** 0.5
+	std = np.std(i_dat)
+
 	i_low = round(mean - low * std, 2)
 	i_hi = round(mean + hi * std, 2)
 	logger.debug(f'Lower:Upper bounds for intensity monitor: {i_low}:{i_hi}')
@@ -424,14 +424,18 @@ class JTCal:
 
 	def idat_vs_peak_fig(self):
 		"""Generate scatter plot of intensity vs peak of azav array"""
+		intensity_data = self.i_dat
+		# TODO: speed up with correct algorithm
+		peak_vals = [azav[0][self.peak] for azav in self.azav_use]
+		ratio = np.mean(peak_vals) / np.mean(self.i_dat)
 		fig = figure(
-			title=f'Intensity vs peak value',
+			title=f'Intensity vs peak value.  Azav/Intensity ratio - {round(ratio, 2)}',
 			x_axis_label='Intensity Values',
 			y_axis_label='Azimuthal Average Peak'
 		)
-		intensity_data = self.i_dat
-		peak_vals = [azav[self.peak] for azav in self.azav_use[0]]
 		fig.scatter(intensity_data, peak_vals)
+		ratio_line = Span(location=ratio, dimension='width', line_color='red', line_width=3)
+		fig.renderers.extend([ratio_line])
 
 		return fig
 
@@ -486,4 +490,3 @@ if __name__ == '__main__':
 	j.calc_peak_and_intensity()
 	j.write_file()
 	j.generate_html_file()
-	j.idat_vs_peak_fig()
