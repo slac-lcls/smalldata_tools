@@ -6,6 +6,21 @@ from scipy.signal import argrelextrema
 from scipy.spatial import cKDTree
 from numba import jit
 
+def fitCircle(x,y,yerr=None, guess=None):
+	"""
+	fit a single circle. Transform input to lists to that fitCircles can be used.
+	"""  
+	x = [x]
+	y = [y]
+	rGuess = (np.nanmax(x)-np.nanmin(x)+np.nanmax(y)-np.nanmin(y))/4. #largest differences/2/2
+	r = [rGuess]
+	fitRes = fitCircles(x,y,r,yerr=None, guess=None)
+	#have only one circle.
+	fitRes['R']=fitRes['R'][0]
+	fitRes['residu']=fitRes['residu'][0]
+
+	return fitRes
+
 def find_edges(image, mask, sigma, hi_thresh, low_thresh):
     """Run the canny edge detection, probably doesn't need to live here
 
@@ -268,8 +283,8 @@ def _fit_circles(x, y, r, yerr=False, guess=None):
         center, ier = optimize.leastsq(f_global, center_estimate, args=(r, x, y))
         fit_res['ier'] = ier
     xc, yc = center
-    fit_res['x_cen'] = xc
-    fit_res['y_cen'] = yc
+    fit_res['xCen'] = xc
+    fit_res['yCen'] = yc
     rs=[]
     resids=[]
     for thisr, thisx, thisy in zip(r,x,y):
@@ -326,7 +341,7 @@ def ransac_result(sparse_edges, center, r_vals, n_max, delta_r, min_points, min_
         r_inner = tree.query_ball_point(center, r - delta_r)
         in_ring = set(r_outer).symmetric_difference(set(r_inner))
         cur_ring_info['r_input'] = r
-        cur_ring_info['points_in_circle'] = list(in_ring)
+        cur_ring_info['pointsInCircle'] = list(in_ring)
 
         if len(list(in_ring)) < min_points:
             continue
@@ -347,8 +362,8 @@ def ransac_result(sparse_edges, center, r_vals, n_max, delta_r, min_points, min_
 
     for ir, cur_ring_info in enumerate(ring_info):
         all_r.append(ir)
-        all_x.append(sparse_edges.col[cur_ring_info['points_in_circle']])
-        all_y.append(sparse_edges.row[cur_ring_info['points_in_circle']])
+        all_x.append(sparse_edges.col[cur_ring_info['pointsInCircle']])
+        all_y.append(sparse_edges.row[cur_ring_info['pointsInCircle']])
 
     try:
         comb_res = _fit_circles(all_x, all_y, all_r, yerr=True)
