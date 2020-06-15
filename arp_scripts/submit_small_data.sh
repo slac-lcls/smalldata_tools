@@ -115,13 +115,19 @@ ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 #Define cores if we don't have them
 #Set to 1 if single is set
 CORES=${CORES:='1'}
-if [ "$SINGLE" = true ]; then
+if [[ "$SINGLE" = true ]]; then
 	CORES=1
 fi
 
-#Generate smalldata_producer_arp.py args
-ARGS="--run ${RUN} "
-ARGS+="--exp ${EXPERIMENT} "
+#Generate smalldata_producer_arp.py args, for now if
+#Experiment and Run not specified assume it's being handed
+#by the ARP args in the os.environment
+if [[ -v RUN ]]; then
+	ARGS="--run ${RUN} "
+fi
+if [[ -v EXPERIMENT ]]; then
+	ARGS+="--exp ${EXPERIMENT} "
+fi
 if [[ -v NEVENTS ]]; then
 	ARGS+="--nevt ${NEVENTS} "
 fi
