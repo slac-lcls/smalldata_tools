@@ -55,7 +55,7 @@ do
 			shift
 			;;
 		-d|--directory)
-			DIR="$2"
+			DIRECTORY="$2"
 			shift
 			shift
 			;;
@@ -86,12 +86,21 @@ do
 			NORECORDER=true
 			shift
 			;;
+		-o|--offline)
+			OFFLINE=true
+			shift
+			;;
 		-t|--test)
 			TEST=true
 			shift
 			;;
 		-b|--bsub)
 			LFS=true
+			shift
+			;;
+		-g|--gather_interval)
+			GATHER_INTERVAL="$2"
+			shift
 			shift
 			;;
 	esac
@@ -105,11 +114,20 @@ ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 
 #Define cores if we don't have them
 #Set to 1 if single is set
-CORES=${CORES:='12'}
+CORES=${CORES:='1'}
 if [ "$SINGLE" = true ]; then
 	CORES=1
 fi
 
-#sbatch --nodes=4 --cpus-per-task=$CORES --test-only $ABS_PATH/smalldata_producer_arp.py
+#Generate smalldata_producer_arp.py args
+ARGS="--run ${RUN} "
+ARGS+="--exp ${EXPERIMENT} "
+ARGS+="--nevt ${NEVENTS} "
+ARGS+="--dir ${DIRECTORY} "
+ARGS+="--offline ${OFFLINE} "
+ARGS+="--gather ${GATHER_INTERVAL} "
+ARGS+="--norecorder ${NORECORDER}"
 
-sbatch --nodes=2 --time=5 $ABS_PATH/smalldata_producer_arp.py "$@"
+#sbatch --cpus-per-task=$CORES --test-only $ABS_PATH/smalldata_producer_arp.py
+
+sbatch --nodes=1 --time=5 $ABS_PATH/smalldata_producer_arp.py "$ARGS"

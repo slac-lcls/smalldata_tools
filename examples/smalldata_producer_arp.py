@@ -58,11 +58,13 @@ args = parser.parse_args()
 ###### Helper Functions ##########
 
 def get_cur_exp(hutch, station):
-	"""Get the active experiment for the given hutch"""
+	"""Get the active experiment for the given hutch, returns 'None' if no active
+	experimets for given hutch
+	"""
 	endpoint = ''.join([WS_URL, ACTIVE_EXP_EXT])
 	args = {'instrument_name': hutch, 'station': station}
 	r = requests.get(endpoint, args)
-	active_exp = str(r.json().get('value', {}).get('name'))
+	active_exp = str(r.json().get('value', None))
 	
 	return active_exp
 
