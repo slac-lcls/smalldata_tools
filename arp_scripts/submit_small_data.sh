@@ -122,11 +122,21 @@ fi
 #Generate smalldata_producer_arp.py args
 ARGS="--run ${RUN} "
 ARGS+="--exp ${EXPERIMENT} "
-ARGS+="--nevt ${NEVENTS} "
-ARGS+="--dir ${DIRECTORY} "
-ARGS+="--offline ${OFFLINE} "
-ARGS+="--gather ${GATHER_INTERVAL} "
-ARGS+="--norecorder ${NORECORDER}"
+if [[ -v NEVENTS ]]; then
+	ARGS+="--nevt ${NEVENTS} "
+fi
+if [[ -v DIRECTORY ]]; then
+	ARGS+="--dir ${DIRECTORY} "
+fi
+if [[ -v OFFLINE ]]; then
+	ARGS+="--offline ${OFFLINE} "
+fi
+if [[ -v GATHER_INTERVAL ]]; then
+	ARGS+="--gather ${GATHER_INTERVAL} "
+fi
+if [[ -v NORECORDER ]]; then
+	ARGS+="--norecorder ${NORECORDER}"
+fi
 
 #sbatch --cpus-per-task=$CORES --test-only $ABS_PATH/smalldata_producer_arp.py
 
