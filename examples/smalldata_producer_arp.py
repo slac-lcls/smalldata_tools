@@ -45,8 +45,8 @@ WS_CUR_RUN = '/ws/current_run'
 
 # Define Args
 parser = argparse.ArgumentParser()
-parser.add_argument('--run', help='run', type=str, default=os.environ['RUN_NUM'])
-parser.add_argument('--exp', help='experiment name', type=str, default=os.environ['EXPERIMENT'])
+parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
+parser.add_argument('--exp', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevt', help='number of events', type=int, default=1e9)
 parser.add_argument('--dir', help='directory for output files (def <exp>/hdf5/smalldata)')
@@ -64,7 +64,7 @@ def get_cur_exp(hutch, station):
 	endpoint = ''.join([WS_URL, ACTIVE_EXP_EXT])
 	args = {'instrument_name': hutch, 'station': station}
 	r = requests.get(endpoint, args)
-	active_exp = str(r.json().get('value', ''))
+	active_exp = str(r.json().get('value', {'name':''}).get('name'))
 	
 	return active_exp
 

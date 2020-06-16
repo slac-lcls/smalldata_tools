@@ -138,7 +138,10 @@ def cxiDetectors(beamCodes=[[162],[]]):
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
     dets.append(ttDetector(baseName='CXI:TTSPEC:'))
-    dets.append(impDetector('Sc1Imp'))
+    try:
+        dets.append(impDetector('Sc1Imp'))
+    except:
+        pass
     dets.append(damageDetector())
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
