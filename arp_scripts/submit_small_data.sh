@@ -1,5 +1,9 @@
 #!/bin/bash
 
+source /reg/g/psdm/etc/psconda.sh
+ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
+
+batch --nodes=1 --time=5 $ABS_PATH/smalldata_producer_arp.py "$@"
 # Took this from Silke's script, nice implementation
 usage()
 {
@@ -33,14 +37,14 @@ $(basename "$0"):
 		-b|--bsub
 			Run the job through LFS
 EOF
-}
 
+}
 #Look for args we expect, for now ignore other args
 #Since we can have a mix of flags/args and args do in loop
 for arg in "$@" 
 do
 	case $arg in
-		-h| --help)
+		-h|--help)
 			usage
 			exit
 			;;
@@ -74,6 +78,7 @@ do
 			shift
 			;;
 		-n|--nevents)
+			echo "GOt events"
 			NEVENTS="$2"
 			shift
 			shift
@@ -106,44 +111,39 @@ do
 	esac
 done
 
-#Activate Conda Environment
-source /reg/g/psdm/etc/psconda.sh
-
-#Path to script
-ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
-
 #Define cores if we don't have them
 #Set to 1 if single is set
 CORES=${CORES:='1'}
 if [[ "$SINGLE" = true ]]; then
 	CORES=1
 fi
-
+ARGS=''
 #Generate smalldata_producer_arp.py args, for now if
 #Experiment and Run not specified assume it's being handed
 #by the ARP args in the os.environment
 if [[ -v RUN ]]; then
-	ARGS="--run ${RUN} "
+	ARGS=$ARGS' --run '$RUN
 fi
-if [[ -v EXPERIMENT ]]; then
-	ARGS+="--exp ${EXPERIMENT} "
+if [[ -v EXP ]]; then
+	ARGS=$ARGS' --exp $EXP'
 fi
 if [[ -v NEVENTS ]]; then
-	ARGS+="--nevt ${NEVENTS} "
+	ARGS=$ARGS' --nevt '$NEVENTS
 fi
 if [[ -v DIRECTORY ]]; then
-	ARGS+="--dir ${DIRECTORY} "
+	ARGS=$ARGS' --dir '$DIRECTORY
 fi
 if [[ -v OFFLINE ]]; then
-	ARGS+="--offline ${OFFLINE} "
+	ARGS=$ARGS' --offline'
 fi
 if [[ -v GATHER_INTERVAL ]]; then
-	ARGS+="--gather ${GATHER_INTERVAL} "
+	ARGS=$ARGS' --gather '$GATHER_INTERVAL
 fi
 if [[ -v NORECORDER ]]; then
-	ARGS+="--norecorder ${NORECORDER}"
+	ARGS=$ARGS' --norecorder'
 fi
-
 #sbatch --cpus-per-task=$CORES --test-only $ABS_PATH/smalldata_producer_arp.py
-
-sbatch --nodes=1 --time=5 $ABS_PATH/smalldata_producer_arp.py "$ARGS"
+#source /reg/g/psdm/etc/psconda.sh
+#ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
+#python $ABS_PATH/smalldata_producer_arp.py $ARGS
+#sbatch --nodes=1 --time=5 $ABS_PATH/smalldata_producer_arp.py "$ARGS"

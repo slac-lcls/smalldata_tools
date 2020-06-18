@@ -54,7 +54,7 @@ parser.add_argument('--offline', help='run offline (def for current exp from ffb
 parser.add_argument('--gather', help='gather interval', type=int, default=100)
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
-
+print('here are args ', args)
 ###### Helper Functions ##########
 
 def get_cur_exp(hutch, station):
