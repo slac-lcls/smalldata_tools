@@ -121,7 +121,7 @@ if [[ -v RUN ]]; then
 	ARGS+=' --run '$RUN
 fi
 if [[ -v EXP ]]; then
-	ARGS+=' --exp $EXP'
+	ARGS+=' --exp '$EXP
 fi
 if [[ -v NEVENTS ]]; then
 	ARGS+=' --nevt '$NEVENTS
