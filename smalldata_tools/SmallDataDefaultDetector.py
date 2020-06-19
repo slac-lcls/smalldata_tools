@@ -181,7 +181,7 @@ class epicsDetector(defaultDetector):
                 self.PVlist.append(pv)
             except:
                 print('could not find EPICS PV %s in data'%pv)
-            
+
     def inRun(self):
         if len(self.pvs)>0:
             return True
@@ -672,12 +672,25 @@ class gmdDetector(defaultDetector):
         dl={}
         raw = self.det.get(evt)
         if raw is not None:
-            dl['milliJoulesAverage'] = raw.milliJoulesAverage()
-            dl['rawAvgBkg'] = raw.rawAvgBkgd()
-            dl['sumAllPeaksFiltBkgd'] = raw.sumAllPeaksFiltBkgd()
-            dl['sumAllPeaksRawBkgd'] = raw.sumAllPeaksRawBkgd()
-            dl['relativeEnergyPerPulse'] = raw.relativeEnergyPerPulse()
-            dl['milliJoulesPerPulse'] = raw.milliJoulesPerPulse()
+           fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(raw, field)()
+        return dl
+
+class eorbitsDetector(defaultDetector):
+    def __init__(self, name=None):
+        if name is None:
+            self.name = 'EOrbits'
+        else:
+            self.name = name
+        defaultDetector.__init__(self, 'EOrbits', self.name)
+    def data(self, evt):
+        dl={}
+        detData = self.det.get(evt)
+        if detData is not None:
+           fields = [ field for field in dir(detData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(detData, field)()
         return dl
 
 #
@@ -685,7 +698,6 @@ class gmdDetector(defaultDetector):
 # mpiData fields are not available here.
 #
 
-#cheap out and only store the one field we look at for now.
 class ebeamDetector(defaultDetector):
     def __init__(self, name=None):
         if name is None:
@@ -697,7 +709,9 @@ class ebeamDetector(defaultDetector):
         dl={}
         ebeamData = self.det.get(evt)
         if ebeamData is not None:
-            dl['L3Energy']=ebeamData.ebeamL3Energy()
+            fields = [ field for field in dir(ebeamData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(ebeamData, field)()
         return dl
 
 class gasDetector(defaultDetector):
@@ -711,10 +725,7 @@ class gasDetector(defaultDetector):
         dl={}
         gdetData = self.det.get(evt)
         if gdetData is not None:
-            dl['f_11_ENRC']=gdetData.f_11_ENRC()
-            dl['f_12_ENRC']=gdetData.f_12_ENRC()
-            dl['f_21_ENRC']=gdetData.f_21_ENRC()
-            dl['f_22_ENRC']=gdetData.f_22_ENRC()
-            dl['f_63_ENRC']=gdetData.f_63_ENRC()
-            dl['f_64_ENRC']=gdetData.f_64_ENRC()
+           fields = [ field for field in dir(gdetData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(gdetData, field)()
         return dl
