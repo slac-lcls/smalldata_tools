@@ -49,12 +49,8 @@ do
 unset PYTHONPATH
 unset LD_LIBRARY_PATH
 	    
-#HAVE_ANA=`echo $PATH | grep  /reg/g/psdm/sw/conda/inst/miniconda2-prod-rhel7/envs/ana-1 | wc -l`
-#if [ $HAVE_ANA -eq 0 ]; then
-#    source /reg/g/psdm/etc/psconda.sh
-#    source activate ana-1.3.20
-#fi
 source /reg/g/psdm/etc/psconda.sh
+#source /reg/g/psdm/sw/conda1/manange/psconda.sh -py3
 ##if special release is needed
 #conda activate ana-1.3.62
 

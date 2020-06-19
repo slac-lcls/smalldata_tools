@@ -23,13 +23,13 @@ import tables
 from matplotlib import gridspec
 from pylab import ginput
 from matplotlib import pyplot as plt
-from utilities import dictToHdf5, shapeFromKey_h5
-from utilities import hist2d
-from utilities import running_median_insort
-from utilities import get_startOffIdx, get_offVar
-from utilities import getBins as util_getBins
-from utilities import printR
-from utilities_plotting import plotImageBokeh, plotMarker, plotImage
+from smalldata_tools.utilities import dictToHdf5, shapeFromKey_h5
+from smalldata_tools.utilities import hist2d
+from smalldata_tools.utilities import running_median_insort
+from smalldata_tools.utilities import get_startOffIdx, get_offVar
+from smalldata_tools.utilities import getBins as util_getBins
+from smalldata_tools.utilities import printR
+from smalldata_tools.utilities_plotting import plotImageBokeh, plotMarker, plotImage
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import WheelZoomTool, BoxZoomTool, Div
@@ -41,8 +41,10 @@ except:
 from bokeh.layouts import column
 import sys
 from epicsarchive import EpicsArchive
-
-from pscache import client #works from ana-1.2.9 on
+try:
+    basestring
+except NameError:
+    basestring = str
 
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
@@ -2202,7 +2204,7 @@ class SmallDataAna(object):
 
     def FitCircle(self, detname=None, mask=None, method=None, thres=None):
         try:
-            from utilities_FitCenter import fitCircle
+            from smalldata_tools.utilities_FitCenter import fitCircle
         except:
             print('could not import underlying code, this does not work yet')
             return

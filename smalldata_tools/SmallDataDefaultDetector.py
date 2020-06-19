@@ -2,6 +2,11 @@
 import psana
 import abc
 import numpy as np
+try:
+    basestring
+except NameError:
+    basestring = str
+
 #import more specific psana functions here
 import xtcav.ShotToShotCharacterization as Xtcav  
 
@@ -710,8 +715,8 @@ class ebeamDetector(defaultDetector):
         ebeamData = self.det.get(evt)
         if ebeamData is not None:
             fields = [ field for field in dir(ebeamData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
-           for field in fields:
-               dl[field]=getattr(ebeamData, field)()
+            for field in fields:
+                dl[field]=getattr(ebeamData, field)()
         return dl
 
 class gasDetector(defaultDetector):

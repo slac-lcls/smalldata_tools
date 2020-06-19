@@ -4,14 +4,19 @@ from os import makedirs
 import tables
 import numpy as np
 from scipy import sparse
-from utilities import rebinShape
-from utilities_plotting import plotMarker, plotImage
-from utilities_plotting import plot2d_from3d, plot3d_img_time
-from utilities_plotting import hv_3dimage
-from utilities import E2lam
-from utilities import dictToHdf5
-from utilities import image_from_dxy
-import azimuthalBinning as ab
+try:
+    basestring
+except NameError:
+    basestring = str
+
+from smalldata_tools.utilities import rebinShape
+from smalldata_tools.utilities_plotting import plotMarker, plotImage
+from smalldata_tools.utilities_plotting import plot2d_from3d, plot3d_img_time
+from smalldata_tools.utilities_plotting import hv_3dimage
+from smalldata_tools.utilities import E2lam
+from smalldata_tools.utilities import dictToHdf5
+from smalldata_tools.utilities import image_from_dxy
+import smalldata_tools.azimuthalBinning as ab
 import xarray as xr
 from bokeh.io import show
 import holoviews as hv
@@ -19,11 +24,11 @@ import holoviews as hv
 #example cube for xpptut - 2 runs or Tims data (azav,...)
 #test function to add cubes & to sum runs & extend plot (azav as fct of run) 
 
-from utilities_plotting import cmaps
+from smalldata_tools.utilities_plotting import cmaps
 
 class CubeAna(object):
     def __init__(self, expname='', run=0, dirname='', cubeName='', cubeDict=None, plotWith='matplotlib', debug=False):
-        if debug: print 'DEBUG INIT; ',expname, run
+        if debug: print('DEBUG INIT; ',expname, run)
         self._fields={}
         self._expname=expname
         self._initrun=run
@@ -59,19 +64,19 @@ class CubeAna(object):
                     self._cubeName = cubeName
                     break
             if self._fname == '':
-                print 'Could not find a file with that name'
+                print('Could not find a file with that name')
         if cubeName == '' or self._fname=='':
             cubeNames=[]
             for thisFile in allFiles:
                 cubeNames.append(thisFile.replace('%s/Cube'%self._dirname,'').replace('_%s_Run%03d_'%(self._expname,run),'').replace('.h5',''))
             if len(cubeNames)==0 and self._inDict is None:
-                print 'no cube files found and no cube dictionary passed in, return'
+                print('no cube files found and no cube dictionary passed in, return')
                 return None
             if len(cubeNames)==1:
                 self._fname = '%s/Cube_%s_Run%03d_%s.h5'%(self._dirname,self._expname,run, cubeNames[0])
                 self._cubeName = cubeNames[0]
             else:
-                print 'Options for Cube names are: ',cubeNames
+                print('Options for Cube names are: ',cubeNames)
                 self._cubeName = raw_input('Select one of these options: \n ')
                 self._fname = self._filenameFromRun(run)
 
@@ -80,16 +85,16 @@ class CubeAna(object):
             self._bins = thisDict['binVar_bins']
             thisXrdata = xr.DataArray(self._bins, coords={'bins': self._bins}, dms=('bins'), name='Bins')
             for dkey in thisDict.keys():
-                print 'DEBUG -- from dict: ',dkey, bins.shape, thisDict[dkey].shape[0]
+                print('DEBUG -- from dict: ',dkey, bins.shape, thisDict[dkey].shape[0])
                 if thisDict[dkey].shape[0] != bins.shape[0]:
-                    print '%s not same shape in as bin variables'%(dkay)
+                    print('%s not same shape in as bin variables'%(dkay))
                     continue
                 dataShape, coords, dims = self._getXarrayDims(dkey, thisDict[dbkey].shape)
                 thisXrdata = xr.merge([thisXrdata, xr.DataArray(thisDict[dkey], coords=coords, dims=dims,name=dkey) ])
         elif path.isfile(self._fname):
             thisXrdata = self._xrFromRun(run)
         else:
-            print 'Could not find cubeFile %s nor was passed a dictionay'%self._fname
+            print('Could not find cubeFile %s nor was passed a dictionay'%self._fname)
             thisXrdata = None
             return None
         self._cubeDict = { "Run%03d"%run: thisXrdata}
@@ -136,12 +141,12 @@ class CubeAna(object):
             coords={'bins': self._bins}
             dims = ['bins']
             detname = key.split('__')[0].replace('/','')
-            if self._debug: print 'get dims&coords: ',key, key.split('__')[0], self._detConfig.keys()
+            if self._debug: print('get dims&coords: ',key, key.split('__')[0], self._detConfig.keys())
             if (detname in self._detConfig.keys()) and ('x' in self._detConfig[detname].keys()) and ('y' in self._detConfig[detname].keys()):
                 #this only works for detectors in image shape, NOT in raw shape......
                 if len(self._detConfig[detname]['x'].shape)==2:
                     for idim,thisDimStr in enumerate( ['x','y']):
-                        print 'use X&y array for dim: ',thisDimStr, self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1]
+                        print('use X&y array for dim: ',thisDimStr, self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1])
                         thisDim = np.linspace(self._detConfig[detname][thisDimStr].min(), self._detConfig[detname][thisDimStr].max(),dataShape[idim+1])
                         dimStr='%s_%s'%(detname,thisDimStr)
                         coords[dimStr] = thisDim
@@ -184,14 +189,13 @@ class CubeAna(object):
         self._detConfig={}
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
-            if self._debug: print '_xrFromRun config: looking at key: ',key
+            if self._debug: print('_xrFromRun config: looking at key: ',key)
             #make a dictionary with detector config data is present
             if key.find('Cfg')>=0:
                 if key.find('UserDataCfg')>=0:
-                    print 'skip key ',key,' for now.'
+                    print('skip key ',key,' for now.')
                     continue
                 detname = key.split('__')[1]
-                #if self._debug: print 'DEBUG config: ',self._detConfig
                 if not (detname in self._detConfig.keys()):
                     self._detConfig[detname]={}
                 if key.split('__')[2] not in self._detConfig[detname].keys():
@@ -200,25 +204,25 @@ class CubeAna(object):
         if self._debug: 
             for key in self._detConfig.keys():
                 for kkey in self._detConfig[key].keys():
-                    print '_xrFromRun -: config for %s is %s '%(key, kkey)
+                    print('_xrFromRun -: config for %s is %s '%(key, kkey))
         #second loop for data.
         for node in cubeTable.root._f_list_nodes():
             key = node._v_pathname
-            if self._debug: print '_xrFromRun -: looking at key for data: ',key
+            if self._debug: print('_xrFromRun -: looking at key for data: ',key)
             if key == '/binVar_bins' or key.find('Cfg')>=0:
                 continue
             if isinstance(node, tables.group.Group): #skip for now, should become loop over keys of group
-                if self._debug: print '_xrFromRun - skipped node: ',node
+                if self._debug: print('_xrFromRun - skipped node: ',node)
                 continue
             tArrName = key[1:]
             dataShape = cubeTable.get_node(key).shape
             if dataShape[0]!=self._bins.shape[0]:
                 if self._debug:
-                    print '_xrFromRun - data for %s is not of the right shape: '%(key), dataShape
+                    print('_xrFromRun - data for %s is not of the right shape: '%(key), dataShape)
                 continue
-            if self._debug: print '_xrFromRun - getDims: ',key, dataShape
+            if self._debug: print('_xrFromRun - getDims: ',key, dataShape)
             dataShape,coords, dims = self._getXarrayDims(key, dataShape)
-            if self._debug: print '_xrFromRun - gotDims: ',key, dataShape, coords, dims 
+            if self._debug: print('_xrFromRun - gotDims: ',key, dataShape, coords, dims )
             thisXrdata = xr.merge([thisXrdata, xr.DataArray(cubeTable.get_node(key).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
             #print 'data has been added for ',key, dataShape
         return thisXrdata
@@ -247,7 +251,7 @@ class CubeAna(object):
             else:
                 inArray=inArray[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3]]
         else:
-            print 'this dimension is not yet implemented:',len(sig.shape)
+            print('this dimension is not yet implemented:',len(sig.shape))
         return inArray
         
     def addAzInt(self, detname=None, phiBins=1,qBin=1e-2,center=None,dis_to_sam=None, eBeam=None, azavName='azav',Pplane=1,userMask=None, tx=0, ty=0):
@@ -263,7 +267,7 @@ class CubeAna(object):
         if userMask is not None and userMask.shape == self.mask.shape:
             azavMask = ~(cmask.astype(bool)&smask.astype(bool)&userMask.astype(bool))
 
-        print 'mask %d pixel for azimuthal integration'%azavMask.sum()
+        print('mask %d pixel for azimuthal integration'%azavMask.sum())
 
         x = self._detConfig[detname]['x']
         y = self._detConfig[detname]['y']
@@ -281,7 +285,7 @@ class CubeAna(object):
     def makeImg(self, detname=None):        
         if detname is None:
             if len(self._detConfig.keys())==0:
-                print 'I could not find a detector with its calib info'
+                print('I could not find a detector with its calib info')
                 return
             elif len(self._detConfig.keys())==1:
                 detname = self._detConfig.keys()[0]
@@ -294,7 +298,7 @@ class CubeAna(object):
                 for shpX,shpD in zip(reversed(self._detConfig[detname]['x'].shape), reversed(getattr(self._cubeSumDict, k).shape)):
                     if shpX==shpD:
                         nshpMatch-=1
-                if self._debug: print 'makeImg: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch
+                if self._debug: print('makeImg: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch)
                 #this should test the slices of the detector: the last part of the tuple shall be == x-shape!
                 #similar to rebin code.
                 if nshpMatch>0:
@@ -309,17 +313,17 @@ class CubeAna(object):
                 coords['ix']=np.arange(imgs[-1].shape[0])
                 coords['iy']=np.arange(imgs[-1].shape[1])
                 dims=tuple(dims)
-                if self._debug: print 'makeImg: dshapes. ',dims
+                if self._debug: print('makeImg: dshapes. ',dims)
                 dsetName = (detname+'_image')
                 if k.replace(detname,'').replace('_','')!='':
                     dsetName = dsetName.replace('image','%s_image'%k.replace(detname,'').replace('_',''))
                 newDataArray = xr.DataArray(imgs,coords=coords, dims=dims,name=dsetName)
                 self._cubeSumDict = xr.merge([self._cubeSumDict, newDataArray])
-        if self._debug: print 'makeImg: made images for detector ',detname
+        if self._debug: print('makeImg: made images for detector ',detname)
 
     def applyAzav(self, azavName='azav'):        
         if azavName not in self.__dict__.keys():
-            print 'azimuthal average %s is not defined: '%azavName
+            print('azimuthal average %s is not defined: '%azavName)
             return
 
         detname = self.__dict__[azavName+'_detname']
@@ -331,7 +335,7 @@ class CubeAna(object):
                 for shpX,shpD in zip(reversed(self._detConfig[detname]['x'].shape), reversed(getattr(self._cubeSumDict, k).shape)):
                     if shpX==shpD:
                         nshpMatch-=1
-                if self._debug: print 'applyAzAv: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch
+                if self._debug: print('applyAzAv: ',k, getattr(self._cubeSumDict, k).shape, self._detConfig[detname]['x'].shape, nshpMatch)
                 #this should test the slices of the detector: the last part of the tuple shall be == x-shape!
                 #similar to rebin code.
                 if nshpMatch==0:
@@ -339,7 +343,7 @@ class CubeAna(object):
                     binShp = data.shape[:-len(self._detConfig[detname]['x'].shape)]
                     totBins = 1
                     for dim in binShp: totBins*=dim
-                    if self._debug: print 'applyAzAv: k ',k,binShp, totBins
+                    if self._debug: print('applyAzAv: k ',k,binShp, totBins)
                     if len(binShp)>1:
                         flatShp=[totBins]
                         for dim in self._detConfig[detname]['x'].shape:
@@ -349,22 +353,22 @@ class CubeAna(object):
                     azData=[]
                     for image in data:
                         azData.append(self.__dict__[azavName].doCake(image))
-                    if self._debug: print 'applyAzAv: azData ',len(azData), np.array(azData[0]).shape
+                    if self._debug: print('applyAzAv: azData ',len(azData), np.array(azData[0]).shape)
                     if len(binShp)>1:
                         newShp=list(binShp)
                         for dim in np.array(azData[0]).shape:
                             newShp.append(dim)
                         newShp=tuple(newShp)
-                        if self._debug: print 'applyAzAv: azData ',azData.shape
+                        if self._debug: print('applyAzAv: azData ',azData.shape)
                         azData = np.array(azData).reshape(newShp).squeeze()
                     else:
                         azData = np.array(azData).squeeze()
-                    if self._debug: print 'applyAzAv: azData ',azData.shape
+                    if self._debug: print('applyAzAv: azData ',azData.shape)
                     #need 
                     dsetName = (detname+'_'+azavName+'_azavData')
                     if k.replace(detname,'').replace('_','')!='':
                         dsetName = dsetName.replace('azavData','%s_azavData'%k.replace(detname,'').replace('_',''))
-                    if self._debug: print 'applyAzAv: dsetName ',dsetName
+                    if self._debug: print('applyAzAv: dsetName ',dsetName)
                     coords={'bins': self._bins}
                     dims=['bins']
                     if len(azData.shape)==3:
@@ -373,8 +377,8 @@ class CubeAna(object):
                     dims.append('qBins')
                     coords['qBins']=self.__dict__[azavName+'_q']
                     dims=tuple(dims)
-                    if self._debug: print 'applyAzAv: dshapes. ',dims
-                    if self._debug: print 'applyAzAv: dshapes. ',coords
+                    if self._debug: print('applyAzAv: dshapes. ',dims)
+                    if self._debug: print('applyAzAv: dshapes. ',coords)
                     newDataArray = xr.DataArray(azData,coords=coords, dims=dims,name=dsetName)
                     self._cubeSumDict = xr.merge([self._cubeSumDict, newDataArray])
 
@@ -409,7 +413,7 @@ class CubeAna(object):
     def addDataFromRun(self, run, offEvents=False):
         fname = self._filenameFromRun(run, offEvents)
         if not path.isfile(fname):
-            print 'Could not find file for run %d for cube %s, looked for: %s'%(run, self._cubeName, fname)
+            print('Could not find file for run %d for cube %s, looked for: %s'%(run, self._cubeName, fname))
             return            
         thisXrdata = self._xrFromRun(run)
         if not offEvents:
@@ -465,7 +469,7 @@ class CubeAna(object):
         for ik,exShp in enumerate(extendShapes):
             extendShapes[ik] =  (len(runKeys),)+exShp
             extendDims[ik] = ('runs',)+extendDims[ik]
-            #print 'ik coords ',ik,extendCoords[ik]
+            #print('ik coords ',ik,extendCoords[ik])
             #DEBUG/FIX ME: how do I add additional coordinates
             #make coords from dims &add run using dict.
             extendCoords[ik]={'runs':extendRun}
@@ -474,12 +478,12 @@ class CubeAna(object):
         #now make new dictionary
         thisXrdata = xr.DataArray(self._bins, coords={'bins': self._bins}, dims=('bins'), name='Bins')
         for ik,k in enumerate(extendKeys):
-            print 'reshaping ',extendData[ik].shape, extendShapes[ik]
+            print('reshaping ',extendData[ik].shape, extendShapes[ik])
         for ik,k in enumerate(extendKeys):
             #reject if k isdim
             if k in allDims:
                 continue;
-            print 'reshaping ',k,extendData[ik].shape, extendShapes[ik]
+            print('reshaping ',k,extendData[ik].shape, extendShapes[ik])
             thisXrdata = xr.merge([thisXrdata, xr.DataArray(extendData[ik].reshape(extendShapes[ik]), coords=extendCoords[ik], dims=extendDims[ik],name=k) ])
         self._cubeExtendDict = thisXrdata
 
@@ -505,7 +509,7 @@ class CubeAna(object):
         plotvar = 'binVar'
 
         if i0 is not None and i0 not in cubeDict.variables:
-            print 'could not find i0, return'; return
+            print('could not find i0, return'); return
 
         sigROI = None
         aimDim=0
@@ -515,7 +519,7 @@ class CubeAna(object):
             sigROI = sig[1]
             sig = sig[0]
         if sig not in cubeDict.variables:
-            print 'could not find sig, return'; return
+            print('could not find sig, return'); return
 
         if i0 is None:
             i0Var = np.ones_like(sigVar)
@@ -547,13 +551,13 @@ class CubeAna(object):
                     binVar = rebinShape(binVar,(nPoints,))
                 plotMarker(sigVar, xData=[binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self._plot_dirname, line_dash='dashed')
             else:
-                print 'plot2Data NOT SURE WHAT THIS WAS SUPPOSED TO ACTUALLY DO'
+                print('plot2Data NOT SURE WHAT THIS WAS SUPPOSED TO ACTUALLY DO')
                 plotMarker([sigVar, addData], xData=[binVar, binVar], xLabel=plotvar, yLabel=sigvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self._plot_dirname, line_dash='dashed')
         elif len(sigVar.shape)==2:
             extent=[binVar[0], binVar[-1],0,sigVar.shape[0]]
             plotImage(sigVar, xLabel=plotvar, plotWith=plotWith, runLabel=runKey, plotTitle="%s vs %s for %s"%(sigvar, plotvar, runKey), plotDirname=self._plot_dirname, extent=extent, plotLog=plotLog)
         else:
-            print 'no code yet to plot 3-d data'
+            print('no code yet to plot 3-d data')
             return
 
         return None
@@ -577,14 +581,14 @@ class CubeAna(object):
 
         if sig is None:
             if len(self.Keys(img=True))>1:
-                print 'we have the following cubed images: ',
+                print('we have the following cubed images: ')
                 for k in self.Keys(img=True):
-                    print k
+                    print(k)
                 sig = raw_input('Please select one:')
             elif len(self.Keys(img=True))==1:
                 sig = self.Keys(img=True)[0]
             else:
-                print 'have no 2d image, return'
+                print('have no 2d image, return')
                 return
         
         if isinstance(sig, list):
@@ -596,7 +600,7 @@ class CubeAna(object):
         else:
             sigROI=None
         if sig not in cubeDict.variables:
-            print 'could not find sig, return'; return
+            print('could not find sig, return'); return
 
         if not plot3d:
             if sigIdx is not None:
@@ -611,7 +615,7 @@ class CubeAna(object):
             return
         
         if plotWith=='matplotlib':
-            print 'only supported with bokeh'
+            print('only supported with bokeh')
             return
             
         if useHoloviews:
@@ -624,7 +628,7 @@ class CubeAna(object):
         if plotWith==None:
             plotWith=self._plotWith
             if plotWith=='matplotlib':
-                print 'only supported with bokeh'
+                print('only supported with bokeh')
                 return
             
         runKey = None
@@ -642,14 +646,14 @@ class CubeAna(object):
 
         if sig is None:
             if len(self.Keys(img=True))>1:
-                print 'we have the following cubed images: ',
+                print('we have the following cubed images: ')
                 for k in self.Keys(img=True):
-                    print k
+                    print(k)
                 sig = raw_input('Please select one:')
             elif len(self.Keys(img=True))==1:
                 sig = self.Keys(img=True)[0]
             else:
-                print 'have no 2d image, return'
+                print('have no 2d image, return')
                 return
         
         if isinstance(sig, list):
@@ -658,7 +662,7 @@ class CubeAna(object):
         else:
             sigROI=None
         if sig not in cubeDict.variables:
-            print 'could not find sig, return'; return
+            print('could not find sig, return'); return
 
         bins = self._cubeSumDict['bins'].data
         data2plot = cubeDict[sig].data
@@ -670,7 +674,7 @@ class CubeAna(object):
                 if normIdx in cubeDict.keys():
                     normIdx = self._cubeSumDict[normIdx].data
                 else:
-                    print 'normIdx %s not in cube, options are: '%normIdx, cubeDict.keys()
+                    print('normIdx %s not in cube, options are: '%normIdx, cubeDict.keys())
                     return
             if isinstance(normIdx, list):
                 normIdx=np.array(normIdx)
@@ -700,9 +704,9 @@ class CubeAna(object):
                     bins=bins[sigIdx[0]:sigIdx[1]]
                 
             layout,im,p,p1d=plot3d_img_time(data2plot=data2plot,cmaps=cmaps,coord=bins.tolist(),init_plot=bins[bins.shape[0]/2])
-            print 'dataIdx: ',data2plot.shape,' bins: ',bins
+            print('dataIdx: ',data2plot.shape,' bins: ',bins)
             show(layout)
-            print 'done'
+            print('done')
         
         else:
             dmap = hv_3dimage(data2plot=data2plot, plotLowHighPercentile=plotLowHighPercentile,plotLog=plotLog)
@@ -712,7 +716,7 @@ class CubeAna(object):
 
 
     def getReducedCube(self, aimShape=None, aimSize=4000000, runKey = None):
-        print 'make reduced data'
+        print('make reduced data')
         if runKey is None:
             cubeDict = self._cubeSumDict
         else:
@@ -753,7 +757,7 @@ class CubeAna(object):
             if cubeDict[thisVar].size<=aimSize and locShape[0]>=cubeDict[thisVar].shape[0]:
                 newXr = xr.merge([newXr, cubeDict[thisVar]]) #nothing changes.
             else: #need reshaping.
-                if self._debug: print 'we need to reshape ',thisVar
+                if self._debug: print('we need to reshape ',thisVar)
                 if len(cubeDict[thisVar].shape)==2:
                     locShape=(locShape[0], cubeDict[thisVar].shape[1])
                 elif len(cubeDict[thisVar].shape)==3:
@@ -764,11 +768,11 @@ class CubeAna(object):
                 rebinFac=1.
                 if cubeDict[thisVar].size*locShape[0]/cubeDict[thisVar].shape[0]>aimSize:
                     if self._debug:
-                        print 'make image smaller. deal with coordinates!'
+                        print('make image smaller. deal with coordinates!')
                     imgSize = maxSize/cubeDict[thisVar].shape[0]
                     rebinFac = np.sqrt(1.*aimSize/locShape[0]/imgSize)
                     locShape = (locShape[0], int(cubeDict[thisVar].shape[1]*rebinFac), int(cubeDict[thisVar].shape[2]*rebinFac))                
-                if self._debug: print 'rebin: ',cubeDict[thisVar].data.shape, '***',locShape
+                if self._debug: print('rebin: ',cubeDict[thisVar].data.shape, '***',locShape)
                 thisVarData = rebinShape(cubeDict[thisVar].data, locShape)
                 #
                 if len(cubeDict[thisVar].shape)>1:
@@ -798,7 +802,7 @@ class CubeAna(object):
         #now get possible images.
         if sig is not None:
             if not sig in inCube.keys():
-                print 'Variable %s is not in cube, check for all options.'%sig
+                print('Variable %s is not in cube, check for all options.'%sig)
                 sig = None
         if sig is None:
             imgList=[]
@@ -809,11 +813,11 @@ class CubeAna(object):
             if len(imgList)==1:
                 sig = imgList[0]
             else:
-                print 'we have the following cubed images: ',
-                for k in imgList: print k
+                print('we have the following cubed images: ')
+                for k in imgList: print(k)
                 sig = raw_input('Please select one:')
             if not sig in inCube.variables:
-                print 'Well, this did not work. Likely we had no images or you made a typo. We give up for now'
+                print('Well, this did not work. Likely we had no images or you made a typo. We give up for now')
                 return
         
         #get i0

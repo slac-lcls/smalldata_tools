@@ -20,7 +20,12 @@ from matplotlib import gridspec
 import psana
 import logging
 import requests
-import SmallDataAna as sda
+try:
+    basestring
+except NameError:
+    basestring = str
+
+import smalldata_tools.SmallDataAna as sda
 
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.SmallDataUtils import getUserData
@@ -336,15 +341,15 @@ class SmallDataAna_psana(object):
 
     def getImages(self, detname='None', numEvts=-1, useFilter=None, nSkip=0, common_mode=0):
         if not isinstance(detname, basestring):
-            print 'please give parameter name unless specifying arguments in right order. detname is first'
+            print('please give parameter name unless specifying arguments in right order. detname is first')
             return
         #look for detector
         if detname=='None':
             detname = self._getDetName()
             if isinstance(detname, list):
-                print 'detectors in event: \n',
+                print('detectors in event: \n')
                 for alias in detname:
-                    print alias
+                    print(alias)
                 detname = raw_input("Select detector to get detector info for?:\n")
 
         if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
@@ -358,10 +363,10 @@ class SmallDataAna_psana(object):
         if detname.find('opal')>=0:
             common_mode = -1
             if pedestals[0,0]==-1:
-                print 'time tool opal, image was not saved. Should ideally exclude from detector list'
+                print('time tool opal, image was not saved. Should ideally exclude from detector list')
                 return
         else:
-            print 'done setting up the geometry'
+            print('done setting up the geometry')
 
         #now get the non-image data
         imgAr = []
@@ -371,17 +376,17 @@ class SmallDataAna_psana(object):
             useFilter = None
         if useFilter is not None:
             evttsSel = self.sda.getSelIdx(useFilter)
-            print 'using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter)
+            print('using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter))
             if numEvts==-1:
                 numEvts = len(evttsSel)-nSkip
                 if numEvts<0:
-                    print 'have no events, quit'
+                    print('have no events, quit')
                     return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
                 times.append(psana.EventTime(evtts[1],evtts[0]))
         else:
             times = run.times()[nSkip:]
-        print 'requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events'
+        print('requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events')
         if (min(len(times),numEvts) < numEvts*0.5):
             if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
                 return
@@ -395,10 +400,10 @@ class SmallDataAna_psana(object):
             try:
                 evt=run.event(tm)
             except:
-                print 'Could not get this event, skip '
+                print('Could not get this event, skip ')
                 continue
             if evt is None:
-                print 'Returned event is None, skip'
+                print('Returned event is None, skip')
                 continue
             aliases = [ k.alias() for k in evt.keys() ]
             if not detname in aliases:
@@ -1809,7 +1814,7 @@ class SmallDataAna_psana(object):
         if not detname in self.__dict__.keys():
             detname = self.addDetInfo(detname=detname)
             if detname == 'None':
-                print 'need detector name as input! '
+                print('need detector name as input! ')
                 return
         det=self.__dict__[detname].det
         rms = self.__dict__[detname+'_rms']
@@ -1864,11 +1869,11 @@ class SmallDataAna_psana(object):
                 allPedsImg.append(allPeds[-1].tolist())
                 allRmsImg.append(allRms[-1].tolist())
             if len(printVal)<2:
-                print 'getting pedestal from run ',pedRun
+                print('getting pedestal from run ',pedRun)
             elif len(printVal)>=4:
-                print 'run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum())
+                print('run %d, pixel cold/hot, low noise, high noise: %d / %d / %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum(),(allRms[-1]<printVal[2]).sum(), (allRms[-1]>printVal[3]).sum()))
             elif len(printVal)>=2:
-                print 'run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum())                        
+                print('run %d, pixel cold/hot: %d / %d pixels'%(pedRun,(allPeds[-1]<printVal[0]).sum(), (allPeds[-1]>printVal[1]).sum()))
 
         allPeds = np.array(allPeds)
         allRms = np.array(allRms)
@@ -1944,7 +1949,7 @@ class SmallDataAna_psana(object):
             elif showPlot == 'rms3d':
                 return hv_3dimage(self.calibhisto['rms3d'])
             else:
-                print 'this is not a defined option'
+                print('this is not a defined option')
                 return
 
         #fallback to matplotlib

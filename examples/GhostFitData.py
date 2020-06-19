@@ -144,9 +144,9 @@ for imodule,module in enumerate(ped):
     offModuleDatasets.append(fout.create_dataset('epix10ka2m_off_%02d'%imodule,moduleShape))
     preModuleDatasets.append(fout.create_dataset('epix10ka2m_pre_%02d'%imodule,moduleShape))
 
-print 'we have %d events for ghost fitting'%offfids.shape[0]
+print('we have %d events for ghost fitting'%offfids.shape[0])
 for ievt, evtfid, evttime, preevtfid, preevttime in itertools.izip(itertools.count(), offfids, offtimes, preofffids, preofftimes):
-    print 'get events...', evttime, evtfid, '  ---  ', preevttime, preevtfid
+    print('get events...', evttime, evtfid, '  ---  ', preevttime, preevtfid)
     evtt = psana.EventTime(evttime,evtfid)
     evt = runIdx.event(evtt)
     preevtt = psana.EventTime(preevttime,preevtfid)

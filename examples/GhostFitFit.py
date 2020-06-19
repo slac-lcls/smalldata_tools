@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import TheilSenRegressor
 from sklearn.linear_model import RANSACRegressor
 from sklearn.linear_model import HuberRegressor
+from future.utils import iteritems
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -59,7 +60,7 @@ else:
     outFileName='/reg/d/psdm/xcs/%s/scratch/GhostFits_%s_Run%03d.h5'%(expname,expname,run)
 #fout = h5py.File(outFileName, "w")
 fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
-print 'opened output file: ',outFileName
+print('opened output file: ',outFileName)
 
 resultsDict={'times':{}, 'score':{},'p0':{},'p1':{}}
 p0_dset = {}
@@ -103,7 +104,7 @@ if args.stat:
 nanArray=np.empty((16,nRows,nCols))
 nanArray.fill(np.nan)
 p0ModuleArray={}
-for name,estimator in estimators.iteritems():
+for name,estimator in iteritems(estimators):
     p0_dset[name] = fout.create_dataset('epix10ka2m_%s_p0'%name,data=nanArray.copy())
     p1_dset[name] = fout.create_dataset('epix10ka2m_%s_p1'%name,data=nanArray.copy())
     p0_array[name] = nanArray[0].copy()
@@ -141,7 +142,7 @@ for iModule in range(max(maxModules, size)):
             PppreData=ppreData[:,np.newaxis]
             line_x = np.array([0, np.nanmax(ppreData)])
 
-            for name,estimator in estimators.iteritems():
+            for name,estimator in iteritems(estimators):
                 try:
                     t0=time.time()
                     estimator.fit(PppreData, poffData)
@@ -165,7 +166,7 @@ for iModule in range(max(maxModules, size)):
                 except:
                     pass
 
-    for name,estimator in estimators.iteritems():
+    for name,estimator in iteritems(estimators):
         p0_dset[name][iModule] = p0_array[name]
         p1_dset[name][iModule] = p1_array[name]
         if keepStat:

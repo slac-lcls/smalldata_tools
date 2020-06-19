@@ -19,7 +19,7 @@ class getCMPeakFunc(DetObjectFunc):
     def setFromFunc(self, parentFunc=None):
         super(getCMPeakFunc, self).setFromFunc()
         if parentFunc is not None and isinstance(parentFunc, spectrumFunc):
-            print 'DEBUG: set bins for finding the peak....'
+            print('DEBUG: set bins for finding the peak....')
             self.bins = parentFunc.bins
 
     def process(self, data):
@@ -184,7 +184,7 @@ class templateFitFunc(DetObjectFunc):
                             ret_dict[param]=[int(getattr(resObj, param))]
                         elif param=='fun':
                             if isinstance(getattr(resObj, param), list):
-                                print 'getattr. fun ',getattr(resObj, param)
+                                #print 'getattr. fun ',getattr(resObj, param)
                                 fun=np.array(getattr(resObj, param))
                             else:
                                 fun=getattr(resObj, param)

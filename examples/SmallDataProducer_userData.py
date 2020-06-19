@@ -123,7 +123,7 @@ if not args.exp:
             if path.find(thisHutch)>=0:
                 hutch=thisHutch.upper()
     if hutch is None:
-        print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        print9'cannot figure out which experiment to use, please specify -e <expname> on commandline')
         import sys
         sys.exit()
     if hutch == 'cxi':
@@ -169,7 +169,7 @@ time_ev_sum = 0.
 try:
     ds = psana.MPIDataSource(dsname)
 except:
-    print 'failed to make MPIDataSource for ',dsname
+    print('failed to make MPIDataSource for ',dsname)
     import sys
     sys.exit()
 
@@ -181,7 +181,7 @@ try:
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
 
 except:
-    print 'failed making the output file ',smldataFile
+    print('failed making the output file ',smldataFile)
     import sys
     sys.exit()
 
@@ -190,7 +190,7 @@ if ds.rank==0:
     for dirn in psana.__file__.split('/'):
         if dirn.find('ana-')>=0:
             version=dirn
-    print 'Using psana version ',version
+    print('Using psana version ',version)
 
 
 ########################################################## 
@@ -351,5 +351,5 @@ for det in dets:
 if len(sumDict['Sums'].keys())>0:
     smldata.save(sumDict)
 
-print 'rank %d on %s is finished'%(ds.rank, hostname)
+print('rank %d on %s is finished'%(ds.rank, hostname))
 smldata.save()
