@@ -73,7 +73,7 @@ if not args.exp:
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
         expname = resp.json().get("value", {}).get("name")
     except:
-        print 'could not determine experiment name, will quit'
+        print('could not determine experiment name, will quit')
         sys.exit()
 else:
     expname=args.exp
@@ -93,4 +93,4 @@ cube.makeImg()
 cube.cubeSumToHdf5()
     
 t1 = time.time()
-print 'this took %g seconds '%(t1-t0)
+print('this took %g seconds '%(t1-t0))

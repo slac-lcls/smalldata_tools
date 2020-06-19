@@ -224,7 +224,7 @@ def create_img_slider_scale(im, imOrg,valStart=0,coords=None,p = None):
     if coords is not None and isinstance(coords, np.ndarray):
         coords = coords.tolist()
     if coords is not None and not isinstance(coords, list):
-        print 'if coords is given it needs to be a list.'
+        print('if coords is given it needs to be a list.')
         coords = None
     if coords is None:
         coords=np.arange(imOrg.shape[0]).tolist()
@@ -290,14 +290,14 @@ def plotImageBokeh(data, **kwargs):
     dateTime = kwargs.pop("dateTime",None)
     output_quad = kwargs.pop("output_quad",False)
     if len(kwargs)>0:
-        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+        print('found unexpected parameters to plotMarker, will ignore', kwargs)
 
     if plotLog: data = np.log(data)
     try:
         data[np.isinf(data)]=np.nan 
         data[np.isneginf(data)]=np.nan 
     except:
-        print 'could not set inf data to nan. '
+        print('could not set inf data to nan. ')
     if plotMin=="auto":
         plotMin = np.nanmin(data)
     if plotMax=="auto":
@@ -423,7 +423,7 @@ def plot2d_from3d(data2plot, **kwargs):
     title_align = kwargs.pop("title_align","center")
     x_axis_type = kwargs.pop("x_axis_type","linear")
     if len(kwargs)>0:
-        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+        print('found unexpected parameters to plotMarker, will ignore', kwargs)
 
     if type(cmaps)==type(None):
         cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
@@ -460,10 +460,10 @@ def plot2d_from3d(data2plot, **kwargs):
 
     #deal with getting (initial) 2-d image to plot
     if len(data2plot.shape)<2:
-        print 'data to plot has less than 2 dims'
+        print('data to plot has less than 2 dims')
         return 
     elif len(data2plot.shape)>3:
-        print 'data to plot has more than 3 dims'
+        print('data to plot has more than 3 dims')
         return
     elif len(data2plot.shape)==2:
         init_plot=-1
@@ -481,7 +481,7 @@ def plot2d_from3d(data2plot, **kwargs):
                     initIdx = np.argmin(abs(np.array(coord)-init_plot))
             if not isinstance(initIdx, int):
                 if not isinstance(init_plot, int):
-                    print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
+                    print('init_plot needs to be integer, using z-axis to be implemented later, will start at first image')
                     initIdx = 0
                 else:
                     initIdx = init_plot
@@ -642,12 +642,12 @@ def plotMarker(data, **kwargs):
     if color is not None and len(color) != len(data):
         color = None
     if color is None and len(data)>1:
-        print 'ndataset ',len(data)
+        print('ndataset ',len(data))
         sorted_colors = getColors(nColors=len(data))
     ylim = kwargs.pop("ylim", None)
     width_height = kwargs.pop("width_height", None)
     if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
-        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+        print('found unexpected parameters to plotMarker, will ignore', kwargs)
 
     if plotWith.find('matplotlib')>=0:
         if 'fig' in kwargs.keys():
@@ -737,7 +737,7 @@ def plotMarker(data, **kwargs):
             elif plotMarker=='D':
                 p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             else:
-                print 'unsupported marker option'
+                print('unsupported marker option')
             if line_dash is not None:
                 p.line(ixdata, idata, line_dash=line_dash, line_color=thiscolor, name='p%d'%ic)
         if plotWith=='bokeh_notebook':
@@ -751,7 +751,7 @@ def plotMarker(data, **kwargs):
             return p
                 
     elif plotWith != 'no_plot':
-        print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
+        print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith)
             
     return
 
@@ -788,7 +788,7 @@ def plotImage(image, **kwargs):
     if not isinstance(image, np.ndarray):
         image = np.array(image)
     if len(image.shape)!=2:
-        print 'plotImage need to be given a 2-d array, got this shape',image.shape,' instead, will quit'
+        print('plotImage need to be given a 2-d array, got this shape',image.shape,' instead, will quit')
         return
 
     xLabel = kwargs.pop("xLabel", "")
@@ -811,7 +811,7 @@ def plotImage(image, **kwargs):
     plotLog = kwargs.pop("plotLog", False)
     rangeInput = kwargs.pop("rangeInput", True)
     if len(kwargs)>1 or (len(kwargs)==1 and kwargs.keys()[0]!='fig'):
-        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+        print('found unexpected parameters to plotMarker, will ignore', kwargs)
 
     if plotWith.find('matplotlib')>=0:
         fig = None
@@ -852,7 +852,7 @@ def plotImage(image, **kwargs):
             bp.save(layout)
 
     elif plotWith != 'no_plot':
-        print 'plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith
+        print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith)
             
     return
 
@@ -915,7 +915,7 @@ def plot3d_img_time(data2plot, **kwargs):
     title_align = kwargs.pop("title_align","center")
     x_axis_type = kwargs.pop("x_axis_type","linear")
     if len(kwargs)>0:
-        print 'found unexpected parameters to plotMarker, will ignore', kwargs
+        print('found unexpected parameters to plotMarker, will ignore', kwargs)
 
     if type(cmaps)==type(None):
         cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
@@ -943,10 +943,10 @@ def plot3d_img_time(data2plot, **kwargs):
 
     #deal with getting (initial) 2-d image to plot
     if len(data2plot.shape)<2:
-        print 'data to plot has less than 2 dims'
+        print('data to plot has less than 2 dims')
         return 
     elif len(data2plot.shape)>3:
-        print 'data to plot has more than 3 dims'
+        print('data to plot has more than 3 dims')
         return
     elif len(data2plot.shape)==2:
         init_plot=-1
@@ -954,11 +954,11 @@ def plot3d_img_time(data2plot, **kwargs):
     else:
         if init_plot is not None:
             if not isinstance(init_plot, int):
-                print 'init_plot needs to be integer, using z-axis to be implemented later, will start at first image'
+                print('init_plot needs to be integer, using z-axis to be implemented later, will start at first image')
                 init_plot = 0
         else:
             init_plot = 0
-        print 'DEBUG: start w/ plot ',init_plot
+        print('DEBUG: start w/ plot ',init_plot)
         init_dat = data2plot[init_plot]
         
     if coord is None or (len(data2plot.shape)==3 and data2plot.shape[0]!=len(coord)):
@@ -1114,10 +1114,10 @@ def hv_image(data2plot, **kwargs):
         try:
             data2plot = np.array(data2plot)
         except:
-            print 'input data was no array and could not be cast to one either'
+            print('input data was no array and could not be cast to one either')
             return
     if len(data2plot.shape)>2:
-        print 'this function only spports 2-d data'
+        print('this function only spports 2-d data')
         return
 
     if plotLog:
@@ -1158,10 +1158,10 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
         try:
             data2plot = np.array(data2plot)
         except:
-            print 'input data was no array and could not be cast to one either'
+            print('input data was no array and could not be cast to one either')
             return
     if len(data2plot.shape)>2:
-        print 'this function only spports 2-d data'
+        print('this function only spports 2-d data')
         return
 
     if plotLog:
@@ -1196,10 +1196,10 @@ def hv_image_ctl(data2plot, **kwargs):
         try:
             data2plot = np.array(data2plot)
         except:
-            print 'input data was no array and could not be cast to one either'
+            print('input data was no array and could not be cast to one either')
             return
     if len(data2plot.shape)>2:
-        print 'this function only spports 2-d data'
+        print('this function only spports 2-d data')
         return
 
     if plotLog:
@@ -1242,10 +1242,10 @@ def hv_imageFromIndex(index, cmap, imgLow, imgHigh, data2plot, **kwargs):
         try:
             data2plot = np.array(data2plot)
         except:
-            print 'input data was no array and could not be cast to one either'
+            print('input data was no array and could not be cast to one either')
             return
     if len(data2plot.shape)!=3:
-        print 'this function only spports 3-d data, data has shape: ', data2plot.shape
+        print('this function only spports 3-d data, data has shape: ', data2plot.shape)
         return
 
     data2plot_2d = data2plot[index]
@@ -1277,10 +1277,10 @@ def hv_3dimage(data2plot, **kwargs):
         try:
             data2plot = np.array(data2plot)
         except:
-            print 'input data was no array and could not be cast to one either'
+            print('input data was no array and could not be cast to one either')
             return
     if len(data2plot.shape)!=3:
-        print 'this function only spports 3-d data, data has shape: ', data2plot.shape
+        print('this function only spports 3-d data, data has shape: ', data2plot.shape)
         return
     
     dimIdx = hv.Dimension('index', range=(0,data2plot.shape[0]-1))

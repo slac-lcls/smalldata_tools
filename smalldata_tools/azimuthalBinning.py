@@ -4,8 +4,8 @@ from scipy import hypot,arcsin,arccos
 import time
 import h5py
 from scipy.interpolate import griddata
-import utilities as util
-from DetObject import DetObjectFunc
+import smalldata_tools.utilities as util
+from smalldata_tools.DetObject import DetObjectFunc
 from mpi4py import MPI
 from smalldata_tools.roi_rebin import ROIFunc
 comm = MPI.COMM_WORLD
@@ -85,7 +85,7 @@ class azimuthalBinning(DetObjectFunc):
         if func is None:
             self._setup()
             return
-        print 'set params from func ', func.__dict__.keys()
+        print('set params from func ', func.__dict__.keys())
         if func._x is not None: self.x = func._x.flatten()/1e3
         if func._y is not None: self.y = func._y.flatten()/1e3
         if func._mask is not None and isinstance(func, ROIFunc): 

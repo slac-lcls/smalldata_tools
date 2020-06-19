@@ -85,7 +85,7 @@ if not args.exp:
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
         expname = resp.json().get("value", {}).get("name")
     except:
-        print 'could not determine experiment name, will quit'
+        print('could not determine experiment name, will quit')
         sys.exit()
 else:
     expname=args.exp
@@ -110,14 +110,14 @@ try:
     #from smalldata_tools import SmallDataAna_psana
     anaps = SmallDataAna_psana(expname,run,dirname,fname)
 except:
-    print 'failed to import & create SmallDataAna_psana object'
+    print('failed to import & create SmallDataAna_psana object')
     pass
 
 if anaps is not None and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
-    print 'use ana module from anaps'
+    print('use ana module from anaps')
     ana = anaps.sda
 else:
-    print 'we will now try to open the littleData file directly'
+    print('we will now try to open the littleData file directly')
     ana = SmallDataAna(expname,run, dirname, fname)
     if 'fh5' not in ana.__dict__.keys():
         ana = None
@@ -235,4 +235,4 @@ if ana is not None:
 
     
 t1 = time.time()
-print 'this took %g seconds '%(t1-t0)
+print('this took %g seconds '%(t1-t0))

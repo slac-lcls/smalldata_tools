@@ -107,7 +107,7 @@ else:
                 while not files_there:
                     presentXtc=glob.glob('%s'%xtcname)
                     if len(presentXtc)==0:
-                        print 'no files yet, wait'
+                        print('no files yet, wait')
                         sleep(30)
                         nWait=nWait+1
                     else:
@@ -146,7 +146,7 @@ try:
     directory = os.path.dirname(dirname)
     #I think this is not actually working. Can't do it from script. Need to create first.
     if ds.rank==0 and not os.path.isdir(dirname):
-        print 'made directory for output files: %s'%dirname
+        print('made directory for output files: %s'%dirname)
         os.mkdir(directory)
 
     smldataFile = '%s/%s_Run%03d.h5'%(dirname,expname,int(run))
@@ -154,7 +154,7 @@ try:
     smldata = ds.small_data(smldataFile,gather_interval=gatherInterval)
 
 except:
-    print 'failed making the output file ',smldataFile
+    print('failed making the output file ',smldataFile)
     import sys
     sys.exit()
 
@@ -163,7 +163,7 @@ if ds.rank==0:
     for dirn in psana.__file__.split('/'):
         if dirn.find('ana-')>=0:
             version=dirn
-    print 'Using psana version ',version
+    print('Using psana version ',version)
 
 defaultDets = defaultDetectors(hutch)
 epicsPV=[] #automatically read PVs from questionnaire/epicsArch file 
@@ -192,8 +192,8 @@ for eventNr,evt in enumerate(ds.events()):
     #add default data
     defData = detData(defaultDets, evt)
     #for key in defData.keys():
-    #    print eventNr, key, defData[key]
+    #    print(eventNr, key, defData[key])
     smldata.event(defData)
 
-print 'rank %d on %s is finished'%(ds.rank, hostname)
+print('rank %d on %s is finished'%(ds.rank, hostname))
 smldata.save()

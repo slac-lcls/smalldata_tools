@@ -39,7 +39,7 @@ if not args.exp:
             if path.find(thisHutch)>=0:
                 hutch=thisHutch.upper()
     if hutch is None:
-        print 'cannot figure out which experiment to use, please specify -e <expname> on commandline'
+        print('cannot figure out which experiment to use, please specify -e <expname> on commandline')
         import sys
         sys.exit()
 
@@ -54,7 +54,7 @@ if not args.exp:
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
         expname = resp.json().get("value", {}).get("name")
     except:
-        print 'could not determine experiment name, will quit'
+        print('could not determine experiment name, will quit')
         sys.exit()
 else:
     expname=args.exp
@@ -69,19 +69,19 @@ if args.file:
     fname = args.file
 
 sys.path.append('./smalldata_tools')
-print 'try to import smalldata'
+print('try to import smalldata')
 from SmallDataAna import SmallDataAna
-print 'imported smalldata'
+print('imported smalldata')
 from SmallDataAna_psana import SmallDataAna_psana
-print 'imported smalldata_psana'
+print('imported smalldata_psana')
 
 ana = None
 anaps = SmallDataAna_psana(expname,run,dirname,fname)
 if anaps and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
-    print 'create ana module from anaps'
+    print('create ana module from anaps')
     ana = anaps.sda
 else:
-    print 'we will now try to open the littleData file directly'
+    print('we will now try to open the littleData file directly')
     ana = SmallDataAna(expname,run, dirname, fname)
     if 'fh5' not in ana.__dict__.keys():
         ana = None
@@ -135,10 +135,10 @@ if ana is not None:
         binSteps = scanSteps
         cubeName = scanName
         if scanName == 'lxt':    
-            print 'bin data using ',scanName,' and bins: ',scanSteps
+            print('bin data using ',scanName,' and bins: ',scanSteps)
             binName='delay'
         else:
-            print 'bin data using ',scanName,' and bins: ',scanSteps
+            print('bin data using ',scanName,' and bins: ',scanSteps)
             binName='scan/%s'%scanName
     else:
         cubeName='randomTest'
@@ -164,7 +164,7 @@ if ana is not None:
     nSel = ana.getFilter(filterName).sum()
     nSel2 = ana.getFilter('filter2').sum()
     if args.nev:
-        print 'make cube with fewer events/bin'
+        print('make cube with fewer events/bin')
         if nSel>0:
             anaps.makeCubeData(cubeName,  nEvtsPerBin=int(args.nev))
         if nSel2>0:

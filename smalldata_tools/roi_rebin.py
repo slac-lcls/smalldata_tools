@@ -7,7 +7,6 @@ import time
 from smalldata_tools.utilities import rebin, getBins
 from smalldata_tools.DetObject import DetObjectFunc
 from smalldata_tools.droplet import dropletFunc
-#from droplet import dropletFunc
 
 #
 # for now, this works in "raw" coordinates.
@@ -160,7 +159,7 @@ class ROIFunc(DetObjectFunc):
                     try:
                         ret_dict['%s_%s'%(k,kk)] = np.array(subfuncResults[k][kk])
                     except:
-                        print 'issue with: ',subfuncResults[k][kk], '%s_%s'%(k,kk), len(subfuncResults[k][kk])
+                        print('issue with: ',subfuncResults[k][kk], '%s_%s'%(k,kk), len(subfuncResults[k][kk]))
 
                 else:
                     ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]

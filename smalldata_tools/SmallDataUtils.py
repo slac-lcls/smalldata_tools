@@ -1,7 +1,7 @@
 # importing generic python modules
 import numpy as np
 #import psana
-from SmallDataDefaultDetector import *
+from smalldata_tools.SmallDataDefaultDetector import *
 
 def defaultDetectors(hutch):
     if hutch.lower()=='amo':

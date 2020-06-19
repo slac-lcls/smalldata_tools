@@ -62,9 +62,9 @@ def getUxiDict(run):
         fnamePre='uxi_x311_%04d.dat'%(int(run)-2)
     fnamePost='uxi_x311_%04d.dat'%(int(run)+1)
 
-    print 'look for uxi: ',uxiPath+fname
+    print('look for uxi: ',uxiPath+fname)
     minUxi=None; maxUxi=None
-    print 'xtc begin: ',xtcBeginTime, xtcEndTime
+    print('xtc begin: ',xtcBeginTime, xtcEndTime)
 
     uxiDict={}
     try:
@@ -74,14 +74,13 @@ def getUxiDict(run):
 
     #print 'DEBUG times: ',xtcBeginTime,minUxi
     if minUxi is None:
-        print 'here:',fnamePre
         configDict, tmp, tmp2 = fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
     if xtcBeginTime<minUxi and os.path.isfile(uxiPath+fnamePre):
-        print 'checking the run before....'
+        print('checking the run before....')
         tmp1, tmp2, tmp3 = fillUxiDict(uxiPath+fnamePre, xtcBeginTime, xtcEndTime, uxiDict)
 
     if xtcEndTime>maxUxi and os.path.isfile(uxiPath+fnamePost):
-        print 'checking the run after....'
+        print('checking the run after....')
         tmp1, tmp2, tmp3 = fillUxiDict(uxiPath+fnamePost, xtcBeginTime, xtcEndTime, uxiDict)
     
     if uxiDict=={}:
@@ -107,10 +106,10 @@ def fillUxiDict(fname, xtcBeginTime, xtcEndTime, uxiDict, debug=False):
     t_preUxiRead=time.time()
     dataDictTS['uxi'] = get_uxi_timestamps(fname)    
     
-    print 'UXI file ',fname, dataDictTS['uxi']['lcls_ts_secs']
+    print('UXI file ',fname, dataDictTS['uxi']['lcls_ts_secs'])
     minUxi = int(min(dataDictTS['uxi']['lcls_ts_secs']))
     maxUxi = int(max(dataDictTS['uxi']['lcls_ts_secs']))
-    if debug: print 'min/max time: ',minUxi, maxUxi
+    if debug: print('min/max time: ',minUxi, maxUxi)
     
     configDict=None
     #if uxi event time stamps lie in uxi range, get all uxi data
@@ -129,7 +128,7 @@ def fillUxiDict(fname, xtcBeginTime, xtcEndTime, uxiDict, debug=False):
             else:
                 uxiDict[key] = np.append(uxiDict[key], np.array(uxiDictAllValue)[inXtc], axis=0)
                 #uxiDict[key] = np.append(uxiDict[key], np.array((uxiDictAll[key]))[inXtc], axis=0)
-        if debug: print 'check lengths: ',len(uxiDictAll['lcls_ts_secs']),' inXtc: ',inXtc.sum(),' out dict ',len(uxiDict['lcls_ts_secs'])
+        if debug: print('check lengths: ',len(uxiDictAll['lcls_ts_secs']),' inXtc: ',inXtc.sum(),' out dict ',len(uxiDict['lcls_ts_secs']))
     return configDict, minUxi, maxUxi
 
 def read_uxi(fname, returnConfig=False):
@@ -157,7 +156,7 @@ def read_uxi(fname, returnConfig=False):
                     Metadata = namedtuple('Metadata', header_match.group("meta"))
                 elif config_match:
                     configDict = eval(config_match.group("conf"))
-                    print configDict
+                    print(configDict)
                 continue
             frameA = np.reshape(np.load(infile), uxi_shape)
             frameB = np.reshape(np.load(infile), uxi_shape)
@@ -211,7 +210,7 @@ def uxi_pedestal(fname):
                     Metadata = namedtuple('Metadata', header_match.group("meta"))
                 elif config_match:
                     configDict = eval(config_match.group("conf"))
-                    print configDict
+                    print(configDict)
                 continue
             frameA = np.load(infile)
             frameB = np.load(infile)
@@ -234,7 +233,7 @@ def uxi_pedestal(fname):
             #print(frameB)
 
     runStr = fname.split('_')[-1].replace('.dat','')
-    print 'fname ',fname, runStr
+    print('fname ',fname, runStr)
     run = int(runStr)
     fnameOut='/reg/d/psdm/xcs/xcsx31116/calib/uxi/Run%04d_pedestals.h5'%run
 
@@ -303,7 +302,7 @@ def getDarks(run, useMed=True):
 
 def getUnbonded(frame, useMed=True):
     if frame.shape != uxi_shape:
-        print 'frame does not have right shape, expected ',uxi_shape,', and got ',frame.shape
+        print('frame does not have right shape, expected ',uxi_shape,', and got ',frame.shape)
         return
     unbData = frame[:,255:257]
     if useMed:

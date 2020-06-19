@@ -3,7 +3,10 @@ import os
 import time
 import datetime
 import urllib
-import urllib2
+try:
+    from urllib.request import urlopen
+except:
+    from urllib2 import urlopen
 import matplotlib.pyplot as plt
 import simplejson as json
 
@@ -205,7 +208,7 @@ days_map.update({ x: 1./24/60/60/1000 for x in ("milliseconds", "msec", "ms")   
 
 def url_query(url):
     """Makes the URL request."""
-    req = urllib2.urlopen(url)
+    req = urlopen(url)
     data = json.load(req)
     return data
 

@@ -1,13 +1,17 @@
 import os
 import copy
 import numpy as np
-from utilities import cm_epix
-from utilities import cm_uxi
-from read_uxi import getDarks
+from smalldata_tools.utilities import cm_epix
+from smalldata_tools.utilities import cm_uxi
+from smalldata_tools.read_uxi import getDarks
 import tables
+from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
-
+try:
+    basestring
+except NameError:
+    basestring = str
 from read_uxi import read_uxi, get_uxi_timestamps, getDarks
 #for common mode.
 #from read_uxi import getUnbonded, getZeroPeakFit 
@@ -45,14 +49,14 @@ class DetObjectFunc(object):
         for key in kwargs:
             self.__dict__[key] = kwargs[key]
     def setFromDet(self, det):
-        for k, sfunc in self.__dict__.iteritems(): 
+        for k, sfunc in iteritems(self.__dict__): 
             if isinstance(sfunc, DetObjectFunc):
-                print 'DEBUG: call set from det for %s with detector %s: '%(self._name, det._name)
+                print('DEBUG: call set from det for %s with detector %s: '%(self._name, det._name))
                 sfunc.setFromDet(det) #pass parameters from det (rms, geometry, .....)
     def setFromFunc(self, parentFunc=None):
-        for k, sfunc in self.__dict__.iteritems(): 
+        for k, sfunc in iteritems(self.__dict__): 
             if isinstance(sfunc, DetObjectFunc):
-                print 'DEBUG: call set from func for %s from %s: '%(sfunc._name, self._name)
+                print('DEBUG: call set from func for %s from %s: '%(sfunc._name, self._name))
                 sfunc.setFromFunc(self) #pass parameters from function (rms, boundaries, .....)
 
     def params_as_dict(self):
@@ -70,7 +74,7 @@ class DetObjectFunc(object):
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (isinstance(getattr(self,key), (basestring, int, float, np.ndarray)) and key[0]!='_')}
         parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (isinstance(getattr(self,key), list) and key[0]!='_')})
         remKeys = [key for key in self.__dict__ if (key not in parList)]
-        for key, value in parList.iteritems():
+        for key, value in iteritems(parList):
           funcPars['%s_%s'%(self._name, key)] = value
         if self._debug: print('DEBUG: keys which are not parameters:',self._name, remKeys)
         #print 'return for ',self._name, funcPars.keys()
@@ -102,7 +106,7 @@ class DetObjectFunc(object):
 
 
 def DetObject(srcName, env, run, **kwargs):
-    print 'Getting the detector for: ',srcName
+    print('Getting the detector for: ',srcName)
     det = None
     try:
         det = psana.Detector(srcName)
@@ -157,7 +161,7 @@ class DetObjectClass(object):
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         for sf in subFuncs:
             sfPars = sf.params_as_dict()
-            parList.update({'%s__%s'%(sf._name,key): value for key,value in sfPars.iteritems() if (key[0]!='_' and isinstance(value, (basestring, int, float, np.ndarray, tuple)))})
+            parList.update({'%s__%s'%(sf._name,key): value for key,value in iteritems(sfPars) if (key[0]!='_' and isinstance(value, (basestring, int, float, np.ndarray, tuple)))})
 
         #remKeys = [key for key in self.__dict__ if (key not in parList)]
         #print('DEBUG: keys which are not parameters:',remKeys)
@@ -852,7 +856,7 @@ class Epix10k2MObject(TiledCameraObject):
                 epixCalRows = None
                 
             if len(self.ped.shape)==3:
-                print 'own pedestal...'
+                print('own pedestal...')
                 dat_dat =  (raw_dat&0x3fff)-self.ped
             else:
                 ped = np.zeros_like(self.ped[0])
@@ -882,7 +886,6 @@ class Epix10k2MObject(TiledCameraObject):
             self.evt.dat[:,:,:] = evt_dat[:,:,:]
             
         if self.common_mode>100: #correct for the ghost image after official calibration
-            print 'DEBUG cm 180: ',np.nanmean(self.evt.dat)
             #current event info
             thisFid = evt.get(psana.EventId).fiducials()
             thisSec = evt.get(psana.EventId).time()[0]
@@ -1004,7 +1007,7 @@ class UxiObject(DetObjectClass):
         self._uxiDict =  kwargs.get('uxiDict', None)
         uxiConfigDict =  kwargs.get('uxiConfigDict', None)
         self.common_mode =  kwargs.get('common_mode', 0)
-        for k, value in uxiConfigDict.iteritems():
+        for k, value in iteritems(uxiConfigDict):
           setattr(self, k, value)
         #now get the pedestals from run unless we stuff this into the configDict before.
         iDark, darkA, darkB =  getDarks(int(run))
@@ -1047,7 +1050,7 @@ class UxiObject(DetObjectClass):
         uxiEvent=False; uxiIdx=-1
         if (len(np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0]))>0):
             if (len(np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0]))>1):
-                print 'more than one UXI match???'
+                print('more than one UXI match???')
             secIdx=np.argwhere(self._uxiDict['lcls_ts_secs']==evttime[0])[0][0]
             if len(np.argwhere(self._uxiDict['lcls_ts_necs']==evttime[1]))>0 and len(np.argwhere(self._uxiDict['lcls_ts_fids']==evtfid))>0:
                 #evtNr_withUxi=eventNr
@@ -1108,7 +1111,7 @@ class UxiObject(DetObjectClass):
             return
 
         corrImg, cmDict = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
-        for k, value in cmDict.iteritems():
+        for k, value in iteritems(cmDict):
           self.evt.__dict__['env_%s'%k] = value
         self.evt.dat = corrImg
 

@@ -7,7 +7,7 @@ from scipy.optimize import curve_fit
 # ---> SHOULD BE IN PYPSALGO
 def gauss(x, mean, sigma, height=1.0, pedestal=0.0) :
     if sigma==0:
-        print 'sigma is 0: ',sigma,' ',mean
+        print('sigma is 0: ',sigma,' ',mean)
         return 1e32
     return  (height * np.exp(-0.5 * ((x-mean)/sigma)**2)) + pedestal
 
@@ -122,7 +122,7 @@ def GaussFit(data,xaxis=None, debug=False) :
 
     params_estimate = gauss_params_estimate(data)
     if (params_estimate[1]==0):
-        print 'params_estimate failed, will return nans.', params_estimate[0],' ', params_estimate[1]
+        print('params_estimate failed, will return nans.', params_estimate[0],' ', params_estimate[1])
         fit_results = {'mean':np.nan,
                        'sigma':np.nan,
                        'height':np.nan,
@@ -139,19 +139,19 @@ def GaussFit(data,xaxis=None, debug=False) :
 
     try:
         fit_params, fit_cov = curve_fit(gauss,xaxis,data,params_estimate)
-        #print 'ESTIMATE ', params_estimate
-        #print 'fit_params ', fit_params
-        #print 'fit_cov ', fit_cov
+        #print('ESTIMATE ', params_estimate)
+        #print('fit_params ', fit_params)
+        #print('fit_cov ', fit_cov)
         try:
             dCov = np.diag(fit_cov)
             fit_params_error = np.sqrt(dCov)
         except:
             if debug:
-                print 'np diag failed'
+                print('np diag failed')
             fit_params_error = [-1.,-1.,-1., -1.]
     except:
         if debug:
-            print 'curve fit failed failed'
+            print('curve fit failed failed')
         fit_params = [-1.,-1.,-1., -1.]
         fit_params_error = [-1.,-1.,-1., -1.]        
 
@@ -178,14 +178,14 @@ def fitPeaks(peakDat, peakWindow, means, sigmas,heights, showPlot=False):
 
     while highEdge<peakDat.size and lowEdge<highEdge-peakWindow[0]*0.25:
         if debug:
-            print 'lowEdge ',lowEdge,' high ',highEdge
+            print('lowEdge ',lowEdge,' high ',highEdge)
         fitAr = GaussFit(peakDat[lowEdge:highEdge])
         if showPlot:
             plt.plot(peakDat[lowEdge:highEdge])
         if fitAr is not None:
            if fitAr['sigma']<0:
                if (debug):
-                   print 'Fit sigma is zero!', fitAr
+                   print('Fit sigma is zero!', fitAr)
                lowEdge+=peakWindow[0]*0.5
                highEdge=min(peakDat.size,lowEdge+peakWindow[0])
            #before appending, check if peakis at or beyond range, if so, add 1/2 window and redo
@@ -203,7 +203,7 @@ def fitPeaks(peakDat, peakWindow, means, sigmas,heights, showPlot=False):
                if showPlot:
                    plt.plot([fitAr['mean'],fitAr['mean']],[fitAr['pedestal']*0.9,(fitAr['height']+fitAr['pedestal'])*1.05],'r')
                if debug:
-                   print 'mean: ',fitAr['mean'],' ',fitAr['height']
+                   print('mean: ',fitAr['mean'],' ',fitAr['height'])
                #check: if peak found, make sure that low edge of next fit is at least peak+2 sigma
                if (fitAr['mean']+2*fitAr['sigma']) < (peakWindow[0]-peakWindow[1]):
                    lowEdge+=peakWindow[0]-peakWindow[1]
@@ -212,7 +212,7 @@ def fitPeaks(peakDat, peakWindow, means, sigmas,heights, showPlot=False):
                    highEdge=min(peakDat.size,lowEdge+peakWindow[0])
         else: #just advance the edges by half a window
             if (debug):
-                print 'Issues in GaussFit: returns None.'
+                print('Issues in GaussFit: returns None.')
             lowEdge+=peakWindow[0]*0.5
         highEdge=min(peakDat.size,lowEdge+peakWindow[0])
         if showPlot:
@@ -234,24 +234,24 @@ if __name__ == "__main__" :
     params_estimate = gauss_params_estimate(data)
     crude_fit = gauss(xaxis,*params_estimate)
         
-    print "Initial:",params
-    print "Estimate:",params_estimate
+    print("Initial:",params)
+    print("Estimate:",params_estimate)
 
-    print "Fitting"
+    print("Fitting")
     fit_params, fit_cov = curve_fit(gauss,xaxis,data,params_estimate)
     fit_params_error = np.sqrt(np.diag(fit_cov))
 
-    print "Final Fit(errors):",zip(fit_params,fit_params_error)
-    print "Covariance Matrix:",fit_cov
+    print("Final Fit(errors):",zip(fit_params,fit_params_error))
+    print("Covariance Matrix:",fit_cov)
     gauss_fit = gauss(xaxis, *fit_params)    
 
-    print "Parameter \t Fit \t Error \t Diff \t Status"
+    print("Parameter \t Fit \t Error \t Diff \t Status")
     for p,fit,fit_error in zip(params,fit_params,fit_params_error) :
         diff = abs(p-fit)
         fitStatus = "GOOD" if diff < fit_error else "BAD"
-        print p,"\t",fit,"\t",fit_error,"\t",diff,"\t",fitStatus
+        print(p,"\t",fit,"\t",fit_error,"\t",diff,"\t",fitStatus)
         
-    print "Plotting"    
+    print("Plotting")
     plt.figure(1)
     plt.clf()
     plt.plot(data,'.', realgauss,'p',crude_fit,'.',gauss_fit,'-')

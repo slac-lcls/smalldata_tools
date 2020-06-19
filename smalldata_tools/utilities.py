@@ -1,6 +1,4 @@
 import os
-import json
-import copy
 import numpy as np
 import time
 import h5py
@@ -9,11 +7,9 @@ from scipy import optimize
 from scipy import ndimage
 from scipy import signal
 from scipy import sparse
-from scipt.stats import gaussian_kde
+from scipy.stats import gaussian_kde
 from matplotlib import pyplot as plt
 import resource
-from itertools import izip, count
-import psana
 
 from collections import deque
 from itertools import islice

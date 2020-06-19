@@ -54,7 +54,7 @@ if not args.exp:
                 foundHutch=True
                 break
         if not foundHutch:
-            print 'I cannot figure out which hutch we are in, so cannot determine the current experiment'
+            print('I cannot figure out which hutch we are in, so cannot determine the current experiment')
             sys.exit()
 
     try:
@@ -68,7 +68,7 @@ if not args.exp:
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
         expname = resp.json().get("value", {}).get("name")
     except:
-        print 'could not determine experiment name, will quit'
+        print('could not determine experiment name, will quit')
         sys.exit()
 else:
     expname=args.exp
@@ -92,7 +92,7 @@ try:
     #from smalldata_tools import SmallDataAna_psana
     anaps = SmallDataAna_psana(expname,run,dirname,fname)
 except:
-    print 'failed to import & create SmallDataAna_psana object'
+    print('failed to import & create SmallDataAna_psana object')
     pass
 
 if anaps is not None:
