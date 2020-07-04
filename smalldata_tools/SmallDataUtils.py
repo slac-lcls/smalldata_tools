@@ -90,7 +90,7 @@ def xcsDetectors(beamCodes=[[162],[89]]):
     dets.append(ipmDetector('XCS-IPM-mono','diodeMono'))
     dets.append(ipmDetector('XCS-IPM-gon','diodeGon'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
-    dets.append(bmmonDetector('XCS-SND-DIO','snd_dio'))
+    dets.append(bmmonDetector('XCS-SND-DIO','snd_dio',savePos=False))
     dets.append(bmmonDetector('XCS-SB1-BMMON','ipm4'))
     dets.append(bmmonDetector('XCS-SB2-BMMON','ipm5'))
     dets.append(bmmonDetector('HFX-DG2-BMMON','ipm2'))
