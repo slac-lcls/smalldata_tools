@@ -9,6 +9,10 @@ except NameError:
 
 #import more specific psana functions here
 import xtcav.ShotToShotCharacterization as Xtcav  
+try:
+    basestring
+except NameError:
+    basestring = str
 
 #
 # classes for default detector types
@@ -48,7 +52,7 @@ class defaultDetector(object):
 class lightStatus(defaultDetector):
     def __init__(self, codes=[[162],[]]):
         evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
-        print('in lightStatus', evrNames)
+        #print('in lightStatus', evrNames)
         if len(evrNames)<1:
             return
         nCodesMax = -1
@@ -86,7 +90,7 @@ class ipmDetector(defaultDetector):
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
         self.savePos = savePos
     def data(self, evt):
         dl={}
@@ -99,12 +103,12 @@ class ipmDetector(defaultDetector):
         return dl
 
 class bmmonDetector(defaultDetector):
-    def __init__(self, detname, name=None, savePos=False):
+    def __init__(self, detname, name=None, savePos=True):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
         self.savePos = savePos
     def data(self, evt):
         dl={}
@@ -195,7 +199,13 @@ class epicsDetector(defaultDetector):
     def data(self,evt):
         dl={}
         for pvname,pv in zip(self.PVlist,self.pvs):
-            dl[pvname]=pv()
+            try:
+                dl[pvname]=pv()
+                if isinstance(dl[pvname], basestring):
+                    dl[pvname]=np.nan
+            except:
+                #print('we have issues with %s in this event'%pvname)
+                pass
         return dl
 
 class encoderDetector(defaultDetector):
@@ -204,7 +214,7 @@ class encoderDetector(defaultDetector):
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
     def data(self, evt):
         dl={}
         if self.det.descriptions() is None:
@@ -240,7 +250,7 @@ class aiDetector(defaultDetector):
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
         self.aioInfo = [[ i for i in range(0,16)], [ 'ch%02d'%i for i in range(0,16)], [ 1. for i in range(0,16)], [ 0. for i in range(0,16)]]
 
     def setPars(self, AIOPars):
@@ -273,7 +283,7 @@ class adcDetector(defaultDetector):
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
 
     def data(self, evt):
         dl={}
@@ -287,7 +297,7 @@ class feeBldDetector(defaultDetector):
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, name)
+        defaultDetector.__init__(self, detname, self.name)
 
     def data(self, evt):
         dl={}
@@ -709,7 +719,7 @@ class ebeamDetector(defaultDetector):
             self.name = 'ebeam'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'EBeam', name)
+        defaultDetector.__init__(self, 'EBeam', self.name)
     def data(self, evt):
         dl={}
         ebeamData = self.det.get(evt)
@@ -725,7 +735,7 @@ class gasDetector(defaultDetector):
             self.name = 'gas_detector'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'FEEGasDetEnergy', name)
+        defaultDetector.__init__(self, 'FEEGasDetEnergy', self.name)
     def data(self, evt):
         dl={}
         gdetData = self.det.get(evt)
