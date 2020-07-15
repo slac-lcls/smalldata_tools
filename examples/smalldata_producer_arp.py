@@ -17,7 +17,11 @@ from glob import glob
 # If it is current, check in ffb for xtc data, if not there, default to psdm
 
 # TODO: Fix this
-sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
+fpath=os.path.dirname(os.path.abspath(__file__))
+fpathup = '/'.join(fpath.split('/')[:-1])
+sys.path.append(fpathup)
+print(fpathup)
+sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
@@ -110,7 +114,7 @@ hostname = socket.gethostname()
 exp = args.exp
 run = args.run
 station = args.stn
-logger.debug('Analayzing data for EXP:{0} - RUN:{1}'.format(args.exp, args.run))
+logger.debug('Analyzing data for EXP:{0} - RUN:{1}'.format(args.exp, args.run))
 
 hutch = exp[:3].upper()
 if hutch not in HUTCHES:
@@ -161,8 +165,11 @@ for evt_num, evt in enumerate(ds.events()):
 
 	det_data = detData(default_dets, evt)
 	small_data.event(det_data)
+        if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
+requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
