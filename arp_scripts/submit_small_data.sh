@@ -146,14 +146,12 @@ if [[ -v NORECORDER ]]; then
 fi
 
 source /reg/g/psdm/etc/psconda.sh
-#this worked,
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
-#nor sure if it switches here, does not seem to.
 if [[ -v LOCALLY ]]; then
     ABS_PATH=/reg/neh/home4/snelson/feeComm_smd/smalldata_tools/examples
 fi
 if [[ -v FULL ]]; then
-    sbatch --cpus-per-task=$CORES --time=5 $ABS_PATH/smalldata_producer_full_arp.py $ARGS
+    sbatch --cpus-per-task=$CORES $ABS_PATH/smalldata_producer_full_arp.py $ARGS
 else
-    sbatch --cpus-per-task=$CORES --time=5 $ABS_PATH/smalldata_producer_arp.py $ARGS
+    sbatch --cpus-per-task=$CORES $ABS_PATH/smalldata_producer_arp.py $ARGS
 fi
