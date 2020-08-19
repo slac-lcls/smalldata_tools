@@ -723,19 +723,19 @@ def plotMarker(data, **kwargs):
             else:
                 plotMarker = marker
             if plotMarker=='o':
-                p.circle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.circle(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='*':
-                p.asterisk(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.asterisk(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='+':
-                p.cross(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.cross(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='x':
-                p.x(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.x(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='s':
-                p.square(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.square(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='^':
-                p.triangle(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.triangle(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             elif plotMarker=='D':
-                p.diamond(ixdata, idata, legend=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
+                p.diamond(ixdata, idata, legend_label=iRunLabel, size=markersize, color=thiscolor, name='p%d'%ic)
             else:
                 print('unsupported marker option')
             if line_dash is not None:

@@ -29,7 +29,9 @@ from smalldata_tools.utilities import running_median_insort
 from smalldata_tools.utilities import get_startOffIdx, get_offVar
 from smalldata_tools.utilities import getBins as util_getBins
 from smalldata_tools.utilities import printR
-from smalldata_tools.utilities_plotting import plotImageBokeh, plotMarker, plotImage
+from smalldata_tools.epicsarchive import EpicsArchive
+from smalldata_tools.utilities_plotting import plotImageBokeh, plotMarker
+from smalldata_tools.utilities_plotting import plotImage
 import bokeh
 import bokeh.plotting as bp
 from bokeh.models import WheelZoomTool, BoxZoomTool, Div
@@ -40,7 +42,6 @@ except:
     pass
 from bokeh.layouts import column
 import sys
-from epicsarchive import EpicsArchive
 try:
     basestring
 except NameError:
@@ -740,13 +741,13 @@ class SmallDataAna(object):
         if useFilter is None:
             print('you need to pass the name for the filter/selection you want to use')
             return
-        if not self.Sels.has_key(useFilter):
+        if not useFilter in self.Sels:
             self.Sels[useFilter] = Selection()
         if varmin!=varmax:
             self.Sels[useFilter].addCut(varName, varmin, varmax)
         else:
             if isinstance(varName, basestring):
-                if self.Sels.has_key(varName):
+                if varName in self.Sels:
                     self.Sels[useFilter].add(self.Sels[varName])
                 else:
                     print('Cannot add cuts for filter %s as its not defined yet'%varName)
@@ -765,7 +766,7 @@ class SmallDataAna(object):
            varName: name of variable on which to not cut anymore
            useFilter: name of selection/filter
         """
-        if not self.Sels.has_key(useFilter):
+        if not useFilter in self.Sels:
             print('Selection with name %s does not exist, cannot remove cut'%useFilter)
             return
         self.Sels[useFilter].removeCut(varName)
@@ -1206,7 +1207,7 @@ class SmallDataAna(object):
         filters=[]
         filters.append((vals[0] >= pmin0 ) & (vals[0] <= pmax0))
         filters.append((vals[1] >= pmin1 ) & (vals[1] <= pmax1))
-        if useFilter is not None and self.Sels.has_key(useFilter):
+        if useFilter is not None and useFilter in self.Sels:
             filters.append(self.getFilter(useFilter,plotvars))
         for ft in filters:
             total_filter&=ft                
@@ -1239,7 +1240,7 @@ class SmallDataAna(object):
     def getScanName(self):
         scanNames=[]
         for key in self.Keys('scan'):
-            if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0:
+            if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0 and key.find('UserDataCfg')<0:
                 scanNames.append(key.replace('/scan/','').replace('scan/',''))
         if len(scanNames)==0: return ''
         elif len(scanNames)==1: return scanNames[0]
@@ -1502,7 +1503,7 @@ class SmallDataAna(object):
         scan = returnDict['scan']
         print('plot ',plotVarName, scanVarName, ' shape ',scan.shape,' plot diff ',plotDiff)
 
-        if interpolation!='' and returnDict.has_key('scanOffPoints'):
+        if interpolation!='' and 'scanOffPoints' in returnDict:
             finter_off = interpolate.interp1d(returnDict['scanOffPoints'], returnDict['scanOff'],kind=interpolation)
             scanoff_interp = finter_off(scanPoints[:-1])
         if plotWith=='matplotlib':
@@ -1515,7 +1516,7 @@ class SmallDataAna(object):
                 scanXvals=[scanPoints]
                 markers = ['o']
                 colors = ['red']
-                if returnDict.has_key('scanOffPoints') and plotOff:
+                if 'scanOffPoints' in returnDict and plotOff:
                     markers.append('o')
                     colors.append('black')
                     scanYvals.append(returnDict['scanOff'])
@@ -1526,7 +1527,7 @@ class SmallDataAna(object):
                         scanYvals.append(scanoff_interp)
                         scanXvals.append(scanPoints)
 
-                if plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+                if plotDiff and 'scanOffPoints' in returnDict and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
                     if fig is None:
                         fig=plt.figure(figsize=(10,10))
                     gs=gridspec.GridSpec(2,1,width_ratios=[1])
@@ -1552,7 +1553,7 @@ class SmallDataAna(object):
                 scanXvals=[scanPoints]
                 markers = ['o']
                 colors = ['red']
-                if returnDict.has_key('scanOffPoints') and plotOff:
+                if 'scanOffPoints' in returnDict and plotOff:
                     markers.append('o')
                     colors.append('black')
                     scanYvals.append(returnDict['scanOff'])
@@ -1563,7 +1564,7 @@ class SmallDataAna(object):
                         scanYvals.append(scanoff_interp)
                         scanXvals.append(scanPoints)
 
-                if plotDiff and returnDict.has_key('scanOffPoints') and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
+                if plotDiff and 'scanOffPoints' in returnDict and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
 
                     p = plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], width_height=(750,350), fig='return')
 
@@ -1783,7 +1784,7 @@ class SmallDataAna(object):
                 addBinVar = addBinVar[cubeFilter]
                 addBinIdx = np.digitize(addBinVar, cube.addBinVars[addVar])
                 if np.array(addBinIdx).min()<1:
-                    printR(rank, 'something went wrong in the setting of the cube selection for variable %s, please fix me....'%addVar)
+                    printR(rank, 'something went wrong in the setting of the cube selection for variable %s for cube %s using the Filter %s, please fix me....'%(addVar,cube.cubeName, cube.useFilter))
                     return
                 addBinIdx = (np.array(addBinIdx)-1).tolist()
                 binShp.append(cube.addBinVars[addVar].shape[0]-1)
@@ -1895,7 +1896,9 @@ class SmallDataAna(object):
         else:
             for key in cubeDataErr.variables:
                 if key.replace('std_','').replace('__','/') in cube.targetVars:
-                    cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
+                    #cubeDataErr.rename({key: 'std_%s'%key}, inplace=True)
+                    #I cannot remember what "inplace" did.
+                    cubeDataErr.rename({key: 'std_%s'%key})#, inplace=True) 
             for key in cubeDataErr.variables:
                 if key not in cubeData.variables:
                     cubeData = xr.merge([cubeData, cubeDataErr[key]])
