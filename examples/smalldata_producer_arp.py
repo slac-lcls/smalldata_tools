@@ -170,6 +170,6 @@ for evt_num, evt in enumerate(ds.events()):
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
-requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
