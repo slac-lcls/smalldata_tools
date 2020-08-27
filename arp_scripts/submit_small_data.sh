@@ -34,6 +34,8 @@ $(basename "$0"):
 			Run the slurm job as test only to get job info
 		-b|--bsub
 			Run the job through LFS
+		-E|--epicsAll
+			If specified, translate all EPIVS PVs
 EOF
 
 }
@@ -110,6 +112,10 @@ do
 			shift
 			shift
 			;;
+		-E|--epicsAll)
+			EPICSALL=True
+			shift
+			;;
 	esac
 done
 
@@ -144,14 +150,19 @@ fi
 if [[ -v NORECORDER ]]; then
 	ARGS+=' --norecorder'
 fi
+if [[ -v EPICSALL ]]; then
+	ARGS+=' --epicsAll'
+fi
 
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
+    #this should ideally be a relative path like ../smalldata_tools 
+    #that did not work for me though....
     ABS_PATH=/reg/neh/home4/snelson/feeComm_smd/smalldata_tools/examples
 fi
 if [[ -v FULL ]]; then
-    sbatch --cpus-per-task=$CORES $ABS_PATH/smalldata_producer_full_arp.py $ARGS
+    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_full_arp.py $ARGS
 else
-    sbatch --cpus-per-task=$CORES $ABS_PATH/smalldata_producer_arp.py $ARGS
+    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
 fi

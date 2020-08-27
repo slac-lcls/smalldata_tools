@@ -20,7 +20,7 @@ fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
 print(fpathup)
-sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
+sys.path.append('../results/smalldata_tools')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
@@ -126,17 +126,21 @@ if hutch not in HUTCHES:
 
 # Get current exp and run
 cur_exp = get_cur_exp(hutch, station)
-cur_run = get_cur_run(cur_exp)  # This might be unecessary
 
 xtc_files = []
 # If experiment matches, check for files in ffb
 if cur_exp == exp:
-	xtc_files = get_xtc_files(FFB_BASE, hutch, cur_run)
+	xtc_files = get_xtc_files(FFB_BASE, hutch, run)
 
 # If not a current experiment or files in ffb, look in psdm
 if not xtc_files:
 	logger.debug('Either not a current exp or files not in ffb, looking in psdm')
-	xtc_files = get_xtc_files(PSDM_BASE, hutch, cur_run)
+	xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
+
+if not xtc_files:
+	logger.debug('XTC files not available')
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>XTC files:</b>", "value": 'not available'}])
+        sys.exit()
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.dir, exp, hutch)

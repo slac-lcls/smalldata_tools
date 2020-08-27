@@ -17,17 +17,20 @@ from glob import glob
 # If it is current, check in ffb for xtc data, if not there, default to psdm
 
 # TODO: Fix this
-fpath=os.path.dirname(os.path.abspath(__file__))
-fpathup = '/'.join(fpath.split('/')[:-1])
-sys.path.append(fpathup)
-print(fpathup)
-sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
+#fpath=os.path.dirname(os.path.abspath(__file__))
+#fpathup = '/'.join(fpath.split('/')[:-1])
+#sys.path.append(fpathup)
+#print(fpathup)
+#sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
+sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
+#sys.path.append('../results/smalldata_tools')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.debug('Directory is {0}'.format(os.getcwd()))
 
 # Constants
 HUTCHES = [
@@ -56,6 +59,7 @@ parser.add_argument('--nevt', help='number of events', type=int, default=1e9)
 parser.add_argument('--dir', help='directory for output files (def <exp>/hdf5/smalldata)')
 parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather', help='gather interval', type=int, default=100)
+parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
@@ -123,17 +127,21 @@ if hutch not in HUTCHES:
 
 # Get current exp and run
 cur_exp = get_cur_exp(hutch, station)
-cur_run = get_cur_run(cur_exp)  # This might be unecessary
 
 xtc_files = []
 # If experiment matches, check for files in ffb
 if cur_exp == exp:
-	xtc_files = get_xtc_files(FFB_BASE, hutch, cur_run)
+        xtc_files = get_xtc_files(FFB_BASE, hutch, run)
 
 # If not a current experiment or files in ffb, look in psdm
 if not xtc_files:
 	logger.debug('Either not a current exp or files not in ffb, looking in psdm')
-	xtc_files = get_xtc_files(PSDM_BASE, hutch, cur_run)
+	xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
+
+if not xtc_files:
+	logger.debug('XTC files not available')
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>XTC files:</b>", "value": 'not available'}])
+        sys.exit()
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.dir, exp, hutch)
@@ -157,6 +165,19 @@ if ds.rank is 0:
 default_dets = defaultDetectors(hutch.lower())
 config_data = {det.name: det.params_as_dict() for det in default_dets}
 small_data.save({'UserDataCfg': config_data})
+
+#
+# add stuff here to save all EPICS PVs.
+#
+logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
+epicsPVall=[]
+if args.exp.find('dia')>=0:
+    epicsPVall=ds.env().epicsStore().pvNames()
+elif args.epicsAll:
+    epicsPVall=ds.env().epicsStore().aliases()
+if len(epicsPVall)>0:
+    logger.debug('adding all epicsPVs....')
+    default_dets.append(epicsDetector(PVlist=epicsPVall,name='epicsAll'))
 
 max_iter = args.nevt / ds.size
 for evt_num, evt in enumerate(ds.events()):
