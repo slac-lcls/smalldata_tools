@@ -136,7 +136,7 @@ if [[ -v EXP ]]; then
 	ARGS+=' --exp '$EXP
 fi
 if [[ -v NEVENTS ]]; then
-	ARGS+=' --nevt '$NEVENTS
+	ARGS+=' --nevents '$NEVENTS
 fi
 if [[ -v DIRECTORY ]]; then
 	ARGS+=' --dir '$DIRECTORY
@@ -153,6 +153,9 @@ fi
 if [[ -v EPICSALL ]]; then
 	ARGS+=' --epicsAll'
 fi
+if [[ -v FULL ]]; then
+	ARGS+=' --full'
+fi
 
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
@@ -161,8 +164,5 @@ if [[ -v LOCALLY ]]; then
     #that did not work for me though....
     ABS_PATH=/reg/neh/home4/snelson/feeComm_smd/smalldata_tools/examples
 fi
-if [[ -v FULL ]]; then
-    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-else
-    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
-fi
+sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
+
