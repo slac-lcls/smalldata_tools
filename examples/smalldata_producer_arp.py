@@ -21,12 +21,19 @@ from glob import glob
 #fpathup = '/'.join(fpath.split('/')[:-1])
 #sys.path.append(fpathup)
 #print(fpathup)
-#sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
-sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
+#this did not work for me, but test again...
 #sys.path.append('../results/smalldata_tools')
+sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
+
+from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
+from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
+from smalldata_tools.SmallDataDefaultDetector import encoderDetector
+from smalldata_tools.roi_rebin import ROIFunc
+from smalldata_tools.DetObject import DetObject
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -55,11 +62,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
 parser.add_argument('--exp', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
-parser.add_argument('--nevt', help='number of events', type=int, default=1e9)
+parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--dir', help='directory for output files (def <exp>/hdf5/smalldata)')
 parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather', help='gather interval', type=int, default=100)
 parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true')
+parser.add_argument('--full', help='save everything (use with care)', action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
@@ -147,7 +155,10 @@ if not xtc_files:
 h5_f_name = get_sd_file(args.dir, exp, hutch)
 
 # Define data source name and generate data source object, don't understand all conditions yet
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':stream=0-79'])
+if args.norecorder:
+        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live:stream=0-79'])
+else:
+        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live'])
 try:
 	ds = psana.MPIDataSource(ds_name)
 except Exception as e:
@@ -159,7 +170,7 @@ small_data = ds.small_data(h5_f_name, gather_interval=args.gather)
 
 # Not sure why, but here
 if ds.rank is 0:
-	logger.debug('psana conda environemnt is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
+	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 # gather default dets and add to data
 default_dets = defaultDetectors(hutch.lower())
@@ -173,21 +184,84 @@ logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
 epicsPVall=[]
 if args.exp.find('dia')>=0:
     epicsPVall=ds.env().epicsStore().pvNames()
+    default_dets.append(eorbitsDetector())
 elif args.epicsAll:
     epicsPVall=ds.env().epicsStore().aliases()
+elif args.full:
+    epicsPVall=ds.env().epicsStore().aliases()
 if len(epicsPVall)>0:
-    logger.debug('adding all epicsPVs....')
+    logger.debug('adding all epicsPVs....total of %d PVs'%(len(epicsPVall)))
     default_dets.append(epicsDetector(PVlist=epicsPVall,name='epicsAll'))
+    logger.debug('default dets: ',[det.name for det in default_dets])
 
-max_iter = args.nevt / ds.size
+dets=[]
+if args.full:
+        default_det_aliases = [det.name for det in default_dets]
+
+        aliases = []
+        for dn in psana.DetNames():
+            if dn[1]!='':
+                aliases.append(dn[1])
+            else:
+                aliases.append(dn[0])
+
+        for alias in aliases:
+            if alias in default_det_aliases: continue
+            if alias=='FEEGasDetEnergy': continue #done by mpidatasource
+            if alias=='PhaseCavity':     continue #done by mpidatasource
+            if alias.find('evr')>=0:     continue #done by mpidatasource
+            if alias=='ControlData':     continue #done by my code
+            if alias.find('BMMON')>=0:
+                default_dets.append(bmmonDetector(alias))
+                continue
+            elif alias.find('IPM')>=0 or alias.find('Ipm')>0:
+                default_dets.append(ipmDetector(alias, savePos=True))
+                continue
+            elif alias.find('DIO')>=0 or alias.find('Imb')>0:
+                default_dets.append(ipmDetector(alias, savePos=False))
+                continue
+            elif alias.find('USB')>=0:
+                default_dets.append(encoderDetector(alias))
+                continue
+            try:
+                thisDet = DetObject(alias, ds.env(), int(run), name=alias)
+                fullROI_write = ROIFunc(writeArea=True)
+                thisDet.addFunc(fullROI_write)
+                dets.append(thisDet)
+            except:
+                pass
+
+
+max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
-	if evt_num > max_iter:
+	if evt_num >= max_iter:
 		break
 
 	det_data = detData(default_dets, evt)
 	small_data.event(det_data)
+        if (evt_num==0): 
+            print('default det data: ',[k for k in det_data])
         if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+
+        #detector data using DetObject 
+        if len(dets)>0:
+            userDict = {}
+            for det in dets:
+                try:
+                    det.getData(evt)
+                    det.processFuncs()
+                    userDict[det._name]=0
+                    userDict[det._name]=getUserData(det)
+                    try:
+                        envData=getUserEnvData(det)
+                        if len(envData.keys())>0:
+                            userDict[det._name+'_env']=envData
+                    except:
+                        pass
+                except:
+                    pass
+            small_data.event(userDict)
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
