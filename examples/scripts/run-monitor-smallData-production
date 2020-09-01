@@ -4,10 +4,6 @@ source /reg/d/iocCommon/All/xpp_env.sh
 export TIME=`date +%s`
 export NAME="monitor-lsmallData.$HOSTNAME.$TIME"
 
-CURREXP=`/reg/g/xpp/scripts/get_curr_exp`
-if [[ $CURREXP =~ 'xpp' ]]; then
-    cd /reg/d/psdm/xpp/$CURREXP/results/smalldata_tools/examples/scripts
-else
-    cd /reg/d/psdm/xcs/$CURREXP/results/smalldata_tools/examples/scripts
-fi
+CURREXP=`/reg/g/pcds/engineering_tools/xpp/scripts/get_curr_exp`
+cd /reg/d/psdm/${CURREXP:0:3}/$CURREXP/results/smalldata_tools/examples/scripts
 $PROCSERV --logfile /tmp/$NAME --name monitor-smallData 40001 ./monitor-smallData-production
