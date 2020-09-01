@@ -56,8 +56,7 @@ class photonFunc(DetObjectFunc):
         ret_dict = {'nPhot': photons_nda.sum()}
         ret_dict['nPhot_mask']=photons_nda[locMask>0].sum() 
         #ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
-        self.dat = photons_nda
-        #print 'self.dat: ',self.dat.shape
+        self.dat = np.ma.masked_array(photons_nda, locMask)
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:

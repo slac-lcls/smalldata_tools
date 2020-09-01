@@ -241,6 +241,8 @@ class controlDetector(defaultDetector):
             dl['varStep']=self.stepPV()
         for icpv,cpv in enumerate(self.det().pvControls()):
             dl['var%d'%icpv]=cpv.value()
+            #this can lead to issues with utf-8 encoded python3 strings.....
+            #dl[(cpv.name()).decode('utf-8', errors='ignore').encode('ascii')]=cpv.value()
             dl[cpv.name()]=cpv.value()
         return dl
 

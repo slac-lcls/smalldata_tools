@@ -231,17 +231,22 @@ if have_epix:
     #create detector object. needs run for calibration data
     #common mode: 46 is the "original" to psana method 7(?)
     #row & column correction on data w/ photons&neighbors removed.
-    epix = DetObject(epixname ,ds.env(), int(run), common_mode=46)
+    det = DetObject(epixname ,ds.env(), int(run), common_mode=46)
 
     #two threshold droplet finding.
     #for data w/ > 1 photon energy this is the only thing that will work.
     #Tends to add photons together into single droplet if occupancy
     #is not low, might need photonizing step to get single photon positions
-    droplet = droplet(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
-    specFunc_300=spectrumFunc(name='spec_300',bins=[0,300,5.])
+    droplet = dropletFunc(threshold=10., thresholdLow=3., thresADU=0.,name='droplet')
+    #spectrum of found droplets
+    specFunc_300=spectrumFunc(name='spec_300',bins=[0,1000,2.5])
     droplet.addFunc(specFunc_300) 
-    #droplet.addDropletSave(maxDroplets=nDrop)
-    epix.addFund(droplet)
+    #save droplets as rectangular array.
+    droplet.addFunc(sparsifyFunc(nData=10000))
+    save droplets in image format - not working yet for epix10k: 
+        might need geometry or hardcode stuff.
+    droplet.addFunc(imageFunc())
+    det.addFunc(droplet)
 
     #now add photon algorithms. Only works for single energy photon data
     # ADU_per_photon: expected ADU for photon of expected energy
@@ -250,10 +255,19 @@ if have_epix:
     #retImg: 0 (def): only histogram of 0,1,2,3,...,24 photons/pixel is returned
     #        1 return Nphot, x, y arrays
     #        2 store image using photons /event
-    if (int(run)==444):
-        epix.addFunc(photon(ADU_per_photon=165, thresADU=0.9, retImg=2, nphotMax=200))
+    photon = photonFunc(ADU_per_photon=10, thresADU=0.9, name='photon')
+    #save number/photons per pixel
+    nPhotPP=spectrumFunc(name='nPhotPP',bins=[0,30,1.])
+    photon.addFunc(nPhotPP)
+    #save sparsified array
+    sparse = sparsifyFunc(nData=15000)
+    photon.addFunc(sparse)
+    #save as full area
+    fullImg = ROIFunc(writeArea=True)
+    photon.addFunc(fullImg)
+    det.addFunc(photon)
 
-    dets.append(epix)
+    dets.append(det)
 
 ROI_rowland = getROI_rowland(int(run))
 if checkDet(ds.env(), 'cs140_diff'):

@@ -2,6 +2,7 @@ import os
 import numpy as np
 from scipy import sparse
 import numpy.ma as ma
+import itertools
 
 import time
 from smalldata_tools.utilities import rebin, getBins
@@ -146,11 +147,11 @@ class ROIFunc(DetObjectFunc):
         if self.writeArea:
             ret_dict['area'] = ROIdata.data.squeeze()
         if self._calcPars:
-            ret_dict['max'] = np.max(ROIdata.astype(np.float64))
-            ret_dict['sum'] = np.sum(ROIdata.astype(np.float64))
+            ret_dict['sum'] = ROIdata.filled(fill_value=0).sum()
+            ret_dict['max'] = ROIdata.filled(fill_value=0).max()
             ret_dict['com'] = self.centerOfMass(ROIdata)
         if 'Nsat' in self.__dict__.keys():
-            ret_dict['nsat'] =  (ROIdata >= self.Nsat).astype(int).sum()
+            ret_dict['nsat'] =  (ROIdata.filled(fill_value=0) >= self.Nsat).astype(int).sum()
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
@@ -202,8 +203,8 @@ class projectionFunc(DetObjectFunc):
         self.axis =  kwargs.get('axis',-1)
         self._name = kwargs.get('name','pj_ax_%d'%abs(self.axis))
         super(projectionFunc, self).__init__(**kwargs)
-        self.thresADU =  kwargs.get('thresADU',1e-6)
-        self.thresRms =  kwargs.get('thresRms',1e-6)
+        self.thresADU =  kwargs.get('thresADU',None)
+        self.thresRms =  kwargs.get('thresRms',None)
         self.singlePhoton =  kwargs.get('singlePhoton',False)
         self.mean =  kwargs.get('mean',False)
     def process(self,data):
@@ -214,8 +215,9 @@ class projectionFunc(DetObjectFunc):
         if not isinstance(data, np.ma.masked_array):
             array = data.copy().squeeze()[np.zeros_like(data.squeeze())]
         array = data.copy().squeeze()
-        array.data[array.data<self.thresADU]=0
-        if 'rms' in self.__dict__.keys() and self.rms is not None:
+        if self.thresADU is not None:
+            array.data[array.data<self.thresADU]=0
+        if self.thresRms is not None and 'rms' in self.__dict__.keys() and self.rms is not None:
             array.data[array.data<self.thresRms*self.rms.squeeze()]=0
         if self.singlePhoton:
             array.data[array.data>0]=1
@@ -224,7 +226,10 @@ class projectionFunc(DetObjectFunc):
             if self.axis<0:
                 retDict={'data': np.mean(array)}
             else:
-                retDict={'data': np.mean(array,axis=self.axis)}
+                meanRes = np.mean(array,axis=self.axis)
+                if isinstance(data, np.ma.masked_array):
+                    meanRes = meanRes.data
+                retDict={'data': meanRes}
         else:
             if self.axis<0:
                 retDict={'data': np.sum(array)}
@@ -256,7 +261,7 @@ class spectrumFunc(DetObjectFunc):
             his=np.histogram(data['data'], self.bins)
         else:
             print('cannot make a spectrum of input data', data)
-            
+                        
         ret_dict = {'histogram': his[0]}
 
         #store for further processing
@@ -265,7 +270,6 @@ class spectrumFunc(DetObjectFunc):
         for k in subfuncResults:
             for kk in subfuncResults[k]:
                 ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
-
         return ret_dict
 
 #effectitely a projection onto a non-spatial coordinate.
@@ -286,7 +290,7 @@ class sparsifyFunc(DetObjectFunc):
     def process(self, data):
         #apply mask - set to zero, so pixels will fall out in sparify step.
         if isinstance(data, np.ma.masked_array):            
-            data = data.filled(data, fill_value=0)
+            data = data.filled(fill_value=0)
 
         #already have dict w/ data
         if  isinstance(data, dict):
@@ -359,20 +363,24 @@ class imageFunc(DetObjectFunc):
         super(imageFunc, self).setFromDet(det)
         #set imgShape if obvious (and not previously set)
         if self.imgShape is None:
-            #cspad
-            if det.x.shape==(32,185,388): self.imgShape=[1689,1689]
-            #cs140k
-            #elif det.x.shape==(2,185,388): self.imgShape=[391,371] #at least for one geometry
-            elif det.x.shape==(2,185,388): self.imgShape=[371,391]
-            #epix100a
-            elif det.x.shape==(704,768): self.imgShape=[709,773]
-            #jungfrau512k
-            elif det.x.shape==(1,512,1024): self.imgShape=[514,1030]
-            elif det.x.shape==(512,1024): self.imgShape=[514,1030]
-            #jungfrau1M
-            elif det.x.shape==(2,512,1024): self.imgShape=[1064,1030]
-            #epix10a
-            elif det.x.shape==(704,768): self.imgShape=[709,773]
+            try:
+                self.imgShape = [det.ix.max()-det.ix.min(),
+                                 det.iy.max()-det.iy.min()]
+            except:
+                #cspad
+                if det.x.shape==(32,185,388): self.imgShape=[1689,1689]
+                #cs140k
+                #elif det.x.shape==(2,185,388): self.imgShape=[391,371] #at least for one geometry
+                elif det.x.shape==(2,185,388): self.imgShape=[371,391]
+                #epix100a
+                elif det.x.shape==(704,768): self.imgShape=[709,773]
+                #jungfrau512k
+                elif det.x.shape==(1,512,1024): self.imgShape=[514,1030]
+                elif det.x.shape==(512,1024): self.imgShape=[514,1030]
+                #jungfrau1M
+                elif det.x.shape==(2,512,1024): self.imgShape=[1064,1030]
+                #epix10a
+                elif det.x.shape==(704,768): self.imgShape=[709,773]
 
         if self.mask is None:
             self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool)).flatten()
@@ -414,7 +422,7 @@ class imageFunc(DetObjectFunc):
         if self.imgShape is None:
             self.imgShape = det.imgShape
 
-        if len(self.coords)==2:
+        if self.coords is not None and len(self.coords)==2:
             self.imgShape = (int(max(np.max(self.__dict__['i%s'%self.coords[0]])+1, \
                                      self.imgShape[0])), \
                              int(max(np.max(self.__dict__['i%s'%self.coords[1]])+1, \
@@ -439,7 +447,16 @@ class imageFunc(DetObjectFunc):
             #
             #img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
             if 'tile' not in data or max(data['tile'])==0:
-                data = sparse.coo_matrix(data['data'],(data['row'],data['col'])).todense()
+                aduData = data['data']
+                rowData = data['row'].astype(int)[aduData>0]
+                colData = data['col'].astype(int)[aduData>0]
+                if self.imgShape is not None:
+                    data = sparse.coo_matrix((aduData[aduData>0],(rowData, colData)), 
+                                                 shape=(self.imgShape[1], self.imgShape[0])).todense()
+                else:
+                    data = sparse.coo_matrix(aduData[aduData>0],
+                                             (data['col'][aduData>0].astype(int),
+                                              data['row'][aduData>0].astype(int))).todense()
             else:
                 data = np.array([ sparse.coo_matrix(data['data'][data['tile']==itile],(data['row'][data['tile']==itile],data['col'][data['tile']==itile])).todense() for itile in range(1+max(data['tile'])) ])
 
@@ -455,6 +472,8 @@ class imageFunc(DetObjectFunc):
                     data = data.filled(data, fill_value=0)
                 else:
                     data = data.filled(data, fill_value=np.nan)
+            if isinstance(data, np.matrix):
+                data = np.asarray(data)
             return {'img': data}
 
         #DEBUG ME: masked pixels should be in extra pixel!
