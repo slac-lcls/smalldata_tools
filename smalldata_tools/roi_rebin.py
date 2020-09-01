@@ -2,6 +2,7 @@ import os
 import numpy as np
 from scipy import sparse
 import numpy.ma as ma
+import itertools
 
 import time
 from smalldata_tools.utilities import rebin, getBins
