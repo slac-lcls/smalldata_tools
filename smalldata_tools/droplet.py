@@ -55,7 +55,10 @@ class dropletFunc(DetObjectFunc):
         if not self.useRms:
             self._compData = np.ones_like(self._mask)
         else:
-            self._compData = self._rms
+            if (len(self._rms.shape) > len(self._mask.shape)):
+                self._compData = self._rms[0]
+            else:
+                self._compData = self._rms
         #self._grid = np.meshgrid(range(max(self._compData.shape)),range(max(self._compData.shape)))
 
     def applyThreshold(self,img, donut=False, invert=False, low=False):
@@ -129,7 +132,10 @@ class dropletFunc(DetObjectFunc):
         #get all neighbors
 
         if (self.threshold != self.thresholdLow):
-            imgDrop = self.neighborImg(img_drop[0])
+            if (len(img_drop[0].shape) == 2):
+                imgDrop = self.neighborImg(img_drop[0])
+            else:
+                imgDrop = np.array([self.neighborImg(imgd_tile) for imgd_tile in img_drop[0]])
             img = self.prepareImg(data, low=True)
             #
             if self.relabel:
@@ -151,12 +157,11 @@ class dropletFunc(DetObjectFunc):
         drop_ind_thres = np.delete(drop_ind,vThres)
 
         ret_dict['nDroplets'] = len(drop_ind_thres)
-
         if self._flagMasked is None and self._needProps is None and self._saveDrops is None:
             for sfunc in [getattr(self, k) for k in  self.__dict__ if isinstance(self.__dict__[k], DetObjectFunc)]:
                 self._saveDrops = True
-                if sfunc._flagMasked: self._flagMasked = True
-                if sfunc._needProps: self._needProps = True
+                self._flagMasked = getattr(sfunc, '_flagMasked', self._flagMasked)
+                self._needProps = getattr(sfunc, '_needProps', self._needProps)
             if self._saveDrops is None: self._saveDrops = False
             if self._flagMasked is None: self._flagMasked = False
             if self._needProps is None: self._needProps = False
@@ -191,8 +196,12 @@ class dropletFunc(DetObjectFunc):
             npix_drop = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
             dat_dict={'data': drop_adu}#adu_drop}
             #dat_dict={'data': adu_drop}
-            dat_dict['row']=pos_drop[:,0]
-            dat_dict['col']=pos_drop[:,1]
+            if drop_adu.shape[0]==0:
+                dat_dict['row']=np.array([])
+                dat_dict['col']=np.array([])
+            else:
+                dat_dict['row']=pos_drop[:,0]
+                dat_dict['col']=pos_drop[:,1]
             dat_dict['npix']=npix_drop
         else:
             #t2 = time.time()
