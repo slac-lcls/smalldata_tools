@@ -123,15 +123,16 @@ def DetObject(srcName, env, run, **kwargs):
         2: CsPadObject,
         5: PulnixObject,
         6: OpalObject,
+       13: EpixObject,
        15: AndOrObject,
+       16: AcqirisObject,
+       19: RayonixObject,
+       26: JungfrauObject,
        27: ZylaObject,
        28: ControlsCameraObject,
-       13: EpixObject,
-       32: Epix10k2MObject,
-       26: JungfrauObject,
-       19: RayonixObject,
+       29: Epix10kObject,
        30: IcarusObject,
-       16: AcqirisObject,
+       32: Epix10k2MObject,
        98: OceanOpticsObject,
        99: ImpObject,
     }
@@ -558,7 +559,7 @@ class JungfrauObject(TiledCameraObject):
         self.pixelsize=[75e-6]
         self.isGainswitching=True
         try:
-            self.imgShape = self.det.image(run, self.ped[0])
+            self.imgShape = self.det.image(run, self.ped[0]).shape
         except:
             pass
         self._gainSwitching = True
@@ -721,6 +722,150 @@ class EpixObject(TiledCameraObject):
             self.evt.__dict__['env_BiasI']  = envRow[6]*0.000001
             self.evt.__dict__['env_AnalogV']  = envRow[7]*0.001
             self.evt.__dict__['env_DigitalV']  = envRow[8]*0.001
+        except:
+            pass
+
+#
+# as a
+#
+class Epix10kObject(TiledCameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        #super().__init__(det,env,run, **kwargs)
+        super(Epix10kObject, self).__init__(det,env,run, **kwargs)
+        self._common_mode_list = [80, 0, -1, -2, 30] # official, ped sub, raw, raw_gain, calib
+        self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode not in self._common_mode_list:
+            print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
+        self.pixelsize=[100e-6]
+        self.isGainswitching=True
+
+        epixCfg = env.configStore().get(psana.Epix.Config10kaV1, det.source)               
+        self.trbit = []
+        self.pixelGain=[]
+        self.nomGain=[1.,3.,100.,100.,3.,100.] #H,M,L,(HL auto), (ML auto - 2 values)
+        #asicList=[0,3,1,2]
+        asicList=[0,1,3,2]
+        self.carrierId0 = epixCfg.carrierId0()
+        self.carrierId1 = epixCfg.carrierId1()
+        self.pixelConfig = epixCfg.asicPixelConfigArray()
+        trbits=[]
+        for ia in range(epixCfg.asics_shape()[0]):
+            trbits.append(epixCfg.asics(ia).trbit())
+        self.trbit = trbits
+
+        cfgShape=epixCfg.asicPixelConfigArray().shape
+        cfgReshape=epixCfg.asicPixelConfigArray().reshape(cfgShape[0]/2, cfgShape[1]*2,order='F')
+        pixelGain=np.ones_like(cfgReshape).astype(float)
+        for ia in asicList:
+            if epixCfg.asics(ia).trbit()==1:
+                continue
+            asicGainConfig=cfgReshape[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]
+            pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*self.nomGain[1] + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*self.nomGain[2]
+            #pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
+        self.pixelGain = pixelGain.reshape(cfgShape,order='F')
+
+        self.gainSetting = 0
+        if self.pixelGain.mean()==0:
+            if self.trbit.mean()==1:
+                self.gainSetting = 1 #gain switch HL
+            else:
+                self.gainSetting = 2 #gain switch ML
+
+        if self.rms is None or self.rms.shape!=self.ped.shape:
+            self.rms=np.ones_like(self.ped)
+        try:
+            self.imgShape=self.det.image(run, self.ped[0]).shape
+        except:
+            if len(self.ped[0].squeeze().shape)==2:
+                self.imgShape=self.ped[0].squeeze().shape
+            else:
+                self.imgShape=None
+        self._gainSwitching = True                
+
+    def getData(self, evt):
+        super(Epix10kObject, self).getData(evt)
+        mbits=0 #do not apply mask (would set pixels to zero)
+        #mbits=1 #set bad pixels to 0
+        if self.common_mode<0:
+          if self.common_mode==-2:
+            self.evt.dat = self.evt.dat
+          else:
+            self.evt.dat = self.evt.dat&0x3fff
+          #self.evt.gainbit = (self.evt.dat&0xc000>0)
+          try:
+            epixCalRows = evt.get(psana.Epix.ArrayV1, psana.Source(self.det.alias)).calibrationRows()
+            self.evt.__dict__['env_calibRows']  = epixCalRows
+          except:
+            epixCalRows = None
+        elif self.common_mode==0:
+            ##########
+            ### FIX ME epix10ka
+            #will need to read gain bit from data and use right pedestal.
+            #will hopefully get calib function for this.
+            ##########
+            if len(self.ped.shape)>3:
+                self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped[0]
+            else:
+                self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped
+        elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
+            #self.evt.dat = self.det.calib(evt, mbits=mbits)
+            evt_dat = self.det.calib(evt)
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) #can't reember why I'm doing this. I think for the data type.
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+            
+        #override gain if desired -- this looks like CsPad.
+        if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
+            self.evt.dat*=self.local_gain   #apply own gain
+
+        #store environmental row 
+        try:
+            envRows = evt.get(psana.Epix.ArrayV1,psana.Source(self.det.alias)).environmentalRows()
+            #envRows = evt.get(psana.Epix.ArrayV1,psana.Source(self.det.alias)).environmentalRows().astype(np.uint16)
+            #print 'envRow: iunt16', envRows.shape
+            temp1    = []
+            temp1H    = []
+            temp2    = []
+            temp3    = []
+            hum      = []
+            humH      = []
+            anacur   = []
+            digcur   = []
+            anav     = []
+            digv     = []
+            anatemp  = []
+            digtemp  = []
+            for moduleRow in envRows:
+                tempVal= np.array([ divmod(temp, 1<<16) for temp in moduleRow[0]]).flatten()
+                humH.append(tempVal[16]/65535.0 * 100)
+                temp1H.append(getThermistorTemp(tempVal[26]))
+                moduleRow = moduleRow.astype(np.uint16)
+                #print moduleRow.shape, moduleRow[1][26], moduleRow[1][27]
+                temp1.append(getThermistorTemp(moduleRow[1][26]))
+                temp2.append(getThermistorTemp(moduleRow[1][27]))
+                temp3.append(moduleRow[1][17]/65535.0  * 175 - 45)
+                hum.append(moduleRow[1][16]/65535.0 * 100)
+                anacur.append(moduleRow[1][31]*1024.0/4095/0.2)
+                digcur.append(moduleRow[1][28]*1024.0/4095/0.2)
+                anav.append(moduleRow[1][32]*1024.0/4095 * 100)
+                digv.append(moduleRow[1][29]*1024.0/4095 * 100)
+                anatemp.append(moduleRow[1][33]*2.048/4095*(130/(0.882-1.951)) + (0.882/0.0082+100))
+                digtemp.append(moduleRow[1][30]*2.048/4095*(130/(0.882-1.951)) + (0.882/0.0082+100))
+
+            #print 'temp1',temp1
+            #print 'temp1H',temp1H
+            #print 'hum',hum
+            #print 'humH',humH
+            self.evt.__dict__['env_temp1']  = np.array(temp1) 
+            self.evt.__dict__['env_temp2']  = np.array(temp2) 
+            self.evt.__dict__['env_temp3']  = np.array(temp3) 
+            self.evt.__dict__['env_humidity']  = np.array(hum) 
+
+            self.evt.__dict__['env_AnalogI']  = np.array(anacur) 
+            self.evt.__dict__['env_DigitalI']  = np.array(digcur) 
+            self.evt.__dict__['env_AnalogV']  = np.array(anav) 
+            self.evt.__dict__['env_DigitalV']  = np.array(digv) 
+            self.evt.__dict__['env_AnalogTemp']  =  np.array(anatemp) 
+            self.evt.__dict__['env_DigitalTemp']  =  np.array(digtemp) 
         except:
             pass
 
