@@ -64,20 +64,32 @@ class lightStatus(defaultDetector):
         if nCodesMax < 0:
             return
         defaultDetector.__init__(self, evrName, 'lightStatus')
-        self.xrayCodes = codes[0]
-        self.laserCodes = codes[1]
+        self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
+        self.laserCodes_drop = [ c for c in codes[1] if c > 0]
+        self.xrayCodes_req = [ -c for c in codes[0] if c < 0]
+        self.laserCodes_req =  [ -c for c in codes[1] if c < 0]
 
     def data(self,evt):
         xfel_status, laser_status = (1,1) # default if no EVR code matches
         dl={}
         evtCodes = self.det.eventCodes(evt)
         if evtCodes is not None:
-            for xOff in self.xrayCodes:
+            for xOff in self.xrayCodes_drop:
                 if xOff in evtCodes:
                     xfel_status = 0
-            for lOff in self.laserCodes:
+            for lOff in self.laserCodes_drop:
                 if lOff in evtCodes:
                     laser_status = 0
+            if len(self.xrayCodes_req)>0 and xfel_status==1:
+                xfel_status = 0
+                for code in evtCodes:
+                    if code in self.xrayCodes_req:
+                        xfel_status = 1
+            if len(self.laserCodes_req)>0 and laser_status==1:
+                laser_status = 0
+                for code in evtCodes:
+                    if code in self.laserCodes_req:
+                        laser_status = 1
         else:
             xfel_status, laser_status = (-1,-1) # default if no EVR code matches
         dl['xray']=xfel_status
