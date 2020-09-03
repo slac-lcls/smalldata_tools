@@ -286,6 +286,38 @@ class DetObjectClass(object):
             except:
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
 
+    def processSums(self):
+        for key in self._storeSum.keys():
+            asImg=False
+            thres=-1.e9
+            for skey in key.split('_'):
+                if skey.find('img')>=0:
+                    asImg=True
+                else:
+                    if skey.find('thresADU')>=0:
+                        thres=float(skey.replace('thresADU',''))
+            
+            dat_to_be_summed = self.evt.dat
+            if thres>1e-9:
+                dat_to_be_summed[self.evt.dat<thres]=0.
+
+            if key.find('nhits')>=0:
+                dat_to_be_summed[dat_to_be_summed>0]=1
+            
+            if key.find('square')>=0:
+                dat_to_be_summed = np.square(dat_to_be_summed)
+
+            if asImg:
+                try:
+                    dat_to_be_summed = self.det.image(self.run,dat_to_be_summed)
+                except:
+                    pass
+
+            if self._storeSum[key] is None:
+                self._storeSum[key] = dat_to_be_summed.copy()
+            else:
+                self._storeSum[key] += dat_to_be_summed
+  
 
 class WaveformObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
