@@ -1,10 +1,12 @@
 #!/bin/bash
 
-export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
+export PATH=$PATH:/reg/g/pcds/engineering_tools/latest-released/scripts
 THISEXP=`get_curr_exp`
 HUTCH=${THISEXP:0:3}
 cd /reg/d/psdm/$HUTCH/$THISEXP/results/smalldata_tools
 LASTRUN=`get_lastRun`
+PYTHON_EXE='./examples/DataqualityPlots.py'
+unset DISPLAY
 while true; do
 	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
 	CURREXP=`get_curr_exp`
@@ -12,16 +14,23 @@ while true; do
 	if [[ $EXP_RUN -ge $LASTRUN ]] && [[ $CURREXP == $THISEXP ]]; then
             #HASH5=`ls -t /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*Run*$LASTRUN*h5 | wc | awk {'print $1'}`
 	    #now require minimum time since file has been written to!
-            HASH5=`find /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*Run*$LASTRUN*h5 -type f -mmin +2 | wc -l`
+            HASH5=`find /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*Run*$LASTRUN*h5 -type f -mmin +1 | wc -l`
 	    echo 'Last Run: '$EXP_RUN ', checked at ' $CREATE_TIME ', checking to process run ' $LASTRUN
 
 	    if [ $HASH5 -eq 1 ]; then
-		echo 'send job for run ' $LASTRUN 
-		#./examples/avimageRun -a -r $LASTRUN
-		./examples/cubeRun -r $LASTRUN
+		# necessary because xarray check if it can use the set DISPLAY variable and
+		# that is not possible when in batch mode but it is also absolutely not needed
+
+		echo 'so I will make plots for ' $LASTRUN
+		CMD=`echo python $PYTHON_EXE $LASTRUN`
+		source /reg/g/psdm/sw/conda1/manage/bin/psconda.sh -py3
+
+		echo $CMD
+		$CMD
+
 		let "LASTRUN+=1" 
-		sleep 30
+		sleep 120
 	    fi
 	fi
-	sleep 10
+	sleep 30
 done

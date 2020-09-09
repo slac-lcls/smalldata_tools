@@ -238,10 +238,12 @@ class SmallDataAna(object):
         if len(expname)>3:
             self.hutch=self.expname[:3]
             self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
+            print('dirname ',self.plot_dirname)
             if dirname=='':
                 self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
+                    print('Directory did not exist? ',self.dirname)
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
                     self.plot_dirname='/reg/d/psdm/%s/%s/res/smalldata_plots/'%(self.hutch,self.expname)
             else:
@@ -255,9 +257,6 @@ class SmallDataAna(object):
             print('setting up dirs:')
             if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
-            if not path.isfile(self.fname):
-                self.dirname='/reg/d/psdm/%s/%s/results/arphdf5'%(self.hutch,self.expname)
-                self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
         print('and now open in dir: ',self.dirname,' to open file ',self.fname)
@@ -793,11 +792,13 @@ class SmallDataAna(object):
             if not brief:
                 print(self.Sels[sel].printCuts())
                 print('--------------------------')
+
     def printCuts(self, selName=None, brief=True):
         """
         alias to printSelections
         """
         self.printSelections(selName=selName, brief=brief)
+
     def getFilterLaser(self, useFilter, ignoreVar=[]):
         #moved functionality into getFilter.
         useFilterBase = useFilter.split('__')[0]
@@ -835,6 +836,7 @@ class SmallDataAna(object):
 
         if LaserReq == 0:
             ignoreVar.append('lightStatus/laser')
+            ignoreVar.append('enc/lasDelay')
             if self.ttCorr is not None:
                 ignoreVar.append(self.ttCorr)
             if self.hasKey(self.ttBaseStr+'AMPL'):
@@ -1287,13 +1289,13 @@ class SmallDataAna(object):
             scanVarName=[scanVarName]
         BinList=[]
         if len(bindef)==0:
+            if scanVarName=='':
+                print('this run is no scan, will need bins as input, quit now')
+                return []
             for scanVN in scanVarName:
-                if scanVarName=='':
-                    print('this run is no scan, will need bins as input, quit now')
-                    return []
-                print('no bins as input, we will use the scan variable %s '%scanVarName)
+                print('no bins as input, we will use the scan variable %s '%scanVN)
                 Bins = np.unique(scan)
-                if scanVarName.find('lxt')>=0:
+                if scanVN.find('lxt')>=0:
                     Bins*=1e12
                 if debug:
                     print('Bins: ',Bins)
@@ -1642,8 +1644,8 @@ class SmallDataAna(object):
             scanValues = self.getScanValues()
             if scanValues[0]!='' and len(scanValues[1])>0:
                 Bins = np.unique(scanValues[1])
-                Bins = np.insert(Bins,0,Bins[0]-1e-5)
-                Bins = np.append(Bins,Bins[-1]+1e-5)
+                Bins = np.insert(Bins,0,Bins[0]-1e-7)
+                Bins = np.append(Bins,Bins[-1]+1e-7)
             else:
                 print('prepCube could not prepare Bins: ',scanValues[0]!='' , len(scanValues[1]))
         else:
@@ -1823,10 +1825,15 @@ class SmallDataAna(object):
                 #newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords=coords, dims=dims,name=tVar)])
             newXr = xr.merge([newXr, newDar])
 
+        if debug: print('make cube.binBounds later.', Bins)
         #now we actually bin.
-        cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).sum(dim='time')                  
+        #cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).sum(dim='time')                  
+        cubeData = newXr.groupby_bins('binVar',Bins,labels=Bins[:-1],include_lowest=True, right=False).sum(dim='time')
+        #cubeData = newXr.groupby_bins('binVar',Bins,include_lowest=True, right=False).sum(dim='time')
+
         #could add error using the std of the values.
-        cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).std(dim='time')
+        cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=Bins[:-1],include_lowest=True, right=False).std(dim='time')
+        #cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).std(dim='time')
             
         if len(cube.addBinVars.keys())>0:
             newXr = None
@@ -1836,7 +1843,10 @@ class SmallDataAna(object):
                 #    continue
                 #get dimensions & coords for reshaped data
                 dims = [cube.binVar]
-                coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                #this is better for linearly spaced floating point variable
+                #coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                coords={cube.binVar: (orgBins[1:])}
+                #print('coords: ',coords)
                 for addVar in cube.addBinVars.keys():
                     dims.append(addVar)
                     coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
@@ -1870,7 +1880,8 @@ class SmallDataAna(object):
                     continue
                 #get dimensions & coords for reshaped data
                 dims = [cube.binVar]
-                coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
+                coords={cube.binVar: (orgBins[1:])}
+                #coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
                 for addVar in cube.addBinVars.keys():
                     dims.append(addVar)
                     coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
