@@ -166,7 +166,7 @@ def getBins(bindef=[], debug=False):
             Bins=np.linspace(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2]+1,endpoint=True)
         else:
             Bins=np.arange(min(bindef[0],bindef[1]),max(bindef[0],bindef[1]),bindef[2])
-        if Bins[-1]<bindef[1]:
+        if Bins[-1]<max(bindef[0],bindef[1]):
             Bins = np.append(Bins,max(bindef[0],bindef[1]))
         return Bins
 

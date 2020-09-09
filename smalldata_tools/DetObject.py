@@ -786,13 +786,13 @@ class Epix10kObject(TiledCameraObject):
         self.trbit = trbits
 
         cfgShape=epixCfg.asicPixelConfigArray().shape
-        cfgReshape=epixCfg.asicPixelConfigArray().reshape(cfgShape[0]/2, cfgShape[1]*2,order='F')
+        cfgReshape=epixCfg.asicPixelConfigArray().reshape(int(cfgShape[0]/2), cfgShape[1]*2,order='F')
         pixelGain=np.ones_like(cfgReshape).astype(float)
         for ia in asicList:
             if epixCfg.asics(ia).trbit()==1:
                 continue
-            asicGainConfig=cfgReshape[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]
-            pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*self.nomGain[1] + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*self.nomGain[2]
+            asicGainConfig=cfgReshape[:,ia*int(cfgShape[1]/2):(ia+1)*int(cfgShape[1]/2)]
+            pixelGain[:,ia*int(cfgShape[1]/2):(ia+1)*int(cfgShape[1]/2)]=((asicGainConfig&0x4)/4).astype(float)*self.nomGain[1] + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*self.nomGain[2]
             #pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
         self.pixelGain = pixelGain.reshape(cfgShape,order='F')
 
@@ -931,13 +931,13 @@ class Epix10k2MObject(TiledCameraObject):
                 trbits.append(elemCfg.asics(ia).trbit())
             self.trbit.append(trbits)
             cfgShape=elemCfg.asicPixelConfigArray().shape
-            cfgReshape=elemCfg.asicPixelConfigArray().reshape(cfgShape[0]/2, cfgShape[1]*2,order='F')
+            cfgReshape=elemCfg.asicPixelConfigArray().reshape(int(cfgShape[0]/2), cfgShape[1]*2,order='F')
             pixelGain=np.ones_like(cfgReshape).astype(float)
             for ia in asicList:
                 if elemCfg.asics(ia).trbit()==1:
                     continue
-                asicGainConfig=cfgReshape[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]
-                pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*self.nomGain[1] + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*self.nomGain[2]
+                asicGainConfig=cfgReshape[:,ia*int(cfgShape[1]/2):(ia+1)*int(cfgShape[1]/2)]
+                pixelGain[:,ia*int(cfgShape[1]/2):(ia+1)*int(cfgShape[1]/2)]=((asicGainConfig&0x4)/4).astype(float)*self.nomGain[1] + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*self.nomGain[2]
                 #pixelGain[:,ia*cfgShape[1]/2:(ia+1)*cfgShape[1]/2]=((asicGainConfig&0x4)/4).astype(float)*100./3. + ((np.ones_like(asicGainConfig)-(asicGainConfig&0x4)/4)).astype(float)*100.
             pixelGain=pixelGain.reshape(cfgShape,order='F')
             self.pixelGain.append(pixelGain)

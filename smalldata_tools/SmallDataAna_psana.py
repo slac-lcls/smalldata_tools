@@ -24,6 +24,11 @@ try:
     basestring
 except NameError:
     basestring = str
+try:
+    raw_input
+except NameError:
+    raw_input = input
+
 
 import smalldata_tools.SmallDataAna as sda
 
@@ -76,10 +81,10 @@ class SmallDataAna_psana(object):
             isLive = rundoc.get('end_time', None)
             self.dsname='exp=%s:run=%i:smd'%(expname,run)
             xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-            idxname=xtcdirname+'/index/e*-r%04d-*'%int(run)
+            idxname=xtcdirname+'/index/*-r%04d-*'%int(run)
             ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
-            ffbxtcname=ffbxtcdirname+'/e*-r%04d-*'%int(run)
-            ffbidxname=ffbxtcdirname+'/index/e*-r%04d-*'%int(run)
+            ffbxtcname=ffbxtcdirname+'/*-r%04d-*'%int(run)
+            ffbidxname=ffbxtcdirname+'/index/*-r%04d-*'%int(run)
             import glob
             present_ffbXtc=glob.glob('%s'%ffbxtcname)
             present_ffbIdx=glob.glob('%s'%ffbidxname)
@@ -109,7 +114,7 @@ class SmallDataAna_psana(object):
             self.dsname='exp=%s:run=%i:smd'%(expname,run)
             self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
             xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-            idxname=xtcdirname+'/index/e*-r%04d-*'%int(run)
+            idxname=xtcdirname+'/index/*-r%04d-*'%int(run)
             import glob
             present_Idx=glob.glob('%s'%idxname)
             if len(present_Idx)>0:
@@ -119,7 +124,7 @@ class SmallDataAna_psana(object):
 
         printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
-            self.ds = psana.DataSource(self.dsname)
+            self.ds = psana.DataSource(str(self.dsname))
         except:
             printR(rank, 'Failed to set up small data psana dataset!')
             self.ds = None
@@ -127,12 +132,19 @@ class SmallDataAna_psana(object):
             printR(rank, 'Failed to set up index based psana dataset, likely because no idx files have been produced/moved yet')
         else:
             try:
-                self.dsIdx = psana.DataSource(self.dsnameIdx)
-                self.dsIdxRun = self.dsIdx.runs().next()
+                self.dsIdx = psana.DataSource(str(self.dsnameIdx))
             except:
-                printR(rank, 'Failed to set up index based psana dataset')
                 self.dsIdx = None
-                self.dsIdxRun = None
+                printR(rank, 'Failed to set up index based psana dataset from dsname: %s'%self.dsnameIdx)
+            if self.dsIdx is not None:
+                try:
+                    self.dsIdxRun = self.dsIdx.runs().next()
+                except:
+                    try:
+                        self.dsIdxRun = next(self.dsIdx.runs())
+                    except:
+                        self.dsIdxRun = None
+                        printR(rank, 'Failed to get run from psana dataset from dsname: %s'%self.dsnameIdx)
         printR(rank, 'try to make SmallDataAna using dirname %s, for exp %s and run %s'%(dirname,expname,run))
         try:
             printR(rank, 'setting up SmallData ana from anaps ')
@@ -264,7 +276,7 @@ class SmallDataAna_psana(object):
 #
 # these functions need psana as well, make separate class that imports SmallDataAna?
 #
-    def addDetInfo(self, detname='None', common_mode=0):
+    def addDetInfo(self, detname='None', common_mode=None):
         if detname=='None':
             aliases = self._getDetName()
             if len(aliases)==1:
@@ -280,7 +292,7 @@ class SmallDataAna_psana(object):
         detnameDict=None
         if isinstance(detname, dict):
             detnameDict = detname
-            if 'common_mode' in detnameDict.keys():
+            if 'common_mode' in detnameDict.keys() and common_mode is not None:
                 common_mode=detnameDict['common_mode']
             detname = detnameDict['source']
 
@@ -290,7 +302,7 @@ class SmallDataAna_psana(object):
 
         if detname in self.__dict__.keys():
             printR(rank, 'redefine detector object with different common mode: %d instead of %d'%( common_mode,self.__dict__[detname].common_mode))
-        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname,common_mode=common_mode)
+        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname)#,common_mode=common_mode)
         self.__dict__[detname]=det
         if (detname+'_pedestals') in self.__dict__.keys():
             return detname
@@ -376,14 +388,14 @@ class SmallDataAna_psana(object):
             useFilter = None
         if useFilter is not None:
             evttsSel = self.sda.getSelIdx(useFilter)
-            print('using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter))
+            print('using smd based selection, have %s events for selection %s'%(len(evttsSel),useFilter))
             if numEvts==-1:
                 numEvts = len(evttsSel)-nSkip
                 if numEvts<0:
                     print('have no events, quit')
                     return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
-                times.append(psana.EventTime(evtts[1],evtts[0]))
+                times.append(psana.EventTime(int(evtts[1]),evtts[0]))
         else:
             times = run.times()[nSkip:]
         print('requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events')
@@ -415,7 +427,7 @@ class SmallDataAna_psana(object):
 
         return np.array(imgAr)
 
-    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=0, std=False, median=False, printFid=False,useMask=True):
+    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=None, std=False, median=False, printFid=False,useMask=True):
         if not isinstance(detname, basestring):
             print('please give parameter name unless specifying arguments in right order. detname is first')
             return
@@ -453,14 +465,14 @@ class SmallDataAna_psana(object):
             useFilter = None
         if useFilter is not None:
             evttsSel = self.sda.getSelIdx(useFilter)
-            print('using ldat base selection, have %s events for selection %s'%(len(evttsSel),useFilter))
+            print('using smd based selection, have %s events for selection %s'%(len(evttsSel),useFilter))
             if numEvts==-1:
                 numEvts = len(evttsSel)-nSkip
                 if numEvts<0:
                     print('have no events, quit')
                     return
             for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
-                times.append(psana.EventTime(evtts[1],evtts[0]))
+                times.append(psana.EventTime(int(evtts[1]),evtts[0]))
         else:
             times = run.times()[nSkip:]
         print('requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events')
@@ -512,6 +524,8 @@ class SmallDataAna_psana(object):
         if thresRms!=0:
             data+='thresRms%d_'%int(thresRms*10.)
 
+        if common_mode is None:
+            common_mode = det.common_mode
         print('use common mode: ',common_mode)
         data+=self.commonModeStr(common_mode)
         data+=detname
@@ -822,6 +836,7 @@ class SmallDataAna_psana(object):
         if combRes==-1:
             return -1
         greens=['#666600','#669900','#66cc00','#66cc99','#6699cc','#6633ff']
+        print('center ',combRes['xCen'],combRes['yCen'])
         for ir,thisRingInfo,rFit in itertools.izip(itertools.count(),ringInfo,combRes['R']):
             #plot ransac selected data in green <-- consider different greens for first circles.
             plt.plot(arSparse.col[thisRingInfo['pointsInCircle']], arSparse.row[thisRingInfo['pointsInCircle']],marker='.',color=greens[ir],linestyle='None', markersize=4)
@@ -834,7 +849,6 @@ class SmallDataAna_psana(object):
         plt.xlim(limits[0])
         plt.ylim(limits[1])
         plt.show()
-        print('center ',combRes['xCen'],combRes['yCen'])
         if needsGeo:
             geo = self.__dict__[detname].det.geometry(self.run)
             d=160000.
@@ -1423,6 +1437,10 @@ class SmallDataAna_psana(object):
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
             elif det.dettype==19:
                 dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
+            elif det.dettype==29:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+            elif det.dettype==32:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
 
         if not os.path.exists(dirname+'pedestals'):
             os.makedirs(dirname+'pedestals')
@@ -1720,6 +1738,10 @@ class SmallDataAna_psana(object):
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
             elif det.dettype==13:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+            elif det.dettype==29:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+            elif det.dettype==32:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
