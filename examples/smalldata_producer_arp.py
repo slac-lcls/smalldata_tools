@@ -233,6 +233,7 @@ if args.full:
 
 
 max_iter = args.nevents / ds.size
+evt_num = -1
 for evt_num, evt in enumerate(ds.events()):
 	if evt_num >= max_iter:
 		break

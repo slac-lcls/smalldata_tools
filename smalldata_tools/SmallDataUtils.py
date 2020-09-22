@@ -38,7 +38,7 @@ def sxrDetectors(beamCodes=[[162],[91]]):
     dets.append(gmdDetector())
     return dets
 
-def xppDetectors(beamCodes=[[162,120],[91]]):
+def xppDetectors(beamCodes=[[162],[91]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp', 'las_drift_correction']))
@@ -76,7 +76,7 @@ def xppDetectors(beamCodes=[[162,120],[91]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def xcsDetectors(beamCodes=[[162,120],[89]]):
+def xcsDetectors(beamCodes=[[162],[89]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -109,7 +109,7 @@ def xcsDetectors(beamCodes=[[162,120],[89]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def mfxDetectors(beamCodes=[[162,120],[]]):
+def mfxDetectors(beamCodes=[[162],[]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -130,7 +130,7 @@ def mfxDetectors(beamCodes=[[162,120],[]]):
                                       'BeamMonitor_target','Dg1Ipm_target']))
     return dets
 
-def cxiDetectors(beamCodes=[[162,120],[]]):
+def cxiDetectors(beamCodes=[[162],[]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -157,7 +157,7 @@ def cxiDetectors(beamCodes=[[162,120],[]]):
         pass
     return dets
 
-def mecDetectors(beamCodes=[[162,120],[]]):
+def mecDetectors(beamCodes=[[162],[]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -172,7 +172,16 @@ def mecDetectors(beamCodes=[[162,120],[]]):
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
-    dets.append(epicsDetector(PVlist=['belens z']))
+    dets.append(epicsDetector(PVlist=['belens z','MEC:NOTE:LAS:NSDELAY',
+                                      'MEC:NS1:MMS:01.RBV',
+                                      'MEC:NS1:MMS:02.RBV',
+                                      'MEC:LAS:MMN:30.RBV',
+                                      'MEC:LAS:MMN:29.RBV',
+                                      'MEC:PPL:MMS:09.RBV',
+                                      'MEC:USR:MMS:17.RBV',
+                                      'MEC:LAS:DDG:05:aDelaySI',
+                                      'MEC:LAS:DDG:05:eDelaySI',
+                                      'SIOC:SYS0:LM00:AO627']))
     dets.append(damageDetector())
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
@@ -194,7 +203,7 @@ def detData(detList, evt):
         try:
             data[det.name] = det.data(evt)
         except:
-            print('could not get data in this event for detector ',det.name)
+            #print('could not get data in this event for detector ',det.name)
             pass
     return data
 
