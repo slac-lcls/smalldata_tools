@@ -22,17 +22,17 @@ from glob import glob
 #sys.path.append(fpathup)
 #print(fpathup)
 #this did not work for me, but test again...
-#sys.path.append('../results/smalldata_tools')
+#sys.path.append('../smalldata_tools')
 sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
-from smalldata_tools.SmallDataUtils import getUserData
+from smalldata_tools.SmallDataUtils import getUserData, getUserEnvData
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
 
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector
-from smalldata_tools.roi_rebin import ROIFunc
+from smalldata_tools.roi_rebin import ROIFunc, imageFunc
 from smalldata_tools.DetObject import DetObject
 
 logging.basicConfig(level=logging.DEBUG)
@@ -69,6 +69,7 @@ parser.add_argument('--gather', help='gather interval', type=int, default=100)
 parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true')
 parser.add_argument('--full', help='save everything (use with care)', action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
+parser.add_argument('--image', help='save everything as image (use with care)', action='store_true')
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -225,8 +226,15 @@ if args.full:
                 continue
             try:
                 thisDet = DetObject(alias, ds.env(), int(run), name=alias)
-                fullROI_write = ROIFunc(writeArea=True)
-                thisDet.addFunc(fullROI_write)
+                hasGeom=False
+                for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
+                        if alias.find(keyword)>=0 and args.image: hasGeom=True
+                if hasGeom:
+                        fullROI = ROIFunc()
+                        fullROI.addFunc(imageFunc(coords=['x','y']))
+                else:
+                        fullROI = ROIFunc(writeArea=True)
+                thisDet.addFunc(fullROI)
                 dets.append(thisDet)
             except:
                 pass
@@ -243,7 +251,10 @@ for evt_num, evt in enumerate(ds.events()):
         if (evt_num==0): 
             print('default det data: ',[k for k in det_data])
         if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+            try:
+                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+            except:
+                pass
 
         #detector data using DetObject 
         if len(dets)>0:
@@ -254,6 +265,7 @@ for evt_num, evt in enumerate(ds.events()):
                     det.processFuncs()
                     userDict[det._name]=0
                     userDict[det._name]=getUserData(det)
+                    #print(userDict[det._name].keys())
                     try:
                         envData=getUserEnvData(det)
                         if len(envData.keys())>0:
@@ -266,6 +278,9 @@ for evt_num, evt in enumerate(ds.events()):
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
-requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
+try:
+    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
+except:
+    pass
 logger.debug('Saved all small data')
 

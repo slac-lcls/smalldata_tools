@@ -29,7 +29,9 @@ $(basename "$0"):
 		-f|--fast
 			If specified, don't use recorder data
 		-F|--full
-			If specified, translate everythin
+			If specified, translate everything
+		-i|--image
+			If specified, translate everything & save area detectors as images
 		-t|--test
 			Run the slurm job as test only to get job info
 		-b|--bsub
@@ -78,12 +80,11 @@ do
 			shift
 			;;
 		-n|--nevents)
-			echo "GOt events"
 			NEVENTS="$2"
 			shift
 			shift
 			;;
-		-l|--local)
+		-l|--locally)
 			LOCALLY=true
 			shift
 			;;
@@ -93,6 +94,10 @@ do
 			;;
 		-F|--full)
 			FULL=True
+			shift
+			;;
+		-i|--image)
+			IMAGE=True
 			shift
 			;;
 		-o|--offline)
@@ -156,13 +161,19 @@ fi
 if [[ -v FULL ]]; then
 	ARGS+=' --full'
 fi
+if [[ -v IMAGE ]]; then
+	ARGS+=' --image'
+fi
 
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
     #this should ideally be a relative path like ../smalldata_tools 
     #that did not work for me though....
-    ABS_PATH=/reg/neh/home4/snelson/feeComm_smd/smalldata_tools/examples
+    ABS_PATH=/reg/neh/home4/snelson/git_smd/smalldata_tools/examples
 fi
-sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
-
+if [[ -v SINGLE ]]; then
+    $ABS_PATH/smalldata_producer_arp.py $ARGS
+#else
+#    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
+fi

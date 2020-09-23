@@ -58,7 +58,6 @@ class ROIFunc(DetObjectFunc):
                     self.mask = ~(np.ones_like(det.ped).astype(bool))
                 except:
                     self.mask = None
-
         if self.mask is not None:
             try:
                 self.mask = self.applyROI(self.mask)
@@ -491,12 +490,14 @@ class imageFunc(DetObjectFunc):
             #retDict['img_sparse'] = np.array(data2d)
             I=np.bincount(self._multidim_idxs, weights = data.flatten(), minlength=int(self._n_multidim_idxs))
             I=np.reshape(I[:self._n_multidim_idxs], self._n_coordTuple)
-            retDict['img_bc'] = I
+            retDict['img'] = I
             if self._npix_div is not None:
                 Inorm=I*self._npix_div
-                retDict['img_bc'] = Inorm
+                retDict['img'] = Inorm
             else:
-                retDict['img_bc'] = I
+                retDict['img'] = I
+            #cast to same type that input array was.
+            retDict['img'] = retDict['img'].astype(data.dtype)
             return retDict
 
         elif len(self.coords)==1: #this might be a special case of the multi dim thing....
