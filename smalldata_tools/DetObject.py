@@ -123,6 +123,7 @@ def DetObject(srcName, env, run, **kwargs):
         2: CsPadObject,
         5: PulnixObject,
         6: OpalObject,
+        8: OpalObject,
        13: EpixObject,
        15: AndOrObject,
        16: AcqirisObject,
@@ -133,6 +134,7 @@ def DetObject(srcName, env, run, **kwargs):
        29: Epix10kObject,
        30: IcarusObject,
        32: Epix10k2MObject,
+       34: CameraObject,
        98: OceanOpticsObject,
        99: ImpObject,
     }
@@ -423,7 +425,10 @@ class CameraObject(DetObjectClass):
             self.evt.dat = self.det.raw_data(evt)
         elif self.common_mode==0:
             if not self._gainSwitching:
-                self.evt.dat = self.det.raw_data(evt)-self.ped
+                if self.ped is not None:
+                    self.evt.dat = self.det.raw_data(evt)-self.ped
+                else:
+                    self.evt.dat = self.det.raw_data(evt)
                 self._applyMask()
                 if (self.gain is not None) and self.gain.std() != 0 and self.gain.mean() != 1.:
                     if self.gain.shape == self.evt.dat.shape:
@@ -434,7 +439,6 @@ class CameraObject(DetObjectClass):
         #override gain if desired
         if self.local_gain is not None and self.common_mode in [0,30] and self._gainSwitching is False and self.local_gain.shape == self.evt.dat.shape:
             self.evt.dat*=self.local_gain   #apply own gain
-
         
 
 class OpalObject(CameraObject): 
@@ -450,13 +454,17 @@ class OpalObject(CameraObject):
             if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
                 #if srcName=='xtcav':
                 #  self.ped = np.zeros([1024,1024])
-                self.ped = np.zeros([1024,1024])
-        self.imgShape = self.ped.shape
-        if self.x is None:
-            self._get_coords_from_ped()
-        if self.mask is None or self.mask.shape!=self.imgShape:
-            self.mask = np.ones(self.imgShape)
-            self.cmask = np.ones(self.imgShape)
+                if det.dettype == 6:
+                    self.ped = np.zeros([1024,1024])
+                else:
+                    self.ped = None
+        if det.dettype == 6:
+            self.imgShape = self.ped.shape
+            if self.x is None:
+                self._get_coords_from_ped()
+            if self.mask is None or self.mask.shape!=self.imgShape:
+                self.mask = np.ones(self.imgShape)
+                self.cmask = np.ones(self.imgShape)
 
 class ZylaObject(CameraObject): 
     def __init__(self, det,env,run,**kwargs):
