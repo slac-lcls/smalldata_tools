@@ -302,7 +302,7 @@ class SmallDataAna_psana(object):
 
         if detname in self.__dict__.keys():
             printR(rank, 'redefine detector object with different common mode: %d instead of %d'%( common_mode,self.__dict__[detname].common_mode))
-        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname)#,common_mode=common_mode)
+        det = DetObject(detname , self.dsIdx.env(), self.run, name=detname, common_mode=common_mode)
         self.__dict__[detname]=det
         if (detname+'_pedestals') in self.__dict__.keys():
             return detname
