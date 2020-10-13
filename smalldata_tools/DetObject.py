@@ -134,6 +134,7 @@ def DetObject(srcName, env, run, **kwargs):
        29: Epix10kObject,
        30: IcarusObject,
        32: Epix10k2MObject,
+       33: Epix10k2MObject,
        34: CameraObject,
        98: OceanOpticsObject,
        99: ImpObject,
@@ -921,6 +922,8 @@ class Epix10k2MObject(TiledCameraObject):
         self.isGainswitching=True
 
         epixCfg = env.configStore().get(psana.Epix.Config10ka2MV1, det.source)               
+        if epixCfg is None:
+            epixCfg = env.configStore().get(psana.Epix.Config10kaQuadV1, det.source)               
         self.carrierId0 = []
         self.carrierId1 = []
         self.pixelConfig = []
