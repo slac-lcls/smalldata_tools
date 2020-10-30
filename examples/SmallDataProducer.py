@@ -71,7 +71,7 @@ if not args.exp:
 
     if (run < lastRun) or (run == lastRun and (not rundoc.get('end_time', None))):
         xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
-        xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
+        xtcname=xtcdirname+'/*-r%04d-*'%int(run)
         import glob
         presentXtc=glob.glob('%s'%xtcname)
         if len(presentXtc)==0:

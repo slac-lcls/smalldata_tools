@@ -138,7 +138,7 @@ if not args.exp:
     isLive = rundoc.get('end_time', None)
     if not isLive:
         xtcdirname = '/reg/d/ffb/%s/%s/xtc'%(hutch.lower(),expname)
-        xtcname=xtcdirname+'/e*-r%04d-*'%int(run)
+        xtcname=xtcdirname+'/*-r%04d-*'%int(run)
         import glob
         presentXtc=glob.glob('%s'%xtcname)
         if len(presentXtc)==0:
