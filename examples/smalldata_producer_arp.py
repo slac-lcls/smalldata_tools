@@ -139,13 +139,17 @@ cur_exp = get_cur_exp(hutch, station)
 
 xtc_files = []
 # If experiment matches, check for files in ffb
+ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if cur_exp == exp:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
 
+if xtc_files:
+        ds_name = ds_name.replace(':smd',':dir=/reg/d/ffb/%s/%s/xtc:live:smd'%(exp[:3],exp))
 # If not a current experiment or files in ffb, look in psdm
-if not xtc_files:
+else:
 	logger.debug('Either not a current exp or files not in ffb, looking in psdm')
 	xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
+        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live'])
 
 if not xtc_files:
 	logger.debug('XTC files not available')
@@ -157,9 +161,8 @@ h5_f_name = get_sd_file(args.dir, exp, hutch)
 
 # Define data source name and generate data source object, don't understand all conditions yet
 if args.norecorder:
-        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live:stream=0-79'])
-else:
-        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live'])
+        ds_name += 'stream=0-79'
+
 try:
 	ds = psana.MPIDataSource(ds_name)
 except Exception as e:
