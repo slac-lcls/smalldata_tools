@@ -14,7 +14,7 @@ def fitCircle(x,y,yerr=None, guess=None):
 	y = [y]
 	rGuess = (np.nanmax(x)-np.nanmin(x)+np.nanmax(y)-np.nanmin(y))/4. #largest differences/2/2
 	r = [rGuess]
-	fitRes = fitCircles(x,y,r,yerr=None, guess=None)
+	fitRes = _fit_circles(x,y,r,yerr=None, guess=None)
 	#have only one circle.
 	fitRes['R']=fitRes['R'][0]
 	fitRes['residu']=fitRes['residu'][0]
