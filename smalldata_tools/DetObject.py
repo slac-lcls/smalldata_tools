@@ -398,6 +398,8 @@ class CameraObject(DetObjectClass):
         super(CameraObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [0,-1, 30] #none, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list and type(self) is CameraObject:
             print('Common mode %d is not an option for a CameraObject, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[25e-6]
@@ -562,6 +564,8 @@ class IcarusObject(CameraObject):
         super(IcarusObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [0,98,99,-1] #none, unb-calc, unb-applied, raw
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for a CsPad detector, please choose from: '%self.common_mode, self._common_mode_list)
         if self.x is None and self.ped is not None:
@@ -595,6 +599,8 @@ class JungfrauObject(TiledCameraObject):
         super(JungfrauObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [0, 7,71,72,-1, 30] #none, epix-style corr on row*col, row, col, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for Jungfrau, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[75e-6]
@@ -627,6 +633,8 @@ class CsPadObject(TiledCameraObject):
         super(CsPadObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [1,5,55,10,0,-1, 30] #zero-peak, unbonded, unbonded (high no-correcion threshold), mixed, none, raw data, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for a CsPad detector, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[110e-6]
@@ -674,6 +682,8 @@ class CsPad2MObject(CsPadObject):
         print('cspad alias',det.alias)
         self._common_mode_list = [0, 1,5,10,-1,30] #none, zero-peak, unbonded, mixed, raw data, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for a CsPad2M detector, please choose from: '%self.common_mode, self._common_mode_list)
         if self.ped is not None:
@@ -690,6 +700,8 @@ class EpixObject(TiledCameraObject):
         super(EpixObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [6, 36, 4, 34, 45, 46, 47, 0,-1, 30] # Jacob (norm), Jacob, def, def(ami-like), mine, mine (norm), mine (norm-bank), none, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[50e-6]
@@ -775,6 +787,8 @@ class Epix10kObject(TiledCameraObject):
         super(Epix10kObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [80, 0, -1, -2, 30] # official, ped sub, raw, raw_gain, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[100e-6]
@@ -916,6 +930,8 @@ class Epix10k2MObject(TiledCameraObject):
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [80, 81, 82, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for as Epix detector, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[100e-6]
@@ -1165,6 +1181,8 @@ class RayonixObject(CameraObject):
         #super().__init__(det,env,run, **kwargs)
         super(RayonixObject, self).__init__(det,env,run, **kwargs)
         self.common_mode = kwargs.get('common_mode', -1)
+        if self.common_mode is None:
+            self.common_mode = -1
         #this is NOT correct for the new, bigger rayonix. Fix me.
         rcfg = env.configStore().get(psana.Rayonix.ConfigV2,psana.Source('%s'%det.name))
         binning=rcfg.binning_s()
@@ -1195,6 +1213,8 @@ class UxiObject(DetObjectClass):
         self._uxiDict =  kwargs.get('uxiDict', None)
         uxiConfigDict =  kwargs.get('uxiConfigDict', None)
         self.common_mode =  kwargs.get('common_mode', 0)
+        if self.common_mode is None:
+            self.common_mode = 0
         for k, value in iteritems(uxiConfigDict):
           setattr(self, k, value)
         #now get the pedestals from run unless we stuff this into the configDict before.
