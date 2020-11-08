@@ -56,6 +56,8 @@ class azimuthalBinning(DetObjectFunc):
         self.thresADUhigh = kwargs.pop("thresADUhigh",None)
         self.x = kwargs.pop("x",None)
         self.y = kwargs.pop("y",None)
+        self.geomCorr = kwargs.pop("geomCorr",True)
+        self.polCorr = kwargs.pop("polCorr",True)
 
         center = kwargs.pop("center",None)
         if center is not None:
@@ -212,11 +214,15 @@ class azimuthalBinning(DetObjectFunc):
         #print("last index",last_idx)
         self.msg("...done")
         # include geometrical corrections
-        geom    = (self.dis_to_sam/r) ; # pixels are not perpendicular to scattered beam
+        geom  = (self.dis_to_sam/r) ; # pixels are not perpendicular to scattered beam
         geom *= (self.dis_to_sam/r**2); # scattered radiation is proportional to 1/r^2
         self.msg("calculating normalization...",cr=0)
         self.geom = geom
         self.geom /= self.geom.max()
+        if not self.geomCorr:
+            self.geom = np.ones_like(self.geom).astype(float)
+        if not self.polCorr:
+            self.pol = np.ones_like(self.pol).astype(float)
         self.correction = self.geom*self.pol
         self.Npixel = np.bincount(self.idxq,minlength=self.nq); self.Npixel = self.Npixel[:self.nq]
         self.norm     = self.Npixel

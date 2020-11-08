@@ -871,7 +871,7 @@ class SmallDataAna_psana(object):
     def FitCircleMouse(self, detname=None, use_mask=False, limits=[5,99.5], use_mask_local=False):
         self.FitCircle(detname=detname, use_mouse=True, use_mask=use_mask, use_mask_local=use_mask_local, limits=[5,99.5])
 
-    def FitCircleThreshold(self, detname=None, use_mask=False, use_mask_local=True, limits=[5,99.5],plotIt=False, thresIn=None):
+    def FitCircleThreshold(self, detname=None, use_mask=False, use_mask_local=False, limits=[5,99.5],plotIt=False, thresIn=None):
         self.FitCircle(detname=detname, use_mouse=False, use_mask=use_mask, use_mask_local=use_mask_local, limits=[5,99.5], thresIn=thresIn, plotIt=plotIt)
 
     def FitCircle(self, **kwargs):
@@ -1461,7 +1461,7 @@ class SmallDataAna_psana(object):
             det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.3f',addmetad=True)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
-    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0):
+    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0, geomCorr=True, polCorr=True):
         detname, img, avImage = self.getAvImage(detname=detname)
         if dis_to_sam==None:
             dis_to_sam=float(raw_input('please enter the detector distance'))
@@ -1470,7 +1470,7 @@ class SmallDataAna_psana(object):
             center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
                     int(centerString.replace('[','').replace(']','').split(',')[1])]
 
-        azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbins=qBin, tx=tx, ty=ty, name=name)
+        azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbins=qBin, tx=tx, ty=ty, geomCorr=geomCorr, polCorr=polCorr, name=name)
         getattr(self,detname).addFunc(azav)
 
     def getAzAvs(self,detname=None):
