@@ -64,7 +64,7 @@ parser.add_argument('--exp', help='experiment name', type=str, default=os.enviro
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--dir', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
+parser.add_argument('--offline', help='run offline (def for current exp from ffb)', action='store_true')
 parser.add_argument('--gather', help='gather interval', type=int, default=100)
 parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true')
 parser.add_argument('--full', help='save everything (use with care)', action='store_true')
@@ -143,7 +143,7 @@ ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if cur_exp == exp:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
 
-if xtc_files:
+if xtc_files and not args.offline:
         ds_name = ds_name.replace(':smd',':dir=/reg/d/ffb/%s/%s/xtc:live:smd'%(exp[:3],exp))
 # If not a current experiment or files in ffb, look in psdm
 else:
@@ -166,7 +166,7 @@ if args.norecorder:
 try:
 	ds = psana.MPIDataSource(ds_name)
 except Exception as e:
-	logger.debug('Could not instantiate MPIDataSource with {0): {1}'.format(ds_name, e))
+	logger.debug('Could not instantiate MPIDataSource with {0}: {1}'.format(ds_name, e))
 	sys.exit()
 
 # Generate smalldata object
