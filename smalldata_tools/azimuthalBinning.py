@@ -34,6 +34,9 @@ class azimuthalBinning(DetObjectFunc):
         dis_to_sam = distance of center of detector to sample (in m)
         lam = wavelength in Ang
         userMask = userMask as array (detector data shaped)
+        thresADU = lower threshold in ADU
+        thresADUhigh = high threshold in ADU
+        thresRms = lower threshold in RMS
         """
         # save parameters for later use
         self._name = kwargs.get('name','azav')
