@@ -165,6 +165,8 @@ if [[ -v IMAGE ]]; then
 	ARGS+=' --image'
 fi
 
+#source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh --py3
+#source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
