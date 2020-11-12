@@ -223,17 +223,20 @@ class projectionFunc(DetObjectFunc):
         #array.data = array.data.astype(np.float64)
         if self.mean:
             if self.axis<0:
-                retDict={'data': np.mean(array)}
+                retDict={'data': np.nanmean(array)}
             else:
-                meanRes = np.mean(array,axis=self.axis)
+                meanRes = np.nanmean(array,axis=self.axis)
                 if isinstance(data, np.ma.masked_array):
                     meanRes = meanRes.data
                 retDict={'data': meanRes}
         else:
             if self.axis<0:
-                retDict={'data': np.sum(array)}
+                retDict={'data': np.nansum(array)}
             else:
-                retDict={'data': np.sum(array,axis=self.axis)}
+                sumRes = np.nansum(array,axis=self.axis)
+                if isinstance(data, np.ma.masked_array):
+                    sumRes = sumRes.data
+                retDict={'data': sumRes}
         return retDict
 
 #effectitely a projection onto a non-spatial coordinate.
