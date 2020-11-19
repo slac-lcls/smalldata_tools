@@ -190,9 +190,12 @@ class DetObjectClass(object):
             self.imgShape = None
 
     def _get_coords_from_ped(self):
-        self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
-        self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
-        self.x, self.y = np.meshgrid(self.x, self.y)
+        self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0]*1e6, self.pixelsize[0]*1e6)
+        if len(self.pixelsize)==1:
+            self.y = np.arange(0,self.ped.shape[-1])*self.pixelsize[0]*1e6
+        else:
+            self.y = np.arange(0,self.ped.shape[-1])*self.pixelsize[1]*1e6
+        self.x, self.y = np.meshgrid(self.x, self.y, indexing='ij')
         self.ix = self.x.copy()
         self.ix = self.ix - np.min(self.ix)
         self.ix = (self.ix/np.max(self.ix)*self.imgShape[0]).astype(int)
