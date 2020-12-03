@@ -61,6 +61,8 @@ class SmallDataAna_psana(object):
         self.plotWith=plotWith
         self.sda=None
 
+        #psana.setOption('psana.calibdir','/reg/d/psdm/xcs/xcslu7818/results/calibTemp')
+
         ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
