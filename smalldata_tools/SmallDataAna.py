@@ -1255,7 +1255,7 @@ class SmallDataAna(object):
         if isinstance(scanVarName, basestring):
             scanVarName=[scanVarName]
         for scanVN in scanVarName:
-            if scanVN.find('lxt')>=0 or scanVarName=='':
+            if scanVN.find('lxt')>=0 or scanVN=='':
                 delays=self.getDelay()
                 #CHECK ME: not sure why I required both mean&std to be==0 for not scan?
                 if delays is None or delays.mean()==0 or delays.std()==0: 
