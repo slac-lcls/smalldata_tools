@@ -293,6 +293,8 @@ class DetObjectClass(object):
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
 
     def processSums(self):
+        if self.evt.dat is None:
+            return
         for key in self._storeSum.keys():
             asImg=False
             thres=-1.e9
