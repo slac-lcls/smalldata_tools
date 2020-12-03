@@ -62,6 +62,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
     dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))
     dets.append(aiDetector('FEE-SPEC0','feeBld'))
+    dets.append(encoderDetector('XPP-USB-ENCODER-02','enc'))
     try:
         dets.append(encoderDetector('usbencoder','enc'))
     except:
@@ -71,6 +72,7 @@ def xppDetectors(beamCodes=[[162],[91]]):
         except:
             print('did not add encoder detector')
             pass
+    dets.append(encoderDetector('XPP-USB-ENCODER-01','lom_enc'))
     dets.append(l3tDetector())
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage')
