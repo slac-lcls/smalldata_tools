@@ -40,6 +40,7 @@ class ROIFunc(DetObjectFunc):
         self.writeArea = kwargs.get('writeArea',False)
         self._calcPars = kwargs.get('calcPars',True)
         self.mask =  kwargs.get('userMask',None)
+        self.thresADU = kwargs.get('thresADU',None)
 
     def setFromDet(self, det):
         super(ROIFunc, self).setFromDet(det)
@@ -127,6 +128,8 @@ class ROIFunc(DetObjectFunc):
         self.Nsat = highLim
 
     def process(self, data):
+        if self.thresADU is not None:
+            data[data<self.thresADU]=0
         ret_dict = {}
         ROIdata=self.applyROI(data)
         if self.mask is not None:
