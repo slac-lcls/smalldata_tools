@@ -61,8 +61,6 @@ class SmallDataAna_psana(object):
         self.plotWith=plotWith
         self.sda=None
 
-        #psana.setOption('psana.calibdir','/reg/d/psdm/xcs/xcslu7818/results/calibTemp')
-
         ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
@@ -300,6 +298,9 @@ class SmallDataAna_psana(object):
 
         #only do this if information is not in object yet
         if detname in self.__dict__.keys() and self.__dict__[detname].common_mode==common_mode and detnameDict is not None:
+            return detname
+
+        if detname in self.__dict__.keys() and common_mode is None:
             return detname
 
         if detname in self.__dict__.keys():
@@ -603,8 +604,10 @@ class SmallDataAna_psana(object):
 
     def _getDetName_from_AvImage(self,avimage):
         detname=''
+        avimage=avimage.replace('std_','')
+        avimage=avimage.replace('AvImg_','')
         for thisCmString in self.commonModeStrings:
-            avimage=avimage.replace(thisCmString+'_','').replace('AvImg_','')
+            avimage=avimage.replace(thisCmString+'_','')
         dns = avimage.split('_')
         for ddns in dns:
             if ddns.find('thres')<0 and ddns.find('Filter')<0:
