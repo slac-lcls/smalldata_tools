@@ -32,6 +32,8 @@ $(basename "$0"):
 			If specified, translate everything
 		-i|--image
 			If specified, translate everything & save area detectors as images
+		-T|--tiff
+			If specified, translate everything & save area detectors as images * single-evet tiffs.
 		-t|--test
 			Run the slurm job as test only to get job info
 		-b|--bsub
@@ -100,6 +102,10 @@ do
 			IMAGE=True
 			shift
 			;;
+		-T|--tiff)
+			TIFF=True
+			shift
+			;;
 		-o|--offline)
 			OFFLINE=true
 			shift
@@ -164,6 +170,9 @@ fi
 if [[ -v IMAGE ]]; then
 	ARGS+=' --image'
 fi
+if [[ -v TIFF ]]; then
+	ARGS+=' --tiff'
+fi
 
 #source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh --py3
 #source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh
@@ -176,6 +185,6 @@ if [[ -v LOCALLY ]]; then
 fi
 if [[ -v SINGLE ]]; then
     $ABS_PATH/smalldata_producer_arp.py $ARGS
-#else
-#    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
+else
+    sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_arp.py $ARGS
 fi

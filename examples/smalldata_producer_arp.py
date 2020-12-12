@@ -10,6 +10,7 @@ import logging
 import requests
 import sys
 from glob import glob
+from PIL import Image
 
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
@@ -70,6 +71,8 @@ parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true'
 parser.add_argument('--full', help='save everything (use with care)', action='store_true')
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true')
+parser.add_argument('--tiff', help='save all image also as single tiff (use with even more care)', action='store_true')
+
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -243,6 +246,8 @@ if args.full:
                 pass
 
 
+if args.tiff:
+    dirname = '/reg/d/psdm/%s/%s/scratch/run%d'%(args.exp[:3],args.exp,int(args.run))
 max_iter = args.nevents / ds.size
 evt_num = -1
 for evt_num, evt in enumerate(ds.events()):
@@ -278,13 +283,23 @@ for evt_num, evt in enumerate(ds.events()):
                 except:
                     pass
             small_data.event(userDict)
+
+            if args.tiff:
+                for key in userDict:
+                    for skey in userDict[key]:
+                        if skey.find('area')>=0 or skey.find('img')>=0:
+                            if len(userDict[key][skey].shape)==2:
+                                im = Image.fromarray(userDict[key][skey])
+                                file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
+                                im.save(file)
+
         if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
 try:
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
+    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num+1}])
 except:
     pass
 logger.debug('Saved all small data')
