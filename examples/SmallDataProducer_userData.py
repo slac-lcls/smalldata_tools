@@ -31,11 +31,11 @@ def getAzIntParams(run):
         run=int(run)
         
     ret_dict = {'eBeam': 9.5}
-    ret_dict['cspad_center'] = [87526.79161840, 92773.3296889500]
-    ret_dict['cspad_dis_to_sam'] = 80.
+    ret_dict['epix10k2M_center'] = [87526.79161840, 92773.3296889500]
+    ret_dict['epix10k2M_dis_to_sam'] = 80.
     return ret_dict
 
-def getROI_cspad(run):
+def getROI_epix10k2M(run):
     if isinstance(run,basestring):
         run=int(run)
     if run <=6:
@@ -123,7 +123,7 @@ if not args.exp:
             if path.find(thisHutch)>=0:
                 hutch=thisHutch.upper()
     if hutch is None:
-        print9'cannot figure out which experiment to use, please specify -e <expname> on commandline')
+        print('cannot figure out which experiment to use, please specify -e <expname> on commandline')
         import sys
         sys.exit()
     if hutch == 'cxi':
@@ -167,7 +167,7 @@ if args.norecorder:
 debug = True
 time_ev_sum = 0.
 try:
-    ds = psana.MPIDataSource(dsname)
+    ds = psana.MPIDataSource(str(dsname))
 except:
     print('failed to make MPIDataSource for ',dsname)
     import sys
@@ -277,32 +277,32 @@ if checkDet(ds.env(), 'cs140_diff'):
     dets.append(cs140)
 
 azIntParams = getAzIntParams(run)
-ROI_cspad = getROI_cspad(int(run))
-haveCspad = checkDet(ds.env(), 'cspad')
-if haveCspad:
-    cspad = DetObject('cspad' ,ds.env(), int(run), name='cspad')
-    for iROI,ROI in enumerate(ROI_cspad):
-        cspad.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
+ROI_epix10k2M = getROI_epix10k2M(int(run))
+haveEpix10k2M = checkDet(ds.env(), 'epix10k2M')
+if haveEpix10k2M:
+    epix10k2M = DetObject('epix10k2M' ,ds.env(), int(run), name='epix10k2M')
+    for iROI,ROI in enumerate(ROI_epix10k2M):
+        epix10k2M.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
 
-    cspad.azav_eBeam=azIntParams['eBeam']
-    if azIntParams.has_key('cspad_center'):
+    epix10k2M.azav_eBeam=azIntParams['eBeam']
+    if azIntParams.has_key('epix10k2M_center'):
         try:
-            azav = azimuthalBinning(center=azIntParams['cspad_center'], dis_to_sam=azIntParams['cspad_dis_to_sam'], phiBins=11, Pplane=0)
-            cspad.addFunc(azav)
+            azav = azimuthalBinning(center=azIntParams['epix10k2M_center'], dis_to_sam=azIntParams['epix10k2M_dis_to_sam'], phiBins=11, Pplane=0)
+            epix10k2M.addFunc(azav)
         except:
 	        pass
 
 
-    cspad.storeSum(sumAlgo='calib')
-    cspad.storeSum(sumAlgo='square')
-    dets.append(cspad)
+    epix10k2M.storeSum(sumAlgo='calib')
+    epix10k2M.storeSum(sumAlgo='square')
+    dets.append(epix10k2M)
 
 ########################################################## 
 ##
 ## <-- User Input end
 ##
 ########################################################## 
-dets = [ det for det in dets if checkDet(ds.env(), det._srcName)]
+#dets = [ det for det in dets if checkDet(ds.env(), det._src.__repr__())]
 #for now require all area detectors in run to also be present in event.
 
 
@@ -343,6 +343,7 @@ for eventNr,evt in enumerate(ds.events()):
                     userDict[det._name+'_env']=envData
             except:
                 pass
+            det.processSums()
             #print userDict[det._name]
         except:
             pass
@@ -350,9 +351,9 @@ for eventNr,evt in enumerate(ds.events()):
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.
     #try:
-    #    cspadMax = cspad.evt.dat.max()
+    #    epix10k2MMax = epix10k2M.evt.dat.max()
     #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': cspadMax*epix_vonHamosMax}
+    #    combDict = {'userValue': epix10k2MMax*epix_vonHamosMax}
     #    smldata.event(combDict)
     #except:
     #    pass
