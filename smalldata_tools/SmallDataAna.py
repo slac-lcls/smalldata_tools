@@ -254,6 +254,8 @@ class SmallDataAna(object):
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
+            if not path.isfile(self.fname):
+                self.fname='%s/%s_Run%04d.h5'%(self.dirname,self.expname,self.run)
             print('setting up dirs:')
             if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
