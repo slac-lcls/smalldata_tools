@@ -10,7 +10,6 @@ import logging
 import requests
 import sys
 from glob import glob
-from PIL import Image
 
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
@@ -18,27 +17,17 @@ from PIL import Image
 # If it is current, check in ffb for xtc data, if not there, default to psdm
 
 # TODO: Fix this
-#fpath=os.path.dirname(os.path.abspath(__file__))
-#fpathup = '/'.join(fpath.split('/')[:-1])
-#sys.path.append(fpathup)
-#print(fpathup)
-#this did not work for me, but test again...
-#sys.path.append('../smalldata_tools')
-sys.path.append('/reg/g/psdm/sw/tools/smalldata_tools')
+fpath=os.path.dirname(os.path.abspath(__file__))
+fpathup = '/'.join(fpath.split('/')[:-1])
+sys.path.append(fpathup)
+print(fpathup)
+sys.path.append('/reg/neh/home/snelson/feeComm_smd/smalldata_tools/')
 from smalldata_tools.utilities import printMsg
 from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
-from smalldata_tools.SmallDataUtils import getUserData, getUserEnvData
 from smalldata_tools.SmallDataDefaultDetector import ttRawDetector, wave8Detector, epicsDetector
-
-from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
-from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
-from smalldata_tools.SmallDataDefaultDetector import encoderDetector
-from smalldata_tools.roi_rebin import ROIFunc, imageFunc
-from smalldata_tools.DetObject import DetObject
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.debug('Directory is {0}'.format(os.getcwd()))
 
 # Constants
 HUTCHES = [
@@ -61,18 +50,13 @@ WS_CUR_RUN = '/ws/current_run'
 # Define Args
 parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
-parser.add_argument('--exp', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
+parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
-parser.add_argument('--dir', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--offline', help='run offline (def for current exp from ffb)', action='store_true')
-parser.add_argument('--gather', help='gather interval', type=int, default=100)
-parser.add_argument('--epicsAll', help='save all EPICS PVs', action='store_true')
-parser.add_argument('--full', help='save everything (use with care)', action='store_true')
+parser.add_argument('--directory', help='directory for output files (def <experiment>/hdf5/smalldata)')
+parser.add_argument('--offline', help='run offline (def for current experiment from ffb)')
+parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true')
-parser.add_argument('--image', help='save everything as image (use with care)', action='store_true')
-parser.add_argument('--tiff', help='save all image also as single tiff (use with even more care)', action='store_true')
-
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -127,10 +111,10 @@ def get_sd_file(write_dir, exp, hutch):
 hostname = socket.gethostname()
 
 # Parse hutch name from experiment and check it's a valid hutch
-exp = args.exp
+exp = args.experiment
 run = args.run
 station = args.stn
-logger.debug('Analyzing data for EXP:{0} - RUN:{1}'.format(args.exp, args.run))
+logger.debug('Analyzing data for EXP:{0} - RUN:{1}'.format(args.experiment, args.run))
 
 hutch = exp[:3].upper()
 if hutch not in HUTCHES:
@@ -139,168 +123,55 @@ if hutch not in HUTCHES:
 
 # Get current exp and run
 cur_exp = get_cur_exp(hutch, station)
+cur_run = get_cur_run(cur_exp)  # This might be unecessary
 
 xtc_files = []
 # If experiment matches, check for files in ffb
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if cur_exp == exp:
-        xtc_files = get_xtc_files(FFB_BASE, hutch, run)
+	xtc_files = get_xtc_files(FFB_BASE, hutch, cur_run)
 
-if xtc_files and not args.offline:
-        ds_name = ds_name.replace(':smd',':dir=/reg/d/ffb/%s/%s/xtc:live:smd'%(exp[:3],exp))
 # If not a current experiment or files in ffb, look in psdm
-else:
-	logger.debug('Either not a current exp or files not in ffb, looking in psdm')
-	xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
-        ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':live'])
-
 if not xtc_files:
-	logger.debug('XTC files not available')
-        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>XTC files:</b>", "value": 'not available'}])
-        sys.exit()
+	logger.debug('Either not a current exp or files not in ffb, looking in psdm')
+	xtc_files = get_xtc_files(PSDM_BASE, hutch, cur_run)
 
 # Get output file, check if we can write to it
-h5_f_name = get_sd_file(args.dir, exp, hutch)
+h5_f_name = get_sd_file(args.directory, exp, hutch)
 
 # Define data source name and generate data source object, don't understand all conditions yet
-if args.norecorder:
-        ds_name += 'stream=0-79'
-
+ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':stream=0-79'])
 try:
 	ds = psana.MPIDataSource(ds_name)
 except Exception as e:
-	logger.debug('Could not instantiate MPIDataSource with {0}: {1}'.format(ds_name, e))
+	logger.debug('Could not instantiate MPIDataSource with {0): {1}'.format(ds_name, e))
 	sys.exit()
 
 # Generate smalldata object
-small_data = ds.small_data(h5_f_name, gather_interval=args.gather)
+small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
 if ds.rank is 0:
-	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
+	logger.debug('psana conda environemnt is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 # gather default dets and add to data
 default_dets = defaultDetectors(hutch.lower())
 config_data = {det.name: det.params_as_dict() for det in default_dets}
 small_data.save({'UserDataCfg': config_data})
 
-#
-# add stuff here to save all EPICS PVs.
-#
-logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
-epicsPVall=[]
-if args.exp.find('dia')>=0:
-    epicsPVall=ds.env().epicsStore().pvNames()
-    default_dets.append(eorbitsDetector())
-elif args.epicsAll:
-    epicsPVall=ds.env().epicsStore().aliases()
-elif args.full:
-    epicsPVall=ds.env().epicsStore().aliases()
-if len(epicsPVall)>0:
-    logger.debug('adding all epicsPVs....total of %d PVs'%(len(epicsPVall)))
-    default_dets.append(epicsDetector(PVlist=epicsPVall,name='epicsAll'))
-    logger.debug('default dets: ',[det.name for det in default_dets])
-
-dets=[]
-if args.full:
-        default_det_aliases = [det.name for det in default_dets]
-
-        aliases = []
-        for dn in psana.DetNames():
-            if dn[1]!='':
-                aliases.append(dn[1])
-            else:
-                aliases.append(dn[0])
-
-        for alias in aliases:
-            if alias in default_det_aliases: continue
-            if alias=='FEEGasDetEnergy': continue #done by mpidatasource
-            if alias=='PhaseCavity':     continue #done by mpidatasource
-            if alias.find('evr')>=0:     continue #done by mpidatasource
-            if alias=='ControlData':     continue #done by my code
-            if alias.find('BMMON')>=0:
-                default_dets.append(bmmonDetector(alias))
-                continue
-            elif alias.find('IPM')>=0 or alias.find('Ipm')>0:
-                default_dets.append(ipmDetector(alias, savePos=True))
-                continue
-            elif alias.find('DIO')>=0 or alias.find('Imb')>0:
-                default_dets.append(ipmDetector(alias, savePos=False))
-                continue
-            elif alias.find('USB')>=0:
-                default_dets.append(encoderDetector(alias))
-                continue
-            try:
-                thisDet = DetObject(alias, ds.env(), int(run), name=alias)
-                hasGeom=False
-                for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
-                        if alias.find(keyword)>=0 and args.image: hasGeom=True
-                if hasGeom:
-                        fullROI = ROIFunc()
-                        fullROI.addFunc(imageFunc(coords=['x','y']))
-                else:
-                        fullROI = ROIFunc(writeArea=True)
-                thisDet.addFunc(fullROI)
-                dets.append(thisDet)
-            except:
-                pass
-
-
-if args.tiff:
-    dirname = '/reg/d/psdm/%s/%s/scratch/run%d'%(args.exp[:3],args.exp,int(args.run))
 max_iter = args.nevents / ds.size
-evt_num = -1
 for evt_num, evt in enumerate(ds.events()):
-	if evt_num >= max_iter:
+	if evt_num > max_iter:
 		break
 
 	det_data = detData(default_dets, evt)
 	small_data.event(det_data)
-        if (evt_num==0): 
-            print('default det data: ',[k for k in det_data])
-        if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
-            try:
-                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
-            except:
-                pass
-
-        #detector data using DetObject 
-        if len(dets)>0:
-            userDict = {}
-            for det in dets:
-                try:
-                    det.getData(evt)
-                    det.processFuncs()
-                    userDict[det._name]=0
-                    userDict[det._name]=getUserData(det)
-                    #print(userDict[det._name].keys())
-                    try:
-                        envData=getUserEnvData(det)
-                        if len(envData.keys())>0:
-                            userDict[det._name+'_env']=envData
-                    except:
-                        pass
-                except:
-                    pass
-            small_data.event(userDict)
-
-            if args.tiff:
-                for key in userDict:
-                    for skey in userDict[key]:
-                        if skey.find('area')>=0 or skey.find('img')>=0:
-                            if len(userDict[key][skey].shape)==2:
-                                im = Image.fromarray(userDict[key][skey])
-                                file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
-                                im.save(file)
-
-        if ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
+        if ds.size == 1:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+        else:
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num}])
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
-try:
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num+1}])
-except:
-    pass
+requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num*ds.size}])
 logger.debug('Saved all small data')
 
