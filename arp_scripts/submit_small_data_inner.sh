@@ -52,16 +52,6 @@ do
 			usage
 			exit
 			;;
-		-q|--queue)
-			QUEUE="$2"
-			shift
-			shift
-			;;
-		-c|--cores)
-			CORES="$2"
-			shift
-			shift
-			;;
 		-l|--locally)
 			LOCALLY=true
 			shift
@@ -78,11 +68,6 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
-#Define cores if we don't have them
-#Set to 1 if single is set
-CORES=${CORES:='1'}
-QUEUE=${QUEUE:='anagpu'}
-
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
@@ -90,11 +75,7 @@ if [[ -v LOCALLY ]]; then
 fi
 
 if [[ -v FULL ]]; then
-    #sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #sbatch --cpus-per-task=$CORES -p psnehprioq $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    sbatch -p $QUEUE $ABS_PATH/smalldata_producer_full_arp.py $@
-    #sbatch --ntasks=$CORES -p psnehprioq mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
+    mpirun $ABS_PATH/smalldata_producer_full_arp.py $@
 else
-    sbatch --cpus-per-task=$CORES -p $QUEUE $ABS_PATH/smalldata_producer_arp.py $@
+    mpirun $ABS_PATH/smalldata_producer_arp.py $@
 fi

@@ -10,24 +10,24 @@ $(basename "$0"):
 	OPTIONS:
 		-h|--help
 			Definition of options
-		-e|--experiment
+		--experiment
 			Experiment name (i.e. cxilr6716)
-		-r|--run
+		--run
 			Run Number
-		-d|--directory
+		---directory
 			Full path to directory for output file
+		--nevents
+			Number of events to analyze
+		--norecorder
+			If specified, don't use recorder data
 		-q|--queue
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
 		-s|--single
 			Run on a single core
-		-n|--nevents
-			Number of events to analyze
 		-l|--locally
 			If specified, will run locally
-		-x|--norecorder
-			If specified, don't use recorder data
 		-F|--full
 			eIf specified, translate everything
 		-t|--test
@@ -62,14 +62,6 @@ do
 			shift
 			shift
 			;;
-		-l|--locally)
-			LOCALLY=true
-			shift
-			;;
-		-F|--full)
-			FULL=True
-			shift
-			;;
                  *)
                         POSITIONAL+=("$1")
 			shift
@@ -80,21 +72,15 @@ set -- "${POSITIONAL[@]}"
 
 #Define cores if we don't have them
 #Set to 1 if single is set
-CORES=${CORES:='1'}
-QUEUE=${QUEUE:='anagpu'}
+CORES=${CORES:=1}
+QUEUE=${QUEUE:='psanaq'}
 
-source /reg/g/psdm/etc/psconda.sh
-ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
-if [[ -v LOCALLY ]]; then
-    ABS_PATH=/reg/d/psdm/xcs/xcsx43118/results/smalldata_tools/examples
-fi
+# deal with request cores & cores/per nodde
+#if [ $CORES -gt 1 ]; then
+#   if [ $QUEUE =~ 'psneh' ]; then
 
-if [[ -v FULL ]]; then
-    #sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #sbatch --cpus-per-task=$CORES -p psnehprioq $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    sbatch -p $QUEUE $ABS_PATH/smalldata_producer_full_arp.py $@
-    #sbatch --ntasks=$CORES -p psnehprioq mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-else
-    sbatch --cpus-per-task=$CORES -p $QUEUE $ABS_PATH/smalldata_producer_arp.py $@
-fi
+#SBATCH --ntasks-per-node=$CORES
+#SBATCH --nodes=1
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+sbatch -p $QUEUE --ntasks-per-node $CORES $DIR/submit_small_data_inner.sh $@
