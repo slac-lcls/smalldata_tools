@@ -250,7 +250,8 @@ class SmallDataAna(object):
                 self.dirname=dirname
                 self.plot_dirname = dirname+'/smalldata_plots'
             if not path.isdir(self.plot_dirname):
-                makedirs(self.plot_dirname)
+                #makedirs(self.plot_dirname)
+                self.plot_dirname = None
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)

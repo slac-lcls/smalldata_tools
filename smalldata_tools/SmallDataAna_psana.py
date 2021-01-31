@@ -65,7 +65,7 @@ class SmallDataAna_psana(object):
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
         if self.hutch == 'cxi':
-            print('Will assume the first CXI station, if this is wrong, please  -e <expname> on commandline')
+            print('Will assume the first CXI station, if this is wrong, make sure to add  -e <expname> on commandline')
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": self.hutch.upper(), 
                                                                                           "station": 0})
         currExpname = resp.json().get("value", {}).get("name")
