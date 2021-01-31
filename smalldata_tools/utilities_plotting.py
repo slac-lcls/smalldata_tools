@@ -844,12 +844,11 @@ def plotImage(image, **kwargs):
             layout,p,im = retValues
         if plotWith=='bokeh_notebook':
             bp.output_notebook()
-            #bp.show(p)
             bp.show(layout)
         else:
-            bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
-            #bp.save(p)
-            bp.save(layout)
+            if self.plot_dirname is not None:
+                bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
+                bp.save(layout)
 
     elif plotWith != 'no_plot':
         print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith)
