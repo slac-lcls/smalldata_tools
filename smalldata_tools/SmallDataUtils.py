@@ -61,7 +61,7 @@ def xppDetectors(beamCodes=[[162,120],[91]]):
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
     dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))
-    dets.append(aiDetector('FEE-SPEC0','feeBld'))
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(encoderDetector('XPP-USB-ENCODER-02','enc'))
     try:
         dets.append(encoderDetector('usbencoder','enc'))
