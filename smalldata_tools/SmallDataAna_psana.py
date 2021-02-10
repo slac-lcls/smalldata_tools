@@ -1472,8 +1472,8 @@ class SmallDataAna_psana(object):
             dis_to_sam=float(raw_input('please enter the detector distance'))
         if center==None or len(center)!=2:
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
-            center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
-                    int(centerString.replace('[','').replace(']','').split(',')[1])]
+            center=[float(centerString.replace('[','').replace(']','').split(',')[0]),
+                    float(centerString.replace('[','').replace(']','').split(',')[1])]
 
         azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbins=qBin, tx=tx, ty=ty, geomCorr=geomCorr, polCorr=polCorr, name=name)
         getattr(self,detname).addFunc(azav)
