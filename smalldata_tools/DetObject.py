@@ -305,6 +305,8 @@ class DetObjectClass(object):
                     if skey.find('thresADU')>=0:
                         thres=float(skey.replace('thresADU',''))
             
+            if self.evt.dat is None:
+                return
             dat_to_be_summed = self.evt.dat
             if thres>1e-9:
                 dat_to_be_summed[self.evt.dat<thres]=0.
@@ -324,8 +326,11 @@ class DetObjectClass(object):
             if self._storeSum[key] is None:
                 self._storeSum[key] = dat_to_be_summed.copy()
             else:
-                self._storeSum[key] += dat_to_be_summed
-  
+                try:
+                    self._storeSum[key] += dat_to_be_summed
+                except:
+                    print('could not add ',dat_to_be_summed)
+                    print('could not to ',self._storeSum[key])
 
 class WaveformObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
