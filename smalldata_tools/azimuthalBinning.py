@@ -23,7 +23,7 @@ class azimuthalBinning(DetObjectFunc):
         Parameters
         ----------
         center (x,y)   = pixel coordinate (1D array each); note: they should be the center of the pixels
-        xcen,ycen = center beam position
+        xcen,ycen = center beam position (in micron as derived from psana-detector geometry)
         tx,ty = angle of detector normal with respect to incoming beam (in deg)
                         zeros are for perpendicular configuration
         darkImg    = darkImage to subtract, by default input is pedestal subtracted.
@@ -31,12 +31,14 @@ class azimuthalBinning(DetObjectFunc):
         qbin = rebinning q (def 0.01)
         phiBins = bin in azimuthal angle (def: one bin)
         Pplane = Polarization (1 = horizontal, 0 = vertical)
-        dis_to_sam = distance of center of detector to sample (in m)
+        dis_to_sam = distance of center of detector to sample (in mm)
         lam = wavelength in Ang
         userMask = userMask as array (detector data shaped)
         thresADU = lower threshold in ADU
         thresADUhigh = high threshold in ADU
         thresRms = lower threshold in RMS
+        geomCorr: apply geometry correction (def True)
+        polCorr: apply polalization correction (def True)
         """
         # save parameters for later use
         self._name = kwargs.get('name','azav')
@@ -261,7 +263,8 @@ class azimuthalBinning(DetObjectFunc):
             I=np.bincount(self.idxq, weights = img.ravel()/self.correction.ravel(), minlength=self.nq); I=I[:self.nq]
         else:
             I=np.bincount(self.idxq, weights = img.ravel()                        , minlength=self.nq); I=I[:self.nq]
-        self.sig = np.sqrt(1./self.ADU_per_photon)*np.sqrt(I)/self.norm
+        #do not calculate until we want to save this again.
+        #self.sig = np.sqrt(1./self.ADU_per_photon)*np.sqrt(I)/self.norm
         self.I = I/self.norm
         return self.I
 
@@ -279,9 +282,9 @@ class azimuthalBinning(DetObjectFunc):
         else:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
             I=np.bincount(self.Cake_idxs, weights = img                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-        #print('reshape')
         I = np.reshape(I,(self.nphi,self.nq))
-        self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
+        #don't calculate this - I don't think this is stored.
+        #self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
         self.Icake = I/self.Cake_norm
         return self.Icake
 
