@@ -10,32 +10,14 @@ $(basename "$0"):
 	OPTIONS:
 		-h|--help
 			Definition of options
-		-e|--experiment
+		--experiment
 			Experiment name (i.e. cxilr6716)
-		-r|--run
+		--run
 			Run Number
-		-d|--directory
-			Full path to directory for output file
 		-q|--queue
 			Queue to use on SLURM
-		-c|--cores
-			Number of cores to be utilized
-		-s|--single
-			Run on a single core
-		-n|--nevents
-			Number of events to analyze
 		-l|--locally
 			If specified, will run locally
-		-x|--norecorder
-			If specified, don't use recorder data
-		-F|--full
-			eIf specified, translate everything
-                -i|--image
-			If specified, translate everything & save area detectors as images
-                -T|--tiff
-			If specified, translate everything & save area detectors as images * single-event tiffs
-		-t|--test
-			Run the slurm job as test only to get job info
 EOF
 
 }
@@ -56,12 +38,17 @@ do
 			usage
 			exit
 			;;
+		-q|--queue)
+			QUEUE="$2"
+			shift
+			shift
+			;;
 		-l|--locally)
 			LOCALLY=true
 			shift
 			;;
-		-F|--full)
-			FULL=True
+		-i|--interactive)
+			INTERACTIVE=true
 			shift
 			;;
                  *)
@@ -72,17 +59,22 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+#Define cores if we don't have them
+#QUEUE=${QUEUE:='psanaq'}
+QUEUE=${QUEUE:='ffbh3q'}
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
-    ABS_PATH=/reg/d/psdm/mec/meclv0318/results/smalldata_tools/examples
-    #ABS_PATH=/cds/home/s/snelson/git_smd_fullimage/smalldata_tools/examples
+    ABS_PATH=$DIR
 fi
 
-if [[ -v FULL ]]; then
-    #local test befre full commit
-    mpirun $ABS_PATH/smalldata_producer_full_arp.py $@
-    #$ABS_PATH/smalldata_producer_full_arp.py $@
+if [[ -v INTERACTIVE ]]; then
+    echo 88888
+    $ABS_PATH/../examples/DataqualityPlots.py $@
 else
-    mpirun $ABS_PATH/smalldata_producer_arp.py $@
+    echo 99999
+    sbatch $ABS_PATH/../examples/DataqualityPlots.py $@
 fi
