@@ -30,6 +30,10 @@ $(basename "$0"):
 			If specified, don't use recorder data
 		-F|--full
 			eIf specified, translate everything
+                -i|--image
+			If specified, translate everything & save area detectors as images
+                -T|--tiff
+			If specified, translate everything & save area detectors as images * single-event tiffs
 		-t|--test
 			Run the slurm job as test only to get job info
 EOF
@@ -71,11 +75,14 @@ set -- "${POSITIONAL[@]}"
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
-    ABS_PATH=/reg/d/psdm/xcs/xcsx43118/results/smalldata_tools/examples
+    ABS_PATH=/reg/d/psdm/mec/meclv0318/results/smalldata_tools/examples
+    #ABS_PATH=/cds/home/s/snelson/git_smd_fullimage/smalldata_tools/examples
 fi
 
 if [[ -v FULL ]]; then
+    #local test befre full commit
     mpirun $ABS_PATH/smalldata_producer_full_arp.py $@
+    #$ABS_PATH/smalldata_producer_full_arp.py $@
 else
     mpirun $ABS_PATH/smalldata_producer_arp.py $@
 fi

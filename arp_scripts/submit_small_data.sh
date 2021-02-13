@@ -30,6 +30,10 @@ $(basename "$0"):
 			If specified, don't use recorder data
 		-F|--full
 			eIf specified, translate everything
+                -i|--image
+			If specified, translate everything & save area detectors as images
+                -T|--tiff
+			If specified, translate everything & save area detectors as images * single-event tiffs
 		-t|--test
 			Run the slurm job as test only to get job info
 EOF

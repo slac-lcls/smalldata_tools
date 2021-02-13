@@ -29,7 +29,11 @@ $(basename "$0"):
 		-l|--locally
 			If specified, will run locally
 		-F|--full
-			eIf specified, translate everything
+			If specified, translate everything
+                -i|--image
+			If specified, translate everything & save area detectors as images
+                -T|--tiff
+			If specified, translate everything & save area detectors as images * single-event tiffs
 		-t|--test
 			Run the slurm job as test only to get job info
 EOF
@@ -83,4 +87,6 @@ QUEUE=${QUEUE:='psanaq'}
 #SBATCH --nodes=1
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+#test  before git commit!!!!!
 sbatch -p $QUEUE --ntasks-per-node $CORES $DIR/submit_small_data_inner.sh $@
+#$DIR/submit_small_data_inner.sh $@
