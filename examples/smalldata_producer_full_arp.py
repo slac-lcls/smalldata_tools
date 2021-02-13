@@ -10,6 +10,7 @@ import logging
 import requests
 import sys
 from glob import glob
+from PIL import Image
 
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
@@ -22,12 +23,16 @@ sys.path.append(fpathup)
 print(fpathup)
 sys.path.append('/reg/d/psdm/xcs/xcsx43118/results/smalldata_tools/')
 from smalldata_tools.utilities import printMsg
-from smalldata_tools.SmallDataUtils import setParameter, defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import setParameter, getUserData, defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector
-from smalldata_tools.roi_rebin import ROIFunc
 from smalldata_tools.DetObject import DetObject
+from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
+from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
+from smalldata_tools.droplet import dropletFunc
+from smalldata_tools.photons import photonFunc
+from smalldata_tools.azimuthalBinning import azimuthalBinning
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -60,6 +65,10 @@ parser.add_argument('--directory', help='directory for output files (def <exp>/h
 parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
 parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true', default=False)
+parser.add_argument("--full", help="save everything (use with care)", action='store_true', default=False)
+parser.add_argument("--image", help="save everything as image (use with care)", action='store_true', default=False)
+parser.add_argument("--tiff", help="save all images also as single tiff (use with even more care)", action='store_true', default=False)
+
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -181,7 +190,8 @@ else:
     epicsPV=ds.env().epicsStore().aliases()
 if len(epicsPV)>0:
     logger.debug('adding all epicsPVs....')
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+#snelson DEBUG comment out for now due to all error messages....
+#    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
 
@@ -217,11 +227,23 @@ for alias in aliases:
         continue
     try:
         thisDet = DetObject(alias, ds.env(), int(run), name=alias)
-        fullROI_write = ROIFunc(writeArea=True)
-        thisDet.addFunc(fullROI_write)
+        hasGeom=False
+        for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
+            if alias.find(keyword)>=0 and args.image: hasGeom=True
+        if hasGeom:
+            fullROI=ROIFunc()
+            fullROI.addFunc(imageFunc(coords=['x','y']))
+        else:    
+            fullROI = ROIFunc(writeArea=True)
+        thisDet.addFunc(fullROI)
         dets.append(thisDet)
     except:
         pass
+
+if args.tiff:
+    dirname = '/reg/d/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
 
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
@@ -230,12 +252,42 @@ for evt_num, evt in enumerate(ds.events()):
 
     det_data = detData(default_dets, evt)
     small_data.event(det_data)
+
+    #detector data using DetObject 
+    userDict = {}
+    for det in dets:
+        try:
+            #this should be a plain dict. Really.
+            det.getData(evt)
+            det.processFuncs()
+            userDict[det._name]=getUserData(det)
+            try:
+                envData=getUserEnvData(det)
+                if len(envData.keys())>0:
+                    userDict[det._name+'_env']=envData
+            except:
+                pass
+            det.processSums()
+            print userDict[det._name]
+        except:
+            pass
+    small_data.event(userDict)
+
+    if args.tiff:
+        for key in userDict:
+            for skey in userDict[key]:
+                if skey.find('area')>=0 or skey.find('img')>=0:
+                   if len(userDict[key][skey].shape)==2:
+                       im = Image.fromarray(userDict[key][skey])
+                       tiff_file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
+                       im.save(tiff_file)
+
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
     if (int(os.environ.get('RUN_NUM', '-1')) > 0) and ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
         if ds.size == 1:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num}])
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
         else:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num}])
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
 
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
