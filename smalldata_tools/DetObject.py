@@ -293,8 +293,6 @@ class DetObjectClass(object):
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
 
     def processSums(self):
-        if self.evt.dat is None:
-            return
         for key in self._storeSum.keys():
             asImg=False
             thres=-1.e9
@@ -425,9 +423,10 @@ class CameraObject(DetObjectClass):
         self._gainSwitching = False
         try:
             self.x = self.det.coords_x(run)
-            self.y = self.det.coords_y(run)
             self.ix=self.x
+            self.y = self.det.coords_y(run)
             self.iy=self.y
+            self.z = self.det.coords_z(run)
         except:
             self.x = None
             self.y = None
