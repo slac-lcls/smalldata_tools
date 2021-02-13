@@ -795,23 +795,34 @@ class SmallDataAna_psana(object):
                 print('ROI: [[%i,%i], [%i,%i]]'%(ax1.min(),ax1.max(),ax0.min(),ax0.max()))
             
 
-    def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inParams={}):
-        detname, img, avImage = self.getAvImage(detname=None)
-        try:
-            mask = self.__dict__[detname].det.cmask.astype(bool)
-        except:
-            mask = self.__dict__[detname].det.mask(self.run, calib=True, status=True).astype(bool)
-        nPixRaw=1.
-        for idim in mask.shape:
-            nPixRaw=nPixRaw*idim
-        print('check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw))
-        if (mask.sum()/nPixRaw)<0.5 and not forceMask:
-            mask=~mask
-        try:
-            maskgeo = self.__dict__[detname].det.mask_geo(self.run).astype(bool)
-            mask = mask*maskgeo
-        except:
-            pass
+    def FitCircleAuto(self, detname=None, plotRes=True, forceMask=False, inImage={},inParams={}):
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
+
+        else:
+            detname, img, avImage = self.getAvImage(detname=None)
+            try:
+               mask = self.__dict__[detname].det.cmask.astype(bool)
+            except:
+               mask = self.__dict__[detname].det.mask(self.run, calib=True, status=True).astype(bool)
+            nPixRaw=1.
+            for idim in mask.shape:
+                nPixRaw=nPixRaw*idim
+            print('check calib mask: ',mask.sum(),nPixRaw,(mask.sum()/nPixRaw)>0.5,(mask.sum().astype(float)/nPixRaw))
+            if (mask.sum()/nPixRaw)<0.5 and not forceMask:
+                mask=~mask
+            try:
+                maskgeo = self.__dict__[detname].det.mask_geo(self.run).astype(bool)
+                mask = mask*maskgeo
+            except:
+                pass
         #apply mask to image.
         img = (img*mask)
 
@@ -1466,8 +1477,19 @@ class SmallDataAna_psana(object):
             det.save_txtnda(dirname+'pixel_rms/'+fname,self.__dict__['AvImg_std_raw_%s'%(detname)], fmt='%.3f',addmetad=True)
         det.save_txtnda(dirname+'pixel_status/'+fname,status, fmt='%d',addmetad=True)
 
-    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0, geomCorr=True, polCorr=True):
-        detname, img, avImage = self.getAvImage(detname=detname)
+    def addAzInt(self, detname=None, phiBins=1, qBin=0.01, eBeam=9.5, center=None, dis_to_sam=None, name='azav', Pplane=1,userMask=None,tx=0,ty=0, geomCorr=True, polCorr=True, inImage={}):
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
+        else:
+            detname, img, avImage = self.getAvImage(detname=detname)
+
         if dis_to_sam==None:
             dis_to_sam=float(raw_input('please enter the detector distance'))
         if center==None or len(center)!=2:
@@ -1475,7 +1497,7 @@ class SmallDataAna_psana(object):
             center=[float(centerString.replace('[','').replace(']','').split(',')[0]),
                     float(centerString.replace('[','').replace(']','').split(',')[1])]
 
-        azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbins=qBin, tx=tx, ty=ty, geomCorr=geomCorr, polCorr=polCorr, name=name)
+        azav = azimuthalBinning(center=center, dis_to_sam=dis_to_sam,  phiBins=phiBins, eBeam=eBeam, Pplane=Pplane, userMask=userMask, qbin=qBin, tx=tx, ty=ty, geomCorr=geomCorr, polCorr=polCorr, name=name)
         getattr(self,detname).addFunc(azav)
 
     def getAzAvs(self,detname=None):
@@ -1487,26 +1509,30 @@ class SmallDataAna_psana(object):
         azintNames = [ key for key in getattr(self,detname).__dict__.keys() if isinstance(getattr(getattr(self, detname),key), azimuthalBinning) ]
         return azintNames, azintArray
 
-    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, data=None, imgName=None):
+    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, inImage={}, imgName=None):
         avImage=None
-        if data is not None:
-            if detname is None:
-                detname=raw_input('type the name detector alias')
-            img=data
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
         else:
             detname, img, avImage = self.getAvImage(detname=detname, imgName=None)
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
-            img = (img*mask)
         if use_mask_local:
             if avImage is None:
                 detname_dump, img_dump, avImage = self.getAvImage(detname=detname)
             if self.__dict__.has_key('_mask_'+avImage):
                 mask = self.__dict__['_mask_'+avImage]
-                img = (img*mask)
             else:
                 print('no local mask defined for ',avImage)
 
+        img = (img*mask)
         azIntNames,azIntegrations = self.getAzAvs(detname)
         if len(azIntegrations)>1:
             if azintName is None:
@@ -1563,31 +1589,36 @@ class SmallDataAna_psana(object):
         except:
             pass
 
-    def AzInt_centerVar(self, detname=None, use_mask=False, center=None, data=None, varCenter=110., zoom=None, qBin=0.001, phiBins=13, dis_to_sam=1000.):
-        if data is not None:
-            if detname is None:
-                detname=raw_input('type the name detector alias')
-            img=data
+    def AzInt_centerVar(self, detname=None, use_mask=False, center=None, data=None, varCenter=110., zoom=None, qBin=0.001, phiBins=13, dis_to_sam=1000., inImage={}, imgName=None, plotGrid=0):
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
         else:
-            detname, img, avImage = self.getAvImage(detname=detname)
+            detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
             img = (img*mask)
 
         if center==None or len(center)!=2:
             centerString=raw_input('please enter the coordinates of the beam center as c1,c2 or [c1,c2]:')
-            center=[int(centerString.replace('[','').replace(']','').split(',')[0]),
-                    int(centerString.replace('[','').replace(']','').split(',')[1])]
-        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]], dis_to_sam=dis_to_sam, name='c00')
-        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]-varCenter,center[1]], dis_to_sam=dis_to_sam, name='cm10')
-        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]+varCenter,center[1]], dis_to_sam=dis_to_sam, name='cp10')
-        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]-varCenter], dis_to_sam=dis_to_sam, name='cm01')
-        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]+varCenter], dis_to_sam=dis_to_sam, name='cp01')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='c00')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cm10')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cp10')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cm01')
-        self.AzInt(detname=detname, use_mask=use_mask, data=data, azintName='cp01')
+            center=[float(centerString.replace('[','').replace(']','').split(',')[0]),
+                    float(centerString.replace('[','').replace(']','').split(',')[1])]
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]], dis_to_sam=dis_to_sam, name='c00', inImage=inImage)
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]-varCenter,center[1]], dis_to_sam=dis_to_sam, name='cm10', inImage=inImage)
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0]+varCenter,center[1]], dis_to_sam=dis_to_sam, name='cp10', inImage=inImage)
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]-varCenter], dis_to_sam=dis_to_sam, name='cm01', inImage=inImage)
+        self.addAzInt(detname=detname, phiBins=phiBins, qBin=qBin, eBeam=9.5, center=[center[0],center[1]+varCenter], dis_to_sam=dis_to_sam, name='cp01', inImage=inImage)
+        self.AzInt(detname=detname, use_mask=use_mask, azintName='c00', inImage=inImage)
+        self.AzInt(detname=detname, use_mask=use_mask, azintName='cm10', inImage=inImage)
+        self.AzInt(detname=detname, use_mask=use_mask, azintName='cp10', inImage=inImage)
+        self.AzInt(detname=detname, use_mask=use_mask, azintName='cm01', inImage=inImage)
+        self.AzInt(detname=detname, use_mask=use_mask, azintName='cp01', inImage=inImage)
 
         azintValues_c00 = self.__dict__['_azint_c00']
         azintValues_cm10 = self.__dict__['_azint_cm10']
@@ -1610,21 +1641,27 @@ class SmallDataAna_psana(object):
         while 1:
             ymin=0;ymax=azintValues_c00.shape[1]-1
             if zoom is not None:
-                if isinstance(zoom, list) and isinstance(zoom[0], int) and zoom[0]>=0 and zoom[1]>=0 and zoom[0]!=zoom[1]:
-                    ymin=zoom[0]
-                    ymax=zoom[1]
+                if len(zoom)==1:
+                    maxVal = np.nanpercentile(azintValues_c00, zoom[0])
+                    zoom = None
+                elif len(zoom)==3:
+                    maxVal = np.nanpercentile(azintValues_c00, zoom[2])
                 else:
-                    yString=raw_input('please enter x-boundaries of the zoomed figure as c1,c2 or [c1,c2]:')
-                    ymin=int(yString.replace('[','').replace(']','').split(',')[0])
-                    ymax=int(yString.replace('[','').replace(']','').split(',')[1])
+                    if isinstance(zoom, list) and isinstance(zoom[0], int) and zoom[0]>=0 and zoom[1]>=0 and zoom[0]!=zoom[1]:
+                        ymin=zoom[0]
+                        ymax=zoom[1]
+                    else:
+                        yString=raw_input('please enter x-boundaries of the zoomed figure as c1,c2 or [c1,c2]:')
+                        ymin=int(yString.replace('[','').replace(']','').split(',')[0])
+                        ymax=int(yString.replace('[','').replace(']','').split(',')[1])
             print('we will plot from bin %d to %d '%(ymin, ymax))
 
             try:
-                p33_11.imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none')
-                p33_10.imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none')
-                p33_12.imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none')
-                p33_01.imshow(azintValues_cm01[:,ymin:ymax],aspect='auto',interpolation='none')
-                p33_21.imshow(azintValues_cp01[:,ymin:ymax],aspect='auto',interpolation='none')
+                p33_11.imshow(azintValues_c00[:,ymin:ymax],aspect='auto',interpolation='none',vmax=maxVal)
+                p33_10.imshow(azintValues_cm10[:,ymin:ymax],aspect='auto',interpolation='none',vmax=maxVal)
+                p33_12.imshow(azintValues_cp10[:,ymin:ymax],aspect='auto',interpolation='none',vmax=maxVal)
+                p33_01.imshow(azintValues_cm01[:,ymin:ymax],aspect='auto',interpolation='none',vmax=maxVal)
+                p33_21.imshow(azintValues_cp01[:,ymin:ymax],aspect='auto',interpolation='none',vmax=maxVal)
                 maxVal_c00 =  np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_c00[:,ymin:ymax])])
                 maxVal_cm10 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm10[:,ymin:ymax])])
                 maxVal_cm01 = np.array([[ip,np.nanargmax(phiBin)] for ip,phiBin in enumerate(azintValues_cm01[:,ymin:ymax])])
@@ -1636,12 +1673,23 @@ class SmallDataAna_psana(object):
                     p33_12.plot(maxVal_cp10[:,1], maxVal_cp10[:,0],'r+')
                     p33_01.plot(maxVal_cm01[:,1], maxVal_cm01[:,0],'r+')
                     p33_21.plot(maxVal_cp01[:,1], maxVal_cp01[:,0],'r+')
-                    cMaxVal_c00 = np.nanargmax(azintValues_c00[:,ymin:ymax].sum(axis=0))
-                    p33_11.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
-                    p33_10.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
-                    p33_12.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
-                    p33_01.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
-                    p33_21.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    if plotGrid==0:
+                        cMaxVal_c00 = np.nanargmax(azintValues_c00[:,ymin:ymax].sum(axis=0))
+                        p33_11.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                        p33_10.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                        p33_12.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                        p33_01.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                        p33_21.plot([cMaxVal_c00,cMaxVal_c00],[0, azintValues_c00.shape[0]],'m')
+                    else:
+                        for il,lineVal in enumerate(np.linspace(ymin,ymax,int(plotGrid))):
+                            lw=1
+                            if plotGrid>15 and il%5>0:
+                                lw=0.5
+                            p33_11.plot([lineVal,lineVal],[0, azintValues_c00.shape[0]],'b',linewidth=lw,linestyle='dotted')
+                            p33_10.plot([lineVal,lineVal],[0, azintValues_c00.shape[0]],'b',linewidth=lw,linestyle='dotted')
+                            p33_12.plot([lineVal,lineVal],[0, azintValues_c00.shape[0]],'b',linewidth=lw,linestyle='dotted')
+                            p33_01.plot([lineVal,lineVal],[0, azintValues_c00.shape[0]],'b',linewidth=lw,linestyle='dotted')
+                            p33_21.plot([lineVal,lineVal],[0, azintValues_c00.shape[0]],'b',linewidth=lw,linestyle='dotted')
                 except:
                     print('failed at plotting')
 
