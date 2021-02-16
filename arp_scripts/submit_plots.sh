@@ -60,15 +60,15 @@ done
 set -- "${POSITIONAL[@]}"
 
 #Define cores if we don't have them
-#QUEUE=${QUEUE:='psanaq'}
-QUEUE=${QUEUE:='ffbh3q'}
+QUEUE=${QUEUE:='psanaq'}
+#QUEUE=${QUEUE:='ffbh3q'}
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
-    ABS_PATH=$DIR
+    ABS_PATH=$MYDIR
 fi
 
 if [[ -v INTERACTIVE ]]; then
@@ -76,5 +76,5 @@ if [[ -v INTERACTIVE ]]; then
     $ABS_PATH/../examples/DataqualityPlots.py $@
 else
     echo 99999
-    sbatch $ABS_PATH/../examples/DataqualityPlots.py $@
+    sbatch -p $QUEUE $ABS_PATH/../examples/DataqualityPlots.py $@
 fi
