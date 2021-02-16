@@ -20,22 +20,20 @@ $(basename "$0"):
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
-		-s|--single
-			Run on a single core
 		-n|--nevents
 			Number of events to analyze
 		-l|--locally
 			If specified, will run locally
 		-x|--norecorder
 			If specified, don't use recorder data
-		-F|--full
+		-D|--default
+			If specified, translate only small data
+		-f|--full
 			eIf specified, translate everything
                 -i|--image
 			If specified, translate everything & save area detectors as images
                 -T|--tiff
 			If specified, translate everything & save area detectors as images * single-event tiffs
-		-t|--test
-			Run the slurm job as test only to get job info
 EOF
 
 }
@@ -56,22 +54,29 @@ do
 			usage
 			exit
 			;;
-		-q|--queue)
-			QUEUE="$2"
-			shift
-			shift
-			;;
-		-c|--cores)
-			CORES="$2"
-			shift
-			shift
-			;;
 		-l|--locally)
 			LOCALLY=true
 			shift
 			;;
-		-F|--full)
-			FULL=True
+		-e|--experiment)
+                        POSITIONAL+=("--experiment $2")
+			shift
+			shift
+			;;
+		-r|--run)
+                        POSITIONAL+=("--run $2")
+			shift
+			shift
+			;;
+		-n|--nevents)
+		        NEVENTS=$2
+                        POSITIONAL+=("--nevents $2")
+			shift
+			shift
+			;;
+		-d|--directory)
+                        POSITIONAL+=("--directory $2")
+			shift
 			shift
 			;;
                  *)
@@ -82,23 +87,15 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
-#Define cores if we don't have them
-#Set to 1 if single is set
-CORES=${CORES:='1'}
-QUEUE=${QUEUE:='anagpu'}
-
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
 if [[ -v LOCALLY ]]; then
-    ABS_PATH=/reg/d/psdm/xcs/xcsx43118/results/smalldata_tools/examples
+    #DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 fi
 
-if [[ -v FULL ]]; then
-    #sbatch --cpus-per-task=$CORES -p anagpu $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #sbatch --cpus-per-task=$CORES -p psnehprioq $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    sbatch -p $QUEUE $ABS_PATH/smalldata_producer_full_arp.py $@
-    #sbatch --ntasks=$CORES -p psnehprioq mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
-    #mpirun $ABS_PATH/smalldata_producer_full_arp.py $ARGS
+if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
+    $ABS_PATH/smalldata_producer.py $@
 else
-    sbatch --cpus-per-task=$CORES -p $QUEUE $ABS_PATH/smalldata_producer_arp.py $@
+    mpirun $ABS_PATH/smalldata_producer.py $@
 fi

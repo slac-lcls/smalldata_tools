@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Took this from Silke's script, nice implementation
 usage()
 {
 cat << EOF
@@ -10,32 +9,36 @@ $(basename "$0"):
 	OPTIONS:
 		-h|--help
 			Definition of options
-		--experiment
+		-e|--experiment
 			Experiment name (i.e. cxilr6716)
-		--run
+		-r|--run
 			Run Number
-		---directory
+		-d|--directory
 			Full path to directory for output file
-		--nevents
+		-n|--nevents
 			Number of events to analyze
-		--norecorder
-			If specified, don't use recorder data
 		-q|--queue
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
-		-s|--single
-			Run on a single core
 		-l|--locally
 			If specified, will run locally
-		-F|--full
+		-f|--full
 			If specified, translate everything
+		-D|--default
+			If specified, translate only smalldata
                 -i|--image
 			If specified, translate everything & save area detectors as images
                 -T|--tiff
 			If specified, translate everything & save area detectors as images * single-event tiffs
-		-t|--test
-			Run the slurm job as test only to get job info
+		--norecorder
+			If specified, don't use recorder data
+                --nparallel
+                        Number of processes per node
+                --postTrigger
+                        Post that primary processing done to elog to seconndary jobs can start
+                --interactive
+                        Run the process live w/o batch system
 EOF
 
 }
@@ -66,6 +69,15 @@ do
 			shift
 			shift
 			;;
+                --nparallel)
+   		        TASKS_PER_NODE="$2"
+			shift
+			shift
+			;;
+                 --interactive)
+                        INTERACTIVE=1
+			shift
+			;;
                  *)
                         POSITIONAL+=("$1")
 			shift
@@ -77,16 +89,19 @@ set -- "${POSITIONAL[@]}"
 #Define cores if we don't have them
 #Set to 1 if single is set
 CORES=${CORES:=1}
-QUEUE=${QUEUE:='psanaq'}
+#QUEUE=${QUEUE:='psanaq'}
+#QUEUE=${QUEUE:='ffbh3q'}
+QUEUE=${QUEUE:='psfehq'}
+TASKS_PER_NODE=${TASKS_PER_NODE:=20}
 
-# deal with request cores & cores/per nodde
-#if [ $CORES -gt 1 ]; then
-#   if [ $QUEUE =~ 'psneh' ]; then
+if [ $TASKS_PER_NODE -gt $CORES ]; then
+    TASKS_PER_NODE=$CORES 
+fi
 
-#SBATCH --ntasks-per-node=$CORES
-#SBATCH --nodes=1
-
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-#test  before git commit!!!!!
-sbatch -p $QUEUE --ntasks-per-node $CORES $DIR/submit_small_data_inner.sh $@
-#$DIR/submit_small_data_inner.sh $@
+#need to export this so that it can be used in the follow-up script even in SLURMx
+export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+if [ -v INTERACTIVE ]; then
+    $DIR/submit_small_data.sh $@
+    exit 0
+fi
+sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_small_data.sh $@
