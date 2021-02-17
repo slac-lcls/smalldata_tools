@@ -16,8 +16,6 @@ $(basename "$0"):
 			Run Number
 		-q|--queue
 			Queue to use on SLURM
-		-l|--locally
-			If specified, will run locally
 EOF
 
 }
@@ -43,10 +41,6 @@ do
 			shift
 			shift
 			;;
-		-l|--locally)
-			LOCALLY=true
-			shift
-			;;
 		-i|--interactive)
 			INTERACTIVE=true
 			shift
@@ -65,16 +59,12 @@ QUEUE=${QUEUE:='psanaq'}
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
-source /reg/g/psdm/etc/psconda.sh
-ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
-if [[ -v LOCALLY ]]; then
-    ABS_PATH=$MYDIR
-fi
+source /reg/g/psdm/etc/psconda.sh -py3
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
 if [[ -v INTERACTIVE ]]; then
-    echo 88888
-    $ABS_PATH/../examples/DataqualityPlots.py $@
+    #$ABS_PATH/../examples/DataqualityPlots.py $@
+    $ABS_PATH/BeamlineSummaryPlots.py $@
 else
-    echo 99999
-    sbatch -p $QUEUE $ABS_PATH/../examples/DataqualityPlots.py $@
+    sbatch -p $QUEUE $ABS_PATH/../examples/BeamlineSummaryPlots.py $@
 fi

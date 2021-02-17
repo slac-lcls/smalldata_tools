@@ -21,8 +21,6 @@ $(basename "$0"):
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
-		-l|--locally
-			If specified, will run locally
 		-f|--full
 			If specified, translate everything
 		-D|--default
