@@ -964,7 +964,7 @@ class SmallDataAna(object):
         if vals is None:
             return
         if threshold!=-1e25:
-            vals = vals[vals<threshold]=0
+            vals[vals<threshold]=0
         if len(vals.shape)>1:
             if sigROI!=[]:
                 if len(vals.shape)==2:
@@ -1024,6 +1024,12 @@ class SmallDataAna(object):
         if len(nomDelay.shape) == 0:
             return None
 
+        epics_delay = np.zeros_like(self.xrData.fiducials)
+        if self.hasKey('epics/lxt_ttc'):
+            epics_delay = self.getVar('epics/lxt_ttc')
+        elif self.hasKey('epics/lxt'):
+            epics_delay = self.getVar('epics/lxt')
+
         isDaqDelayScan=False
         scanVar = self.getScanName()
         if isinstance(scanVar,basestring):
@@ -1033,18 +1039,18 @@ class SmallDataAna(object):
                 isDaqDelayScan=True
                 #print('DEBUG: found that we have a delay scan')
                 nomDelay=self.getVar('scan/%s'%scanVN)*1e12
-
+        
         if not isDaqDelayScan:
             if self.hasKey('enc/lasDelay'):
                 encVal = self.getVar('enc/lasDelay')
-                #print('DEBUG: encoder info',np.nanstd(encVal))
-                if np.nanstd(encVal)>1e-9:
-                    nomDelay=encVal
-                    addEnc=False
-                elif np.nanstd(encVal)>1e-15:
-                    nomDelay=encVal*1e12
-                    addEnc=False
-                elif self.hasKey('enc/ch0'):
+                if len(np.unique(encVal))>10:
+                    if np.nanstd(encVal)>1e-9:
+                        nomDelay=encVal
+                        addEnc=False
+                    elif np.nanstd(encVal)>1e-15:
+                        nomDelay=encVal*1e12
+                        addEnc=False
+            elif self.hasKey('enc/ch0'):
                     encVal = self.getVar('enc/ch0')
                     if np.nanstd(encVal)>1e-15 and np.nanstd(encVal)<1e-9:
                         nomDelay=encVal*1e12
@@ -1053,12 +1059,13 @@ class SmallDataAna(object):
                         nomDelay=encVal
                     else:
                         print('strange encoder value for runs taken before encoder FEX....', encCal.std())
-                else:
-                    epics_delay = self.getVar('epics/lxt_ttc')
-                    if epics_delay.std()!=0:
-                        nomDelay = epics_delay
+            else:
+                #print('DEBUG check if someone just moved lxt  ot lxt_ttc')
+                print(epics_delay.std())
+                if epics_delay.std()!=0:
+                    nomDelay = epics_delay*1e12
 
-        if addEnc and self.hasKey('enc/lasDelay'):
+        if addEnc and not self.hasKey('enc/lasDelay'):
             print('required to add encoder value, did not find encoder!')
         if addEnc and self.hasKey('enc/lasDelay'):
             if self.getVar(fh5,'enc/lasDelay').std()>1e-6:
@@ -1068,7 +1075,10 @@ class SmallDataAna(object):
             try:
                 nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
             except:
-                pass
+                try:
+                    nomDelay=nomDelay.copy()+self.getVar('epics/lxt')*1e12
+                except:
+                    pass
 
         if use_ttCorr:
             #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
