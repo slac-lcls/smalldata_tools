@@ -11,11 +11,7 @@ import requests
 import sys
 from glob import glob
 from PIL import Image
-from krtc import KerberosTicket
-try:
-    from urllib.parse import urlparse
-except:
-    from urlparse import urlparse
+from requests.auth import HTTPBasicAuth
 
 ########################################################## 
 ##
@@ -142,8 +138,7 @@ parser.add_argument('--directory', help='directory for output files (def <exp>/h
 parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
 parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
-parser.add_argument('--postTrigger', help='postTrigger for seconday jobs', action='store_true')
-parser.add_argument('--url', default='https://pswww.slac.stanford.edu/ws-kerb/lgbk/')
+parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)
 parser.add_argument('--full', help='store all data (please think before usig this)', action='store_true', default=False)
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
@@ -412,11 +407,12 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}, {"key": "<b>Parallel jobs</b>", "value": ds.size}])
 logger.debug('Saved all small data')
 
-if args.postTrigger:
-    print('posting to the run tables.')
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL:',ws_url)
-    krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    runtable_data = {"SmallData":"done"}
-    r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
+print('posting to the run tables.')
+ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
+print('URL:',ws_url)
+user=args.experiment[:3]+'opr'
+with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+    answer = reader.readline()
+runtable_data = {"ProdDone":current_time}
+r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+print(r)
