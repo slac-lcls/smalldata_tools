@@ -3,6 +3,7 @@
 import numpy as np
 import psana
 import time
+from datetime import datetime
 import argparse
 import socket
 import os
@@ -144,6 +145,7 @@ parser.add_argument('--full', help='store all data (please think before usig thi
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
+parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -187,6 +189,8 @@ exp = args.experiment
 run = args.run
 station = args.stn
 logger.debug('Analyzing data for EXP:{0} - RUN:{1}'.format(args.experiment, args.run))
+
+begin_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
 hutch = exp[:3].upper()
 if hutch not in HUTCHES:
@@ -361,7 +365,7 @@ for evt_num, evt in enumerate(ds.events()):
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
-            print('userdata ',det)
+            #print('userdata ',det)
             try:
                 envData=getUserEnvData(det)
                 if len(envData.keys())>0:
@@ -400,6 +404,8 @@ for evt_num, evt in enumerate(ds.events()):
         else:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
 
+end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
@@ -407,12 +413,22 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}, {"key": "<b>Parallel jobs</b>", "value": ds.size}])
 logger.debug('Saved all small data')
 
-print('posting to the run tables.')
-ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-print('URL:',ws_url)
-user=args.experiment[:3]+'opr'
-with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-    answer = reader.readline()
-runtable_data = {"ProdDone":current_time}
-r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-print(r)
+if args.postRuntable:
+    print('posting to the run tables.')
+    runtable_data = {"Prod_end":end_prod_time,
+                     "Prod_start":begin_prod_time,
+                     "Prod_ncores":ds.size}
+    if args.default:
+        runtable_data["SmallData"]="default"
+    else:
+        runtable_data["SmallData"]="done"
+    time.sleep(5)
+    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
+    print('URL:',ws_url)
+    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
+    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
+    user=args.experiment[:3]+'opr'
+    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+        answer = reader.readline()
+    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+    print(r)
