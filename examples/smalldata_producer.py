@@ -122,7 +122,8 @@ HUTCHES = [
 	'XCS',
 	'MFX',
 	'CXI',
-	'MEC'
+	'MEC',
+	'DIA'
 ]
 
 FFB_BASE = '/cds/data/drpsrcf'
