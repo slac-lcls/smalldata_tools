@@ -20,6 +20,8 @@ def defaultDetectors(hutch):
         dets = mecDetectors()
     elif hutch.lower()=='det':
         dets = detDetectors()
+    elif hutch.lower()=='dia':
+        dets = diaDetectors()
     else:
         dets = []
     detsInRun= [ det for det in dets if det.inRun() ]
@@ -190,6 +192,10 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     except:
         pass
     return dets
+
+def diaDetectors():
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    return []
 
 def detDetectors():
     return []
