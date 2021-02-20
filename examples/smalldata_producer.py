@@ -283,6 +283,7 @@ if not args.default:
 else:
     dets = []
 
+det_presence={}
 if args.full:
     aliases = []
     for dn in psana.DetNames():
@@ -292,6 +293,7 @@ if args.full:
             aliases.append(dn[0])
 
     for alias in aliases:
+        det_presence[alias]=1
         if alias in default_det_aliases: continue
         if alias=='FEEGasDetEnergy': continue #done by mpidatasource
         if alias=='PhaseCavity':     continue #done by mpidatasource
@@ -417,7 +419,7 @@ logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     if ds.size > 1:
-        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}, {"key": "<b>Parallel jobs</b>", "value": ds.size}])
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
@@ -436,8 +438,11 @@ if args.postRuntable:
     print('URL:',ws_url)
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    user=args.experiment[:3]+'opr'
+    user=(args.experiment[:3]+'opr').replace('dia','mcc')
     with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
         answer = reader.readline()
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)
+    if det_presence!={}:
+        rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+        print(rp)
