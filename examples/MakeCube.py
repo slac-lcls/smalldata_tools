@@ -199,7 +199,7 @@ if ana is not None:
     nSel2 = ana.getFilter('filter2').sum()
 
     if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube: </b>", "value": "Prepared"}])
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Prepared"}])
 
     if args.nevents:
         print('make cube with fewer events/bin')
@@ -218,7 +218,7 @@ if ana is not None:
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube: </b>", "value": "Done"}])
+    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
 
 if args.postRuntable:
     print('posting to the run tables.')
