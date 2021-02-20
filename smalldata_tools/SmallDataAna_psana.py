@@ -108,7 +108,7 @@ class SmallDataAna_psana(object):
 
         else:
             if len(present_Xtc)==0:
-                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %04d, return None'%(expname, run))
+                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %04d, return None'%(expname, self.run))
                 return None
 
             self.dsname='exp=%s:run=%i:smd'%(expname,self.run)

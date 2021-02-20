@@ -23,6 +23,16 @@ sys.path.append(fpath)
 from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import rebin
 
+## function that chops the 64 bit time integer into soemthing a bit more realistic
+def evtt2Rt(event_time):
+    evtt0 = event_time>>32
+    evtt1 = (event_time<<32)>>32
+    evtt_sec = evtt0.astype(float)
+    evtt_ns = evtt1.astype(float)*1e-9
+    Rt = evtt_sec + evtt_ns
+    Rt = Rt-Rt[0]
+    return Rt
+
 def postRunTable(runtable_data):
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
@@ -34,6 +44,27 @@ def postRunTable(runtable_data):
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     print(r)
+
+def makeRunTableData(ana, ipmUpDim, ipmDownDim, Filter):
+    n162 = ana.getVar('evr/code_162').sum()
+    nOff = ana.getFilter('xoff').sum()
+    #data to be posted to the run table if so requested.
+    runtable_data = {"N dropped Shots":nOff,
+                 "N BYKIK 162":n162}
+
+    ipmUpVar = ana.getVar(ipmUpDim.name,useFilter=Filter)
+    ipmDownVar = ana.getVar(ipmDownDim.name,useFilter=Filter)
+    ipmUpVar_percentiles = np.nanpercentile(ipmUpVar,[25,50,75])
+    ipmDownVar_percentiles = np.nanpercentile(ipmownVar,[25,50,75])
+    runtable_data["%s_1qt"%(ipmUpDim.name)]=ipmUpVar[0]
+    runtable_data["%s_med"%(ipmUpDim.name)]=ipmUpVar[1]
+    runtable_data["%s_3qt"%(ipmUpDim.name)]=ipmUpVar[2]
+    runtable_data["%s_1qt"%(ipmDownDim.name)]=ipmDownVar[0]
+    runtable_data["%s_med"%(ipmDownDim.name)]=ipmDownVar[1]
+    runtable_data["%s_3qt"%(ipmDownDim.name)]=ipmDownVar[2]
+
+    return runtable_data
+
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -64,6 +95,7 @@ run = int(args.run)
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Dataquality Plots: </b>", "value": "Started"}])
 
+#get the ana & anaps objects (from smalldata_tools
 if args.directory is not None:
     anaps = sdaps(expname,run, dirname=args.directory)
 else:
@@ -78,19 +110,14 @@ ana.addCut('lightStatus/xray',0.5,1.5,iniFilter)
 ana.addCut('lightStatus/laser',0.5,1.5,iniFilter)
 
 #effectively, keep all events
-if args.inclDropped:
+if not args.inclDropped:
     ana.addCut('lightStatus/xray',-0.5,1.5,iniFilter)
     ana.addCut('lightStatus/laser',-0.5,1.5,iniFilter)
     
 #droppled sthots.
 ana.addCut('lightStatus/xray',-0.5,0.5,'xoff')
-n162 = ana.getVar('evr/code_162').sum()
 nOff = ana.getFilter('xoff').sum()
 nEvents = ana.getFilter('xoff').shape[0]
-
-#data to be posted to the run table if so requested.
-runtable_data = {"N dropped Shots":nOff,
-                 "N BYKIK 162":n162}
 
 ### Get data & define axis title&ranges.
 
@@ -103,6 +130,7 @@ elif expname.find('xpp')>=0:
 else:
     ipmUpDim = None
     ipmDownDim = None
+
 eventTimeDim = hv.Dimension(('eventTimeR','relative event time'))
 l3eDim = hv.Dimension(('l3e','L3 Energy'))
 
@@ -117,15 +145,11 @@ lxtDim = hv.Dimension(('epics/lxt','lxt'))
 
 ipmUpVar = ana.getVar(ipmUpDim.name,useFilter=iniFilter)
 ipmDownVar = ana.getVar(ipmDownDim.name,useFilter=iniFilter)
-ipmUpVar_percentiles = np.nanpercentile(ipmUpVar,[25,50,75])
-runtable_data["%s 25 percentile"%(ipmUpDim.name)]=ipmUpVar[0]
-runtable_data["%s 50 percentile"%(ipmUpDim.name)]=ipmUpVar[1]
-runtable_data["%s 75 percentile"%(ipmUpDim.name)]=ipmUpVar[2]
-runtable_data["%s 25 percentile"%(ipmDownDim.name)]=ipmDownVar[0]
-runtable_data["%s 50 percentile"%(ipmDownDim.name)]=ipmDownVar[1]
-runtable_data["%s 75 percentile"%(ipmDownDim.name)]=ipmDownVar[2]
-
 eventTimeRaw = ana.getVar('event_time',useFilter=iniFilter)
+eventTimeR =  evtt2Rt(eventTimeRaw)
+
+runtable_data = makeRunTableData(ana, ipmUpDim, ipmDownDim, iniFilter)
+
 if ana.getFilter(iniFilter).sum()==0:
     print('No events pass Filter, quit')
     if args.postStats:
@@ -133,8 +157,6 @@ if ana.getFilter(iniFilter).sum()==0:
         postRunTable(runtable_data)
     sys.exit()
 
-eventTime = (eventTimeRaw>>32).astype(float)+((eventTimeRaw<<32)>>32).astype(float)*1e-9
-eventTimeR = eventTime-eventTime[0]
 if 'ebeam/L3_energy' in ana.Keys():
     l3eVar = ana.getVar('ebeam/L3_energy',useFilter=iniFilter)
 else:
@@ -160,7 +182,7 @@ scanDim = None
 isStepScan=False
 if scanVar is not None and scanVar!='':
     isStepScan=True
-if isStepScan:
+
     if isinstance(scanVar, basestring):
         scanVar=[scanVar]
     nPoints=[]
@@ -168,7 +190,7 @@ if isStepScan:
 
         if scanDim == None:
             scanDim = hv.Dimension(('scan/%s'%scanVar[0],'%s'%scanVar[0]))
-        nPoints.append(np.unique(self.getVar('scan/%s'%thisScanVar)).shape[0])
+        nPoints.append(np.unique(ana.getVar('scan/%s'%thisScanVar)).shape[0])
     if len(scanVar)==1:
         print('this run is a scan of %s with %d points'%(scanVar[0],nPoints[0]))
 
@@ -223,9 +245,9 @@ if isStepScan:
     try:
         stepPlot = hv.Points((scanVarBins/scanNsteps, scanNsteps), kdims=[scanDim,nevtsDim])
     except:
-        print('Failed to make stepPlot', np.nanmax(stepVar), scanNsteps.shape, scanVarBins.shape)
-        print('DataPoints: ',scanVarBins/scanNsteps)
-        print('Dimensions:', scanDim, nevtsDim)
+        scanNsteps = None
+        print('Failed to make stepPlot',scanDim, nevtsDim)
+
 if lxt_fast_his is not None:
     lxtPlot = hv.Points( (0.5*(lxt_fast_his[1][:-1]+lxt_fast_his[1][1:]), lxt_fast_his[0]), \
                              kdims=[lxtDim,nevtsLxtDim])

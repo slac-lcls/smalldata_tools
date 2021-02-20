@@ -100,7 +100,7 @@ expname = args.experiment
 run = int(args.run)
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots: </b>", "value": "Started"}])
+    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Started"}])
 
 ######################################
 ### load data for the chosen run  ####
@@ -285,7 +285,7 @@ if save_elog:
     tabs.save(('%s/report.html'%elogDir))
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots: </b>", "value": "Posted"}])
+    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Posted"}])
 
 if args.postStats:
     print('posting to the run tables - ipm values.')
