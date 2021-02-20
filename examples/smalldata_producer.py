@@ -13,11 +13,6 @@ import sys
 from glob import glob
 from PIL import Image
 from requests.auth import HTTPBasicAuth
-from krtc import KerberosTicket
-try:
-    from urllib.parse import urlparse
-except:
-    from urlparse import urlparse
 
 ########################################################## 
 ##
@@ -127,7 +122,8 @@ HUTCHES = [
 	'XCS',
 	'MFX',
 	'CXI',
-	'MEC'
+	'MEC',
+	'DIA'
 ]
 
 FFB_BASE = '/cds/data/drpsrcf'
@@ -143,15 +139,14 @@ parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--directory', help='directory for output files (def <exp>/hdf5/smalldata)')
 parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
-parser.add_argument("--norecorder", help="ignore recorder streams", action='store_true', default=False)
-parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
-#parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-kerb/lgbk/")
+parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
-parser.add_argument('--epicsAll', help="store all epics PVs", action='store_true', default=False)
-parser.add_argument('--full', help="store all data (please think before usig this)", action='store_true', default=False)
-parser.add_argument('--default', help="store only default data", action='store_true', default=False)
-parser.add_argument("--image", help="save everything as image (use with care)", action='store_true', default=False)
-parser.add_argument("--tiff", help="save all images also as single tiff (use with even more care)", action='store_true', default=False)
+parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)
+parser.add_argument('--full', help='store all data (please think before usig this)', action='store_true', default=False)
+parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
+parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
+parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
+parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -376,7 +371,7 @@ for evt_num, evt in enumerate(ds.events()):
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
-            print('userdata ',det)
+            #print('userdata ',det)
             try:
                 envData=getUserEnvData(det)
                 if len(envData.keys())>0:
@@ -426,7 +421,6 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
-
 
 if args.postRuntable:
     print('posting to the run tables.')
