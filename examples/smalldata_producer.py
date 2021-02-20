@@ -414,6 +414,14 @@ for evt_num, evt in enumerate(ds.events()):
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
+sumDict={'Sums': {}}
+for det in dets:
+    for key in det.storeSum().keys():
+        sumData=smldata.sum(det.storeSum()[key])
+        sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
+if len(sumDict['Sums'].keys())>0:
+    smldata.save(sumDict)
+
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()

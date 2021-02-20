@@ -232,8 +232,8 @@ class SmallDataAna(object):
     def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, plotWith='matplotlib'):
         self._fields={}
         self.expname=expname
-        self.run=run
-        self.runLabel='Run%03d'%run
+        self.run=int(run)
+        self.runLabel='Run%03d'%self.run
         self.plotWith=plotWith
         if len(expname)>3:
             self.hutch=self.expname[:3]
@@ -1257,6 +1257,13 @@ class SmallDataAna(object):
         for key in self.Keys('scan'):
             if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0 and key.find('UserDataCfg')<0:
                 scanNames.append(key.replace('/scan/','').replace('scan/',''))
+        #during the early times of bluesky scans with pseudo positioners, 
+        #sometimes extra data was saved in the control data
+        scanVarVary=[]
+        for scanVar in scanNames:
+            if len(np.unique(self.getVar('scan/%s'%scanVar)))==1: continue;
+            scanVarVary.append(scanVar)
+        scanNames=scanVarVary
         if len(scanNames)==0: return ''
         elif len(scanNames)==1: return scanNames[0]
         else: return scanNames
@@ -1281,7 +1288,7 @@ class SmallDataAna(object):
                         scanVarName='delay [fs]'
             else:
                 try:
-                    scanOrg = self.getVar('scan/var0')
+                    scanOrg = self.getVar('scan/%s'%scanVN)
                     scanValues.append(scanOrg)
                 except:
                     scanValues.append([])
