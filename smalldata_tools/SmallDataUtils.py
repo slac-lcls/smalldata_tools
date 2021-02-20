@@ -194,8 +194,9 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     return dets
 
 def diaDetectors():
+    dets=[]
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
-    return []
+    return dets
 
 def detDetectors():
     return []
