@@ -1,4 +1,3 @@
-from os import path
 import numpy as np
 try:
     from pylab import ginput
@@ -55,7 +54,7 @@ size = comm.Get_size()
 
 class SmallDataAna_psana(object):
     def __init__(self, expname='', run=-1,dirname='', filename='', plotWith='matplotlib'):
-        self.run=run
+        self.run=int(run)
         self.expname=expname
         self.hutch=expname[0:3]
         self.plotWith=plotWith
@@ -69,56 +68,57 @@ class SmallDataAna_psana(object):
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": self.hutch.upper(), 
                                                                                           "station": 0})
         currExpname = resp.json().get("value", {}).get("name")
+        print('Current experiment for %s is %s'%(self.hutch, currExpname))
+        from glob import glob
+        xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
+        idxname = xtcdirname+'/index/*-r%04d-*'%int(self.run)
+        xtcname = xtcdirname+'/*-r%04d-*xtc'%int(self.run)
+        present_Idx=glob('%s'%idxname)
+        present_Xtc=glob('%s'%xtcname)
         if expname==currExpname:
             rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
             if not rundoc:
                 logger.error("Invalid response from server")
             lastRun = int(rundoc['num'])
             if self.run > lastRun:
-                printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, run))
+                printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
                 return None
             
-            isLive = rundoc.get('end_time', None)
-            self.dsname='exp=%s:run=%i:smd'%(expname,run)
-            xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-            idxname=xtcdirname+'/index/*-r%04d-*'%int(run)
-            ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
-            ffbxtcname=ffbxtcdirname+'/*-r%04d-*'%int(run)
-            ffbidxname=ffbxtcdirname+'/index/*-r%04d-*'%int(run)
-            import glob
-            present_ffbXtc=glob.glob('%s'%ffbxtcname)
-            present_ffbIdx=glob.glob('%s'%ffbidxname)
-            present_Idx=glob.glob('%s'%idxname)
-            if len(present_ffbXtc)>0:
-                self.dsname='exp=%s:run=%i:smd:dir=/reg/d/ffb/%s/%s/xtc'%(expname,run,self.hutch.lower(),expname)
-                if isLive:
-                    self.dsname=self.dsname+':live'
-            if len(present_ffbIdx)>0:
-                self.dsnameIdx='exp=%s:run=%i:idx:dir=/reg/d/ffb/%s/%s/xtc'%(expname,run,self.hutch.lower(),expname)
-            elif len(present_Idx)>0:
-                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+            if self.run == lastRun:
+                isLive = rundoc.get('end_time', None)
             else:
-                self.dsnameIdx=None
+                isLive = False
+            self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
+            ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
+            ffbxtcname=ffbxtcdirname+'/*-r%04d-*'%self.run
+            ffbidxname=ffbxtcdirname+'/index/*-r%04d-*'%self.run
+            present_ffbXtc=glob('%s'%ffbxtcname)
+            present_ffbIdx=glob('%s'%ffbidxname)
+            self.dsnameIdx=None
+            #use ffB if more files are there ONLY (check hostname when move to new FFB)
+            if len(present_ffbXtc)>len(present_Xtc) or (len(present_Xtc)==0 and len(present_ffbXtc)==0):
+                self.dsname=self.dsname+':dir=/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
+                if isLive:
+                    self.dsname=self.dsname+':live:stream=0-79'
+                if len(present_ffbIdx)>0:
+                    self.dsnameIdx='exp=%s:run=%i:idx:dir=/reg/d/ffb/%s/%s/xtc'%(expname,self.run,self.hutch.lower(),expname)
+            else: 
+                if len(present_Idx)>0:
+                    self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
 
         else:
-            xtcdirname = '/reg/d/psdm/%s/%s/xtc/'%(self.hutch, expname)
-            haveXtc=False
-            dirpath, dirnames, filenames = next(os.walk(xtcdirname))
-            for fname in filenames:
-                if fname.find('r%04d'%run)>=0 and fname[-3:]=='xtc':
-                    haveXtc=True
-            if not haveXtc:
-                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %03d, return None'%(expname, run))
+            if len(present_Xtc)==0:
+                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %04d, return None'%(expname, run))
                 return None
 
-            self.dsname='exp=%s:run=%i:smd'%(expname,run)
-            self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+            self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
+            self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
             xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-            idxname=xtcdirname+'/index/*-r%04d-*'%int(run)
+            idxname=xtcdirname+'/index/*-r%04d-*'%self.run
             import glob
             present_Idx=glob.glob('%s'%idxname)
             if len(present_Idx)>0:
-                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,run)
+                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
             else:
                 self.dsnameIdx=None
 
@@ -148,7 +148,7 @@ class SmallDataAna_psana(object):
         printR(rank, 'try to make SmallDataAna using dirname %s, for exp %s and run %s'%(dirname,expname,run))
         try:
             printR(rank, 'setting up SmallData ana from anaps ')
-            self.sda = sda.SmallDataAna(expname,run,dirname=dirname, filename=filename,plotWith=plotWith)
+            self.sda = sda.SmallDataAna(expname,self.run,dirname=dirname, filename=filename,plotWith=plotWith)
         except:
             printR(rank, 'failed, set anaps.lda to None')
             self.sda = None
@@ -430,7 +430,74 @@ class SmallDataAna_psana(object):
 
         return np.array(imgAr)
 
-    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=None, std=False, median=False, printFid=False,useMask=True):
+    def _getEventTimestamps(self, numEvts=100, useFilter=None, nSkip=0, uniform=False, printFid=False):
+        #now get the non-image data
+        run = self.dsIdxRun
+        times=[]
+        if self.sda is None or 'fh5' not in self.sda.__dict__.keys():
+            useFilter = None
+        if useFilter is not None:
+            evttsSel = self.sda.getSelIdx(useFilter)
+            print('using smd based selection, have %s events for selection %s'%(len(evttsSel),useFilter))
+            if numEvts==-1:
+                numEvts = len(evttsSel)-nSkip
+                if numEvts<0:
+                    print('have no events, quit')
+                    return
+            for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
+                times.append(psana.EventTime(int(evtts[1]),evtts[0]))
+        else:
+            times = run.times()[nSkip:]
+        print('requested %d, used %d now actually get events'%(numEvts,min(len(times),numEvts)))
+        if (min(len(times),numEvts) < numEvts*0.5):
+            if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
+                return
+            else:
+                numEvts = len(times)
+
+        if len(times)>numEvts: 
+            if uniform:
+                tr = np.arange(len(times))
+                evtFraction = float(numEvts)/len(times)
+                times_sel = np.array(times)[(tr*evtFraction)%1<(evtFraction)]
+                times = times_sel
+            else:
+                times = times[:numEvts]
+
+        if printFid:
+            for tm in times:
+                print(tm)
+                try:
+                    evt=run.event(tm)
+                except:
+                    print('Could not get this event, skip ')
+                    continue
+                if evt is None:
+                    print('Returned event is None, skip')
+                    continue
+                print((evt.get(psana.EventId)).fiducials())
+
+        return times
+
+    def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=None, std=False, median=False, printFid=False,useMask=True, uniform=False, returnEnv=False):
+        """
+        make an average (summed) image for a given detector
+        if a detector ame is not passed, you will be presented with a choice.
+        argument:
+        numEvts: number of events to be used
+        nSkip: number of events to be skipped
+        common_mode: calibration applied, including optional correction for common mode noise. Default choice will be used if none are passed if not supplied
+        thresADU: threshold  each images at thresADU (in units after calibration)
+        thresRms: threshhold in multtiples of pixels noise. Currently does not work for gain switching detectors.
+        median: get the median, rather than mean image
+        std: get the standard deviation as image, rather than mean image
+        useMask: apply the user mask to the average image.
+        useFilter: use a filter definied using anaps
+        uniform: pick events respecting nSkip&useFilter across whole run (default: False, pick first numEvts events)
+        printFid: print the picked fiducials (debug)
+        minIpm: require a minimal IPM value (if hdf5 file needed to use a filter does not exist). Currently IPM setup only (not wave8)!
+        returnEnv: return dictionary of timestamps & enviroment variables if detector provides them
+        """
         if not isinstance(detname, basestring):
             print('please give parameter name unless specifying arguments in right order. detname is first')
             return
@@ -463,30 +530,11 @@ class SmallDataAna_psana(object):
         #now get the non-image data
         imgAr = []
         run = self.dsIdxRun
-        times=[]
-        if self.sda is None or 'fh5' not in self.sda.__dict__.keys():
-            useFilter = None
-        if useFilter is not None:
-            evttsSel = self.sda.getSelIdx(useFilter)
-            print('using smd based selection, have %s events for selection %s'%(len(evttsSel),useFilter))
-            if numEvts==-1:
-                numEvts = len(evttsSel)-nSkip
-                if numEvts<0:
-                    print('have no events, quit')
-                    return
-            for evtts in evttsSel[nSkip:min(nSkip+numEvts, len(evttsSel))]:
-                times.append(psana.EventTime(int(evtts[1]),evtts[0]))
-        else:
-            times = run.times()[nSkip:]
-        print('requested ',numEvts,' used ',min(len(times),numEvts), ' now actually get events')
-        if (min(len(times),numEvts) < numEvts*0.5):
-            if raw_input('too few events, quit?') in ['y','Y','yes','Yes']:
-                return
-            else:
-                numEvts = len(times)
-
+        times = self._getEventTimestamps(numEvts=numEvts, useFilter=useFilter, nSkip=nSkip, uniform=uniform, printFid=printFid)
+        envDict={'timestamp':[]}
         for tm in times:
             #print('numEvts ',numEvts)
+            #this loop here is used for the minIpm option when no smallData file is available.
             if numEvts<=0:
                 break
             try:
@@ -499,8 +547,6 @@ class SmallDataAna_psana(object):
                 continue
             if minIpm!=-1 and ( (self.hutch=='xpp' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XppSb2_Ipm)')).sum() < minIpm) or (self.hutch=='xcs' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XCS-IPM-05)')).sum() < minIpm)):
                 continue
-            if printFid:
-                print((evt.get(psana.EventId)).fiducials())
             aliases = [ k.alias() for k in evt.keys() ]
             if not detname in aliases:
                 continue
@@ -517,6 +563,14 @@ class SmallDataAna_psana(object):
                     data[data>=abs(thresRms)*rms]=1
             imgAr.append(data)                      
             numEvts-=1
+            ts = evt.get(psana.EventId).time()
+            timesec = float(ts[0])+float(ts[1]/1e6)*1e-3
+            envDict['timestamp'].append(timesec)
+            for dval in det.evt.__dict__:
+                if dval.find('env')>=0: 
+                    if dval.replace('env_','') not in envDict:
+                        envDict[dval.replace('env_','')]=[]
+                    envDict[dval.replace('env_','')].append(det.evt.__dict__[dval][0])
 
         #make array
         data='AvImg_';
@@ -550,6 +604,8 @@ class SmallDataAna_psana(object):
         if median:
             imgM = np.median(img,axis=0)#.squeeze()
             self.__dict__[data.replace('AvImg_','AvImg_median_')]=imgM
+            
+        if returnEnv: return envDict
 
     def getAvImage(self,detname=None, imgName=None):
         avImages=[]

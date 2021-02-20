@@ -29,8 +29,8 @@ def getAzIntParams(run):
     ret_dict = {'eBeam': 18.0}
     ret_dict['center'] = [87526.79161840, 92773.3296889500]
     ret_dict['dis_to_sam'] = 80.
-    #return {}
-    return ret_dict
+    return {}
+    #return ret_dict
 
 def getROIs(run):
     if isinstance(run,basestring):
@@ -49,23 +49,23 @@ def define_dets(run):
 
     azIntParams = getAzIntParams(run)
     ROIs = getROIs(int(run))
-    haveEpix10k2M = checkDet(ds.env(), 'epix10k2M')
-    if haveEpix10k2M:
-        epix10k2M = DetObject('epix10k2M' ,ds.env(), int(run), name='epix10k2M')
+    haveJungfrau1M = checkDet(ds.env(), 'jungfrau1M')
+    if haveJungfrau1M:
+        jungfrau1M = DetObject('jungfrau1M' ,ds.env(), int(run), name='jungfrau1M')
         for iROI,ROI in enumerate(ROIs):
-            epix10k2M.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
+            jungfrau1M.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
 
         if 'center' in azIntParams:
-            epix10k2M.azav_eBeam=azIntParams['eBeam']
+            jungfrau1M.azav_eBeam=azIntParams['eBeam']
             try:
                 azav = azimuthalBinning(center=azIntParams['center'], dis_to_sam=azIntParams['dis_to_sam'], phiBins=1, Pplane=1)
-                epix10k2M.addFunc(azav)
+                jungfrau1M.addFunc(azav)
             except:
 	            pass
 
-        epix10k2M.storeSum(sumAlgo='calib')
-        epix10k2M.storeSum(sumAlgo='square')
-        dets.append(epix10k2M)
+        jungfrau1M.storeSum(sumAlgo='calib')
+        jungfrau1M.storeSum(sumAlgo='square')
+        dets.append(jungfrau1M)
 
     return dets
 
@@ -167,9 +167,13 @@ def get_sd_file(write_dir, exp, hutch):
 		    write_dir = ''.join([FFB_BASE, '/', hutch, '/', exp, '/scratch', SD_EXT])
                 else:
                     write_dir = ''.join([PSDM_BASE, '/', hutch, '/', exp, SD_EXT])
-	h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
-	logger.debug('Will write small data file to {0}'.format(h5_f_name))
+        if args.default:
+            if useFFB:
+                write_dir = write_dir.replace('hdf5','hdf5_def')
+            else:
+                write_dir = write_dir.replace('hdf5','scratch')
 
+	h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
 	if not os.path.isdir(write_dir):
 		logger.debug('{0} does not exist, creating directory'.format(write_dir))
 		try:
@@ -178,6 +182,7 @@ def get_sd_file(write_dir, exp, hutch):
 			logger.debug('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
 			sys.exit()
 
+	logger.debug('Will write small data file to {0}'.format(h5_f_name))
 	return h5_f_name
 
 ##### START SCRIPT ########
@@ -221,11 +226,11 @@ else:
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
-if args.default:
-    if useFFB:
-        h5_f_name = h5_f_name.replace('hdf5','hdf5_def')
-    else:
-        h5_f_name = h5_f_name.replace('hdf5','scratch')
+#if args.default:
+#    if useFFB:
+#        h5_f_name = h5_f_name.replace('hdf5','hdf5_def')
+#    else:
+#        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object, don't understand all conditions yet
 #ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':stream=0-79'])
@@ -248,7 +253,7 @@ small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
 if ds.rank is 0:
-	logger.debug('psana conda environemnt is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
+	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
 ##
@@ -390,9 +395,9 @@ for evt_num, evt in enumerate(ds.events()):
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.
     #try:
-    #    epix10k2MMax = epix10k2M.evt.dat.max()
+    #    jungfrau1MMax = jungfrau1M.evt.dat.max()
     #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': epix10k2MMax*epix_vonHamosMax}
+    #    combDict = {'userValue': jungfrau1MMax*epix_vonHamosMax}
     #    small_data.event(combDict)
     #except:
     #    pass
@@ -411,7 +416,10 @@ end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}, {"key": "<b>Parallel jobs</b>", "value": ds.size}])
+    if ds.size > 1:
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}, {"key": "<b>Parallel jobs</b>", "value": ds.size}])
+    else:
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
 if args.postRuntable:

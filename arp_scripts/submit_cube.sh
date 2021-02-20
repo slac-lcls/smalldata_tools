@@ -10,12 +10,18 @@ $(basename "$0"):
 	OPTIONS:
 		-h|--help
 			Definition of options
-		--experiment
+		-e|--experiment
 			Experiment name (i.e. cxilr6716)
-		--run
+		-r|--run
 			Run Number
 		-q|--queue
 			Queue to use on SLURM
+		-c|--cores
+			Number of cores to be utilized
+		-d|--directory
+			Full path to directory for output file
+		-n|--nevents
+			Number of events to analyze
 EOF
 
 }
@@ -36,13 +42,25 @@ do
 			usage
 			exit
 			;;
-		-q|--queue)
-			QUEUE="$2"
+		-e|--experiment)
+                        POSITIONAL+=("--experiment $2")
 			shift
 			shift
 			;;
-		-i|--interactive)
-			INTERACTIVE=true
+		-r|--run)
+                        POSITIONAL+=("--run $2")
+			shift
+			shift
+			;;
+		-n|--nevents)
+		        NEVENTS=$2
+                        POSITIONAL+=("--nevents $2")
+			shift
+			shift
+			;;
+		-d|--directory)
+                        POSITIONAL+=("--directory $2")
+			shift
 			shift
 			;;
                  *)
@@ -53,18 +71,14 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
-#Define cores if we don't have them
-QUEUE=${QUEUE:='psanaq'}
-#QUEUE=${QUEUE:='ffbh3q'}
-
-export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-
-source /reg/g/psdm/etc/psconda.sh -py3
+#
+#use the old analysis release to set up with old mpi-parallel hdf5 writing.
+#
+source /reg/g/psdm/etc/psconda.sh.old
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
-if [[ -v INTERACTIVE ]]; then
-    #$ABS_PATH/../examples/DataqualityPlots.py $@
-    $ABS_PATH/BeamlineSummaryPlots.py $@
+if [ -v NEVENTS ] && [ $NEVENTS -lt 10 ]; then
+    $ABS_PATH/MakeCube.py $@
 else
-    sbatch -p $QUEUE $ABS_PATH/../examples/BeamlineSummaryPlots.py $@
+    mpirun $ABS_PATH/MakeCube.py $@
 fi

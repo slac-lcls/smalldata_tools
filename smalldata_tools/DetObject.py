@@ -134,7 +134,7 @@ def DetObject(srcName, env, run, **kwargs):
        29: Epix10kObject,
        30: IcarusObject,
        32: Epix10k2MObject,
-       33: Epix10k2MObject,
+       33: Epix10kObject,
        34: CameraObject,
        98: OceanOpticsObject,
        99: ImpObject,

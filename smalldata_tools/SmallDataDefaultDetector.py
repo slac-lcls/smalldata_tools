@@ -8,12 +8,10 @@ except NameError:
     basestring = str
 
 #import more specific psana functions here
-import xtcav.ShotToShotCharacterization as Xtcav  
 try:
-    basestring
-except NameError:
-    basestring = str
-
+    import xtcav.ShotToShotCharacterization as Xtcav  
+except:
+    Xtcav = None
 #
 # classes for default detector types
 #
@@ -647,6 +645,8 @@ class xtcavDetector(defaultDetector):
         self.detname = detname
         self.nb=1
         self.size=5000
+        if Xtcav is None:
+            return None
         self.ShotToShotCharacterization = Xtcav.ShotToShotCharacterization()
     def setEnv(self, env):
         self.ShotToShotCharacterization.SetEnv(env)

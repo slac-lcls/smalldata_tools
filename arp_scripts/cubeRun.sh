@@ -13,28 +13,16 @@ $(basename "$0"):
 			Experiment name (i.e. cxilr6716)
 		-r|--run
 			Run Number
-		-d|--directory
-			Full path to directory for output file
-		-n|--nevents
-			Number of events to analyze
 		-q|--queue
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
-		-f|--full
-			If specified, translate everything
-		-D|--default
-			If specified, translate only smalldata
-                -i|--image
-			If specified, translate everything & save area detectors as images
-                -T|--tiff
-			If specified, translate everything & save area detectors as images * single-event tiffs
-		--norecorder
-			If specified, don't use recorder data
+		-n|--nevents
+			Number of events to analyze
+		-d|--directory
+			Full path to directory for output file
                 --nparallel
                         Number of processes per node
-                --postTrigger
-                        Post that primary processing done to elog to seconndary jobs can start
                 --interactive
                         Run the process live w/o batch system
 EOF
@@ -99,7 +87,7 @@ fi
 #need to export this so that it can be used in the follow-up script even in SLURMx
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 if [ -v INTERACTIVE ]; then
-    $DIR/submit_small_data.sh $@
+    $MYDIR/submit_cube.sh $@
     exit 0
 fi
-sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_small_data.sh $@
+sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_cube.sh $@

@@ -22,8 +22,6 @@ $(basename "$0"):
 			Number of cores to be utilized
 		-n|--nevents
 			Number of events to analyze
-		-l|--locally
-			If specified, will run locally
 		-x|--norecorder
 			If specified, don't use recorder data
 		-D|--default
@@ -53,10 +51,6 @@ do
 		-h|--help)
 			usage
 			exit
-			;;
-		-l|--locally)
-			LOCALLY=true
-			shift
 			;;
 		-e|--experiment)
                         POSITIONAL+=("--experiment $2")
@@ -88,11 +82,7 @@ done
 set -- "${POSITIONAL[@]}"
 
 source /reg/g/psdm/etc/psconda.sh
-ABS_PATH=/reg/g/psdm/sw/tools/smalldata_tools/examples
-if [[ -v LOCALLY ]]; then
-    #DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
-fi
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
 if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
     $ABS_PATH/smalldata_producer.py $@
