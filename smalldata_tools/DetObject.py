@@ -131,10 +131,10 @@ def DetObject(srcName, env, run, **kwargs):
        26: JungfrauObject,
        27: ZylaObject,
        28: ControlsCameraObject,
-       29: Epix10kObject,
+       29: Epix10kObject, #this is a small epix10k
        30: IcarusObject,
-       32: Epix10k2MObject,
-       33: Epix10kObject,
+       32: Epix10k2MObject, #this is a 2M
+       33: Epix10k2MObject, #this is a quad-lookds like a 2M
        34: CameraObject,
        98: OceanOpticsObject,
        99: ImpObject,
