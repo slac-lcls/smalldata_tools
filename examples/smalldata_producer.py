@@ -409,7 +409,7 @@ for evt_num, evt in enumerate(ds.events()):
     if (int(os.environ.get('RUN_NUM', '-1')) > 0) and ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
         if ds.size == 1:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
-        else:
+        elif ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
@@ -426,13 +426,13 @@ if len(sumDict['Sums'].keys())>0:
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    if ds.size > 1:
+    if ds.size > 1 and ds.rank == 0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
-if args.postRuntable:
+if args.postRuntable and ds.rank==0:
     print('posting to the run tables.')
     runtable_data = {"Prod_end":end_prod_time,
                      "Prod_start":begin_prod_time,

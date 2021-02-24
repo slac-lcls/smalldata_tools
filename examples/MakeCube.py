@@ -18,6 +18,10 @@ import logging
 import os
 import requests
 from requests.auth import HTTPBasicAuth
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 ########################################################## 
 ##
@@ -198,7 +202,7 @@ if ana is not None:
     nSel = ana.getFilter(filterName).sum()
     nSel2 = ana.getFilter('filter2').sum()
 
-    if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+    if (int(os.environ.get('RUN_NUM', '-1')) > 0) and rank==0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Prepared"}])
 
     if args.nevents:
@@ -217,10 +221,10 @@ if ana is not None:
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
-if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+if (int(os.environ.get('RUN_NUM', '-1')) > 0) and rank==0:
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
 
-if args.postRuntable:
+if args.postRuntable and rank==0:
     print('posting to the run tables.')
     runtable_data = {"Prod_cube_end":end_prod_time,
                      "Prod_cube_start":begin_prod_time,
