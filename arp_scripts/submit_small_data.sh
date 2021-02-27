@@ -84,6 +84,8 @@ set -- "${POSITIONAL[@]}"
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
+#run all imports on batch node before calling mpirun on that node.
+$ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
     $ABS_PATH/smalldata_producer.py $@
 else
