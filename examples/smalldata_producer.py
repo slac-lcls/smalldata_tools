@@ -4,6 +4,7 @@ import numpy as np
 import psana
 import time
 from datetime import datetime
+begin_job_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 import argparse
 import socket
 import os
@@ -137,7 +138,6 @@ parser.add_argument('--experiment', help='experiment name', type=str, default=os
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--directory', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--offline', help='run offline (def for current exp from ffb)')
 parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
 parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
@@ -147,6 +147,7 @@ parser.add_argument('--default', help='store only minimal data', action='store_t
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
+parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -208,11 +209,22 @@ xtc_files = []
 useFFB=False
 #with the new FFB, no need to check both on & offline as systems are independant.
 if hostname.find('drp')>=0:
-    xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-    if len(xtc_files)==0:
-        print('We have no xtc files for run %s in %s oon the new FFB'%(run,exp))
-        sys.exit()
-    print('Read files from new FFB')
+    nFiles=0
+    logger.debug('On FFB')
+    waitFilesStart=datetime.now()
+    while nFiles==0:
+        xtc_files = get_xtc_files(FFB_BASE, hutch, run)
+        print (xtc_files)
+        nFiles = len(xtc_files)
+        if nFiles == 0:
+            if not args.wait:
+                print('We have no xtc files for run %s in %s in the FFB system, we will quit')
+                sys.exit()
+            else:
+                print('We have no xtc files for run %s in %s in the FFB system, we will wait for 10 second and check again.'%(run,exp))
+                time.sleep(10)
+    waitFilesEnd=datetime.now()
+    print('Files appeared after %s seconds'%(str(waitFilesStart-waitFilesEnd)))
     useFFB = True
 
 # If not a current experiment or files in ffb, look in psdm
@@ -222,7 +234,6 @@ else:
     if len(xtc_files)==0:
         print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
         sys.exit()
-    ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':stream=0-79'])
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
@@ -233,20 +244,19 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object, don't understand all conditions yet
-#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd', ':stream=0-79'])
 ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
+#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if args.norecorder:
-        ds_name += ds_name+':stream=0-79'
+        ds_name += ':stream=0-79'
 if useFFB:
-        ds_name += ds_name+':dir=/cds/data/drpsrcf/%s/%s/xtc:live'%(exp[0:3],exp)
-
+        ds_name += ':dir=/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
 # try this: live & all streams (once I fixed the recording issue)
 #ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
 try:
-	ds = psana.MPIDataSource(ds_name)
+    ds = psana.MPIDataSource(ds_name)
 except Exception as e:
-	logger.debug('Could not instantiate MPIDataSource with {0}: {1}'.format(ds_name, e))
-	sys.exit()
+    logger.debug('Could not instantiate MPIDataSource with {0}: {1}'.format(ds_name, e))
+    sys.exit()
 
 # Generate smalldata object
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
@@ -412,15 +422,15 @@ for evt_num, evt in enumerate(ds.events()):
         elif ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
 
-end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
-
 sumDict={'Sums': {}}
 for det in dets:
     for key in det.storeSum().keys():
-        sumData=smldata.sum(det.storeSum()[key])
+        sumData=small_data.sum(det.storeSum()[key])
         sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
 if len(sumDict['Sums'].keys())>0:
-    smldata.save(sumDict)
+    small_data.save(sumDict)
+
+end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
@@ -434,13 +444,17 @@ logger.debug('Saved all small data')
 
 if args.postRuntable and ds.rank==0:
     print('posting to the run tables.')
-    runtable_data = {"Prod_end":end_prod_time,
-                     "Prod_start":begin_prod_time,
-                     "Prod_ncores":ds.size}
+    locStr=''
+    if useFFB:
+        locStr='_ffb'
+    runtable_data = {"Prod%s_end"%locStr:end_prod_time,
+                     "Prod%s_start"%locStr:begin_prod_time,
+                     "Prod%s_jobstart"%locStr:begin_job_time,
+                     "Prod%s_ncores"%locStr:ds.size}
     if args.default:
-        runtable_data["SmallData"]="default"
+        runtable_data["SmallData%s"%locStr]="default"
     else:
-        runtable_data["SmallData"]="done"
+        runtable_data["SmallData%s"%locStr]="done"
     time.sleep(5)
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
