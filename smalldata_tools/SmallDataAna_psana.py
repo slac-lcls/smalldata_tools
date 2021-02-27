@@ -13,6 +13,7 @@ from matplotlib import gridspec
 from matplotlib import path
 import itertools
 import os
+import socket
 import holoviews as hv
 import bokeh.plotting as bp
 from matplotlib import gridspec
@@ -69,58 +70,26 @@ class SmallDataAna_psana(object):
                                                                                           "station": 0})
         currExpname = resp.json().get("value", {}).get("name")
         print('Current experiment for %s is %s'%(self.hutch, currExpname))
-        from glob import glob
-        xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-        idxname = xtcdirname+'/index/*-r%04d-*'%int(self.run)
-        xtcname = xtcdirname+'/*-r%04d-*xtc'%int(self.run)
-        present_Idx=glob('%s'%idxname)
-        present_Xtc=glob('%s'%xtcname)
-        if expname==currExpname:
-            rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
-            if not rundoc:
-                logger.error("Invalid response from server")
-            lastRun = int(rundoc['num'])
-            if self.run > lastRun:
-                printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
-                return None
+        rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
+        if not rundoc:
+            logger.error("Invalid response from server")
+        lastRun = int(rundoc['num'])
+        if self.run > lastRun:
+            printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
+            return None
             
-            if self.run == lastRun:
-                isLive = rundoc.get('end_time', None)
-            else:
-                isLive = False
-            self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
-            ffbxtcdirname = '/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
-            ffbxtcname=ffbxtcdirname+'/*-r%04d-*'%self.run
-            ffbidxname=ffbxtcdirname+'/index/*-r%04d-*'%self.run
-            present_ffbXtc=glob('%s'%ffbxtcname)
-            present_ffbIdx=glob('%s'%ffbidxname)
-            self.dsnameIdx=None
-            #use ffB if more files are there ONLY (check hostname when move to new FFB)
-            if len(present_ffbXtc)>len(present_Xtc) or (len(present_Xtc)==0 and len(present_ffbXtc)==0):
-                self.dsname=self.dsname+':dir=/reg/d/ffb/%s/%s/xtc'%(self.hutch.lower(),expname)
-                if isLive:
-                    self.dsname=self.dsname+':live:stream=0-79'
-                if len(present_ffbIdx)>0:
-                    self.dsnameIdx='exp=%s:run=%i:idx:dir=/reg/d/ffb/%s/%s/xtc'%(expname,self.run,self.hutch.lower(),expname)
-            else: 
-                if len(present_Idx)>0:
-                    self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
-
+        if self.run == lastRun:
+            isLive = rundoc.get('end_time', None)
         else:
-            if len(present_Xtc)==0:
-                printR(rank, 'Could not find xtc files for SmallDataAna_psana for exp %s and run %04d, return None'%(expname, self.run))
-                return None
-
-            self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
-            self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
-            xtcdirname = '/reg/d/psdm/%s/%s/xtc'%(self.hutch.lower(),expname)
-            idxname=xtcdirname+'/index/*-r%04d-*'%self.run
-            import glob
-            present_Idx=glob.glob('%s'%idxname)
-            if len(present_Idx)>0:
-                self.dsnameIdx='exp=%s:run=%i:idx'%(expname,self.run)
-            else:
-                self.dsnameIdx=None
+            isLive = False
+        self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
+        hostname = socket.gethostname()
+        if hostname.find('drpsrcf')>=0:
+            xtcdirname='/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
+            self.dsname+=':dir=%s'%xtcdirname
+        if isLive:
+            self.dsname=self.dsname+':live:stream=0-79'
+        self.dsnameIdx=self.dsname.replace('smd','idx').replace(':live','')
 
         printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
