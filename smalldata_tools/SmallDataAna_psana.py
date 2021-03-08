@@ -1547,6 +1547,7 @@ class SmallDataAna_psana(object):
                 self.addDetInfo(detname=detname)
         else:
             detname, img, avImage = self.getAvImage(detname=detname, imgName=None)
+        mask=np.ones_like(img)
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
         if use_mask_local:
@@ -1665,6 +1666,7 @@ class SmallDataAna_psana(object):
 
         while 1:
             ymin=0;ymax=azintValues_c00.shape[1]-1
+            maxVal = np.nanpercentile(azintValues_c00, 99.99)
             if zoom is not None:
                 if len(zoom)==1:
                     maxVal = np.nanpercentile(azintValues_c00, zoom[0])
