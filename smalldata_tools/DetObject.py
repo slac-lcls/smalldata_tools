@@ -61,21 +61,21 @@ class DetObjectFunc(object):
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
-        #print 'DEBUG get params for func: ',self._name
+        #print('DEBUG get params for func -- params_as_dict : ',self._name)
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         funcPars={}
         for tfunc in subFuncs:
             sfuncDict = tfunc.params_as_dict()
             for key in sfuncDict:
-                #print  'DEBUG get params for func - subfunc - key: ',self._name, tfunc._name, key
+                #print ('DEBUG get params for func - subfunc - key: ',self._name, tfunc._name, key)
                 #funcPars['%s_%s_%s'%(self._name,tfunc._name,key)] = sfuncDict[key]
                 funcPars['%s'%(key)] = sfuncDict[key]
 
-        parList =  {key:self.__dict__[key] for key in self.__dict__ if (isinstance(getattr(self,key), (basestring, int, float, np.ndarray)) and key[0]!='_')}
+        parList =  {key: self.__dict__[key] for key in self.__dict__ if (isinstance(getattr(self,key), (basestring, int, float, np.ndarray)) and key[0]!='_')}
         parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (isinstance(getattr(self,key), list) and key[0]!='_')})
         remKeys = [key for key in self.__dict__ if (key not in parList)]
         for key, value in iteritems(parList):
-          funcPars['%s_%s'%(self._name, key)] = value
+            funcPars['%s_%s'%(self._name, key)] = value
         if self._debug: print('DEBUG: keys which are not parameters:',self._name, remKeys)
         #print 'return for ',self._name, funcPars.keys()
         return funcPars
@@ -627,11 +627,11 @@ class JungfrauObject(TiledCameraObject):
         if self.common_mode==0:
             self.evt.dat = self.det.calib(evt, cmpars=(7,0,100), mbits=mbits)
         elif self.common_mode%100==71:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,1,100), mbits=mbits) #correction in rows
+            self.evt.dat = self.det.calib(evt, cmpars=(7,1,100,0), mbits=mbits) #correction in rows
         elif self.common_mode%100==72:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,2,100), mbits=mbits) #correction in columns
+            self.evt.dat = self.det.calib(evt, cmpars=(7,2,100,0), mbits=mbits) #correction in columns
         elif self.common_mode%100==7:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,3,100), mbits=mbits) #correction in rows&columns
+            self.evt.dat = self.det.calib(evt, cmpars=(7,3,100,0), mbits=mbits) #correction in rows&columns
         #override gain if desired
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [7,71,72,0]:
             self.evt.dat*=self.local_gain   #apply own gain
@@ -794,7 +794,7 @@ class Epix10kObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10kObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [80, 0, -1, -2, 30] # official, ped sub, raw, raw_gain, calib
+        self._common_mode_list = [84, 85, 80, 0, -1, -2, 30] # official, ped sub, raw, raw_gain, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
@@ -871,10 +871,18 @@ class Epix10kObject(TiledCameraObject):
                 self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped[0]
             else:
                 self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped
-        elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
+        elif self.common_mode%100==80: #no common mode
             #self.evt.dat = self.det.calib(evt, mbits=mbits)
-            evt_dat = self.det.calib(evt)
+            evt_dat = self.det.calib(evt, cmpars=(7,0,100))
             self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) #can't reember why I'm doing this. I think for the data type.
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        elif self.common_mode%100==84: #correct in row
+            evt_dat = self.det.calib(evt, cmpars=(7,2,10,10))
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) 
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        elif self.common_mode%100==85: #correct in row&cols
+            evt_dat = self.det.calib(evt, cmpars=(7,3,10,10))
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) 
             self.evt.dat[:,:,:] = evt_dat[:,:,:]
             
         #override gain if desired -- this looks like CsPad.
@@ -937,7 +945,7 @@ class Epix10k2MObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [80, 81, 82, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
+        self._common_mode_list = [84, 81, 82, 85, 80, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
@@ -1038,10 +1046,21 @@ class Epix10k2MObject(TiledCameraObject):
                 self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped[0]
             else:
                 self.evt.dat = (self.det.raw_data(evt)&0x3fff)-self.ped
-        elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
-            #self.evt.dat = self.det.calib(evt, mbits=mbits)
+        elif self.common_mode%100==30: #default calib
             evt_dat = self.det.calib(evt)
             self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) #can't reember why I'm doing this. I think for the data type.
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        elif self.common_mode%100==80: #placeholder for specific treatment of epix10k
+            evt_dat = self.det.calib(evt, cmpars=(7,0,100))
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) #can't reember why I'm doing this. I think for the data type.
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        elif self.common_mode%100==84: #rows 
+            evt_dat = self.det.calib(evt, cmpars=(7,2,10,10))
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) 
+            self.evt.dat[:,:,:] = evt_dat[:,:,:]
+        elif self.common_mode%100==85: #rows&cols
+            evt_dat = self.det.calib(evt, cmpars=(7,3,10,10))
+            self.evt.dat = np.empty(evt_dat.shape, dtype=np.float32) 
             self.evt.dat[:,:,:] = evt_dat[:,:,:]
         elif self.common_mode%100==81: #my horrible kludge that might work for fixed gains.
             if len(self.ped.shape)>3:
