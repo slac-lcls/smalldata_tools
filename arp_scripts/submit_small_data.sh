@@ -81,6 +81,8 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
+
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 

@@ -23,6 +23,41 @@ from requests.auth import HTTPBasicAuth
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
+def getROIs(run):
+    """ Will only write the results of the ROIs analysis to file 
+    """
+    if isinstance(run,basestring):
+        run=int(run)
+    roiDict={}
+    if run <= 9:
+        roiDict['jungfrau1M'] = [ [[0,1], [1,74], [312,381]],
+                                  [[1,2], [8,89], [218,303]] ]
+    else:
+        roiDict['jungfrau1M'] = [ [[0,1], [1,74], [312,381]],
+                                  [[1,2], [8,89], [218,303]] ]
+
+    return roiDict
+
+
+def getROIs_write(run):
+    """ Will also write the ROIs area to file
+    """
+    if isinstance(run,basestring):
+        run=int(run)
+    roiDict={}
+    if run <= 2:
+        return roiDict
+    elif run>312:
+        roiDict['jungfrau1M'] = [ [[0,1], [157,487], [294,598]]]
+    else:
+        roiDict['jungfrau1M'] = [ [[0,1], [26,245], [330,487]]]
+#     if run in other_det_run:
+#         roiDict['other_det'] = [ [[100,200],[100,200]]  ]
+#     else:
+#         roiDict['other_det'] = []
+    return roiDict
+
+
 def getAzIntParams(run):
     if isinstance(run,basestring):
         run=int(run)
@@ -33,42 +68,36 @@ def getAzIntParams(run):
     return {}
     #return ret_dict
 
-def getROIs(run):
-    if isinstance(run,basestring):
-        run=int(run)
-    roiDict={}
-    if run <=6:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
-    else:
-        return [ [[0,1], [1,74], [312,381]],
-                 [[8,9], [8,89], [218,303]] ]
-    return []
-
+    
 def define_dets(run):
     dets=[]
 
-    azIntParams = getAzIntParams(run)
-    ROIs = getROIs(int(run))
-    haveJungfrau1M = checkDet(ds.env(), 'jungfrau1M')
-    if haveJungfrau1M:
-        jungfrau1M = DetObject('jungfrau1M' ,ds.env(), int(run), name='jungfrau1M')
-        for iROI,ROI in enumerate(ROIs):
-            jungfrau1M.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
+    ROIs = getROIs(run)
+    ROIs_write = getROIs_write(run)
+    detnames = ['jungfrau1M']
+#     detnames=['jungfrau1M','opal_0','opal_2']
+    for detname in detnames:
+        havedet = checkDet(ds.env(), detname)
+        if havedet:
+            if detname=='jungfrau1M':
+                #common_mode=71 #also try 71
+                common_mode=0
+            else:
+                common_mode=0 #no common mode
+            det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
+            #check for ROIs:
+            if detname in ROIs:
+                for iROI,ROI in enumerate(ROIs[detname]):
+                    det.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
+            if detname in ROIs_write:
+                for iROI,ROI in enumerate(ROIs_write[detname]):
+                    det.addFunc(ROIFunc(ROI=ROI, name='ROIw_%d'%iROI, writeArea=True))
 
-        if 'center' in azIntParams:
-            jungfrau1M.azav_eBeam=azIntParams['eBeam']
-            try:
-                azav = azimuthalBinning(center=azIntParams['center'], dis_to_sam=azIntParams['dis_to_sam'], phiBins=1, Pplane=1)
-                jungfrau1M.addFunc(azav)
-            except:
-	            pass
-
-        jungfrau1M.storeSum(sumAlgo='calib')
-        jungfrau1M.storeSum(sumAlgo='square')
-        dets.append(jungfrau1M)
-
+            det.storeSum(sumAlgo='calib')
+            dets.append(det)
     return dets
+
+
 
 ##########################################################
 # run independent parameters 
@@ -87,7 +116,27 @@ aioParams=[]
 ##
 ## <-- User Input end
 ##
-########################################################## 
+##########################################################
+
+##########################################################
+# Custom exception handler to make job abort if a single rank fails
+# Avoid jobs hanging forever and report actual error message to the log file
+import traceback as tb
+
+def global_except_hook(exctype, value, exc_traceback):
+    tb.print_exception(exctype, value, exc_traceback)
+    sys.stderr.write("except_hook. Calling MPI_Abort().\n")
+    sys.stdout.flush() # Command to flush the output - stdout
+    sys.stderr.flush() # Command to flush the output - stderr
+    # Note: mpi4py must be imported inside exception handler, not globally.     
+    import mpi4py.MPI
+    mpi4py.MPI.COMM_WORLD.Abort(1)
+    sys.__excepthook__(exctype, value, exc_traceback)
+    return
+
+sys.excepthook = global_except_hook
+##########################################################
+
 
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
@@ -468,3 +517,12 @@ if args.postRuntable and ds.rank==0:
     if det_presence!={}:
         rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
         print(rp)
+
+# Debug stuff
+# How to implement barrier from ds?
+if ds.rank == 0:
+#    time.sleep(60)#ideally should use barrier or so to make sure all cores have fnished.
+    if 'temp' in h5_f_name: # only for hanging job investigation (to be deleted later)
+        h5_f_name_2 = get_sd_file(None, exp, hutch)
+        os.rename(h5_f_name, h5_f_name_2)
+        logger.debug('Move file from temp directory')
