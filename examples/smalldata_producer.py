@@ -75,7 +75,7 @@ def define_dets(run):
     ROIs = getROIs(run)
     ROIs_write = getROIs_write(run)
     detnames = ['jungfrau1M']
-#     detnames=['jungfrau1M','opal_0','opal_2']
+#     detnames=['jungfrau1M','other_det']
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         if havedet:
@@ -520,9 +520,9 @@ if args.postRuntable and ds.rank==0:
 
 # Debug stuff
 # How to implement barrier from ds?
-if ds.rank == 0:
+# if ds.rank == 0:
 #    time.sleep(60)#ideally should use barrier or so to make sure all cores have fnished.
-    if 'temp' in h5_f_name: # only for hanging job investigation (to be deleted later)
-        h5_f_name_2 = get_sd_file(None, exp, hutch)
-        os.rename(h5_f_name, h5_f_name_2)
-        logger.debug('Move file from temp directory')
+#     if 'temp' in h5_f_name: # only for hanging job investigation (to be deleted later)
+#         h5_f_name_2 = get_sd_file(None, exp, hutch)
+#         os.rename(h5_f_name, h5_f_name_2)
+#         logger.debug('Move file from temp directory')
