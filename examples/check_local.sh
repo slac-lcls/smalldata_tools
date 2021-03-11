@@ -4,7 +4,7 @@ usage()
 {
 cat << EOF
 $(basename "$0"): 
-	Script to locally check the smd translation on a reduced number of events. Needs to have a /tests/ directory in the experiment hdf5 folder.
+    Script to locally check the smd translation on a reduced number of events. Needs to have a /tests/ directory in the experiment hdf5 folder.
 	
 	OPTIONS:
 		-h

@@ -23,11 +23,11 @@ $(basename "$0"):
 		-n|--nevents
 			Number of events to analyze
 		-x|--norecorder
-			If specified, don't use recorder data
+			If specified, don\'t use recorder data
 		-D|--default
 			If specified, translate only small data
 		-f|--full
-			eIf specified, translate everything
+			If specified, translate everything
                 -i|--image
 			If specified, translate everything & save area detectors as images
                 -T|--tiff
