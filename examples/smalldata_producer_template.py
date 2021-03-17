@@ -23,61 +23,84 @@ from requests.auth import HTTPBasicAuth
 ##########################################################
 # functions for run dependant parameters
 ##########################################################
+
+# 1) REGIONS OF INTEREST
 def getROIs(run):
-    """ Will only write the results of the ROIs analysis to file 
+    """ Will only write the results of the ROIs analysis to file
+    See roi_rebin.py for more info
     """
-    if isinstance(run,basestring):
+    if isinstance(run,str):
         run=int(run)
-    roiDict={}
-    if run <= 9:
-        roiDict['jungfrau1M'] = [ [[0,1], [1,74], [312,381]],
-                                  [[1,2], [8,89], [218,303]] ]
-    else:
-        roiDict['jungfrau1M'] = [ [[0,1], [1,74], [312,381]],
-                                  [[1,2], [8,89], [218,303]] ]
-
-    return roiDict
-
-
-def getROIs_write(run):
-    """ Will also write the ROIs area to file
-    """
-    if isinstance(run,basestring):
-        run=int(run)
-    roiDict={}
-    if run <= 2:
-        return roiDict
-    elif run>312:
-        roiDict['jungfrau1M'] = [ [[0,1], [157,487], [294,598]]]
-    else:
-        roiDict['jungfrau1M'] = [ [[0,1], [26,245], [330,487]]]
-#     if run in other_det_run:
-#         roiDict['other_det'] = [ [[100,200],[100,200]]  ]
-#     else:
-#         roiDict['other_det'] = []
-    return roiDict
+    ret_dict = {}
+    if run>9999:
+        roi_dict = {}
+        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
+        roi_dict['writeArea'] = True
+        roi_dict['thresADU'] = None
+        ret_dict['jungfrau1M'] = roi_dict
+    return ret_dict
 
 
+# 2) AZIMUTHAL INTEGRATION
 def getAzIntParams(run):
-    if isinstance(run,basestring):
+    """ Parameters for azimuthal integration
+    See azimuthalBinning.py for more info
+    """
+    if isinstance(run,str):
         run=int(run)
-        
-    ret_dict = {'eBeam': 18.0}
-    ret_dict['center'] = [87526.79161840, 92773.3296889500]
-    ret_dict['dis_to_sam'] = 80.
-    return {}
-    #return ret_dict
+    ret_dict = {}
+    if run>9999:
+        az_dict = {'eBeam': 18.0} # keV
+        az_dict['center'] = [87526.79161840, 92773.3296889500] # um
+        az_dict['dis_to_sam'] = 80. # mm
+        az_dict['tx'] = 0 # deg
+        az_dict['ty'] = 0 # deg
+        ret_dict['jungfrau1M'] = az_dict
+    return ret_dict
 
-    
+
+# 3) DROPLET AND PHOTON COUNTING
+def getPhotonParams(run):
+    """ Parameters for droplet algorithm
+    See photons.py for more info
+    """
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>9999:
+        photon_dict = {}
+        photon_dict['ADU_per_photon'] = 9.5
+        photon_dict['thresADU'] = 0.8 # fraction of ADU_per_photon
+        ret_dict['jungfrau1M'] = photon_dict
+    return ret_dict
+
+
+# 4) WAVEFORM SVD PULSE ANALYSIS
+def getSvdParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>4:
+        svd_dict = {}
+        svd_dict['basis_file'] = None
+        svd_dict['n_pulse'] = 1
+        svd_dict['delay'] = None
+        svd_dict['return_reconstructed'] = True
+        ret_dict['acq_0'] = svd_dict
+    return ret_dict
+
+
+# DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    dets=[]
-
+    detnames = ['jungfrau1M', 'acq_0']
+    dets = []
     ROIs = getROIs(run)
-    ROIs_write = getROIs_write(run)
-    detnames = ['jungfrau1M']
-#     detnames=['jungfrau1M','other_det']
+    az = getAzIntParams(run)
+    phot = getPhotonParams(run)
+    svd = getSvdParams(run)
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
+        # Common mode
         if havedet:
             if detname=='jungfrau1M':
                 #common_mode=71 #also try 71
@@ -85,13 +108,23 @@ def define_dets(run):
             else:
                 common_mode=0 #no common mode
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
-            #check for ROIs:
+            # Analysis functions
+            # ROIs:
             if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]):
-                    det.addFunc(ROIFunc(ROI=ROI, name='ROI_%d'%iROI))
-            if detname in ROIs_write:
-                for iROI,ROI in enumerate(ROIs_write[detname]):
-                    det.addFunc(ROIFunc(ROI=ROI, name='ROIw_%d'%iROI, writeArea=True))
+                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
+                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
+                                        ROI=ROI,
+                                        writeArea=ROIs[detname]['writeArea'],
+                                        thresADU=ROIs[detname]['thresADU']))
+            # Azimuthal binning
+            if detname in az:
+                det.addFunc(azimuthalBinning(**az[detname]))
+            # Droplet
+            if detname in phot:
+                det.addFunc(photonFunc(**phot[detname]))
+            # SVD waveform analysis
+            if detname in svd:
+                det.addFunc(svdFit(**svd[detname]))
 
             det.storeSum(sumAlgo='calib')
             dets.append(det)
@@ -160,6 +193,7 @@ from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.droplet import dropletFunc
 from smalldata_tools.photons import photonFunc
 from smalldata_tools.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.smd_svd import svdFit
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -211,29 +245,27 @@ def get_xtc_files(base, hutch, run):
 	return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
-        """Generate directory to write to, create file name"""
-        if write_dir is None:
-                if useFFB:
-                    write_dir = ''.join([FFB_BASE, '/', hutch, '/', exp, '/scratch', SD_EXT])
-                else:
-                    write_dir = ''.join([PSDM_BASE, '/', hutch, '/', exp, SD_EXT])
-        if args.default:
-            if useFFB:
-                write_dir = write_dir.replace('hdf5','hdf5_def')
-            else:
-                write_dir = write_dir.replace('hdf5','scratch')
-
-        h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
-        if not os.path.isdir(write_dir):
-                logger.debug('{0} does not exist, creating directory'.format(write_dir))
-                try:
-                        os.mkdir(write_dir)
-                except OSError as e:
-                        logger.debug('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
-                        sys.exit()
-
-        logger.debug('Will write small data file to {0}'.format(h5_f_name))
-        return h5_f_name
+    """Generate directory to write to, create file name"""
+    if write_dir is None:
+        if useFFB:
+            write_dir = ''.join([FFB_BASE, '/', hutch, '/', exp, '/scratch', SD_EXT])
+        else:
+            write_dir = ''.join([PSDM_BASE, '/', hutch, '/', exp, SD_EXT])
+    if args.default:
+        if useFFB:
+            write_dir = write_dir.replace('hdf5','hdf5_def')
+        else:
+            write_dir = write_dir.replace('hdf5','scratch')
+    h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
+    if not os.path.isdir(write_dir):
+        logger.debug('{0} does not exist, creating directory'.format(write_dir))
+        try:
+            os.mkdir(write_dir)
+        except OSError as e:
+            logger.debug('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
+            sys.exit()
+    logger.debug('Will write small data file to {0}'.format(h5_f_name))
+    return h5_f_name
 
 ##### START SCRIPT ########
 
@@ -440,7 +472,7 @@ for evt_num, evt in enumerate(ds.events()):
             except:
                 pass
             det.processSums()
-            #print userDict[det._name]
+            #print(userDict[det._name])
         except:
             pass
     small_data.event(userDict)
@@ -477,6 +509,7 @@ for det in dets:
         sumData=small_data.sum(det.storeSum()[key])
         sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
 if len(sumDict['Sums'].keys())>0:
+#     print(sumDict)
     small_data.save(sumDict)
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')

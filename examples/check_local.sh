@@ -38,18 +38,18 @@ if [[ $RUN == 0 ]]; then
     echo "Please give a run number (-r)"
     exit
 fi
-EXP=${EXP:='xpplv0918'} # change default exp to avoid having to type it all the time
-NEVENTS=${NEVENT:=50}
+EXP=${EXP:='xpplv7918'} # change default exp to avoid having to type it all the time
+NEVENTS=${NEVENT:=10}
 
 if [[ $MYDIR == *"drpsrcf"* ]]; then
     echo "On drp"
-    H5PATH="$( cd $MYDIR && cd ../../hdf5/tests >/dev/null && pwd )"
+    H5PATH="$( cd $MYDIR && cd ../../hdf5/debug >/dev/null && pwd )"
 #     if [ ! -d "$H5PATH" ]; then
 #         mkdir $H5PATH
 #     fi
 elif [[ $MYDIR == *"psdm"* ]]; then
     echo "On psana"
-    H5PATH="$( cd $MYDIR && cd ../../../hdf5/tests >/dev/null && pwd )"
+    H5PATH="$( cd $MYDIR && cd ../../../hdf5/debug >/dev/null && pwd )"
 else
     echo "On some unknown place."
     H5PATH=$MYDIR  
@@ -60,6 +60,5 @@ fi
 # echo $RUN
 # echo $EXP
 
-/cds/data/drpsrcf/xpp/xpplv0918/scratch/smalldata_tools/arp_scripts/submit_smd.sh --interactive --nevents $NEVENTS --directory $H5PATH --experiment $EXP --run $RUN
-
-#/cds/data/drpsrcf/xpp/xpplv0918/scratch/smalldata_tools/arp_scripts/submit_smd.sh --interactive --nevents $NEVENTS --experiment $EXPERIMENT --run $RUN
+# /cds/home/e/espov/lcls_software_tools/smalldata_tools/arp_scripts/submit_smd.sh --interactive --nevents $NEVENTS --directory $H5PATH --experiment $EXP --run $RUN
+/cds/home/e/espov/lcls_software_tools/smalldata_tools/arp_scripts/submit_smd.sh --interactive --nevents $NEVENTS --directory /cds/data/psdm/xpp/xpplv7918/hdf5/debug --experiment $EXP --run $RUN

@@ -38,7 +38,7 @@ class azimuthalBinning(DetObjectFunc):
         thresADUhigh = high threshold in ADU
         thresRms = lower threshold in RMS
         geomCorr: apply geometry correction (def True)
-        polCorr: apply polalization correction (def True)
+        polCorr: apply polarization correction (def True)
         """
         # save parameters for later use
         self._name = kwargs.get('name','azav')
