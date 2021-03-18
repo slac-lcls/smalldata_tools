@@ -6,9 +6,8 @@ from pathlib import Path
 import datetime
 import h5py as h5
 
-sys.path.append('/cds/home/e/espov/lcls_software_tools/smalldata_tools/') # path to smalldata_tools
 import smalldata_tools.DetObject as dobj
-import svd_waveform_processing as proc
+import smalldata_tools.ana_funcs.svd_waveform_processing as proc
 
 
 def make_basis(exp_name, run, det_name, nWaveforms=500, bkg_idx=None, n_c=2, roi=None, channel=None):

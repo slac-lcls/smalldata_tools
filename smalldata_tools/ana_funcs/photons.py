@@ -4,7 +4,7 @@ import time
 from ImgAlgos.PyAlgos import photons
 import scipy.ndimage.filters as filters
 import itertools
-from DetObject import DetObjectFunc
+from smalldata_tools.DetObject import DetObjectFunc
 
 def fcn(buffer):
     if len(buffer[buffer<buffer[2]])>0:

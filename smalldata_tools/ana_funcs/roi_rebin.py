@@ -7,7 +7,7 @@ import itertools
 import time
 from smalldata_tools.utilities import rebin, getBins
 from smalldata_tools.DetObject import DetObjectFunc
-from smalldata_tools.droplet import dropletFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
 
 #
 # for now, this works in "raw" coordinates.

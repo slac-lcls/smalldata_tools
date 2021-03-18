@@ -26,8 +26,9 @@ from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetec
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
 from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
-from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photonFunc
-from smalldata_tools.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
+from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.smd_svd import svdFit

@@ -5,7 +5,6 @@ import os
 import numpy as np
 
 from smalldata_tools.ana_funcs import svd_waveform_processing as proc
-import smalldata_tools.DetObject as dobj
 from smalldata_tools.DetObject import DetObjectFunc
 
 

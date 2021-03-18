@@ -59,7 +59,7 @@ def getAzIntParams(run):
     return ret_dict
 
 
-# 3) DROPLET AND PHOTON COUNTING
+# 3) PHOTON COUNTING AND DROPLET
 def getPhotonParams(run):
     """ Parameters for droplet algorithm
     See photons.py for more info
@@ -75,12 +75,12 @@ def getPhotonParams(run):
     return ret_dict
 
 
-# 4) WAVEFORM SVD PULSE ANALYSIS
+# 4) WAVEFORM ANALYSIS (SVD, peak finding)
 def getSvdParams(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    if run>4:
+    if run>9999:
         svd_dict = {}
         svd_dict['basis_file'] = None
         svd_dict['n_pulse'] = 1
@@ -119,7 +119,7 @@ def define_dets(run):
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
-            # Droplet
+            # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
             # SVD waveform analysis
@@ -152,8 +152,8 @@ aioParams=[]
 ##########################################################
 
 ##########################################################
-# Custom exception handler to make job abort if a single rank fails
-# Avoid jobs hanging forever and report actual error message to the log file
+# Custom exception handler to make job abort if a single rank fails.
+# Avoid jobs hanging forever and report actual error message to the log file.
 import traceback as tb
 
 def global_except_hook(exctype, value, exc_traceback):
@@ -188,11 +188,11 @@ from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetec
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
 from smalldata_tools.DetObject import DetObject
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
-from smalldata_tools.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photonFunc
-from smalldata_tools.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
+from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 
 logging.basicConfig(level=logging.DEBUG)
@@ -472,7 +472,7 @@ for evt_num, evt in enumerate(ds.events()):
             except:
                 pass
             det.processSums()
-            #print(userDict[det._name])
+#             print(userDict[det._name])
         except:
             pass
     small_data.event(userDict)
