@@ -7,3 +7,5 @@ examples/SmallDataProducer.py
 
 #dev notebook
 smalldata_dev.ipynb
+
+check_local.sh
