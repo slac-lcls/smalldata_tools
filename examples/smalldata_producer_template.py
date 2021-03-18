@@ -26,13 +26,13 @@ from requests.auth import HTTPBasicAuth
 
 # 1) REGIONS OF INTEREST
 def getROIs(run):
-    """ Will only write the results of the ROIs analysis to file
+    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
     See roi_rebin.py for more info
     """
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    if run>9999:
+    if run>0:
         roi_dict = {}
         roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
         roi_dict['writeArea'] = True
@@ -49,7 +49,7 @@ def getAzIntParams(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    if run>9999:
+    if run>0:
         az_dict = {'eBeam': 18.0} # keV
         az_dict['center'] = [87526.79161840, 92773.3296889500] # um
         az_dict['dis_to_sam'] = 80. # mm
@@ -67,7 +67,7 @@ def getPhotonParams(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    if run>9999:
+    if run>0:
         photon_dict = {}
         photon_dict['ADU_per_photon'] = 9.5
         photon_dict['thresADU'] = 0.8 # fraction of ADU_per_photon
@@ -80,7 +80,7 @@ def getSvdParams(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    if run>9999:
+    if run>0:
         svd_dict = {}
         svd_dict['basis_file'] = None
         svd_dict['n_pulse'] = 1
