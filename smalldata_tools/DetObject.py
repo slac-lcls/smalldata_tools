@@ -276,9 +276,9 @@ class DetObjectClass(object):
     def addFunc(self, func):
         func.setFromDet(self) #pass parameters from det (rms, geometry, .....)
         try:
-          func.setFromFunc() #pass parameters from itself to children (rms, bounds, .....)            
+            func.setFromFunc() #pass parameters from itself to children (rms, bounds, .....)            
         except:
-          print('Failed to pass parameters to children of ',func._name)
+            print('Failed to pass parameters to children of ',func._name)
         self.__dict__[func._name] = func
 
     def processFuncs(self):

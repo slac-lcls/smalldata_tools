@@ -1,5 +1,11 @@
 #editing remnants
 *.py~
 *.pyc
+*.ipynb_checkpoints
 #copy for the current producer file
 examples/SmallDataProducer.py
+
+#dev notebook
+smalldata_dev.ipynb
+
+check_local.sh

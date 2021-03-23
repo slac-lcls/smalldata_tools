@@ -23,11 +23,11 @@ $(basename "$0"):
 		-n|--nevents
 			Number of events to analyze
 		-x|--norecorder
-			If specified, don't use recorder data
+			If specified, don\'t use recorder data
 		-D|--default
 			If specified, translate only small data
 		-f|--full
-			eIf specified, translate everything
+			If specified, translate everything
                 -i|--image
 			If specified, translate everything & save area detectors as images
                 -T|--tiff
@@ -81,13 +81,17 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
+
 source /reg/g/psdm/etc/psconda.sh
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
 #run all imports on batch node before calling mpirun on that node.
 $ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
-    $ABS_PATH/smalldata_producer.py $@
+#     $ABS_PATH/smalldata_producer.py $@
+    $ABS_PATH/smalldata_producer_template.py $@
 else
-    mpirun $ABS_PATH/smalldata_producer.py $@
+#     mpirun $ABS_PATH/smalldata_producer.py $@
+    mpirun $ABS_PATH/smalldata_producer_template.py $@
 fi

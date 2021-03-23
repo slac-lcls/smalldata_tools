@@ -16,7 +16,7 @@ from smalldata_tools.utilities_plotting import hv_3dimage
 from smalldata_tools.utilities import E2lam
 from smalldata_tools.utilities import dictToHdf5
 from smalldata_tools.utilities import image_from_dxy
-import smalldata_tools.azimuthalBinning as ab
+import smalldata_tools.ana_funcs.azimuthalBinning as ab
 import xarray as xr
 from bokeh.io import show
 import holoviews as hv
