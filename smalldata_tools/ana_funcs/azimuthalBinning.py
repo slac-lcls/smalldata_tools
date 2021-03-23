@@ -7,7 +7,7 @@ from scipy.interpolate import griddata
 import smalldata_tools.utilities as util
 from smalldata_tools.DetObject import DetObjectFunc
 from mpi4py import MPI
-from smalldata_tools.roi_rebin import ROIFunc
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 mpiSize = comm.Get_size()

@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 from scipy import signal as scipy_signal
 from smalldata_tools.DetObject import DetObjectFunc
-from smalldata_tools.roi_rebin import spectrumFunc
+from smalldata_tools.ana_funcs.roi_rebin import spectrumFunc
 from smalldata_tools.utilities import templateArray as utility_templateArray
 
 #find the left-most peak (or so.....)

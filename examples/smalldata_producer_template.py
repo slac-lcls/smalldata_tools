@@ -94,10 +94,23 @@ def getSvdParams(run):
 def define_dets(run):
     detnames = ['jungfrau1M', 'acq_0']
     dets = []
-    ROIs = getROIs(run)
-    az = getAzIntParams(run)
-    phot = getPhotonParams(run)
-    svd = getSvdParams(run)
+    # Load DetObjectFunc parameters (if defined)
+    try:
+        ROIs = getROIs(run)
+    except:
+        ROIs = []
+    try:
+        az = getAzIntParams(run)
+    except:
+        az = []
+    try:
+        phot = getPhotonParams(run)
+    except:
+        phot = []
+    try:
+        svd = getSvdParams(run)
+    except:
+        svd = []
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
