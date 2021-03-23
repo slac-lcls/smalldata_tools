@@ -89,9 +89,9 @@ ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 #run all imports on batch node before calling mpirun on that node.
 $ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
-#     $ABS_PATH/smalldata_producer.py $@
-    $ABS_PATH/smalldata_producer_template.py $@
+    $ABS_PATH/smalldata_producer.py $@
+    #$ABS_PATH/smalldata_producer_template.py $@
 else
-#     mpirun $ABS_PATH/smalldata_producer.py $@
-    mpirun $ABS_PATH/smalldata_producer_template.py $@
+    mpirun $ABS_PATH/smalldata_producer.py $@
+    #mpirun $ABS_PATH/smalldata_producer_template.py $@
 fi
