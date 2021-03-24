@@ -34,9 +34,9 @@ import smalldata_tools.SmallDataAna as sda
 
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.SmallDataUtils import getUserData
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photonFunc
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar
@@ -46,7 +46,7 @@ from smalldata_tools.utilities_plotting import hv_image_ctl
 from smalldata_tools.utilities_plotting import hv_3dimage
 from smalldata_tools.utilities_FitCenter import FindFitCenter
 from smalldata_tools.utilities_FitCenter import fitCircle
-from smalldata_tools.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from mpi4py import MPI
 import h5py
 comm = MPI.COMM_WORLD
