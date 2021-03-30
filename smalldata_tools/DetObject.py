@@ -417,6 +417,7 @@ class CameraObject(DetObjectClass):
         self.ped = self.det.pedestals(run)
         self.gain_mask = self.det.gain_mask(run)
         self.gain = self.det.gain(run)
+        self.common_mode_pars=self.det.common_mode(run)
         self.local_gain = None
         self._getImgShape() #sets self.imgShape
         self._getMasks() #sets mask, cmask, statusMask
@@ -614,6 +615,8 @@ class JungfrauObject(TiledCameraObject):
             print('Common mode %d is not an option for Jungfrau, please choose from: '%self.common_mode, self._common_mode_list)
         self.pixelsize=[75e-6]
         self.isGainswitching=True
+        self.offset=self.det.offset(run)
+        self.pixel_status=self.det.status(run)
         try:
             self.imgShape = self.det.image(run, self.ped[0]).shape
         except:

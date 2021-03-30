@@ -24,22 +24,12 @@ from requests.auth import HTTPBasicAuth
 # functions for run dependant parameters
 ##########################################################
 
-# 1) REGIONS OF INTEREST
-def getROIs(run):
-    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
-    See roi_rebin.py for more info
-    """
-    if isinstance(run,str):
-        run=int(run)
+# 5) GET FULL IMAGE (not recommended)
+def getFullImage(run):
     ret_dict = {}
     if run>0:
-        roi_dict = {}
-        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M'] = roi_dict
-    return ret_dict
-
+        ret_dict['jungfrau1M'] = True
+    return ret_dict  
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
@@ -63,13 +53,17 @@ def define_dets(run):
         svd = getSvdParams(run)
     except:
         svd = []
+    try:
+        image = getFullImage(run)
+    except:
+        image = []
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
         if havedet:
             if detname=='jungfrau1M':
                 #common_mode=71 #also try 71
-                common_mode=0
+                common_mode=-1
             else:
                 common_mode=0 #no common mode
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
@@ -90,6 +84,9 @@ def define_dets(run):
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
+            # image
+            if detname in image:
+                det.addFunc(image_from_dat())
 
             det.storeSum(sumAlgo='calib')
             dets.append(det)
@@ -159,6 +156,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
+from smalldata_tools.ana_funcs.image_from_dat import image_from_dat
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

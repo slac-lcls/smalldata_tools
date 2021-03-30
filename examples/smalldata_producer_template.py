@@ -90,6 +90,14 @@ def getSvdParams(run):
     return ret_dict
 
 
+# 5) GET FULL IMAGE (not recommended)
+def getFullImage(run):
+    ret_dict = {}
+    if run>0:
+        ret_dict['jungfrau1M'] = True
+    return ret_dict        
+
+
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
     detnames = ['jungfrau1M', 'acq_0']
@@ -111,6 +119,10 @@ def define_dets(run):
         svd = getSvdParams(run)
     except:
         svd = []
+    try:
+        image = getFullImage(run)
+    except:
+        image = []
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
@@ -138,6 +150,9 @@ def define_dets(run):
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
+            # image
+            if detname in image:
+                det.addFunc(image_from_dat())
 
             det.storeSum(sumAlgo='calib')
             dets.append(det)
@@ -207,6 +222,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
+from smalldata_tools.ana_funcs.image_from_dat import image_from_dat
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
