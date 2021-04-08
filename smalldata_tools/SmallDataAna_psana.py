@@ -34,9 +34,6 @@ import smalldata_tools.SmallDataAna as sda
 
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.SmallDataUtils import getUserData
-from smalldata_tools.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.droplet import dropletFunc
-from smalldata_tools.photons import photonFunc
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar
@@ -46,7 +43,10 @@ from smalldata_tools.utilities_plotting import hv_image_ctl
 from smalldata_tools.utilities_plotting import hv_3dimage
 from smalldata_tools.utilities_FitCenter import FindFitCenter
 from smalldata_tools.utilities_FitCenter import fitCircle
-from smalldata_tools.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from mpi4py import MPI
 import h5py
 comm = MPI.COMM_WORLD
@@ -307,18 +307,17 @@ class SmallDataAna_psana(object):
         return detname
 
     def _getDetName(self, detname=None):
-        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera','icarus']
+        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera','icarus','ayonix']
         #look for detector
         aliases=[]
         for key in self.Keys():
+            if key.alias()!='':
+                kname = key.alias()
+            else:
+                kname = key.src().__repr__()
             for detName in detNameList:
-                if key.alias().find(detName)>=0:
-                    aliases.append(key.alias())
-        if len(aliases)<1:
-            for key in self.Keys():
-                for detName in detNameList:
-                    if key.src().__repr__().find(detName)>=0:
-                        aliases.append(key.src().__repr__())
+                if kname.find(detName)>=0 and kname.find('Epics')<0:
+                    aliases.append(kname)
         if len(aliases)==1:
             return aliases[0]
         elif detname is not None:
@@ -520,9 +519,9 @@ class SmallDataAna_psana(object):
                 continue
             if minIpm!=-1 and ( (self.hutch=='xpp' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XppSb2_Ipm)')).sum() < minIpm) or (self.hutch=='xcs' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XCS-IPM-05)')).sum() < minIpm)):
                 continue
-            aliases = [ k.alias() for k in evt.keys() ]
-            if not detname in aliases:
-                continue
+            #aliases = [ k.alias() for k in evt.keys() ]
+            #if not detname in aliases:
+            #    continue
 
             det.getData(evt)
             data = det.evt.dat.copy()
@@ -543,7 +542,10 @@ class SmallDataAna_psana(object):
                 if dval.find('env')>=0: 
                     if dval.replace('env_','') not in envDict:
                         envDict[dval.replace('env_','')]=[]
-                    envDict[dval.replace('env_','')].append(det.evt.__dict__[dval][0])
+                    if isinstance(det.evt.__dict__[dval], list) or isinstance(det.evt.__dict__[dval], np.ndarray):
+                        envDict[dval.replace('env_','')].append(det.evt.__dict__[dval][0])
+                    else:
+                        envDict[dval.replace('env_','')].append(det.evt.__dict__[dval])
 
         #make array
         data='AvImg_';
