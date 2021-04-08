@@ -240,7 +240,11 @@ class SmallDataAna(object):
             self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
             print('dirname ',self.plot_dirname)
             if dirname=='':
-                self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
+                hostname = socket.gethostname()
+                if hostname.find('drp-srcf')>=0:
+                    self.dirname='/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                else:
+                    self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
                     print('Directory did not exist? ',self.dirname)
@@ -2235,6 +2239,36 @@ class SmallDataAna(object):
     def getPeakAvImage(self,detname=None, ROI=[]):
         img=self.getAvImage(detname=detname, ROI=ROI)
         return [img.max(), img.mean(axis=0).argmax(),img.mean(axis=1).argmax()]
+
+    def SumImage(self, detname=None):
+        sumimages = self.Keys('Sums')
+        if len(sumimages)==0:
+            print('No summed images were stored.')
+            return
+        if detname is None:
+            detsString='detectors in event: \n'
+            for sumimage in sumimages:
+                detsString+=(sumimage.split('/')[1]).split('_')[0]+', '
+            print(detsString)
+            detname = raw_input("Select detector to get detector info for?:\n")
+        imageList = [sumimage for sumimage in sumimages if sumimage.find(detname)>=0]
+        if len(imageList)==0: 
+            print('no Images found')
+            return
+        if len(imageList)==1:
+            imageName = imageList[0]
+        else:
+            detsString='Images for detector '+detname+':'
+            for iimage in imageList:
+                detsString+=(iimage.split('/')[1])
+            print(detsString)
+            imageName = raw_input("Select image to store:\n")
+
+        imageDict={'detname':detname}
+        imageDict['name'] = imageName
+        imageDict['image'] = self.getVar('Sums/%s'%(imageName.replace('Sums/','')))
+        imageDict['mask'] = self.getVar('UserDataCfg/%s/cmask'%detname)
+        return imageDict
 
     def FitCircle(self, detname=None, mask=None, method=None, thres=None):
         try:

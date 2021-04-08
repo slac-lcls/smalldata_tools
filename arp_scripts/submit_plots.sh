@@ -16,6 +16,10 @@ $(basename "$0"):
 			Run Number
 		-q|--queue
 			Queue to use on SLURM
+		-i|--interactive
+			Run interactively
+		-p|--pedestal
+			plot the pedestals instead
 EOF
 
 }
@@ -45,6 +49,10 @@ do
 			INTERACTIVE=true
 			shift
 			;;
+		-p|--pedestals)
+			PEDESTAL=true
+			shift
+			;;
                  *)
                         POSITIONAL+=("$1")
 			shift
@@ -60,11 +68,15 @@ QUEUE=${QUEUE:='psanaq'}
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source /reg/g/psdm/etc/psconda.sh -py3
+conda activate ana-4.0.15-py3
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
+PLOT_PY=DataqualityPlots
+if [[ -v PEDESTAL ]]; then
+    PLOT_PY=PedestalPlot
+fi
 
 if [[ -v INTERACTIVE ]]; then
-    #$ABS_PATH/../examples/DataqualityPlots.py $@
-    $ABS_PATH/BeamlineSummaryPlots.py $@
+    $ABS_PATH/$PLOT_PY.py $@
 else
-    sbatch -p $QUEUE $ABS_PATH/../examples/BeamlineSummaryPlots.py $@
+    sbatch -p $QUEUE $ABS_PATH/$PLOT_PY.py $@
 fi
