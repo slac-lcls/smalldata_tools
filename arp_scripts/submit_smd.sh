@@ -67,17 +67,17 @@ do
 			shift
 			shift
 			;;
-                --nparallel)
-   		        TASKS_PER_NODE="$2"
+        --nparallel)
+            TASKS_PER_NODE="$2"
 			shift
 			shift
 			;;
-                 --interactive)
-                        INTERACTIVE=1
+        --interactive)
+            INTERACTIVE=1
 			shift
 			;;
-                 *)
-                        POSITIONAL+=("$1")
+        *)
+            POSITIONAL+=("$1")
 			shift
 			;;                     
 	esac
@@ -87,10 +87,10 @@ set -- "${POSITIONAL[@]}"
 #Define cores if we don't have them
 #Set to 1 if single is set
 CORES=${CORES:=1}
-#QUEUE=${QUEUE:='psanaq'}
-#QUEUE=${QUEUE:='ffbh3q'}
-QUEUE=${QUEUE:='psfehq'}
-TASKS_PER_NODE=${TASKS_PER_NODE:=20}
+QUEUE=${QUEUE:='psanaq'}
+# QUEUE=${QUEUE:='ffbh3q'}
+# QUEUE=${QUEUE:='psfehq'}
+TASKS_PER_NODE=${TASKS_PER_NODE:=60}
 
 if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 
@@ -102,4 +102,4 @@ if [ -v INTERACTIVE ]; then
     $MYDIR/submit_small_data.sh $@
     exit 0
 fi
-sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_small_data.sh $@
+sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@

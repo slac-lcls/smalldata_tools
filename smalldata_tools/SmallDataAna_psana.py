@@ -119,7 +119,7 @@ class SmallDataAna_psana(object):
             printR(rank, 'setting up SmallData ana from anaps ')
             self.sda = sda.SmallDataAna(expname,self.run,dirname=dirname, filename=filename,plotWith=plotWith)
         except:
-            printR(rank, 'failed, set anaps.lda to None')
+            printR(rank, 'failed, set anaps.sda to None')
             self.sda = None
         self.calibhisto={}
         self.jobsIds = []
@@ -2214,7 +2214,7 @@ class SmallDataAna_psana(object):
                     print('A: ',oct(os.stat(outFileName).st_mode)[-3:])
                     print('B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name)
                     print('C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos)
-                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
+                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name, pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos, oct(os.stat(outFileName).st_mode)[-3:]))
                 except:
                     printR(rank, 'failed at printing info about file')
             except:

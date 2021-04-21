@@ -35,7 +35,7 @@ def binBoundaries(run):
     if isinstance(run,basestring):
         run=int(run)
     if run == 6:
-        return np.arange(-5.,5.,0.1)
+        return np.arange(-5.,5.,0.2)
     return None
 ########################################################## 
 ##
@@ -43,7 +43,24 @@ def binBoundaries(run):
 ##
 ########################################################## 
 
+##########################################################
+# Custom exception handler to make job abort if a single rank fails.
+# Avoid jobs hanging forever and report actual error message to the log file.
+import traceback as tb
 
+def global_except_hook(exctype, value, exc_traceback):
+    tb.print_exception(exctype, value, exc_traceback)
+    sys.stderr.write("except_hook. Calling MPI_Abort().\n")
+    sys.stdout.flush() # Command to flush the output - stdout
+    sys.stderr.flush() # Command to flush the output - stderr
+    # Note: mpi4py must be imported inside exception handler, not globally.     
+    import mpi4py.MPI
+    mpi4py.MPI.COMM_WORLD.Abort(1)
+    sys.__excepthook__(exctype, value, exc_traceback)
+    return
+
+sys.excepthook = global_except_hook
+##########################################################
 
 fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
@@ -77,7 +94,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument("--indirectory", help="directory w/ smallData file if not default")
-parser.add_argument("--outdirectory", help="directory w/ smallDatafor cube if not same as smallData", default='')
+parser.add_argument("--outdirectory", help="directory w/ smallData for cube if not same as smallData", default='')
 parser.add_argument("--nevents", help="number of events/bin")
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
@@ -135,7 +152,11 @@ if ana is not None:
     ####
     #save image data
     #detDict = {'source':'jungfrau1M','full':1, 'image':1, 'common_mode':7}
-    detDict = {'source':'jungfrau1M','full':1, 'image':1}
+    detDict = {'source':'jungfrau1M', 
+               'full':1, 
+               'image':1, 
+               'threshADU':-1e2, 
+               'common_mode':0}
     #save photon images -- not used recently.
     #detDict = {'source':'jungfrau512k','photon_0p85':3.0, 'image':1}
     #zylaDict = {'source':'zyla','full':1, 'common_mode':0}
@@ -185,6 +206,8 @@ if ana is not None:
         binName='ipm2/sum'
         binVar=ana.getVar(binName)
         binSteps=np.percentile(binVar,[0,25,50,75,100])
+    
+    print('Bin name: {}, bins: {}'.format(binName, binSteps))
 
     if args.nevents:
         cubeName+='_%sEvents'%args.nevents
@@ -228,7 +251,7 @@ if args.postRuntable and rank==0:
     print('posting to the run tables.')
     runtable_data = {"Prod_cube_end":end_prod_time,
                      "Prod_cube_start":begin_prod_time,
-                     "Prod_cube_ncores":ds.size}
+                     "Prod_cube_ncores":size}
     time.sleep(5)
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
