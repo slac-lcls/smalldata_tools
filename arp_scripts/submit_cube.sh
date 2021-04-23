@@ -77,6 +77,8 @@ set -- "${POSITIONAL[@]}"
 source /reg/g/psdm/etc/psconda.sh.old
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
+#run all imports on batch node before calling mpirun on that node.
+$ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 10 ]; then
     $ABS_PATH/MakeCube.py $@
 else

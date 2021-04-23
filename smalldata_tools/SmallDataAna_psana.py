@@ -34,9 +34,6 @@ import smalldata_tools.SmallDataAna as sda
 
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.SmallDataUtils import getUserData
-from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
-from smalldata_tools.ana_funcs.droplet import dropletFunc
-from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar
@@ -46,6 +43,9 @@ from smalldata_tools.utilities_plotting import hv_image_ctl
 from smalldata_tools.utilities_plotting import hv_3dimage
 from smalldata_tools.utilities_FitCenter import FindFitCenter
 from smalldata_tools.utilities_FitCenter import fitCircle
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from mpi4py import MPI
 import h5py
@@ -68,28 +68,32 @@ class SmallDataAna_psana(object):
             print('Will assume the first CXI station, if this is wrong, make sure to add  -e <expname> on commandline')
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": self.hutch.upper(), 
                                                                                           "station": 0})
-        currExpname = resp.json().get("value", {}).get("name")
-        print('Current experiment for %s is %s'%(self.hutch, currExpname))
-        rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
-        if not rundoc:
-            logger.error("Invalid response from server")
-        lastRun = int(rundoc['num'])
-        if self.run > lastRun:
-            printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
-            return None
-            
+        try:
+            currExpname = resp.json().get("value", {}).get("name")
+            print('Current experiment for %s is %s'%(self.hutch, currExpname))
+            rundoc = requests.get(ws_url + "/lgbk/" + expname  + "/ws/current_run").json()["value"]
+            if not rundoc:
+                logger.error("Invalid response from server")
+            lastRun = int(rundoc['num'])
+            if self.run > lastRun:
+                printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
+                return None
+        except:
+            lastRun = -1
+
         if self.run == lastRun:
             isLive = rundoc.get('end_time', None)
         else:
             isLive = False
         self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
         hostname = socket.gethostname()
-        if hostname.find('drpsrcf')>=0:
+        if hostname.find('drp-srcf')>=0:
             xtcdirname='/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
             self.dsname+=':dir=%s'%xtcdirname
+        self.dsnameIdx=self.dsname.replace('smd','idx').replace(':live','')
         if isLive:
             self.dsname=self.dsname+':live:stream=0-79'
-        self.dsnameIdx=self.dsname.replace('smd','idx').replace(':live','')
+            self.dsnameIdx=None
 
         printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
@@ -98,7 +102,7 @@ class SmallDataAna_psana(object):
             printR(rank, 'Failed to set up small data psana dataset!')
             self.ds = None
         if self.dsnameIdx is None:
-            printR(rank, 'Failed to set up index based psana dataset, likely because no idx files have been produced/moved yet')
+            printR(rank, 'Failed to set up index based psana dataset, likely because this run is still live')
         else:
             try:
                 self.dsIdx = psana.DataSource(str(self.dsnameIdx))
@@ -303,18 +307,17 @@ class SmallDataAna_psana(object):
         return detname
 
     def _getDetName(self, detname=None):
-        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera','icarus']
+        detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla','jungfrau','Jungfrau','gige','Camera','icarus','ayonix']
         #look for detector
         aliases=[]
         for key in self.Keys():
+            if key.alias()!='':
+                kname = key.alias()
+            else:
+                kname = key.src().__repr__()
             for detName in detNameList:
-                if key.alias().find(detName)>=0:
-                    aliases.append(key.alias())
-        if len(aliases)<1:
-            for key in self.Keys():
-                for detName in detNameList:
-                    if key.src().__repr__().find(detName)>=0:
-                        aliases.append(key.src().__repr__())
+                if kname.find(detName)>=0 and kname.find('Epics')<0:
+                    aliases.append(kname)
         if len(aliases)==1:
             return aliases[0]
         elif detname is not None:
@@ -516,9 +519,9 @@ class SmallDataAna_psana(object):
                 continue
             if minIpm!=-1 and ( (self.hutch=='xpp' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XppSb2_Ipm)')).sum() < minIpm) or (self.hutch=='xcs' and evt.get(psana.Lusi.IpmFexV1, psana.Source('BldInfo(XCS-IPM-05)')).sum() < minIpm)):
                 continue
-            aliases = [ k.alias() for k in evt.keys() ]
-            if not detname in aliases:
-                continue
+            #aliases = [ k.alias() for k in evt.keys() ]
+            #if not detname in aliases:
+            #    continue
 
             det.getData(evt)
             data = det.evt.dat.copy()
@@ -539,7 +542,10 @@ class SmallDataAna_psana(object):
                 if dval.find('env')>=0: 
                     if dval.replace('env_','') not in envDict:
                         envDict[dval.replace('env_','')]=[]
-                    envDict[dval.replace('env_','')].append(det.evt.__dict__[dval][0])
+                    if isinstance(det.evt.__dict__[dval], list) or isinstance(det.evt.__dict__[dval], np.ndarray):
+                        envDict[dval.replace('env_','')].append(det.evt.__dict__[dval][0])
+                    else:
+                        envDict[dval.replace('env_','')].append(det.evt.__dict__[dval])
 
         #make array
         data='AvImg_';
@@ -641,8 +647,21 @@ class SmallDataAna_psana(object):
             detname = detname[:-1]
         return detname
 
-    def plotAvImage(self,detname=None,imgName=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1):
-        detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
+    def plotAvImage(self,detname=None,imgName=None, use_mask=False, ROI=[], limits=[5,99.5], returnIt=False, plotWith=None,debugPlot=-1, inImage={}):
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            avImage='input Image'
+            if 'name' in inImage:
+                avImage=inImage['name']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
+        else:
+            detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
 
         if use_mask:
             mask = self.__dict__[detname].det.mask_calib(self.run)
@@ -1542,6 +1561,9 @@ class SmallDataAna_psana(object):
                 mask=inImage['mask']
             else:
                 mask=np.ones_like(img)
+            avImage='input Image'
+            if 'name' in inImage:
+                avImage=inImage['name']
             detname=inImage['detname']
             if not detname in self.__dict__.keys():
                 self.addDetInfo(detname=detname)
@@ -2201,11 +2223,15 @@ class SmallDataAna_psana(object):
             outFileName=outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
         try:
-            #print('DEBUG: open file %s in rank %d '%(outFileName, rank))
+            print('DEBUG: open file %s in rank %d '%(outFileName, rank))
             fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
-            #print('DEBUG: opened file %s in rank %d '%(outFileName, rank))
+            print('DEBUG: opened file %s in rank %d '%(outFileName, rank))
         except:
             try:
+                print('write a test tile -- foutu1')
+                fout1 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w")
+                fout1.close()
+                print('write a test tile - mpio')
                 fout2 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
                 printR(rank, 'could not open the desired file for MPI writing. Likely a permission issue:')
                 fout2.close()
@@ -2234,7 +2260,7 @@ class SmallDataAna_psana(object):
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
                 #FIX ME: TEST THIS!!!!
-                sel = self.sda.Sels[cube.useFilter]
+                sel = self.sda.Sels[myCube.useFilter]
                 selString=''
                 for icut,cut in enumerate(sel.cuts):
                     selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
@@ -2328,27 +2354,30 @@ class SmallDataAna_psana(object):
                 evt = runIdx.event(evtt)                #now loop over detectors in this event
                 for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
                     det = self.__dict__[thisdetName]
-                    det.getData(evt)
-                    det.processFuncs()
+                    try:
+                        det.getData(evt)
+                        det.processFuncs()
 
-                    thisDetDataDict=getUserData(det)
-                    for key in thisDetDataDict.keys():
-                        if not (key=='full_area' or key.find('ROI')>=0 or key.find('photon_img')>=0):
-                            continue
-                        if (key=='full_area' or key.find('ROI')>=0):
-                            if thisdetDict.has_key('thresADU'):
-                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
-                            elif thisdetDict.has_key('thresRms'):
-                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
-                            dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-                        else: #if key.find('photon_img')
-                            dIArray[ib%bins_per_job]=dIArray[ib%bins_per_job]+thisDetDataDict[key]
+                        thisDetDataDict=getUserData(det)
+                        for key in thisDetDataDict.keys():
+                            if not (key=='full_area' or key.find('ROI')>=0 or key.find('photon_img')>=0):
+                                continue
+                            if (key=='full_area' or key.find('ROI')>=0):
+                                if thisdetDict.has_key('thresADU'):
+                                    thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
+                                elif thisdetDict.has_key('thresRms'):
+                                    thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
+                                dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+                            else: #if key.find('photon_img')
+                                dIArray[ib%bins_per_job]=dIArray[ib%bins_per_job]+thisDetDataDict[key]
 
-                        x = thisDetDataDict[key]
-                        oldM = dMArray
-                        dMArray = dMArray + (x-dMArray)/(ievt+1)
-                        dSArray = dSArray + (x-dMArray)*(x-oldM)
-            
+                            x = thisDetDataDict[key]
+                            oldM = dMArray
+                            dMArray = dMArray + (x-dMArray)/(ievt+1)
+                            dSArray = dSArray + (x-dMArray)*(x-oldM)
+                    except: 
+                        print('Failed to get data for this event (possible common mode correction in old release....')
+                        
         ###
         #off events cube
         ###

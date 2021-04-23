@@ -124,6 +124,7 @@ def DetObject(srcName, env, run, **kwargs):
         5: PulnixObject,
         6: OpalObject,
         8: OpalObject,
+        9: OpalObject,
        13: EpixObject,
        15: AndOrObject,
        16: AcqirisObject,

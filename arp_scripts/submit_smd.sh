@@ -102,4 +102,5 @@ if [ -v INTERACTIVE ]; then
     $MYDIR/submit_small_data.sh $@
     exit 0
 fi
+
 sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
