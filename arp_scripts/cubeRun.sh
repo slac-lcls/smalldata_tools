@@ -90,4 +90,4 @@ if [ -v INTERACTIVE ]; then
     $MYDIR/submit_cube.sh $@
     exit 0
 fi
-sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_cube.sh $@
+sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_cube.sh $@

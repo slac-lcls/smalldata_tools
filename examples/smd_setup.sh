@@ -11,11 +11,11 @@ $(basename "$0"):
 			Definition of options
 		-e
 			Experiment name (i.e. cxilr6716)
+        --psana
+            Setup smalldata on psana.
 		--ffb
 			Setup smalldata on the FFB.
-		--psana
-            Setup smalldata on psana.
-            If --ffb is given, will clone the repo from the FFB.
+            If exists on psana, will clone the repo from psana.
 EOF
 }
 
@@ -83,34 +83,35 @@ if [ $PSANA -eq 1 ]; then
 fi
 
 # setup smalldata code
-# On FFB
-if [ $FFB -eq 1 ]; then
-    echo "Cloning smalldata to FFB experiment directory..."
-    if [ -d "$FFB_BASE/smalldata_tools" ]; then
-        echo "Smalldata_tools already on FFB"
-    else
-        git clone https://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
-    fi
-    echo "... Done."
-fi
-echo "Sleep 3"
-sleep 3
 # On PSANA
 if [ $PSANA -eq 1 ]; then
     echo "Cloning smalldata to PSANA experiment directory..."
     if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
         echo "Smalldata_tools already on PSANA"
     else
-        if [ $FFB -eq 1 ]; then
-            echo "Cloning from the FFB directory."
-            git clone $FFB_BASE/smalldata_tools $PSANA_BASE/results/smalldata_tools
+        git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
+    fi
+    echo "... Done."
+fi
+echo "Sleep 3"
+sleep 3
+# On FFB
+if [ $FFB -eq 1 ]; then
+    echo "Cloning smalldata to FFB experiment directory..."
+    if [ -d "$FFB_BASE/smalldata_tools" ]; then
+        echo "Smalldata_tools already on FFB"
+    else
+        if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
+            echo "Cloning from the PSANA directory."
+            git clone $PSANA_BASE/results/smalldata_tools $FFB_BASE/smalldata_tools
         else
             echo "Cloning from the remote."
-            git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
+            git clone https://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
         fi
     fi
     echo "... Done."
 fi
+
 
 # Create h5 directories
 if [ $FFB -eq 1 ]; then
@@ -123,4 +124,5 @@ if [ $PSANA -eq 1 ]; then
 #     mkdir -p $PSANA_BASE/hdf5/cube
 fi
 
+# make jobs (to do)
 # makejobs.py
