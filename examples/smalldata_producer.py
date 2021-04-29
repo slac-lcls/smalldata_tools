@@ -5,6 +5,8 @@ import psana
 import time
 from datetime import datetime
 begin_job_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+import time
+start_job = time.time()
 import argparse
 import socket
 import os
@@ -22,6 +24,8 @@ from requests.auth import HTTPBasicAuth
 ########################################################## 
 ##########################################################
 # functions for run dependant parameters
+# 
+# See smalldata_producer_template.py for more analysis functions
 ##########################################################
 
 # 1) REGIONS OF INTEREST
@@ -40,6 +44,15 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
+# 5) GET FULL IMAGE (not recommended)
+def getFullImage(run):
+    ret_dict = {}
+    if run>0:
+        ret_dict['jungfrau1M'] = {
+            'thresADU': None,
+            'binned': None
+            }
+    return ret_dict  
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
@@ -63,16 +76,22 @@ def define_dets(run):
         svd = getSvdParams(run)
     except:
         svd = []
+    try:
+        image = getFullImage(run)
+    except:
+        image = []
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
         if havedet:
             if detname=='jungfrau1M':
                 #common_mode=71 #also try 71
-                common_mode=0
+                common_mode=0 # no cm
+                #common_mode=-1 # raw
             else:
                 common_mode=0 #no common mode
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
+            
             # Analysis functions
             # ROIs:
             if detname in ROIs:
@@ -90,8 +109,13 @@ def define_dets(run):
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
+            # image
+            if detname in image:
+                det.addFunc(image_from_dat())
 
             det.storeSum(sumAlgo='calib')
+            det.storeSum(sumAlgo='calib_img')
+            det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
 
@@ -159,6 +183,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
+from smalldata_tools.ana_funcs.full_det import image_from_dat
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -331,6 +356,9 @@ if args.full or args.epicsAll:
     if len(epicsPV)>0:
         logger.debug('adding all epicsPVs....')
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+elif len(epicsPV)>0:
+    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
 
@@ -478,6 +506,10 @@ if len(sumDict['Sums'].keys())>0:
     small_data.save(sumDict)
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+end_job = time.time()
+if ds.rank==0:
+    prod_time = (end_job-start_job)/60
+    print('########## JOB TIME: {:03f} minutes ###########'.format(prod_time))
 
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))

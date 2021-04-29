@@ -104,6 +104,6 @@ class svdFit(DetObjectFunc):
     
     
     def process_with_alignment(self, waveform):
-        """ To implement
+        """ To be implemented
         """
         return None

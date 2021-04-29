@@ -21,10 +21,10 @@ $(basename "$0"):
 			Number of events to analyze
 		-d|--directory
 			Full path to directory for output file
-                --nparallel
-                        Number of processes per node
-                --interactive
-                        Run the process live w/o batch system
+        --nparallel
+            Number of processes per node
+        --interactive
+            Run the process live w/o batch system
 EOF
 
 }
@@ -38,47 +38,47 @@ EOF
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
-        key="$1"
+    key="$1"
 
-	case $key in
-		-h|--help)
-			usage
-			exit
-			;;
-		-q|--queue)
-			QUEUE="$2"
-			shift
-			shift
-			;;
-		-c|--cores)
-			CORES="$2"
-			shift
-			shift
-			;;
-                --nparallel)
-   		        TASKS_PER_NODE="$2"
-			shift
-			shift
-			;;
-                 --interactive)
-                        INTERACTIVE=1
-			shift
-			;;
-                 *)
-                        POSITIONAL+=("$1")
-			shift
-			;;                     
-	esac
+    case $key in
+    -h|--help)
+        usage
+        exit
+        ;;
+    -q|--queue)
+        QUEUE="$2"
+        shift
+        shift
+        ;;
+    -c|--cores)
+        CORES="$2"
+        shift
+        shift
+        ;;
+    --nparallel)
+        TASKS_PER_NODE="$2"
+        shift
+        shift
+        ;;
+    --interactive)
+        INTERACTIVE=1
+        shift
+        ;;
+    *)
+        POSITIONAL+=("$1")
+        shift
+        ;;                     
+    esac
 done
 set -- "${POSITIONAL[@]}"
 
 #Define cores if we don't have them
 #Set to 1 if single is set
 CORES=${CORES:=1}
-#QUEUE=${QUEUE:='psanaq'}
+QUEUE=${QUEUE:='psanaq'}
 #QUEUE=${QUEUE:='ffbh3q'}
-QUEUE=${QUEUE:='psfehq'}
-TASKS_PER_NODE=${TASKS_PER_NODE:=20}
+# QUEUE=${QUEUE:='psfehq'}
+TASKS_PER_NODE=${TASKS_PER_NODE:=60}
 
 if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 
@@ -90,4 +90,4 @@ if [ -v INTERACTIVE ]; then
     $MYDIR/submit_cube.sh $@
     exit 0
 fi
-sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES $MYDIR/submit_cube.sh $@
+sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_cube.sh $@
