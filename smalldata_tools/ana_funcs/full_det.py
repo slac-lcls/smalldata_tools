@@ -26,11 +26,13 @@ class image_from_dat(DetObjectFunc):
         binned = kwargs.get('binned', None)
         if isinstance(binned,int) or isinstance(binned,float):
             self.binned = (int(binned), int(binned))
-        elif isinstance(binned, tuple) or isinstance(binned, list), isinstance(binned, np.ndarray):
+        elif isinstance(binned, tuple) or isinstance(binned, list) or isinstance(binned, np.ndarray):
             if len(binned)==1:
                 self.binned = (int(binned[0]), int(binned[0]))
             elif len(binned)==2:
                 self.binned = (int(binned[0]), int(binned[1]))
+        elif binned is None:
+            self.binned = None
         else:
             raise TypeError('Binned argument not valid. Int or tuple / array of length 2 only.')
         
