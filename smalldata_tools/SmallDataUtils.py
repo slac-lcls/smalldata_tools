@@ -167,16 +167,18 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     dets.append(controlDetector())
     dets.append(ipmDetector('MEC-XT2-PIM-02','pim2')) 
     dets.append(ipmDetector('MEC-XT2-PIM-03','pim3')) 
-    dets.append(ipmDetector('MEC-TCTR-DI-01','dio_tctr'))
+    dets.append(ipmDetector('MEC-TCTR-DI-01','pips-diode-air'))
     dets.append(ipmDetector('MEC-LAS-EM-01','dio_las'))
     dets.append(ipmDetector('MEC-XT2-IPM-02','ipm2'))
     dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-02','xt2_ipm2'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-03','xt2_ipm3'))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
+    dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
-    dets.append(epicsDetector(PVlist=['belens z','MEC:NOTE:LAS:NSDELAY',
+    dets.append(epicsDetector(PVlist=['belens_z',
+                                      'MEC:NOTE:LAS:NSDELAY',
                                       'MEC:NS1:MMS:01.RBV',
                                       'MEC:NS1:MMS:02.RBV',
                                       'MEC:LAS:MMN:30.RBV',
@@ -185,7 +187,11 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
                                       'MEC:USR:MMS:17.RBV',
                                       'MEC:LAS:DDG:05:aDelaySI',
                                       'MEC:LAS:DDG:05:eDelaySI',
-                                      'SIOC:SYS0:LM00:AO627']))
+                                      'SIOC:SYS0:LM00:AO627',
+                                      'MEC:TC1:GCC:01:PMON',
+                                      'MEC:TC1:GPI:01:PMON',
+                                      'MEC:TC1:VGC:01:OPN_OK',
+                                      'MEC:TC1:VGC:02:OPN_OK']))
     dets.append(damageDetector())
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))

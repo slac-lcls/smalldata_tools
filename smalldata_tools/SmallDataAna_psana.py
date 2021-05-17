@@ -82,7 +82,7 @@ class SmallDataAna_psana(object):
             lastRun = -1
 
         if self.run == lastRun:
-            isLive = rundoc.get('end_time', None)
+            isLive = (rundoc.get('end_time', None) == None)
         else:
             isLive = False
         self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
@@ -687,6 +687,8 @@ class SmallDataAna_psana(object):
 
         #have issues with Jupyter notebook io size.
         if plotWith is None:
+            if returnIt:
+                return image
             plotWith=self.plotWith
         if plotWith=='bokeh_notebook':
             plot_title="%s in Run %d"%(avImage, self.run)
@@ -697,7 +699,7 @@ class SmallDataAna_psana(object):
             layout, p, im = plotImageBokeh(img, plot_title=plot_title, plotMaxP=np.nanpercentile(img,99),plotMinP=np.nanpercentile(img,1), plotWidth=700, plotHeight=700)
             bp.output_notebook()
             bp.show(layout)
-        else:
+        elif plotWith=='matplotlib':
             fig=plt.figure(figsize=(10,6))
             if ROI!=[]:
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
@@ -1103,8 +1105,21 @@ class SmallDataAna_psana(object):
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
                 plt.show()
 
-    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
-        detname, img, avImage = self.getAvImage(detname=None)
+    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1, inImage={}):
+        if inImage!={}:
+            img=inImage['image']
+            if 'mask' in inImage:
+                mask=inImage['mask']
+            else:
+                mask=np.ones_like(img)
+            detname=inImage['detname']
+            avImage='input Image'
+            if 'name' in inImage:
+                avImage=inImage['name']
+            if not detname in self.__dict__.keys():
+                self.addDetInfo(detname=detname)
+        else:
+            detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
 
         plotMax = np.nanpercentile(img, limits[1])
         plotMin = np.nanpercentile(img, limits[0])
@@ -1158,7 +1173,7 @@ class SmallDataAna_psana(object):
             #needs to be pixel coordinates for rectable selection to work.
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
-            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
+            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n), edgepixels(e), center pixels(cen,center) or statistics(s)?:\n")
             #shape = raw_input()
             #this definitely works for the rayonix...
             if shape=='r':
@@ -1287,7 +1302,7 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
                 else:
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
-            if shape=='e':
+            elif shape=='e':
                 ctot=raw_input("Enter number of edge rows that should be masked:")
                 try:
                     nEdge = int(ctot)
@@ -1310,7 +1325,7 @@ class SmallDataAna_psana(object):
                     tile[:,nEdge:-1]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
 
-            if shape=='cen' or shape=='center':
+            elif shape=='cen' or shape=='center':
                 ctot=raw_input("Enter number of center rows that should be masked:")
                 try:
                     nEdge = int(ctot)
@@ -1328,6 +1343,10 @@ class SmallDataAna_psana(object):
                     tile[int(tile.shape[0]/2-nEdge):int(tile.shape[0]/2+nEdge),:]=1
                     tile[:,int(tile.shape[1]/2-nEdge):int(tile.shape[1]/2+nEdge)]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
+
+            elif shape=='s':
+                #XXX
+                print('statistical masking...')
 
             if mask_r_nda is not None:
                 print('created a mask....',len(mask))
@@ -1553,7 +1572,7 @@ class SmallDataAna_psana(object):
         azintNames = [ key for key in getattr(self,detname).__dict__.keys() if isinstance(getattr(getattr(self, detname),key), azimuthalBinning) ]
         return azintNames, azintArray
 
-    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, inImage={}, imgName=None):
+    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, inImage={}, imgName=None, plotGrid=0):
         avImage=None
         if inImage!={}:
             img=inImage['image']
@@ -1601,6 +1620,12 @@ class SmallDataAna_psana(object):
             elif len(azintValues.shape)==2:
                 plt.imshow(azintValues,aspect='auto',interpolation='none')
                 plt.colorbar()
+                ymin=0;ymax=azintValues.shape[1]-1
+                for il,lineVal in enumerate(np.linspace(ymin,ymax,int(plotGrid))):
+                    lw=1
+                    if plotGrid>15 and il%5>0:
+                        lw=0.5
+                    plt.plot([lineVal,lineVal],[0, azintValues.shape[0]],'r',linewidth=lw,linestyle='dotted')
         else:
             return azintValues
 
@@ -2240,7 +2265,7 @@ class SmallDataAna_psana(object):
                     print('A: ',oct(os.stat(outFileName).st_mode)[-3:])
                     print('B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name)
                     print('C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos)
-                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name, pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos, oct(os.stat(outFileName).st_mode)[-3:]))
+                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
                 except:
                     printR(rank, 'failed at printing info about file')
             except:

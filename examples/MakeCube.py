@@ -4,9 +4,6 @@
 # run this like:
 # ./examples/MakeCube.py --run 302 --exp xppo5616
 #
-# submit to queue like:
-# before submitting to the queue, you'll need to unset the DISPLAY variable. 
-# bsub -q psanaq -n <njobs> -o <path_to_logfile> python ./examples/MakeCube.py --run 302 --exp xppo5616
 ###
 import sys
 import time
@@ -17,50 +14,14 @@ import socket
 import logging 
 import os
 import requests
+import tables
+from PIL import Image
 from requests.auth import HTTPBasicAuth
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-########################################################## 
-##
-## User Input start --> 
-##
-########################################################## 
-##########################################################
-# functions for run dependant parameters
-##########################################################
-def binBoundaries(run):
-    if isinstance(run,basestring):
-        run=int(run)
-    if run == 6:
-        return np.arange(-5.,5.,0.2)
-    return None
-########################################################## 
-##
-## <-- User Input end
-##
-########################################################## 
-
-##########################################################
-# Custom exception handler to make job abort if a single rank fails.
-# Avoid jobs hanging forever and report actual error message to the log file.
-import traceback as tb
-
-def global_except_hook(exctype, value, exc_traceback):
-    tb.print_exception(exctype, value, exc_traceback)
-    sys.stderr.write("except_hook. Calling MPI_Abort().\n")
-    sys.stdout.flush() # Command to flush the output - stdout
-    sys.stderr.flush() # Command to flush the output - stderr
-    # Note: mpi4py must be imported inside exception handler, not globally.     
-    import mpi4py.MPI
-    mpi4py.MPI.COMM_WORLD.Abort(1)
-    sys.__excepthook__(exctype, value, exc_traceback)
-    return
-
-sys.excepthook = global_except_hook
-##########################################################
 
 fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
@@ -70,7 +31,8 @@ print(fpathup)
 from smalldata_tools.SmallDataAna import SmallDataAna
 from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -94,7 +56,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument("--indirectory", help="directory w/ smallData file if not default")
-parser.add_argument("--outdirectory", help="directory w/ smallData for cube if not same as smallData", default='')
+parser.add_argument("--outdirectory", help="directory w/ smallDatafor cube if not same as smallData", default='')
 parser.add_argument("--nevents", help="number of events/bin")
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
@@ -136,78 +98,34 @@ else:
 if ana is not None:
     ana.printRunInfo()
 
-    #CHANGE ME!
+    filterName='PIPS'
     ####
     #set up different event filters.    
     ####
-    ana.addCut('lightStatus/xray',0.5,1.5,'filter1')
+    PIPS = ana.getVar('pips-diode-air/channels')
+    ana.addVar('PIPS',PIPS[:,0])
+    ana.addCut('PIPS',1.5,2.0,filterName)
+    nSel = ana.getFilter(filterName).sum()
 
-    ana.addCut('lightStatus/xray',0.5,1.5,'filter2')
-    ana.addCut('evr/code_41',0.5,1.5,'filter2')
-
-
-    #CHANGE ME 
     ####
     #(if you want a full detector or many)
     ####
     #save image data
-    #detDict = {'source':'jungfrau1M','full':1, 'image':1, 'common_mode':7}
-    detDict = {'source':'jungfrau1M', 
-               'full':1, 
-               'image':1, 
-               'threshADU':-1e2, 
-               'common_mode':0}
+    det1Dict = {'source':'Epix10kaQuad2','full':1, 'image':1, 'thresADU':1.}
+    det2Dict = {'source':'epix100a_1_IXS','full':1, 'image':1, 'thresADU':15.}
+    det3Dict = {'source':'epix100a_2_XRTS','full':1, 'image':1, 'thresADU':15.}
     #save photon images -- not used recently.
     #detDict = {'source':'jungfrau512k','photon_0p85':3.0, 'image':1}
-    #zylaDict = {'source':'zyla','full':1, 'common_mode':0}
 
-    #CHANGE ME!
     ####
     # list of variables to bin
     ####
-    #varList = ['ipm5/sum','snd_dio/t4d','snd_dio/dco','scan/_delay', zylaDict, detDict]
-    varList = ['ipm2/sum','ipm3/sum','diodeU/channels', detDict]
-    #varList = ['ipm2/sum','ipm3/sum','diodeU/channels']
+    varList = ['PIPS', det1Dict, det2Dict, det3Dict]
 
-    #CHANGE ME
-    ####
-    # if you are interested in laser-xray delay, please select the delay of choice here!
-    ####
-    ana.setDelay(use_ttCorr=True, addEnc=False, addLxt=False, reset=True)
 
     cubeName='cube' #initial name
-    scanName, scanValues = ana.getScanValues()
-    binSteps=[]
-    binName=''
-    filterName='filter1'
-    if scanName!='':
-        if scanName.find('delay')<0:
-            scanSteps = np.unique(scanValues)
-            scanSteps = np.append(scanSteps, scanSteps[-1]+abs(scanSteps[1]-scanSteps[0]))#catch value at right edge?
-            scanSteps = np.append(scanSteps[0]-abs(scanSteps[1]-scanSteps[0]),scanSteps) #catch values at left edge
-            binSteps = scanSteps
-            cubeName = scanName
-            if scanName == 'lxt':    
-                print('bin data using ',scanName,' and bins: ',scanSteps)
-                binName='delay'
-            else:
-                print('bin data using ',scanName,' and bins: ',scanSteps)
-                binName='scan/%s'%scanName
-        else:
-            binSteps = binBoundaries(run)
-            if binSteps is None:
-                #assume a fast delay scan here.
-                enc = ana.getVar('enc/lasDelay')
-                binSteps = np.arange( (int(np.nanmin(enc*10)))/10., 
-                                      (int(np.nanmax(enc*10)))/10., 0.1)
-            binName = 'delay'
-    else:
-        cubeName='randomTest'
-        binName='ipm2/sum'
-        binVar=ana.getVar(binName)
-        binSteps=np.percentile(binVar,[0,25,50,75,100])
-    
-    print('Bin name: {}, bins: {}'.format(binName, binSteps))
+    binName='evr/code_140'
+    binSteps=[0.,1.1]
 
     if args.nevents:
         cubeName+='_%sEvents'%args.nevents
@@ -215,15 +133,6 @@ if ana is not None:
     ana.addCube(cubeName,binName,binSteps,filterName)
     ana.addToCube(cubeName,varList)
 
-    ####
-    #there are two ways to get multiple cubes: if you want a standard laser on/off set, use the onoff flag
-    #if you e.g. have data with an external magnet switched on/off, use the 'Sel2' approach.
-    #both are not necessary.
-    ####
-    ana.addCube(cubeName+'Sel2',binName,binSteps,'filter2')
-    ana.addToCube(cubeName+'Sel2',varList)
-    nSel = ana.getFilter(filterName).sum()
-    nSel2 = ana.getFilter('filter2').sum()
 
     if (int(os.environ.get('RUN_NUM', '-1')) > 0) and rank==0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Prepared"}])
@@ -232,17 +141,26 @@ if ana is not None:
         print('make cube with fewer events/bin')
         if nSel>0:
             anaps.makeCubeData(cubeName, nEvtsPerBin=int(args.nevents),dirname=args.outdirectory)
-        #if nSel2>0:
-       #     anaps.makeCubeData(cubeName+'Sel2',  nEvtsPerBin=int(args.nevents))
     else:
         if nSel>0:
             anaps.makeCubeData(cubeName, dirname=args.outdirectory)
-    #        #anaps.makeCubeData(cubeName, onoff=1) #request 'on' events base on input filter (add optical laser filter)
-    #        #anaps.makeCubeData(cubeName, onoff=0) #request 'off' events base on input filter (switch optical laser filter, drop tt requirements)
-    #    if nSel2>0:
-    #        anaps.makeCubeData(cubeName+'Sel2')
-
+   
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+
+#read hdf5 file and make tiff files....
+if rank==0:
+    tiffdir='/cds/data/drpsrcf/mec/meclu9418/scratch/run%s'%args.run
+    cubeFName = 'Cube_%s_Run%04d_%s'%(args.experiment, int(run), cubeName )
+    cubedirectory= args.outdirectory
+    if cubedirectory=='': cubedirectory = '/cds/data/drpsrcf/mec/meclu9418/scratch/hdf5/smalldata'
+    dat = tables.open_file('%s/%s.h5'%(cubedirectory, cubeFName )).root
+    detnames = ['Epix10kaQuad2','epix100a_1_IXS','epix100a_2_XRTS']
+    for detname in detnames:
+        cubedata = np.squeeze(getattr(dat, detname))
+        if cubedata.ndim==2:
+            im = Image.fromarray(cubedata)
+            tiff_file = '%s/Run_%s_%s_filter_%s.tiff'%(tiffdir, run, detname, filterName)
+            im.save(tiff_file)
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0) and rank==0:
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
@@ -251,12 +169,11 @@ if args.postRuntable and rank==0:
     print('posting to the run tables.')
     runtable_data = {"Prod_cube_end":end_prod_time,
                      "Prod_cube_start":begin_prod_time,
-                     "Prod_cube_ncores":size}
+                     "Prod_cube_ncores":ds.size}
     time.sleep(5)
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL:',ws_url)
-    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
+    #print('URL:',ws_url)
+
     user=args.experiment[:3]+'opr'
     with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
         answer = reader.readline()

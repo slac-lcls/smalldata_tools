@@ -535,8 +535,14 @@ def hist2d(ar1, ar2,limits=[1,99.5],numBins=[100,100],histLims=[np.nan,np.nan, n
         pmax1 = histLims[3]
     v0 = ar1
     v1 = ar2
-    binEdges0 = np.linspace(pmin0, pmax0, numBins[0])
-    binEdges1 = np.linspace(pmin1, pmax1, numBins[1])
+    if numBins[0] == None:
+        binEdges0 = np.arange(pmin0, pmax0)
+    else:
+        binEdges0 = np.linspace(pmin0, pmax0, numBins[0])
+    if numBins[0] == None:
+        binEdges1 = np.arange(pmin1, pmax1)
+    else:
+        binEdges1 = np.linspace(pmin1, pmax1, numBins[1])
     ind0 = np.digitize(v0, binEdges0)
     ind1 = np.digitize(v1, binEdges1)
     ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
@@ -834,7 +840,11 @@ def image_from_dxy(d,x,y, **kwargs):
         #jungfrau1M
         elif x.shape==(2,512,1024): imgShape=[1064,1030]
         elif len(x.shape)==2:#is already image (and not special detector)
-            return d
+            pixelSize = kwargs.pop("pixelSize", None)
+            if pixelSize is None:
+                return d
+            else:
+                imgShape = [ (x.max()-x.min())/pixelSize, (y.max()-y.min())/pixelSize]
         else:
             if outShape is None:
                 print('do not know which detector in need of a special geometry this is, cannot determine shape of image')
@@ -851,7 +861,7 @@ def image_from_dxy(d,x,y, **kwargs):
     if outShape is None:
         outShape = (np.max(ix)+1, np.max(iy)+1)
         
-    img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
+    img = np.asarray(sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense())
     return img
 
 

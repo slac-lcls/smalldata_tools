@@ -5,6 +5,9 @@ from skimage.measure import (CircleModel, ransac)
 from scipy.signal import argrelextrema
 from scipy.spatial import cKDTree
 from numba import jit
+import itertools
+from matplotlib import pyplot as plt
+plt.ion()
 
 def fitCircle(x,y,yerr=None, guess=None):
 	"""
@@ -418,3 +421,37 @@ def FindFitCenter(image, mask, **kwargs):
 	res, ring_info, edges = ransac_result(sparse_edges, [x, y], r_vals, n_max, red_factor, min_points, min_samples, res_thresh, min_frac)
 	
 	return res, ring_info, edges
+
+def FindFitCenterPlot(image, mask, **kwargs):
+        #plot image in grayscale
+        combRes, ringInfo, arSparse = FindFitCenter(image, mask, **kwargs)
+
+        #plot image in grayscale
+        plt.figure(figsize=[12,12])
+        plt.imshow(image, interpolation='none', cmap='gray',clim=[0,np.nanpercentile(image.flatten(),99.5)])
+        #plot sparse images in blue.
+        plt.plot(arSparse.col, arSparse.row,markersize=5,color='#ff9900',marker='.',linestyle='None')
+        if combRes==-1:
+            return -1
+        greens=['#666600','#669900','#66cc00','#66cc99','#6699cc','#6633ff']
+        print('center ',combRes['xCen'],combRes['yCen'])
+        for ir,thisRingInfo,rFit in itertools.izip(itertools.count(),ringInfo,combRes['R']):
+            #plot ransac selected data in green <-- consider different greens for first circles.
+            plt.plot(arSparse.col[thisRingInfo['pointsInCircle']], arSparse.row[thisRingInfo['pointsInCircle']],marker='.',color=greens[ir],linestyle='None', markersize=4)
+            circle1 = plt.Circle((combRes['xCen'],combRes['yCen']),rFit,color=greens[ir],fill=False,linestyle='dashed',linewidth=1)
+            circle1b = plt.Circle((combRes['xCen'],combRes['yCen']),rFit,color='red',fill=False,linestyle='dotted',linewidth=2)
+            plt.gca().add_artist(circle1)
+            plt.gca().add_artist(circle1b)
+        #circle1 = plt.Circle((combRes['xCen'],combRes['yCen']),ringInfo[0]['rInput'],color='r',fill=False,linestyle='dashed')
+        #plt.gca().add_artist(circle1)
+        plt.plot([combRes['xCen'],combRes['xCen']],[combRes['yCen']-20,combRes['yCen']+20],color='m')
+        plt.plot([combRes['xCen']-20,combRes['xCen']+20],[combRes['yCen'],combRes['yCen']],color='m')
+        limits=[[0,image.shape[0]],[0,image.shape[1]]]
+        plt.xlim(limits[0])
+        plt.ylim(limits[1])
+        plt.show()
+        for r in combRes['R']:
+            print('aradii: ',r)
+        print('center Final ',combRes['xCen'],combRes['yCen'])
+        return combRes
+ 
