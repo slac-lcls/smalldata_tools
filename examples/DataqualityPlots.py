@@ -29,53 +29,9 @@ sys.path.append(fpath)
 from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import image_from_dxy
 from smalldata_tools.utilities import rebin
-
-## function that chops the 64 bit time integer into something a bit more useful
-def evtt2Rt(event_time):
-    evtt0 = event_time>>32
-    evtt1 = (event_time<<32)>>32
-    evtt_sec = evtt0.astype(float)
-    evtt_ns = evtt1.astype(float)*1e-9
-    Rt = evtt_sec + evtt_ns
-    Rt = Rt-Rt[0]
-    return Rt
-
-def postRunTable(runtable_data):
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL:',ws_url)
-    user=args.experiment[:3]+'opr'
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-        answer = reader.readline()
-    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
-                      auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-    #we might need to use this for non=current expetiments. Currently does not work in ARP
-    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
-
-def makeRunTableData(ana, ipmUpDim, ipmDownDim, Filter, scanName):
-    n162 = ana.getVar('evr/code_162').sum()
-    ana.addCut('evr/code_162',-0.5,0.5,'xon')
-    ana.addCut('evr/code_137',0.5,1.5,'xon')
-    nOff = ana.getFilter('xon').shape[0]-ana.getFilter('xon').sum()
-    #data to be posted to the run table if so requested.
-    runtable_data = {"N dropped Shots":int(nOff),
-                     "N BYKIK 162":int(n162)}
-    if scanName != '':
-        runtable_data['scanName'] = scanName
-
-    ipmUpVar = ana.getVar(ipmUpDim.name,useFilter=Filter)
-    ipmDownVar = ana.getVar(ipmDownDim.name,useFilter=Filter)
-    ipmUpP = np.nanpercentile(ipmUpVar,[25,50,75])
-    ipmDownP = np.nanpercentile(ipmDownVar,[25,50,75])
-    runtable_data["%s_1qt"%(ipmUpDim.name.replace('/','__'))]=ipmUpP[0]
-    runtable_data["%s_med"%(ipmUpDim.name.replace('/','__'))]=ipmUpP[1]
-    runtable_data["%s_3qt"%(ipmUpDim.name.replace('/','__'))]=ipmUpP[2]
-    runtable_data["%s_1qt"%(ipmDownDim.name.replace('/','__'))]=ipmDownP[0]
-    runtable_data["%s_med"%(ipmDownDim.name.replace('/','__'))]=ipmDownP[1]
-    runtable_data["%s_3qt"%(ipmDownDim.name.replace('/','__'))]=ipmDownP[2]
-    
-    return runtable_data
+from smalldata_tools.utilities_dataqualityplots import evtt2Rt, postRunTable
+from smalldata_tools.utilities_dataqualityplots import makeRunTableData
+from smalldata_tools.utilities_dataqualityplots import dropletPics
 
 #logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
@@ -120,16 +76,19 @@ ana = anaps.sda #
 
 ## Defining initial selection (laser-on events)
 iniFilter='initial'
-ana.addCut('lightStatus/xray',0.5,1.5,iniFilter)
-ana.addCut('lightStatus/laser',0.5,1.5,iniFilter)
+ana.addCut('lightStatus/xray',-0.5,1.5,iniFilter)
+#ana.addCut('lightStatus/laser',0.5,1.5,iniFilter)
 
 ### Get data & define axis title&ranges.
 
-ipmUpDim = hv.Dimension(('ipm4/sum','ipm4 Sum'))
-ipmDownDim = hv.Dimension(('ipm5/sum','ipm5 Sum'))
-scatterDim = hv.Dimension(('epix10k2M/ROI_0_sum','epix10k2M intensity'))
+ipmUpDim = hv.Dimension(('gas_detector/f_22_ENRC','gdet'))
+#ipmUpDim = hv.Dimension(('xt2_ipm3/sum','xt2 ipm3 Sum'))
+#ipmUpDim = hv.Dimension(('xt2_ipm2/sum','xt2 ipm2 Sum'))
+ipmDownDim = hv.Dimension(('pips-diode-air/channels','pips-diode-air'))
+#ipmUpDim = hv.Dimension(('xt2_ipm2/sum','xt2 ipm2 Sum'))
+#ipmDownDim = hv.Dimension(('xt2_ipm3/sum','xt2 ipm3 Sum'))
+scatterDim = hv.Dimension(('Epix10kaQuad2/full_sum','epix10kQuad2 intensity'))
 eventTimeDim = hv.Dimension(('eventTimeR','relative event time'))
-l3eDim = hv.Dimension(('l3e','L3 Energy'))
 
 scanVar = ana.getScanName()
 try:
@@ -143,47 +102,56 @@ nevtsLxtDim = hv.Dimension(('neventslxt','N events / lxt'))
 lxtDim = hv.Dimension(('epics/lxt','lxt'))
 
 ipmUpVar = ana.getVar(ipmUpDim.name,useFilter=iniFilter)
-ipmDownVar = ana.getVar(ipmDownDim.name,useFilter=iniFilter)
-stepVar = ana.getVar('scan/varStep',useFilter=iniFilter)
-l3eVar = ana.getVar('ebeam/L3_energy',useFilter=iniFilter)
+if ipmDownDim.name.find('diode'):
+    ipmDownVar = ana.getVar([ipmDownDim.name,0],useFilter=iniFilter)
+else:
+    ipmDownVar = ana.getVar(ipmDownDim.name,useFilter=iniFilter)
+
+#scale them for overlay.
+#ipmDownVar *= np.nanmean(ipmUpVar)/np.nanmean(ipmDownVar)
 eventTimeRaw = ana.getVar('event_time',useFilter=iniFilter)
 eventTime = (eventTimeRaw>>32).astype(float)+((eventTimeRaw<<32)>>32).astype(float)*1e-9
 eventTimeR = eventTime-eventTime[0]
 
-eventTimeRMed = [np.nanmedian(eventTimeR[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
-ipmUpMed =  [np.nanmedian(ipmUpVar[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
-ipmDownMed =  [np.nanmedian(ipmDownVar[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
+l3eDim = hv.Dimension(('ebeam/L3_energy','L3 Energy'))
+if len(ana.Keys(l3eDim.name))>0:
+    l3eVar = ana.getVar(l3eDim.name,useFilter=iniFilter)
+else:
+    l3eVar = None
 
+eventTimeRMed = [np.nanmedian(eventTimeR[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
 try:
-    azav = ana.getVar('epix10k2M/azav_azav',useFilter=iniFilter)
-    azav_sum = np.nanmean(azav, axis=0)
-    azav_peak = np.argmax(azav_sum)
-    if len(azav.shape)>2:
-        azav = np.nanmean(azav, axis=1)
-    scatterVar = np.nanmean(azav[:,max(0,azav_peak-50):min(azav.shape[1],azav_peak+50)], axis=1)
-    if len(scatterVar.shape)>1:
-        scatterVar = np.nanmean(scatterVar,axis=1)
+    ipmUpMed =  [np.nanmedian(ipmUpVar[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
+    ipmDownMed =  [np.nanmedian(ipmDownVar[i*120:i*120+120]) for i in range(int(eventTimeR.shape[0]/120))]
 except:
-    scatterVar = None
+    pass
+
+if len(ana.Keys(scatterDim.name))==0:
+    scatterDim = hv.Dimension(('epix100a_1_IXS/full_sum','epix100_1_IXS intensity'))
+if len(ana.Keys(scatterDim.name))==0:
+    scatterVar=None
+else:
+    scatterVar= ana.getVar(scatterDim.name,useFilter=iniFilter)
 
 ### Scan Variable
 
-try:
+if len(ana.Keys('scan/varStep'))>0:
+    stepVar = ana.getVar('scan/varStep',useFilter=iniFilter)
     isStepScan = np.nanmax(stepVar)>0
     scanVarBins = np.bincount(stepVar,weights=scatterVar)
     scanNsteps = np.bincount(stepVar)
-except:
+else:
     isStepScan = False
 
 ### Fast delay stage 
 
 lxt_fast_his = None
-try:
+if len(ana.Keys('enc/lasDelay'))>0:
     lxt_fast = ana.getVar('enc/lasDelay',useFilter=iniFilter)
     print(np.nanstd(lxt_fast))
     if lxt_fast is not None and np.nanstd(lxt_fast)<1e-4:
         lxt_fast_his = np.histogram(lxt_fast, np.linspace(np.nanpercentile(lxt_fast,1), np.nanpercentile(lxt_fast,99),100))
-except:
+else:
     pass
 
 #droppled sthots.
@@ -196,26 +164,38 @@ else:
 nOff = ana.getFilter(offFilter).sum()
 
 #plots.
-ipmUpTime = hv.HexTiles((eventTimeR[ipmUpVar<np.nanpercentile(ipmUpVar,99)],
+treePlot = None
+stepPlot = None
+lxtPlot = None
+ipmiScatterPlot = None
+try:
+    ipmUpTime = hv.HexTiles((eventTimeR[ipmUpVar<np.nanpercentile(ipmUpVar,99)],
                          ipmUpVar[ipmUpVar<np.nanpercentile(ipmUpVar,99)]),
                         kdims=[eventTimeDim, ipmUpDim]).\
                         opts(cmap='Blues')
-ipmUpTimeMed = hv.Points((eventTimeRMed, ipmUpMed), kdims=[eventTimeDim,ipmUpDim],label=ipmUpDim.label).\
+    ipmUpTimeMed = hv.Points((eventTimeRMed, ipmUpMed), kdims=[eventTimeDim,ipmUpDim],label=ipmUpDim.label).\
     options(color='r')
-ipmDownTimeMed = hv.Points((eventTimeRMed, ipmDownMed), kdims=[eventTimeDim,ipmUpDim],label=ipmDownDim.label).\
+    ipmDownTimeMed = hv.Points((eventTimeRMed, ipmDownMed), kdims=[eventTimeDim,ipmUpDim],label=ipmDownDim.label).\
     options(color='m')
     
-ipmTimeLayout = ipmUpTime*ipmUpTimeMed*ipmDownTimeMed
+    ipmTimeLayout = ipmUpTime*ipmUpTimeMed*ipmDownTimeMed
 
-treeSel = (l3eVar>np.nanpercentile(l3eVar,1))
-treePlot = hv.HexTiles((l3eVar[treeSel],ipmUpVar[treeSel]),kdims=[l3eDim,ipmUpDim])
+    ipmPlot = hv.HexTiles((ipmUpVar, ipmDownVar), kdims=[ipmUpDim, ipmDownDim])
+    ipmLayout = ipmPlot.hist(dimension=[ipmUpDim.name,ipmDownDim.name])
+except:
+    pass
+try:
+    if l3eVar is not None:
+        treeSel = (l3eVar>np.nanpercentile(l3eVar,1))
+        treePlot = hv.HexTiles((l3eVar[treeSel],ipmDownVar[treeSel]),kdims=[l3eDim,ipmDownDim])
+except:
+    pass
+try:
+    if scatterVar is not None:
+        ipmscatterPlot = hv.HexTiles((scatterVar, ipmDownVar), kdims=[scatterDim, ipmDownDim])
+except:
+    pass
 
-ipmPlot = hv.HexTiles((ipmUpVar, ipmDownVar), kdims=[ipmUpDim, ipmDownDim])
-ipmLayout = ipmPlot.hist(dimension=[ipmUpDim.name,ipmDownDim.name])
-if scatterVar is not None:
-    ipmscatterPlot = hv.HexTiles((scatterVar, ipmDownVar), kdims=[scatterDim, ipmDownDim])
-
-stepPlot = None
 if isStepScan:
     try:
         stepPlot = hv.Points((scanVarBins/scanNsteps, scanNsteps), kdims=[scanDim,nevtsDim])
@@ -226,27 +206,33 @@ if isStepScan:
 if lxt_fast_his is not None:
     lxtPlot = hv.Points( (0.5*(lxt_fast_his[1][:-1]+lxt_fast_his[1][1:]), lxt_fast_his[0]), \
                              kdims=[lxtDim,nevtsLxtDim])
-else:
-    lxtPlot = None
 
+gspecS = None
 gspec = pn.GridSpec(sizing_mode='stretch_both', max_width=700, name='Data Quality - Run %d'%run)
 #gspec[0,0:8] = pn.Row('# Data Quality Plot - Run %04d'%run)
-gspec[0:2,0:8] = pn.Column(ipmTimeLayout)
-gspec[2:5,0:4] = pn.Column(ipmLayout)
-gspec[2:5,4:8] = pn.Column(treePlot)
-
-gspecS = pn.GridSpec(sizing_mode='stretch_both', max_width=700, name='Scan&Scatter')
-#gspec[0,0:8] = pn.Row('# Data Quality Plot - Run %04d'%run)
-if scatterVar is not None:
-    gspecS[0:4,0:8] = pn.Column(ipmscatterPlot)
-maxRow=4
-if stepPlot is not None:
+try:
+    gspec[0:2,0:8] = pn.Column(ipmTimeLayout)
+    gspec[2:5,0:4] = pn.Column(ipmLayout)
+    gspec[2:5,4:8] = pn.Column(treePlot)
+except:
+    pass
+try:
+    #gspec[0,0:8] = pn.Row('# Data Quality Plot - Run %04d'%run)
+    if scatterVar is not None:
+        gspecS = pn.GridSpec(sizing_mode='stretch_both', max_width=700, name='Scan&Scatter')
+        gspecS[0:4,0:8] = pn.Column(ipmscatterPlot)
+    maxRow=4
+except:
+    maxRow=1
+if stepPlot is not None and gspecS is not None:
     gspecS[maxRow,0:8] = pn.Row('## Scan Variable')
     gspecS[maxRow+1:maxRow+3,0:8] = pn.Column(stepPlot)
     maxRow=7
-if lxtPlot is not None:
+if lxtPlot is not None and gspecS is not None:
     gspecS[maxRow,0:8] = pn.Row('## Laser - xray Timing')
     gspecS[maxRow+1:maxRow+3,0:8] = pn.Column(lxtPlot)
+
+
 
 # Detector stuff. 
 
@@ -255,12 +241,13 @@ detGrids=[]
 detNames=[]
 for detImgName in ana.Keys('Sums'):
     image = ana.fh5.get_node('/%s'%detImgName).read()
+    detName = detImgName.replace('Sums/','').replace('_calib','').replace('_img','')
+    if detName in detNames:
+        continue
+    detNames.append(detName)
     if len(image.shape)>2:
         if detImgName.find('135')<0:
-            detName = detImgName.replace('Sums/','').split('_')[0]
-            if detName in detNames:
-                continue
-            detNames.append(detName)
+            #detName = detImgName.replace('Sums/','').split('_')[0]
             ix = ana.fh5.get_node('/UserDataCfg/%s/ix'%detName).read()
             iy = ana.fh5.get_node('/UserDataCfg/%s/iy'%detName).read()
             image = image_from_dxy(image, ix, iy)
@@ -311,10 +298,15 @@ if nOff>100:
         detGrid[0,0] = pn.Row(detImgs[-1])
         detGrids.append(detGrid)       
 
+
 tabs = pn.Tabs(gspec)
 tabs.append(gspecS)
 for detGrid in detGrids:
     tabs.append(detGrid)
+gspecD = dropletPics(ana, 'epix100a_1_IXS', 'droplet')
+if gspecD is not None:
+    tabs.append(gspecD)
+
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Done"}])
@@ -335,10 +327,14 @@ if save_elog:
 if args.postStats:
     if scanVar == '':
         encDelay = ana.getVar('enc/lasDelay')
-        delta_encDelay = np.nanmax(encDelay)-np.nanmin(encDelay)
-        if delta_encDelay > 0.5:
-            scanVar='delay'
+        if encDelay is not None:
+            try:
+                delta_encDelay = np.nanmax(encDelay)-np.nanmin(encDelay)
+                if delta_encDelay > 0.5:
+                    scanVar='delay'
+            except:
+                pass
     elif scanVar.find('lxt'):
         scanVar='delay'
-    runtable_data = makeRunTableData(ana, ipmUpDim, ipmDownDim, iniFilter, scanVar)
-    postRunTable(runtable_data)
+    runtable_data = makeRunTableData(ana, scanVar, iniFilter, varNames=[ipmUpDim.name, ipmDownDim.name, 'epix100a_1_IXS/nDroplets'])
+    postRunTable(runtable_data, args.experiment, args.run)
