@@ -63,6 +63,7 @@ class azimuthalBinning(DetObjectFunc):
         self.y = kwargs.pop("y",None)
         self.geomCorr = kwargs.pop("geomCorr",True)
         self.polCorr = kwargs.pop("polCorr",True)
+        self.square = kwargs.pop("square",False)
 
         center = kwargs.pop("center",None)
         if center is not None:
@@ -86,6 +87,9 @@ class azimuthalBinning(DetObjectFunc):
         if det.x is not None:
             self.x = det.x.flatten()/1e3
             self.y = det.y.flatten()/1e3
+            self.z = det.z.flatten()/1e3
+            self.z_off = np.nanmean(self.z)-self.z
+            #z_off defined such that z_off >0 is downstream
 
     def setFromFunc(self, func=None):
         super(azimuthalBinning,self).setFromFunc()
@@ -122,7 +126,7 @@ class azimuthalBinning(DetObjectFunc):
 
         # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
         (A,B,C) = (-np.sin(ty)*np.cos(tx),-np.sin(tx),-np.cos(ty)*np.cos(tx))
-        (a,b,c) = (self.xcen+self.dis_to_sam*np.tan(ty),float(self.ycen)-self.dis_to_sam*np.tan(tx),self.dis_to_sam)
+        (a,b,c) = (self.xcen+(self.dis_to_sam+self.z_off)*np.tan(ty),float(self.ycen)-(self.dis_to_sam+self.z_off)*np.tan(tx),(self.dis_to_sam+self.z_off))
 
         x = self.x
         y = self.y
@@ -219,8 +223,8 @@ class azimuthalBinning(DetObjectFunc):
         #print("last index",last_idx)
         self.msg("...done")
         # include geometrical corrections
-        geom  = (self.dis_to_sam/r) ; # pixels are not perpendicular to scattered beam
-        geom *= (self.dis_to_sam/r**2); # scattered radiation is proportional to 1/r^2
+        geom  = ((self.dis_to_sam+self.z_off)/r) ; # pixels are not perpendicular to scattered beam
+        geom *= ((self.dis_to_sam+self.z_off)/r**2); # scattered radiation is proportional to 1/r^2
         self.msg("calculating normalization...",cr=0)
         self.geom = geom
         self.geom /= self.geom.max()
@@ -296,6 +300,8 @@ class azimuthalBinning(DetObjectFunc):
             data[data>self.thresADU]=0.
         if self.thresRms is not None:
             data[data>self.thresRms*self.rms]=0.
+        if self.square:
+            data=data*data
         return {'azav': self.doCake(data)}
     
         
