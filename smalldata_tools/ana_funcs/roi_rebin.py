@@ -291,6 +291,7 @@ class sparsifyFunc(DetObjectFunc):
         self.nData =  kwargs.get('nData',None)
         self._flagMasked = kwargs.get('flagMasked',False)
         self._needProps = kwargs.get('needProps',False)
+        self._saveint = kwargs.get('saveInt',True)
 
     def process(self, data):
         #apply mask - set to zero, so pixels will fall out in sparify step.
@@ -339,7 +340,9 @@ class sparsifyFunc(DetObjectFunc):
                 if ret_dict[key].shape[0] >= self.nData:
                     ret_dict[key]=ret_dict[key][:self.nData]
                 else:
-                    ret_dict[key]=(np.append(ret_dict[key], np.zeros(self.nData-len(ret_dict[key])))).astype(int)
+                    ret_dict[key]=(np.append(ret_dict[key], np.zeros(self.nData-len(ret_dict[key]))))
+                    if self._saveint:
+                        ret_dict[key] = ret_dict[key].astype(int)
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
