@@ -902,8 +902,8 @@ class SmallDataAna(object):
     def getVar(self, plotvar, useFilter=None, addToXarray=True):
         #get the signal variable
         if isinstance(plotvar,list):
-            plotvar = plotvar[0]
             sigROI = plotvar[1]
+            plotvar = plotvar[0]
         else:
             sigROI=[]
 
@@ -916,9 +916,28 @@ class SmallDataAna(object):
             if self._fields[plotvar][1]=='inXr':
                 fullData = self.xrData[plotvar.replace('/','__')]
                 if Filter is None:
-                    return fullData.values
+                    vals = fullData.values
                 else:
-                    return fullData[Filter].values
+                    vals = fullData[Filter].values
+                if sigROI==[]: return vals
+                if len(vals.shape)==2:
+                    if not isinstance(sigROI, list):
+                        vals=vals[:,sigROI]
+                    elif len(sigROI)>1:
+                        vals=vals[:,sigROI[0]:sigROI[1]]
+                    else:
+                        vals=vals[:,sigROI[0]]
+                    return vals
+                elif len(vals.shape)==3:
+                    if not isinstance(sigROI, list):
+                        vals=vals[:,sigROI]
+                    elif len(sigROI)==1:
+                        vals=vals[:,sigROI[0]]
+                    elif len(sigROI)==2:
+                        vals=vals[:,sigROI[0]:sigROI[1],:]
+                    else:
+                        vals=vals[:,sigROI[0]:sigROI[1],sigROI[2]:sigROI[3]]
+                    return vals
 
         #check if this variable has been added to xarray and needs to be added to fields
         if plotvar not in self._fields.keys():
@@ -930,6 +949,10 @@ class SmallDataAna(object):
 
         #FIX ME
         #if Filter picks > 50% of events, get all  data, add to xarray & return filtered data after
+        #if Filter.sum()/Filter.shape[0]>0.25 and sigROI!=[]:
+        #    redvar = self.getRedVar([plotvar, sigROI])
+        #    return redvar[Filter]
+
         #if only few events are picked, just get those events.
         try:
             if Filter is None:
