@@ -23,24 +23,27 @@ class photonFunc(DetObjectFunc):
     thresADU (def: 0.9): fraction of ADU_per_photon in the most neighboring pixels needed to count as a photon 
     """
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','photonFunc')
+        self._name = kwargs.get('name','photon')
         super(photonFunc, self).__init__(**kwargs)
         self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
         self.thresADU = kwargs.get('thresADU',0.9)
         self._mask = kwargs.get('mask',None)
+        print('photon init mask ',self._mask)
 
     def setFromDet(self, det):
         super(photonFunc, self).setFromDet(det)
+        #photon uses the mask multiplicatively!
         if self._mask is None and det.mask is not None:
-            setattr(self, '_mask', det.mask.astype(np.uint8))
+            mask = (det.mask.astype(bool))
+            setattr(self, '_mask', mask.astype(np.uint8))
 
-    def prepImage(self,image, mask):
+    def prepImage(self,image):
         """
         convert image from ADU to (fractional) photons
         #apply the ROI if applicable (to both image&mask)
         """
         image = image/self.ADU_per_photon
-        return image, mask
+        return image
 
     def process(self,image):
         """
@@ -48,16 +51,18 @@ class photonFunc(DetObjectFunc):
 
         """
         tstart=time.time()
-        fimage, locMask = self.prepImage(image, self._mask)
+        fimage = self.prepImage(image)
+        locMask = self._mask
         #photons_nda_nomask = photons(fimage, np.ones_like(self._mask),thr_fraction=self.thresADU)
         #note: this works on tiled detectors.
         photons_nda = photons(fimage, locMask)
+
         #make filling of histogram a function to be run on dict with nphot(ADU?),row,col 
         ret_dict = {'nPhot': photons_nda.sum()}
         ret_dict['nPhot_mask']=photons_nda[locMask>0].sum() 
         #ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
-        self.dat = np.ma.masked_array(photons_nda, locMask)
-
+        #the masked array will _mask_ the 1 in the mask!
+        self.dat = np.ma.masked_array(photons_nda, mask=(~(locMask.astype(bool))).astype(np.uint8))
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
             for kk in subfuncResults[k]:
