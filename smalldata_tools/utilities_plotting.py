@@ -69,7 +69,7 @@ def get_all_mpl_palettes(allmaps=None):
 # define cmaps.
 #
 cmaps = get_all_mpl_palettes(allmaps=['jet','gray','cool','hot','seismic','CMRmap','nipy_spectral'])
-
+cmapsh = ['gray','viridis','fire','seismic','nipy_spectral', 'rainbow']
 
 def create_cmap_selection(im,cmaps=None,value="jet"):
     if type(cmaps)==type(None):
@@ -850,6 +850,9 @@ def plotImage(image, **kwargs):
                 bp.output_file('%s/%s_%s_vs_%s.html'%(self.plot_dirname,self.runLabel, plotvars[0].replace('/','_'), plotvars[1].replace('/','_')))
                 bp.save(layout)
 
+    elif plotWith.find('holoviews')>=0:
+        hv_image(image, width=width_height[0], height=width_height[1], imgLow = None, imgHigh = None, cmap='rainbow')
+
     elif plotWith != 'no_plot':
         print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot'%plotWith)
             
@@ -1109,6 +1112,9 @@ def hv_image(data2plot, **kwargs):
     imgLow = kwargs.pop("imgLow",None)
     imgHigh = kwargs.pop("imgHigh",None)
 
+    kdims = kwargs.pop("kdims", None)
+    bounds = kwargs.pop("bounds", None)
+
     if not isinstance(data2plot, np.ndarray):
         try:
             data2plot = np.array(data2plot)
@@ -1131,7 +1137,12 @@ def hv_image(data2plot, **kwargs):
         imgHigh = np.nanpercentile(data2plot,99.8) 
 
     #print 'percentiles: ', imgLow, imgHigh, imgMin, imgMax
-    image = hv.Image(data2plot, vdims=hv.Dimension('z', range=(imgLow, imgHigh))).\
+    imkwargs={'vdims': hv.Dimension('z', range=(imgLow, imgHigh))}
+    if kdims is not None:
+        imkwargs['kdims']=kdims
+    if bounds is not None:
+        imkwargs['bounds']=bounds
+    image = hv.Image(data2plot, **imkwargs).\
             options(colorbar=True, width=width, height=height, \
                     cmap=cmap, clipping_colors=clipping)
     return image
@@ -1152,6 +1163,8 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
     width = kwargs.pop("width",600)
     height = kwargs.pop("height",int(width*0.8))
     clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+    kdims = kwargs.pop("kdims", None)
+    bounds = kwargs.pop("bounds", None)
 
     if not isinstance(data2plot, np.ndarray):
         try:
@@ -1159,8 +1172,11 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
         except:
             print('input data was no array and could not be cast to one either')
             return
-    if len(data2plot.shape)>2:
-        print('this function only spports 2-d data')
+    if len(data2plot.shape)==1:
+        print('this function only spports 2&3-d data')
+        return
+    elif len(data2plot.shape)>3:
+        print('this function only spports 2&3-d data')
         return
 
     if plotLog:
@@ -1169,9 +1185,25 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
         data2plot_log[np.isinf(data2plot_log)]=np.nan
         data2plot = data2plot_log
 
-    image = hv.Image(data2plot, vdims=hv.Dimension('z', range=(imgLow, imgHigh))).\
+    if data2plot.ndim==2:
+        imkwargs={'vdims': hv.Dimension('z', range=(imgLow, imgHigh))}
+        if kdims is not None:
+            imkwargs['kdims']=kdims
+        if bounds is not None:
+            imkwargs['bounds']=bounds
+        image = hv.Image(data2plot, **imkwargs).\
+                options(colorbar=True, width=width, height=height, \
+                        cmap=cmap, clipping_colors=clipping)
+    elif data2plot.ndim==3:
+        imkwargs={'vdims': hv.Dimension('z', range=(imgLow, imgHigh))}
+        if kdims is not None:
+            imkwargs['kdims']=kdims
+        if bounds is not None:
+            imkwargs['bounds']=bounds
+        images = [ hv.Image(data2p, **imkwargs).\
             options(colorbar=True, width=width, height=height, \
-                    cmap=cmap, clipping_colors=clipping)
+                    cmap=cmap, clipping_colors=clipping) for data2p in data2plot ]
+        image = hv.Layout(images).cols(1)
     return image
 
 def hv_image_ctl(data2plot, **kwargs):
@@ -1197,9 +1229,15 @@ def hv_image_ctl(data2plot, **kwargs):
         except:
             print('input data was no array and could not be cast to one either')
             return
-    if len(data2plot.shape)>2:
-        print('this function only spports 2-d data')
+    if len(data2plot.shape)==1:
+        print('this function only spports 2&3-d data')
         return
+    elif len(data2plot.shape)>3:
+        print('this function only spports 2&3-d data')
+        return
+    #if len(data2plot.shape)>2:
+    #    print('this function only spports 2-d data')
+    #    return
 
     if plotLog:
         data2plot_log = np.log(data2plot)
@@ -1222,7 +1260,7 @@ def hv_image_ctl(data2plot, **kwargs):
     dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
     dimCol = hv.Dimension('cmap', values=['viridis','fire','seismic','gray','rainbow','jet','nipy_spectral'])
     #def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
-    plotFunc = partial(_hv_image,data2plot=data2plot, kwargs=kwargs)
+    plotFunc = partial(_hv_image,data2plot=data2plot, **kwargs)
     dmap = hv.DynamicMap(plotFunc, kdims=[dimColLow, dimColHigh, dimCol])
     return dmap
 
