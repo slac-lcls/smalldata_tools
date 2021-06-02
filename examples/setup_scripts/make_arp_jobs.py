@@ -27,7 +27,6 @@ if args.psana and not args.ffb:
         'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
         }
 elif args.ffb:
-    print(str(FFB_BASE / 'test'))
     job_def = {
         'name': 'smd',
         'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh'),
