@@ -13,8 +13,8 @@ $(basename "$0"):
 			Experiment name (i.e. cxilr6716)
         --psana
             Setup smalldata on psana.
-		--ffb
-			Setup smalldata on the FFB.
+	--ffb
+        	Setup smalldata on the FFB.
             If exists on psana, will clone the repo from psana.
 EOF
 }
@@ -40,6 +40,10 @@ do
         PSANA=1
         shift 1
         ;;
+    --queue)
+        QUEUE="$2"
+        shift 2
+        ;;
     *) # all other possibilities
         ARGS+=("$1")
         echo $@
@@ -50,6 +54,7 @@ done
 
 FFB=${FFB:=0}
 PSANA=${PSANA:=0}
+MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
 if [ $FFB -eq 1 ]; then
@@ -125,4 +130,4 @@ if [ $PSANA -eq 1 ]; then
 fi
 
 # make jobs (to do)
-# makejobs.py
+# $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --psana $PSANA --ffb $FFB
