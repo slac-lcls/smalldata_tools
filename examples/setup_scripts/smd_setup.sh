@@ -11,10 +11,12 @@ $(basename "$0"):
 			Definition of options
 		-e
 			Experiment name (i.e. cxilr6716)
-        --psana
-            Setup smalldata on psana.
-	--ffb
-        	Setup smalldata on the FFB.
+        -q
+            Queue (only for ffb)
+        --nopsana
+            Do not setup smalldata on psana.
+        --noffb
+        	Do not setup smalldata on the FFB.
             If exists on psana, will clone the repo from psana.
 EOF
 }
@@ -32,6 +34,10 @@ do
         EXP="$2"
         shift 2
         ;;
+    -q)
+        QUEUE="$2"
+        shift 2
+        ;;
     --noffb)
         FFB=0
         shift 1
@@ -39,10 +45,6 @@ do
     --nopsana)
         PSANA=0
         shift 1
-        ;;
-    --queue)
-        QUEUE="$2"
-        shift 2
         ;;
     *) # all other possibilities
         ARGS+=("$1")
@@ -98,8 +100,8 @@ if [ $PSANA -eq 1 ]; then
     fi
     echo "... Done."
 fi
-echo "Sleep 3"
-sleep 3
+echo "Sleep 2"
+sleep 2
 # On FFB
 if [ $FFB -eq 1 ]; then
     echo "Cloning smalldata to FFB experiment directory..."
