@@ -21,15 +21,16 @@ PSANA_BASE = Path("/cds/data/psdm/{}/{}".format(hutch, exp))
 if args.psana and not args.ffb:
     job_def = {
         'name': 'smd',
-        'executable': str(PSANA_BASE / 'results/smalldata_tools/examples/smalldata_producer.py'),
+        'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh'),
         'trigger': 'MANUAL',
         'location': 'SLAC',
         'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
         }
 elif args.ffb:
+    print(str(FFB_BASE / 'test'))
     job_def = {
         'name': 'smd',
-        'executable': str(FFB_BASE / '/smalldata_tools/examples/smalldata_producer.py'),
+        'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh'),
         'trigger': 'START_OF_RUN',
         'location': 'SRCF_FFB',
         'parameters': '--queue {} --norecorder --postRuntable --cores 60 --wait'.format(args.queue)
