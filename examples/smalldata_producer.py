@@ -44,16 +44,6 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
-# 5) GET FULL IMAGE (not recommended)
-def getFullImage(run):
-    ret_dict = {}
-    if run>0:
-        ret_dict['jungfrau1M'] = {
-            'thresADU': None,
-            'binned': None
-            }
-    return ret_dict  
-
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
@@ -185,7 +175,8 @@ from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants

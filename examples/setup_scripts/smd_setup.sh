@@ -11,10 +11,12 @@ $(basename "$0"):
 			Definition of options
 		-e
 			Experiment name (i.e. cxilr6716)
-        --psana
-            Setup smalldata on psana.
-		--ffb
-			Setup smalldata on the FFB.
+        -q
+            Queue (only for ffb)
+        --nopsana
+            Do not setup smalldata on psana.
+        --noffb
+        	Do not setup smalldata on the FFB.
             If exists on psana, will clone the repo from psana.
 EOF
 }
@@ -32,12 +34,16 @@ do
         EXP="$2"
         shift 2
         ;;
-    --ffb)
-        FFB=1
+    -q)
+        QUEUE="$2"
+        shift 2
+        ;;
+    --noffb)
+        FFB=0
         shift 1
         ;;
-    --psana)
-        PSANA=1
+    --nopsana)
+        PSANA=0
         shift 1
         ;;
     *) # all other possibilities
@@ -48,8 +54,9 @@ do
     esac
 done
 
-FFB=${FFB:=0}
-PSANA=${PSANA:=0}
+FFB=${FFB:=1}
+PSANA=${PSANA:=1}
+MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
 if [ $FFB -eq 1 ]; then
@@ -93,8 +100,8 @@ if [ $PSANA -eq 1 ]; then
     fi
     echo "... Done."
 fi
-echo "Sleep 3"
-sleep 3
+echo "Sleep 2"
+sleep 2
 # On FFB
 if [ $FFB -eq 1 ]; then
     echo "Cloning smalldata to FFB experiment directory..."
@@ -119,10 +126,10 @@ if [ $FFB -eq 1 ]; then
     mkdir -p $FFB_BASE/hdf5/cube
     mkdir -p $FFB_BASE/hdf5/debug
 fi
-if [ $PSANA -eq 1 ]; then
-    mkdir -p $PSANA_BASE/hdf5/smalldata/debug
+# if [ $PSANA -eq 1 ]; then
+#     mkdir -p $PSANA_BASE/hdf5/smalldata/debug
 #     mkdir -p $PSANA_BASE/hdf5/cube
-fi
+# fi
 
-# make jobs (to do)
-# makejobs.py
+# make arp jobs
+python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --psana $PSANA --ffb $FFB
