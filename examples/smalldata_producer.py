@@ -202,7 +202,7 @@ parser.add_argument('--experiment', help='experiment name', type=str, default=os
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--directory', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
+parser.add_argument('--gather_interval', help='gather interval', type=int, default=25)
 parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)

@@ -754,7 +754,25 @@ class gasDetector(defaultDetector):
         dl={}
         gdetData = self.det.get(evt)
         if gdetData is not None:
-           fields = [ field for field in dir(gdetData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
-           for field in fields:
-               dl[field]=getattr(gdetData, field)()
+            fields = [ field for field in dir(gdetData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+            for field in fields:
+                dl[field]=getattr(gdetData, field)()
+        return dl
+
+
+class wfGasDetector(defaultDetector):
+    def __init__(self, detname, name=None, returnTime=False):
+        if name is None:
+            self.name = detname
+        else:
+            self.name = name
+        defaultDetector.__init__(self, detname, self.name)
+        self.returnTime = returnTime
+    def data(self, evt):
+        dl={}
+        wf = np.squeeze(self.det.waveform(evt))
+        if wf is not None:
+            dl['wf'] = wf
+            if self.returnTime:
+                dl['time'] = np.squeeze(self.det.wftime(evt))
         return dl
