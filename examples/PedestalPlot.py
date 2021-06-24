@@ -22,8 +22,6 @@ except:
 sys.path.append(fpath)
 from smalldata_tools.utilities import rebin
 
-detImgMaxSize = 500
-
 #logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,6 +51,7 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Diff=1e6
     max95Diff=-1e6
 
+    if nCycles > 5: nCycles = 5
     for i in range(nCycles):
         if nCycles>1:
             thisPed = peds[i]
@@ -99,7 +98,7 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     noiseMax=0
     pedMax=0
     diffMax=0
-    for i in range(max(1, nCycles-2)):
+    for i in range(max(1, nCycles)):
         if nCycles>1:
             thisNoise = noise[i]
             thisPed = peds[i]
@@ -156,9 +155,12 @@ def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=5
             trmsDim = hv.Dimension(('rms_%d'%i,'noise in ADU, cycle %d'%i), range=(np.nanpercentile(thisNoise,0.1), 
                                                          np.nanpercentile(thisNoise,99.9)))
             if peds_pre is not None:
-                thisDiff = peds[i]-peds_pre[i]
-                tdiffDim = hv.Dimension(('ped_%d'%i,'delta pedestal in ADU, cycle %d'%i), range=(np.nanpercentile(thisDiff,0.1), 
+                try:
+                    thisDiff = peds[i]-peds_pre[i]
+                    tdiffDim = hv.Dimension(('ped_%d'%i,'delta pedestal in ADU, cycle %d'%i), range=(np.nanpercentile(thisDiff,0.1), 
                                                             np.nanpercentile(thisDiff,99.9)))
+                except:
+                    peds_pre = None
         else:
             thisPed = peds
             thisNoise = noise
@@ -167,9 +169,12 @@ def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=5
             trmsDim = hv.Dimension(('rms','noise in ADU'), range=(np.nanpercentile(thisNoise,0.1), 
                                                          np.nanpercentile(thisNoise,99.9)))
             if peds_pre is not None:
-                thisDiff = peds-peds_pre
-                tdiffDim = hv.Dimension(('ped_%d'%i,'delta pedestal in ADU'), range=(np.nanpercentile(thisDiff,0.1), 
-                                                            np.nanpercentile(thisDiff,99.9)))
+                try:
+                    thisDiff = peds-peds_pre
+                    tdiffDim = hv.Dimension(('ped_%d'%i,'delta pedestal in ADU'), range=(np.nanpercentile(thisDiff,0.1), 
+                                                                                         np.nanpercentile(thisDiff,99.9)))
+                except:
+                    peds_pre = None
 
         pedImg = det.image(run,thisPed)    
         rmsImg = det.image(run,thisNoise)       
@@ -208,7 +213,7 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
     import smalldata_tools.SmallDataAna_psana as sda
     anaps = sda.SmallDataAna_psana(expname,run, plotWith=None)
 
-    gspecI = pn.GridSpec(sizing_mode='stretch_both', max_width=500, name='Pedestal data - subtracted')
+    gspecI = pn.GridSpec(sizing_mode='stretch_both', max_width=900, name='Pedestal data - subtracted')
     iwidth=3
     iheight=3
     gspecI[0,0:(iwidth*3)] = pn.Row('# Pedestal data - subtracted - Run %04d'%run)
@@ -237,7 +242,7 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
     return gspecI
 
 def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=None, 
-             detImgMaxSize=500):
+             detImgMaxSize=400):
     det = psana.Detector(det_name)
 
     peds = det.pedestals(run)
@@ -266,7 +271,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     plotInfo = [xrange, yrange, xDim, yDim]
     
     nCycles=1
-    if len(peds.shape)>3:
+    if len(peds.shape)>=3:
         nCycles=peds.shape[0]
 
     pedHists, noiseHists, diffHists = ped_rms_histograms(nCycles, peds, noise, (peds-peds_pre), det_name)
@@ -290,7 +295,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
             pedImgs, rmsImgs, diffImgs = plotPedImgs(nCycles, det, run, peds, noise, detImgMaxSize=detImgMaxSize,
                                                 plotInfo=plotInfo)
    
-        gspec = pn.GridSpec(sizing_mode='stretch_both', max_width=500, name='Det Imgs - %s'%det_name)
+        gspec = pn.GridSpec(sizing_mode='stretch_both', max_width=1000, name='Det Imgs - %s'%det_name)
         iwidth=3
         iheight=3
         gspec[0,0:(iwidth*3)] = pn.Row('# Pedestals&RMS - Run %04d'%(run))
@@ -314,7 +319,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     return tabs
 
 def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
-                 detImgMaxSize=500):
+                 detImgMaxSize=400):
     dsname = 'exp={}:run={}:smd'.format(expname,run)
     ds = psana.DataSource(dsname)
     det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0]
