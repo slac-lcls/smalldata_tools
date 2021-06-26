@@ -7,27 +7,34 @@ try:
 except NameError:
     basestring = str
 
-#import more specific psana functions here
-try:
-    import xtcav.ShotToShotCharacterization as Xtcav  
-except:
-    Xtcav = None
 #
 # classes for default detector types
 #
 class defaultDetector(object):
     __metaclass__ = abc.ABCMeta
-    def __init__(self, detname, name):
+    def __init__(self, detname, name, run=None):
         self.name=name
         self.detname=detname
-        self.det=psana.Detector(detname)
         self._debug = False
+        self._run = run
+        self.det = None
+        if self.inRun():
+            if run is None:
+                self.det=psana.Detector(detname)
+            else:
+                self.det=run.Detector(detname)
     def inRun(self):
         dNames=[]
-        for dn in psana.DetNames():
-            for dnn in dn:
-                if dnn!='':
-                    dNames.append(dnn)
+        try:
+            detnames = psana.DetNames()
+            for dn in detnames:
+                for dnn in dn:
+                    if dnn!='':
+                        dNames.append(dnn)
+        except:
+            detnames = self._run.detinfo
+            for dn in detnames:
+                dNames.append(dn[0])
         if self.detname in dNames:
             return True
         return False
@@ -754,25 +761,174 @@ class gasDetector(defaultDetector):
         dl={}
         gdetData = self.det.get(evt)
         if gdetData is not None:
-            fields = [ field for field in dir(gdetData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
-            for field in fields:
-                dl[field]=getattr(gdetData, field)()
+           fields = [ field for field in dir(gdetData) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(gdetData, field)()
+        return dl
+#
+#
+#
+class genlcls2Detector(defaultDetector):
+    def __init__(self,  name=None, run=None, h5name=None):
+        if name is None:
+            self.name = 'anydet'
+        else:
+            self.name = name
+        if h5name is None: h5name = self.name
+        defaultDetector.__init__(self, self.name, h5name, run)
+
+    def data(self, evt):
+        dl={}
+        raw =getattr( self.det, 'raw')
+        if raw is not None:
+           fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           for field in fields:
+               dl[field]=getattr(raw, field)(evt)
+               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
 
 
-class wfGasDetector(defaultDetector):
-    def __init__(self, detname, name=None, returnTime=False):
+class ttlcls2Detector(defaultDetector):
+    def __init__(self,  name=None, run=None, saveTraces=False):
         if name is None:
-            self.name = detname
+            self.name = 'anydet'
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
-        self.returnTime = returnTime
+        self.saveTraces = saveTraces
+        defaultDetector.__init__(self, self.name, 'tt', run)
+
     def data(self, evt):
         dl={}
-        wf = np.squeeze(self.det.waveform(evt))
-        if wf is not None:
-            dl['wf'] = wf
-            if self.returnTime:
-                dl['time'] = np.squeeze(self.det.wftime(evt))
+        fex=getattr( self.det, 'ttfex')
+        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw' ]
+        if not self.saveTraces: 
+            veto_fields.append('proj_ref')
+            veto_fields.append('proj_sig')
+        if fex is not None:
+           fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
+           for field in fields:
+               dl[field]=getattr(fex, field)(evt)
+               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+        return dl
+
+class fimfexDetector(defaultDetector):
+    def __init__(self,  name=None, run=None):
+        if name is None:
+            self.name = 'anydet'
+        else:
+            self.name = name
+        defaultDetector.__init__(self, self.name, self.name, run)
+
+    def data(self, evt):
+        dl={}
+        fex=getattr( self.det, 'fex')
+        veto_fields = []#'TypeId', 'Version', 'calib', 'image', 'raw' ]
+        if fex is not None:
+           fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
+           for field in fields:
+               dl[field]=getattr(fex, field)(evt)
+               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+        return dl
+
+class lcls2_lightStatus(defaultDetector):
+    def __init__(self, codes, run):
+        defaultDetector.__init__(self, 'timing', 'lightStatus', run)
+        self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
+        self.laserCodes_drop = [ c for c in codes[1] if c > 0]
+        self.xrayCodes_req = [ -c for c in codes[0] if c < 0]
+        self.laserCodes_req =  [ -c for c in codes[1] if c < 0]
+
+    def data(self,evt):
+        xfel_status, laser_status = (1,1) # default if no EVR code matches
+        dl={}
+        evtCodes = getattr(getattr( self.det, 'raw'), 'eventcodes')(evt)
+        if evtCodes is not None:
+            for xOff in self.xrayCodes_drop:
+                if evtCodes[xOff]:
+                    xfel_status = 0
+            for lOff in self.laserCodes_drop:
+                if evtCodes[lOff]:
+                    laser_status = 0
+            if len(self.xrayCodes_req)>0 and xfel_status==1:
+                xfel_status = 0
+                for xOff in self.xrayCodes_req:
+                    if evtCodes[xOff]:
+                        xfel_status = 1
+            if len(self.laserCodes_req)>0 and laser_status==1:
+                laser_status = 0
+                for lOff in self.laserCodes_req:
+                    if evtCodes[lOff]:
+                        laser_status = 1
+
+        else:
+            xfel_status, laser_status = (-1,-1) # default if no EVR code matches
+        dl['xray']=xfel_status
+        dl['laser']=laser_status
+        return dl
+
+class lcls2_epicsDetector(defaultDetector):
+    def __init__(self, name='epics', PVlist=[],run=None):
+        self.name = name
+        self.detname='epics'
+        self.PVlist = []
+        self.pvs = []
+        for pv in PVlist:
+            try:
+                self.pvs.append(run.Detector(pv))
+                self.PVlist.append(pv)
+            except:
+                print('could not find LCLS2 EPICS PV %s in data'%pv)
+
+    def inRun(self):
+        if len(self.pvs)>0:
+            return True
+        return False
+
+    def data(self,evt):
+        dl={}
+        for pvname,pv in zip(self.PVlist,self.pvs):
+            try:
+                if pv(evt) is not None:
+                    dl[pvname]=pv(evt)
+                    if isinstance(dl[pvname], basestring):
+                        dl[pvname]=np.nan
+            except:
+                #print('we have issues with %s in this event'%pvname)
+                pass
+        return dl
+
+class scanDetector(defaultDetector):
+    def __init__(self, name='scan',run=None):
+        self.name = name
+        self.detname='scan'
+        self.scans = []
+        self.scanlist = []
+        vetolist = ['step_docstring']
+        try:
+            scanlist = [k[0] for k in run.scaninfo if k[0] not in vetolist]
+            for scan in scanlist:
+                try:
+                    self.scans.append(run.Detector(scan))
+                    self.scanlist.append(scan)
+                except:
+                    print('could not find LCLS2 EPICS PV %s in data'%pv)
+        except:
+            pass
+
+    def inRun(self):
+        if len(self.scans)>0:
+            return True
+        return False
+
+    def data(self,evt):
+        dl={}
+        for scanname,scan in zip(self.scanlist,self.scans):
+            try:
+                if scan(evt) is not None:
+                    dl[scanname]=scan(evt)
+                    if isinstance(dl[scanname], basestring):
+                        dl[scanname]=np.nan
+            except:
+                #print('we have issues with %s in this event'%scanname)
+                pass
         return dl
