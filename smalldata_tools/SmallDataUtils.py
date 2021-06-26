@@ -3,7 +3,7 @@ import numpy as np
 #import psana
 from smalldata_tools.SmallDataDefaultDetector import *
 
-def defaultDetectors(hutch):
+def defaultDetectors(hutch, run=None):
     if hutch.lower()=='amo':
         dets = amoDetectors()
     elif hutch.lower()=='sxr':
@@ -22,6 +22,10 @@ def defaultDetectors(hutch):
         dets = detDetectors()
     elif hutch.lower()=='dia':
         dets = diaDetectors()
+    elif hutch.lower()=='tmo':
+        dets = tmoDetectors(run)
+    elif hutch.lower()=='rix':
+        dets = rixDetectors(run)
     else:
         dets = []
     detsInRun= [ det for det in dets if det.inRun() ]
@@ -31,13 +35,48 @@ def defaultDetectors(hutch):
 def amoDetectors():
     return []
 
+def tmoDetectors(run, beamCodes=[[162],[91]]):
+    dets=[]
+    dets.append(scanDetector('scan', run))
+    dets.append(genlcls2Detector('timing',run))
+    dets.append(genlcls2Detector('gmd',run))
+    dets.append(genlcls2Detector('xgmd',run))
+    dets.append(genlcls2Detector('ebeam',run))
+    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
+    dets.append(lcls2_lightStatus(beamCodes,run))
+    dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
+    dets.append(fimfexDetector('tmo_fim0',run))
+    dets.append(fimfexDetector('tmo_fim1',run))
+
+    return dets
+
+def rixDetectors(run, beamCodes=[[162],[91]]):
+    dets=[]
+    dets.append(scanDetector('scan', run))
+    dets.append(genlcls2Detector('timing',run))
+    dets.append(lcls2_lightStatus(beamCodes,run))
+    dets.append(fimfexDetector('rix_fim0',run))
+    dets.append(fimfexDetector('rix_fim1',run))
+    dets.append(genlcls2Detector('mono_encoder',run))
+
+    #fur future...
+    ##dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
+    #these don't work for RIX x435, run 280...data present, 
+    #    but all none. issue with smd collection then
+    dets.append(genlcls2Detector('gmd',run))
+    #dets.append(genlcls2Detector('xgmd',run))
+    #dets.append(genlcls2Detector('ebeam',run))
+
+    #check a RIX scan to figure out controlDetector.
+    return dets
+
 def sxrDetectors(beamCodes=[[162],[91]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(epicsDetector(PVlist=['GATT:FEE1:310:P_DES','GATT:FEE1:310:R_ACT','GMD_ACQ_RAW']))
     dets.append(ttDetector(baseName='TTSPEC:'))
-    dets.append(gmdDetector())
+    dets.append(GMDDetector())
     return dets
 
 def xppDetectors(beamCodes=[[162,120],[91]]):
