@@ -1,7 +1,10 @@
 import numpy as np
 from scipy import sparse
 import time
-from ImgAlgos.PyAlgos import photons
+try:
+    from ImgAlgos.PyAlgos import photons
+except:
+    pass
 import scipy.ndimage.filters as filters
 import itertools
 from smalldata_tools.DetObject import DetObjectFunc
