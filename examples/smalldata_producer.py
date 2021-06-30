@@ -66,10 +66,6 @@ def define_dets(run):
         svd = getSvdParams(run)
     except:
         svd = []
-    try:
-        image = getFullImage(run)
-    except:
-        image = []
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
@@ -173,7 +169,6 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
-from smalldata_tools.ana_funcs.full_det import image_from_dat
 
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
@@ -506,8 +501,9 @@ if ds.rank==0:
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    if ds.size > 1 and ds.rank == 0:
-        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
+    if ds.size > 1:
+        if ds.rank == 0:
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
