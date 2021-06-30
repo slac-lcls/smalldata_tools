@@ -1,13 +1,3 @@
-#
-# add option to prepareImg to mask the direct neighbors of masked pixels as well
-# only to be used for default threshold _not_ the lower one.
-#
-# with two thresholds: re-label w/ second threshold image (optionally)
-#
-# photonize: store differently: store pos w/ number of photons (not COM for last photon, but pixels)
-#
-# 'fitting': model distributions of multiple photons in 2,3,4 pixels & compare chi sq to actual data.
-#
 import numpy as np
 import time
 import scipy.ndimage.measurements as measurements
