@@ -56,6 +56,7 @@ class azimuthalBinning(DetObjectFunc):
         self.tx = kwargs.pop("tx",0.)
         self.ty = kwargs.pop("ty",0.)
         self.qbin = kwargs.pop("qbin",5e-3)
+        self.rbin = kwargs.pop("rbin", None) #in micron
         self.thresRms =  kwargs.pop("thresRms",None)
         self.thresADU =  kwargs.pop("thresADU",None)
         self.thresADUhigh = kwargs.pop("thresADUhigh",None)
@@ -197,7 +198,20 @@ class azimuthalBinning(DetObjectFunc):
         if self.idxphi.max()>=self.nphi:
             print('pixels will overflow, will put all pixels beyond range into first bin w')
             self.idxphi[self.idxphi==self.nphi]=0 #put all 'overflow' bins in first bin.
-        #print 'idxphi: ',self.idxphi.min(), self.idxphi.max(), self.nphi
+        
+        # include geometrical corrections
+        geom  = ((self.dis_to_sam+self.z_off)/r) ; # pixels are not perpendicular to scattered beam
+        geom *= ((self.dis_to_sam+self.z_off)/r**2); # scattered radiation is proportional to 1/r^2
+        self.msg("calculating normalization...",cr=0)
+        self.geom = geom
+        self.geom /= self.geom.max()
+        if not self.geomCorr:
+            self.geom = np.ones_like(self.geom).astype(float)
+        if not self.polCorr:
+            self.pol = np.ones_like(self.pol).astype(float)
+        self.correction = self.geom*self.pol
+
+        #coordinates in q
         self.matrix_q = 4*np.pi/self.lam*np.sin(self.matrix_theta/2)
         q_max = np.nanmax(self.matrix_q[~self._mask])
         q_min = np.nanmin(self.matrix_q[~self._mask])
@@ -210,35 +224,61 @@ class azimuthalBinning(DetObjectFunc):
         else:
             self.qbins = qbin
         self.q = (self.qbins[0:-1]+self.qbins[1:])/2
-        self.theta = 2*np.arcsin(self.q*self.lam/4/np.pi)
         self.nq = self.q.size
         self.idxq    = np.digitize(self.matrix_q.ravel(),self.qbins)-1
         self.idxq[self._mask.ravel()] = 0; # send the masked ones in the first bin
 
+        self.theta = 2*np.arcsin(self.q*self.lam/4/np.pi)
         # 2D binning!
         self.Cake_idxs = np.ravel_multi_index((self.idxphi,self.idxq),(self.nphi,self.nq))
         self.Cake_idxs[self._mask.ravel()] = 0; # send the masked ones in the first bin
-
-        #last_idx = self.idxq.max()
-        #print("last index",last_idx)
-        self.msg("...done")
-        # include geometrical corrections
-        geom  = ((self.dis_to_sam+self.z_off)/r) ; # pixels are not perpendicular to scattered beam
-        geom *= ((self.dis_to_sam+self.z_off)/r**2); # scattered radiation is proportional to 1/r^2
-        self.msg("calculating normalization...",cr=0)
-        self.geom = geom
-        self.geom /= self.geom.max()
-        if not self.geomCorr:
-            self.geom = np.ones_like(self.geom).astype(float)
-        if not self.polCorr:
-            self.pol = np.ones_like(self.pol).astype(float)
-        self.correction = self.geom*self.pol
-        self.Npixel = np.bincount(self.idxq,minlength=self.nq); self.Npixel = self.Npixel[:self.nq]
-        self.norm     = self.Npixel
         self.Cake_Npixel = np.bincount(self.Cake_idxs,minlength=self.nq*self.nphi)
         #self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
         self.Cake_norm=np.reshape(self.Cake_Npixel,(self.nphi,self.nq));#/self.correction1D
         #self.correction1D    =self.correction1D[:self.nq]/self.Npixel
+
+        #coordinates in r
+        if self.rbin is not None:
+            x = self.x
+            y = self.y
+            rl = np.sqrt( (x-self.xcen)**2+(y-self.ycen)**2 )
+            self.rlocal = rl
+            #r_max = np.nanmax(self.rlocal)
+            #r_min = np.nanmin(self.rlocal)
+            r_max = np.nanmax(self.rlocal[~self._mask])
+            r_min = np.nanmin(self.rlocal[~self._mask])
+            rbin = np.array(self.rbin)
+            if rbin.size==1:
+                if rank==0 and self._debug:
+                    print('q-bin size has been given: rmax: ',r_max,' rbin ',rbin)
+                #self.rbins = np.arange(0,q_max+rbin,rbin)
+                self.rbins = np.arange(r_min-rbin,r_max+rbin,rbin)
+            else:
+                self.rbins = rbin
+            self.rbinsbound = (self.rbins[0:-1]+self.rbins[1:])/2
+            #print('self.rbinsbound ',self.rbinsbound)
+            self.nr = self.rbinsbound.size
+            #print('nr ',self.nr)
+            #here, the bin-range is > thew actual range unlike for q where the bined range is < than the actual range...
+            if ( (np.nanmax(self.rlocal)-np.nanmin(self.rlocal)) < (self.rbins.max()-self.rbins.min()) ):
+                self.nr+=1
+            self.idxr = np.digitize(self.rlocal.ravel(),self.rbins)-1
+            self.idxr[self._mask.ravel()] = 0; # send the masked ones in the first bin
+            #print('2 r', self.idxr.min(), self.idxr.max(), self.idxphi.min(), self.idxphi.max())
+            #print('2 ns' , self.nphi, self.nr, self.rbins.size, self.rbinsbound.size)
+            self.Cake_idxs = np.ravel_multi_index((self.idxphi,self.idxr),(self.nphi,self.nr))
+            #print('3', self.Cake_idxs.shape, self.Cake_idxs.max())
+            self.Cake_idxs[self._mask.ravel()] = 0; # send the masked ones in the first bin
+            self.Cake_Npixel = np.bincount(self.Cake_idxs,minlength=self.nr*self.nphi)
+            #self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
+            self.Cake_norm=np.reshape(self.Cake_Npixel,(self.nphi,self.nr));#/self.correction1D
+            #print('nrend ',self.nr, self.Cake_idxs.max())
+
+        #last_idx = self.idxq.max()
+        #print("last index",last_idx)
+        self.msg("...done")
+
+
         self.header    = "# Parameters for data reduction\n"
         self.header += "# xcen, ycen = %.2f m %.2f m\n" % (self.xcen,self.ycen)
         self.header += "# sample det distance = %.4f m\n" % (self.dis_to_sam)
@@ -250,6 +290,7 @@ class azimuthalBinning(DetObjectFunc):
         #remove idx & correction values for masked pixels. Also remove maks pixels from image in process fct
         self.Cake_idxs = self.Cake_idxs[self._mask.ravel()==0]
         self.correction = self.correction.flatten()[self._mask.ravel()==0]
+        #print('return ', self.Cake_idxs.shape, self.Cake_idxs.max())
         return 
 
     def msg(self,s,cr=True):
@@ -260,33 +301,24 @@ class azimuthalBinning(DetObjectFunc):
                 print(s,)
         sys.stdout.flush()
 
-    def doAzimuthalAveraging(self,img,applyCorrection=True):
-        if self.darkImg is not None: img-=self.darkImg
-        if self.gainImg is not None: img/=self.gainImg
-        if applyCorrection:
-            I=np.bincount(self.idxq, weights = img.ravel()/self.correction.ravel(), minlength=self.nq); I=I[:self.nq]
-        else:
-            I=np.bincount(self.idxq, weights = img.ravel()                        , minlength=self.nq); I=I[:self.nq]
-        #do not calculate until we want to save this again.
-        #self.sig = np.sqrt(1./self.ADU_per_photon)*np.sqrt(I)/self.norm
-        self.I = I/self.norm
-        return self.I
-
-
     def doCake(self,img,applyCorrection=True):
         if self.darkImg is not None: img-=self.darkImg
         if self.gainImg is not None: img/=self.gainImg
 
         img = img.ravel()[self._mask.ravel()==0]
-        #print('img:', img.shape)
+        #print('img:', img.shape, self.Cake_idxs.max())
+
+        nradial=self.nq
+        if self.rbin is not None:
+            nradial=self.nr
 
         if applyCorrection:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()/self.correction.ravel(), minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-            I=np.bincount(self.Cake_idxs, weights = img/self.correction.ravel(), minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
+            I=np.bincount(self.Cake_idxs, weights = img/self.correction.ravel(), minlength=nradial*self.nphi); I=I[:nradial*self.nphi]
         else:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-            I=np.bincount(self.Cake_idxs, weights = img                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-        I = np.reshape(I,(self.nphi,self.nq))
+            I=np.bincount(self.Cake_idxs, weights = img                        , minlength=nradial*self.nphi); I=I[:nradial*self.nphi]
+        I = np.reshape(I,(self.nphi,nradial))
         #don't calculate this - I don't think this is stored.
         #self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
         self.Icake = I/self.Cake_norm
