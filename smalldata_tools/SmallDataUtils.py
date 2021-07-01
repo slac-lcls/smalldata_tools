@@ -175,12 +175,13 @@ def mfxDetectors(beamCodes=[[162, 120],[]]):
 
 def cxiDetectors(beamCodes=[[162, 120],[]]):
     dets=[]
-    dets.append(lightStatus(codes=beamCodes))
+    dets.append(lightStatus(codes=beamCodes, evrName='evr1'))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
-    dets.append(ttDetector(baseName='CXI:TTSPEC:'))
+    #dets.append(ttDetector(baseName='CXI:TTSPEC:'))
+    dets.append(ttDetector(baseName='CXI:TIMETOOL:'))
     try:
         dets.append(impDetector('Sc1Imp'))
     except:
