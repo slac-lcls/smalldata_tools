@@ -55,19 +55,20 @@ class defaultDetector(object):
         """method that should return a dict of values from event"""
 
 class lightStatus(defaultDetector):
-    def __init__(self, codes=[[162],[]]):
-        evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
-        #print('in lightStatus', evrNames)
-        if len(evrNames)<1:
-            return
-        nCodesMax = -1
-        for name in evrNames:
-            nCodes = psana.Detector(name)._fetch_configs()[0].neventcodes()
-            if nCodes > nCodesMax:
-                nCodesMax = nCodes
-                evrName = name
-        if nCodesMax < 0:
-            return
+    def __init__(self, codes=[[162],[]], evrName=None):
+        if evrName is None:
+            evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
+            #print('in lightStatus', evrNames)
+            if len(evrNames)<1:
+                return
+            nCodesMax = -1
+            for name in evrNames:
+                nCodes = psana.Detector(name)._fetch_configs()[0].neventcodes()
+                if nCodes > nCodesMax:
+                    nCodesMax = nCodes
+                    evrName = name
+            if nCodesMax < 0:
+                return
         defaultDetector.__init__(self, evrName, 'lightStatus')
         self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
         self.laserCodes_drop = [ c for c in codes[1] if c > 0]
