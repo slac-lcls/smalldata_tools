@@ -1105,7 +1105,7 @@ class SmallDataAna_psana(object):
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
                 plt.show()
 
-    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1, inImage={}):
+    def MakeMask(self, detname=None, imgName=None, limits=[5,99.5], singleTile=-1, inImage={}):
         if inImage!={}:
             img=inImage['image']
             if 'mask' in inImage:
@@ -1178,7 +1178,7 @@ class SmallDataAna_psana(object):
             #this definitely works for the rayonix...
             if shape=='r':
                 print('select two corners: ')
-                p =np.array(ginput(2))
+                p =np.array(ginput(2)).astype(int)
                 mask_roi=np.zeros_like(image)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
                 if needsGeo:
