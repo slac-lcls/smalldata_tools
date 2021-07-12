@@ -39,7 +39,7 @@ class defaultDetector(object):
             return True
         return False
     def _setDebug(self, debug):
-        self._debug = debug
+        self._debug = debug 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
@@ -784,10 +784,10 @@ class genlcls2Detector(defaultDetector):
         if raw is not None:
            fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
            for field in fields:
+               if getattr(raw, field)(evt) is None: continue
                dl[field]=getattr(raw, field)(evt)
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
-
 
 class ttlcls2Detector(defaultDetector):
     def __init__(self,  name=None, run=None, saveTraces=False):
@@ -808,6 +808,7 @@ class ttlcls2Detector(defaultDetector):
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:
+               if getattr(fex, field)(evt) is None: continue
                dl[field]=getattr(fex, field)(evt)
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
@@ -827,6 +828,7 @@ class fimfexDetector(defaultDetector):
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:
+               if getattr(fex, field)(evt) is None: continue
                dl[field]=getattr(fex, field)(evt)
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
@@ -897,6 +899,12 @@ class lcls2_epicsDetector(defaultDetector):
                 #print('we have issues with %s in this event'%pvname)
                 pass
         return dl
+
+    def params_as_dict(self):
+        """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
+        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
+        PVlist = getattr(self,'PVlist')
+        parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
 
 class scanDetector(defaultDetector):
     def __init__(self, name='scan',run=None):
