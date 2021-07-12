@@ -42,6 +42,7 @@ def tmoDetectors(run, beamCodes=[[162],[91]]):
     dets.append(genlcls2Detector('gmd',run))
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
+    dets.append(genlcls2Detector('pcav',run))
     dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
     dets.append(lcls2_lightStatus(beamCodes,run))
     dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
@@ -57,6 +58,7 @@ def rixDetectors(run, beamCodes=[[162],[91]]):
     dets.append(lcls2_lightStatus(beamCodes,run))
     dets.append(fimfexDetector('rix_fim0',run))
     dets.append(fimfexDetector('rix_fim1',run))
+    dets.append(fimfexDetector('rix_fim2',run))
     dets.append(genlcls2Detector('mono_encoder',run))
 
     #fur future...
@@ -64,8 +66,9 @@ def rixDetectors(run, beamCodes=[[162],[91]]):
     #these don't work for RIX x435, run 280...data present, 
     #    but all none. issue with smd collection then
     dets.append(genlcls2Detector('gmd',run))
-    #dets.append(genlcls2Detector('xgmd',run))
-    #dets.append(genlcls2Detector('ebeam',run))
+    dets.append(genlcls2Detector('xgmd',run))
+    dets.append(genlcls2Detector('ebeam',run))
+    dets.append(genlcls2Detector('pcav',run))
 
     #check a RIX scan to figure out controlDetector.
     return dets
