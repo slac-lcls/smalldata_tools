@@ -51,8 +51,8 @@ class azimuthalBinning(DetObjectFunc):
         self.dis_to_sam = kwargs.pop("dis_to_sam",100e-3)
         self.eBeam =  kwargs.pop("eBeam",9.5)
         self.lam = util.E2lam(self.eBeam)*1e10
-        self.phiBins = kwargs.pop("phiBins",1)
-        self.Pplane = kwargs.pop("Pplane",0)
+        self.phiBins = kwargs.pop("phiBins",1) 
+        self.Pplane = kwargs.pop("Pplane",0) #0/1
         self.tx = kwargs.pop("tx",0.)
         self.ty = kwargs.pop("ty",0.)
         self.qbin = kwargs.pop("qbin",5e-3)
@@ -181,23 +181,24 @@ class azimuthalBinning(DetObjectFunc):
         else:
             self.nphi = self.phiBins
             #phiint = 2*np.pi/self.phiBins
-            phiint = (self.matrix_phi.max()-self.matrix_phi.max())/self.phiBins
+            phiint = (self.matrix_phi.max()-self.matrix_phi.min())/self.phiBins
             pbm = self.matrix_phi + phiint/2
             pbm[pbm>=2*np.pi] -= 2*np.pi
             #self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
             self.phiVec = np.linspace(self.matrix_phi.min(),self.matrix_phi.max()+np.spacing(np.min(pbm)),self.phiBins+1)
-            ##self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
-
-        #print 'DEBUG phi in: ',self.phiVec.min(), self.phiVec.max(), self.phiVec.shape
+            #self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
 
         self.pbm = pbm #added for debugging of epix10k artifacts.
         self.idxphi = np.digitize(pbm.ravel(),self.phiVec)-1
         if self.idxphi.min()<0:
-            print('pixels will underflow, will put all pixels beyond range into first bin w')
+            print('pixels will underflow, will put all pixels beyond range into first bin in phi')
             self.idxphi[self.idxphi<0]=0 #put all 'underflow' bins in first bin.
         if self.idxphi.max()>=self.nphi:
-            print('pixels will overflow, will put all pixels beyond range into first bin w')
+            print('pixels will overflow, will put all pixels beyond range into first bin in phi')
             self.idxphi[self.idxphi==self.nphi]=0 #put all 'overflow' bins in first bin.
+
+        #print('DEBUG phi ',self.phiVec)
+        #print('DEBUG phi ',np.unique(self.idxphi))
         
         # include geometrical corrections
         geom  = ((self.dis_to_sam+self.z_off)/r) ; # pixels are not perpendicular to scattered beam
