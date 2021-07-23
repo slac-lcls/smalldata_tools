@@ -61,10 +61,7 @@ def rixDetectors(run, beamCodes=[[162],[91]]):
     dets.append(fimfexDetector('rix_fim2',run))
     dets.append(genlcls2Detector('mono_encoder',run))
 
-    #fur future...
-    ##dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
-    #these don't work for RIX x435, run 280...data present, 
-    #    but all none. issue with smd collection then
+    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
     dets.append(genlcls2Detector('gmd',run))
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
