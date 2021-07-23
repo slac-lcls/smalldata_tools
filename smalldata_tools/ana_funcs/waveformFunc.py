@@ -209,7 +209,7 @@ class hsdsplitFunc(DetObjectFunc):
     shape: desired shape of array
     """
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','split')
+        self._name = kwargs.get('name','full')
         super(hsdsplitFunc, self).__init__(**kwargs)
         self.writeHsd = kwargs.get('writeHsd', True)
         self.hsdName = kwargs.get('hsdName', {})
@@ -223,7 +223,7 @@ class hsdsplitFunc(DetObjectFunc):
         self._det=det
 
     def process(self, data):
-        ret_dict={}
+        pass_dict={}
         if self._wfxlen is None:
             self._wfxlen = self._det.wfxlen
             self._wfx = self._det.wfx
@@ -241,11 +241,13 @@ class hsdsplitFunc(DetObjectFunc):
             cName = 'hsd_%d'%cidx
             if ('hsd_%d'%cidx) in self.hsdName:
                 cName = self.hsdName['hsd_%d'%cidx]
-            ret_dict[cName] = data[startidx:(startidx+wfxlen)]
+            pass_dict[cName] = data[startidx:(startidx+wfxlen)]
             startidx+=wfxlen
 
-        #store for further processing
-        pass_dict = { k:ret_dict[k] for k in ret_dict}
+        #save full waveforms if desired
+        if self.writeHsd:
+            ret_dict = { k:pass_dict[k] for k in pass_dict}
+
         for cidx,wfxlen in zip(self._cidx, self._wfxlen):
             tName = 'times_hsd_%d'%cidx
             tOrgName = 'times_%d'%cidx
@@ -261,6 +263,51 @@ class hsdsplitFunc(DetObjectFunc):
             for kk in subfuncResults[k]:
                 ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
+
+class hsdROIFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','ROI')
+        super(hsdROIFunc, self).__init__(**kwargs)
+        ## later add different methods.
+        self.ROI = kwargs.get('ROI', {})
+        self.writeArea = kwargs.get('writeArea', False)
+        self.calcPars = kwargs.get('calcPars', True)
+
+    def setFromDet(self, det):
+        super(hsdROIFunc, self).setFromDet(det)
+        self._det=det
+
+    def process(self, data):
+        print('process RF')
+        ret_dict={}
+        pass_dict={}
+
+        for k in self.ROI:
+            print('ROI: ',k, data.keys())
+            if k in data and k.find('times')<0:
+                print('specific ROI:',self.ROI[k])
+                for iROI,ROI in enumerate(self.ROI[k]):
+                    print('ROI....',ROI)
+                    pass_dict['%s_%d'%(k,iROI)] = data[k][ROI[0]:ROI[1]]
+        
+        if self.writeArea:
+            ret_dict = { k:pass_dict[k] for k in pass_dict}
+        if self.calcPars:
+            for k in pass_dict:
+                ret_dict['%s_sum'%(k)] = np.nansum(pass_dict[k])
+                #ret_dict['%s_com'%(k)] = np.nansum(pass_dict[k]*np.arange(pass_dict[k].shape[0]))/np.nansum(pass_dict[k])
+
+        self.dat = pass_dict
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict
+
 
 class hsdBaselineCorrectFunc(DetObjectFunc):
     """
@@ -301,7 +348,6 @@ class hsdBaselineCorrectFunc(DetObjectFunc):
             for kk in subfuncResults[k]:
                 ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
-
 
 class hitFinderCFDFunc(DetObjectFunc):
     """
