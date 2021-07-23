@@ -27,8 +27,6 @@ $(basename "$0"):
 			If specified, translate only smalldata
                 -i|--image
 			If specified, translate everything & save area detectors as images
-                -T|--tiff
-			If specified, translate everything & save area detectors as images * single-event tiffs
 		--norecorder
 			If specified, don't use recorder data
                 --nparallel
@@ -67,17 +65,17 @@ do
 			shift
 			shift
 			;;
-        --nparallel)
-            TASKS_PER_NODE="$2"
+                --nparallel)
+                        TASKS_PER_NODE="$2"
 			shift
 			shift
 			;;
-        --interactive)
-            INTERACTIVE=1
+                 --interactive)
+                        INTERACTIVE=1
 			shift
 			;;
-        *)
-            POSITIONAL+=("$1")
+                 *)
+                        POSITIONAL+=("$1")
 			shift
 			;;                     
 	esac
@@ -90,7 +88,13 @@ CORES=${CORES:=1}
 QUEUE=${QUEUE:='psanaq'}
 # QUEUE=${QUEUE:='ffbh3q'}
 # QUEUE=${QUEUE:='psfehq'}
-TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+if [[ $QUEUE == *psanaq* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
+elif [[ $QUEUE == *psfeh* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=16}
+else
+    TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+fi
 
 if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 
@@ -103,4 +107,5 @@ if [ -v INTERACTIVE ]; then
     exit 0
 fi
 
+#echo sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
 sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
