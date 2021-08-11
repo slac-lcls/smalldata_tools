@@ -52,6 +52,7 @@ do
 			;;
 		-e|--experiment)
                         POSITIONAL+=("--experiment $2")
+                        EXP=$2
 			shift
 			shift
 			;;
@@ -79,21 +80,32 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
-source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
-conda deactivate
-conda activate ps-4.2.6
+# Source the right LCLS-I/LCLS-2 stuff based on the experiment name
+EXP="${EXPERIMENT:=$EXP}" # look for the environment variable for if submitted from the elog
+HUTCH=${EXP:0:3}
+LCLS2_HUTCHES="rix, tmo"
+if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
+    echo "This is a LCLS-II experiment"
+    source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
+    conda deactivate
+    conda activate ps-4.2.6
+    PYTHONEXE=smd2_producer.py
+else
+    echo "This is a LCLS-I experiment"
+    source /reg/g/psdm/etc/psconda.sh -py3
+    PYTHONEXE=smalldata_producer.py
+fi
+
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 
-#PYTHONEXE=smalldata_producer.py
-PYTHONEXE=smd2_producer.py
-
 #run all imports on batch node before calling mpirun on that node.
-$ABS_PATH/preimport.py
-export PS_SRV_NODES 1
+$ABS_PATH/preimport.py # do we still need that?
+export PS_SRV_NODES 1 # what is that?
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
-    $ABS_PATH/$PYTHONEXE $@
+    python -u $ABS_PATH/$PYTHONEXE $@
 else
-    mpirun $ABS_PATH/$PYTHONEXE $@
+    mpirun python -u $ABS_PATH/$PYTHONEXE $@
 fi

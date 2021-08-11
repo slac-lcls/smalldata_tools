@@ -38,16 +38,16 @@ def getROIs(run):
     ret_dict = {}
     if run>0:
         roi_dict = {}
-        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
+        roi_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
         roi_dict['writeArea'] = True
         roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M'] = roi_dict
+        ret_dict['epix_2'] = roi_dict
     return ret_dict
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M']
+    detnames = ['epix_2']
     dets = []
     # Load DetObjectFunc parameters (if defined)
     try:
@@ -95,9 +95,6 @@ def define_dets(run):
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
 
             det.storeSum(sumAlgo='calib')
             det.storeSum(sumAlgo='calib_img')

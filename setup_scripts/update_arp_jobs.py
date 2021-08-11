@@ -27,7 +27,7 @@ for job in job_defs:
         job_def = {
             '_id': id,
             'name': 'smd',
-            'executable': str(PSANA_BASE / 'results/smalldata_tools/examples/smalldata_producer.py'),
+            'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh'),
             'trigger': 'MANUAL',
             'location': 'SLAC',
             'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
