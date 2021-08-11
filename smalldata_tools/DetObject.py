@@ -983,9 +983,13 @@ class Epix10k2MObject(TiledCameraObject):
         self.pixelsize=[100e-6]
         self.isGainswitching=True
 
-        epixCfg = env.configStore().get(psana.Epix.Config10ka2MV1, det.source)               
-        if epixCfg is None:
-            epixCfg = env.configStore().get(psana.Epix.Config10kaQuadV1, det.source)               
+        configs = ['Config10ka2MV1', 'Config10ka2MV2', 'Config10kaQuadV1']
+        for config in configs:
+            epixCfg = ds.env().configStore().get(getattr(ps.Epix, config), det.source)
+            if epixCfg is not None:
+                print('Loaded config {}'.format(config))
+                break
+
         self.carrierId0 = []
         self.carrierId1 = []
         self.pixelConfig = []
