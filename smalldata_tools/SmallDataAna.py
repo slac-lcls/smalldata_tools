@@ -2288,7 +2288,7 @@ class SmallDataAna(object):
             imageName = raw_input("Select image to store:\n")
 
         imageDict={'detname':detname}
-        imageDict['name'] = imageName
+        imageDict['name'] = imageName.replace('Sums/','')
         imageDict['image'] = self.getVar('Sums/%s'%(imageName.replace('Sums/','')))
         imageDict['mask'] = self.getVar('UserDataCfg/%s/cmask'%detname)
         return imageDict

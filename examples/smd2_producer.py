@@ -14,8 +14,10 @@ import logging
 import requests
 import sys
 from glob import glob
-from PIL import Image
 from requests.auth import HTTPBasicAuth
+from mpi4py import MPI
+rank = MPI.COMM_WORLD.Get_rank()
+size = MPI.COMM_WORLD.Get_size()
 
 ########################################################## 
 ##
@@ -36,72 +38,58 @@ def getROIs(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
+    ret_dict['andor'] = []
     if run>0:
-        roi_dict = {}
-        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M'] = roi_dict
+        #this is currently saving the full traces for input detectors.
+        ROI_area_dict={'thresADU': None}
+        ROI_area_dict['writeArea']=True
+        ROI_area_dict['calcPars']=False
+        ROI_area_dict['ROI']=None
+        ret_dict['andor'].append(ROI_area_dict)
+
     return ret_dict
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M']
+    #detnames = ['hsd']
+    detnames = ['andor', 'hsd']
+    #detnames = []
     dets = []
     # Load DetObjectFunc parameters (if defined)
     try:
         ROIs = getROIs(run)
     except:
         ROIs = []
-    try:
-        az = getAzIntParams(run)
-    except:
-        az = []
-    try:
-        phot = getPhotonParams(run)
-    except:
-        phot = []
-    try:
-        svd = getSvdParams(run)
-    except:
-        svd = []
+
     for detname in detnames:
-        havedet = checkDet(ds.env(), detname)
+        havedet = (detname in thisrun.detnames)
         # Common mode
+        common_mode=0
         if havedet:
-            if detname=='jungfrau1M':
-                #common_mode=71 #also try 71
-                common_mode=0 # no cm
-                #common_mode=-1 # raw
-            else:
-                common_mode=0 #no common mode
-            det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
+            det = DetObject_lcls2(detname , thisrun, common_mode=common_mode)
             
             # Analysis functions
             # ROIs:
             if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                        ROI=ROI,
-                                        writeArea=ROIs[detname]['writeArea'],
-                                        thresADU=ROIs[detname]['thresADU']))
-            # Azimuthal binning
-            if detname in az:
-                det.addFunc(azimuthalBinning(**az[detname]))
-            # Photon count
-            if detname in phot:
-                det.addFunc(photonFunc(**phot[detname]))
-            # SVD waveform analysis
-            if detname in svd:
-                det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
+                for iROI,ROI in enumerate(ROIs[detname]):
+                    det.addFunc(ROIFunc(**ROI))
+            ## SVD waveform analysis
+            #if detname in svd:
+            #     det.addFunc(svdFit(**svd[detname]))
+            if detname.find('hsd')>=0:
+                #det.addFunc(hsdsplitFunc())
+                hsdsplit = hsdsplitFunc()
+                #hsdsplit.addFunc(hsdBaselineCorrectFunc())
+                hsdBaselineCorrect =  hsdBaselineCorrectFunc()
+                hitFinderCFD =  hitFinderCFDFunc()
+                hsdBaselineCorrect.addFunc(hitFinderCFD)
+                hsdsplit.addFunc(hsdBaselineCorrect)
+                det.addFunc(hsdsplit)
 
             det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_img')
-            det.storeSum(sumAlgo='square_img')
+            #det.storeSum(sumAlgo='calib_img')
+            #det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
 
@@ -154,17 +142,17 @@ sys.excepthook = global_except_hook
 fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
-print(fpathup)
+if rank==0: print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
 from smalldata_tools.SmallDataUtils import defaultDetectors, detData
-from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
-from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
-from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
-from smalldata_tools.DetObject import DetObject
+from smalldata_tools.SmallDataDefaultDetector import lcls2_epicsDetector, genlcls2Detector
+from smalldata_tools.DetObject_lcls2 import DetObject_lcls2
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
+from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdBaselineCorrectFunc
+from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
@@ -176,6 +164,8 @@ logger = logging.getLogger(__name__)
 
 # Constants
 HUTCHES = [
+	'TMO',
+	'RIX',
 	'AMO',
 	'SXR',
 	'XPP',
@@ -197,7 +187,7 @@ parser.add_argument('--experiment', help='experiment name', type=str, default=os
 parser.add_argument('--stn', help='hutch station', type=int, default=0)
 parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
 parser.add_argument('--directory', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--gather_interval', help='gather interval', type=int, default=25)
+parser.add_argument('--gather_interval', help='gather interval', type=int, default=100)
 parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)
@@ -205,9 +195,11 @@ parser.add_argument('--full', help='store all data (please think before usig thi
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
-parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
+parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
+parser.add_argument("--rawFim", help="save raw Fim data", action='store_true', default=False)
 args = parser.parse_args()
+
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
 ###### Helper Functions ##########
@@ -301,139 +293,112 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object, don't understand all conditions yet
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
-#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
-if args.norecorder:
-        ds_name += ':stream=0-79'
-if useFFB:
-        ds_name += ':dir=/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
-# try this: live & all streams (once I fixed the recording issue)
-#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
+os.environ['PS_SRV_NODES']='1'
+if rank==0: print('Opening the data source:')
 try:
-    ds = psana.MPIDataSource(ds_name)
+    if useFFB:
+        xtcdir = '/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
+        if args.nevents<1e9:
+            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, max_events=args.nevents)
+        else:
+            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir)
+    else:
+        if args.nevents<1e9:
+            ds = psana.DataSource(exp=exp, run=int(run), max_events=args.nevents)
+        else:
+            ds = psana.DataSource(exp=exp, run=int(run))
 except Exception as e:
-    logger.debug('Could not instantiate MPIDataSource with {0}: {1}'.format(ds_name, e))
+    logger.info('Could not instantiate DataSource with {0},{1}: {2}'.format(exp, run, e))
     sys.exit()
+#LCLS-2: need to get run to get detectors....
+if rank==0: print('Opened the data source, now get run')
+thisrun = next(ds.runs())
 
 # Generate smalldata object
-small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
+print('Opening the h5file %s, gathering at %d'%(h5_f_name,args.gather_interval))
+small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
+print('smalldata file has been created on rank %d'%rank)
 
 # Not sure why, but here
-if ds.rank is 0:
-	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
-
+if rank is 0:
+    logger.info('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 ########################################################## 
 ##
 ## Setting up the default detectors
 ##
 ########################################################## 
-default_dets = defaultDetectors(hutch.lower())
-
-
+default_dets = defaultDetectors(hutch.lower(), thisrun)
 #
 # add stuff here to save all EPICS PVs.
 #
 if args.full or args.epicsAll:
-    logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
-    if args.experiment.find('dia')>=0:
-        epicsPV=ds.env().epicsStore().pvNames()
-    else:
-        epicsPV=ds.env().epicsStore().aliases()
+    epicsPV = [k[0] for k in thisrun.epicsinfo]
+    logger.info('epicsStore names for epicsAll', epicsPV)
     if len(epicsPV)>0:
-        logger.debug('adding all epicsPVs....')
-        default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+        logger.info('adding all epicsPVs....')
+        default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
 elif len(epicsPV)>0:
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+    default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsUser', run=thisrun))
 
-default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
+#default_det_aliases = [det.name for det in default_dets if det.name.find('fim')<0]
+#print(default_det_aliases)
+if args.rawFim:
+    for fim in default_det_aliases:
+        if fim.find('fim')>=0: #are you really a FIM?
+            default_dets.append(genlcls2Detector(fim, run=thisrun, h5name='%s_raw'%fim))
 
+dets = []
 if not args.default:
-    dets = define_dets(args.run)
-else:
-    dets = []
+    #try-except as not every rank seems to know thisdet....
+    try:
+        dets = define_dets(args.run)
+    except:
+        pass
 
 det_presence={}
 if args.full:
-    aliases = []
-    for dn in psana.DetNames():
-        if dn[1]!='':
-            aliases.append(dn[1])
-        else:
-            aliases.append(dn[0])
+    aliases = [ dn for dn in thisrun.detnames ]
+    #vetoDets = [ 'epicsinfo' ]
+    vetoDets = [ 'epicsinfo'] #at least for run 339 of rixx43518
+    #vetoDets = [ 'epicsinfo' ,'andor','hsd'] #manta only has little data for run 339, same for andor
 
     for alias in aliases:
         det_presence[alias]=1
         if alias in default_det_aliases: continue
-        if alias=='FEEGasDetEnergy': continue #done by mpidatasource
-        if alias=='PhaseCavity':     continue #done by mpidatasource
-        if alias=='EBeam':           continue #done by mpidatasource
-        if alias.find('evr')>=0:     continue #done by mpidatasource
-        if alias=='ControlData':     continue #done by my code
-        #done in standard default detectors.
-        if alias=='HX2-SB1-BMMON' and args.experiment.find('xpp')>=0:  continue
-        if alias=='XPP-SB2-BMMON' and args.experiment.find('xpp')>=0:  continue
-        if alias=='XPP-SB3-BMMON' and args.experiment.find('xpp')>=0:  continue
-        if alias=='XPP-USB-ENCODER-02' and args.experiment.find('xpp')>=0:  continue
-        if alias=='XCS-SB1-BMMON' and args.experiment.find('xcs')>=0:  continue
-        if alias=='XCS-SB2-BMMON' and args.experiment.find('xcs')>=0:  continue
-        if alias=='MEC-XT2-BMMON-02' and args.experiment.find('mec')>=0:  continue
-        if alias=='MEC-XT2-BMMON-03' and args.experiment.find('mec')>=0:  continue
-
-        if alias.find('BMMON')>=0:
-            print('append a bmmon',alias)
-            default_dets.append(bmmonDetector(alias))
-            continue
-        elif alias.find('IPM')>=0 or alias.find('Ipm')>0:
-            default_dets.append(ipmDetector(alias, savePos=True))
-            continue
-        elif alias.find('DIO')>=0 or alias.find('Imb')>0:
-            default_dets.append(ipmDetector(alias, savePos=False))
-            continue
-        elif alias.find('USB')>=0:
-            default_dets.append(encoderDetector(alias))
-            continue
-        elif alias.find('adc')>=0:
-            default_dets.append(adcDetector(alias))
-            continue
+        if alias in vetoDets: continue
         try:
-            thisDet = DetObject(alias, ds.env(), int(run), name=alias)
+            thisDet = DetObject_lcls2(alias , thisrun)
+            #thisDet = DetObject(alias, ds.env(), int(run), name=alias)
             hasGeom=False
             for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
                 if alias.find(keyword)>=0 and args.image: hasGeom=True
-            if hasGeom:
-                fullROI=ROIFunc()
-                fullROI.addFunc(imageFunc(coords=['x','y']))
-            else:    
-                fullROI = ROIFunc(writeArea=True)
-            thisDet.addFunc(fullROI)
+            if alias.find('hsd')>=0:
+                #thisDet.addFunc(ROIFunc())
+                hsdsplit = hsdsplitFunc()
+                #hsdsplit.addFunc(hsdBaselineCorrectFunc())
+                thisDet.addFunc(hsdsplit)
+            else:
+                if hasGeom:
+                    fullROI=ROIFunc()
+                    fullROI.addFunc(imageFunc(coords=['x','y']))
+                else:    
+                    fullROI = ROIFunc(writeArea=True)
+                thisDet.addFunc(fullROI)
+            print('adding detector for %s'%alias)
             dets.append(thisDet)
         except:
             pass
 
-userDataCfg={}
-for det in default_dets:
-    userDataCfg[det.name] = det.params_as_dict()
-for det in dets:
-    try:
-        userDataCfg[det._name] = det.params_as_dict()
-    except:
-        userDataCfg[det.name] = det.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-small_data.save(Config)
+event_iter = thisrun.events()
 
-if args.tiff:
-    dirname = '/reg/d/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-max_iter = args.nevents / ds.size
-for evt_num, evt in enumerate(ds.events()):
-    if evt_num > max_iter:
-        break
+evt_num=-1 #set this to default until I have a useable rank for printing updates...
+if rank==0: print('And now the event loop....')
+for evt_num, evt in enumerate(event_iter):
 
     det_data = detData(default_dets, evt)
-    small_data.event(det_data)
+    if det_data is not None:
+        small_data.event(evt, det_data)
 
     #detector data using DetObject 
     userDict = {}
@@ -451,72 +416,90 @@ for evt_num, evt in enumerate(ds.events()):
             except:
                 pass
             det.processSums()
-#             print(userDict[det._name])
+            #print(userDict[det._name])
         except:
             pass
-    small_data.event(userDict)
-
-    if args.tiff:
-        for key in userDict:
-            for skey in userDict[key]:
-                if skey.find('area')>=0 or skey.find('img')>=0:
-                   if len(userDict[key][skey].shape)==2:
-                       im = Image.fromarray(userDict[key][skey])
-                       tiff_file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
-                       im.save(tiff_file)
-
-    #here you can add any data you like: example is a product of the maximumof two area detectors.
-    #try:
-    #    jungfrau1MMax = jungfrau1M.evt.dat.max()
-    #    epix_vonHamosMax = epix_vonHamos.evt.dat.max()
-    #    combDict = {'userValue': jungfrau1MMax*epix_vonHamosMax}
-    #    small_data.event(combDict)
-    #except:
-    #    pass
+            
+    #hits = findHits(hsd.evt.dat)
+    small_data.event(evt,userDict)
 
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
-    if (int(os.environ.get('RUN_NUM', '-1')) > 0) and ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
-        if ds.size == 1:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
-        elif ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+    if ((evt_num<10) or(evt_num<100 and (evt_num%10)==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
+        if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+            if not ((evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)): continue
+            try:
+                if size == 1:
+                    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
+                elif rank == size-1:
+                    requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+            except:
+                if rank==0: print('Processed evt %d'%evt_num)
+        else:
+            if rank==0: print('Processed evt %d'%evt_num)
 
+print('Sums:')
 sumDict={'Sums': {}}
 for det in dets:
     for key in det.storeSum().keys():
         sumData=small_data.sum(det.storeSum()[key])
         sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
-if len(sumDict['Sums'].keys())>0:
+if len(sumDict['Sums'].keys())>0 and small_data.summary:
 #     print(sumDict)
-    small_data.save(sumDict)
+    small_data.save_summary(sumDict)
+
+userDataCfg={}
+for det in default_dets:
+    #make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
+    noConfigSave = ['scan']
+    if det.name not in noConfigSave:
+        userDataCfg[det.name] = det.params_as_dict()
+for det in dets:
+    try:
+        userDataCfg[det._name] = det.params_as_dict()
+    except:
+        userDataCfg[det.name] = det.params_as_dict()
+Config={'UserDataCfg':userDataCfg}
+#if rank==0: print(Config)
+if small_data.summary:
+    small_data.save_summary(Config) # this only works w/ 1 rank!
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 end_job = time.time()
-if ds.rank==0:
-    prod_time = (end_job-start_job)/60
+prod_time = (end_job-start_job)/60
+if rank==0:
     print('########## JOB TIME: {:03f} minutes ###########'.format(prod_time))
+logger.info('rank {0} on {1} is finished'.format(rank, hostname))
 
 #finishing up here....
-logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
-small_data.save()
+try:
+    small_data.save()
+except:
+    small_data.done()
+    pass
+
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    if ds.size > 1:
-        if ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
+    if size > 1 and rank == 0:
+        requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
-logger.debug('Saved all small data')
+logger.info('Saved all small data')
 
-if args.postRuntable and ds.rank==0:
+if args.postRuntable and rank>0:
+            
     print('posting to the run tables.')
     locStr=''
     if useFFB:
         locStr='_ffb'
-    runtable_data = {"Prod%s_end"%locStr:end_prod_time,
-                     "Prod%s_start"%locStr:begin_prod_time,
-                     "Prod%s_jobstart"%locStr:begin_job_time,
-                     "Prod%s_ncores"%locStr:ds.size}
+    try: 
+        runtable_data = {"Prod%s_end"%locStr:end_prod_time,
+                         "Prod%s_start"%locStr:begin_prod_time,
+                         "Prod%s_jobstart"%locStr:begin_job_time,
+                         "Prod%s_ncores"%locStr:size}
+    except:
+        runtable_data = {"Prod%s_end"%locStr:end_prod_time,
+                         "Prod%s_start"%locStr:begin_prod_time,
+                         "Prod%s_jobstart"%locStr:begin_job_time}
     if args.default:
         runtable_data["SmallData%s"%locStr]="default"
     else:

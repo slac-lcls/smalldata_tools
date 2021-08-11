@@ -30,8 +30,6 @@ $(basename "$0"):
 			If specified, translate everything
                 -i|--image
 			If specified, translate everything & save area detectors as images
-                -T|--tiff
-			If specified, translate everything & save area detectors as images * single-event tiffs
 EOF
 
 }
@@ -83,15 +81,19 @@ set -- "${POSITIONAL[@]}"
 
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
-source /reg/g/psdm/etc/psconda.sh
+source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
+conda deactivate
+conda activate ps-4.2.6
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
+
+#PYTHONEXE=smalldata_producer.py
+PYTHONEXE=smd2_producer.py
 
 #run all imports on batch node before calling mpirun on that node.
 $ABS_PATH/preimport.py
-if [ -v NEVENTS ] && [ $NEVENTS -lt 100 ]; then
-    $ABS_PATH/smalldata_producer.py $@
-    #$ABS_PATH/smalldata_producer_template.py $@
+export PS_SRV_NODES 1
+if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
+    $ABS_PATH/$PYTHONEXE $@
 else
-    mpirun $ABS_PATH/smalldata_producer.py $@
-    #mpirun $ABS_PATH/smalldata_producer_template.py $@
+    mpirun $ABS_PATH/$PYTHONEXE $@
 fi

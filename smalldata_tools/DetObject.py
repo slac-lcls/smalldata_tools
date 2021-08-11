@@ -1,10 +1,10 @@
 import os
 import copy
 import numpy as np
+import tables
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
 from smalldata_tools.read_uxi import getDarks
-import tables
 from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -111,7 +111,10 @@ def DetObject(srcName, env, run, **kwargs):
     try:
         det = psana.Detector(srcName)
     except:
-        pass
+        try:
+            det = run.Detector(srcName)
+        except:
+            pass
     if det is None:
         if srcName.find('uxi')>=0:
             return UxiObject(run, **kwargs)
@@ -137,6 +140,7 @@ def DetObject(srcName, env, run, **kwargs):
        32: Epix10k2MObject, #this is a 2M
        33: Epix10k2MObject, #this is a quad-lookds like a 2M
        34: CameraObject,
+       36: iStarObject,
        98: OceanOpticsObject,
        99: ImpObject,
     }
@@ -489,6 +493,27 @@ class ZylaObject(CameraObject):
         self.imgShape = (zylaCfg.numPixelsY(), zylaCfg.numPixelsX())
         if self.ped is None:
             self.ped = np.zeros([zylaCfg.numPixelsY(), zylaCfg.numPixelsX()])
+        if self.imgShape != self.ped.shape:            
+            print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
+            if self.common_mode != -1:
+                print('We will use the raw data for Detector %s in run %s'%(self._name,run))
+            self.common_mode = -1
+        self.imgShape = self.ped.shape
+        if self.x is None:
+            self._get_coords_from_ped()
+        if self.mask is None or self.mask.shape!=self.imgShape:
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
+
+class iStarObject(CameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        #super().__init__(det,env,run, **kwargs)
+        super(iStarObject, self).__init__(det,env,run, **kwargs)
+        iStarCfg = env.configStore().get(psana.iStar.ConfigV1, self._src)
+        #needs to be this way around to match shape of data.....
+        self.imgShape = (iStarCfg.numPixelsY(), iStarCfg.numPixelsX())
+        if self.ped is None:
+            self.ped = np.zeros([iStarCfg.numPixelsY(), iStarCfg.numPixelsX()])
         if self.imgShape != self.ped.shape:            
             print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
             if self.common_mode != -1:

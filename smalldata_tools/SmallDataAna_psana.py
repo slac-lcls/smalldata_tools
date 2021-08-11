@@ -1105,7 +1105,7 @@ class SmallDataAna_psana(object):
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
                 plt.show()
 
-    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1, inImage={}):
+    def MakeMask(self, detname=None, imgName=None, limits=[5,99.5], singleTile=-1, inImage={}):
         if inImage!={}:
             img=inImage['image']
             if 'mask' in inImage:
@@ -1178,7 +1178,7 @@ class SmallDataAna_psana(object):
             #this definitely works for the rayonix...
             if shape=='r':
                 print('select two corners: ')
-                p =np.array(ginput(2))
+                p =np.array(ginput(2)).astype(int)
                 mask_roi=np.zeros_like(image)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
                 if needsGeo:
@@ -1444,10 +1444,20 @@ class SmallDataAna_psana(object):
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==13:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype==19:
+            elif det.dettype in [5,6,8,9,19,27,36]:
                 dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+            elif det.dettype==26:
+                dirname='/reg/d/psdm/%s/%s/calib/Jungfrau::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==32:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+            elif det.dettype==33:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10kaQuad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+            elif det.dettype==29:
+                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+            else:
+                print('This detector type is not yet supported, we will return.')
+                return mask
+
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run

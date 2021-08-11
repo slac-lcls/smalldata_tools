@@ -1,10 +1,13 @@
 import tables
 import numpy as np
+import itertools
 import scipy
 from scipy import signal as scipy_signal
 from smalldata_tools.DetObject import DetObjectFunc
 from smalldata_tools.ana_funcs.roi_rebin import spectrumFunc
 from smalldata_tools.utilities import templateArray as utility_templateArray
+from smalldata_tools.utilities_waveforms import hsdBaselineFourierEliminate
+from smalldata_tools.utilities_waveforms import hitFinder_CFD
 
 #find the left-most peak (or so.....)
 class getCMPeakFunc(DetObjectFunc):
@@ -200,3 +203,199 @@ class templateFitFunc(DetObjectFunc):
 
         return ret_dict
 
+class hsdsplitFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','full')
+        super(hsdsplitFunc, self).__init__(**kwargs)
+        self.writeHsd = kwargs.get('writeHsd', True)
+        self.hsdName = kwargs.get('hsdName', {})
+        #print('init hsdname: ', hsdName)
+        #self.hsdName = {}
+
+    def setFromDet(self, det):
+        super(hsdsplitFunc, self).setFromDet(det)
+        self._cidx = det.cidx
+        self._wfxlen = None
+        self._det=det
+
+    def process(self, data):
+        pass_dict={}
+        if self._wfxlen is None:
+            self._wfxlen = self._det.wfxlen
+            self._wfx = self._det.wfx
+            #split the wfx array into separate pieces
+            startidx=0
+            for cidx,wfxlen in zip(self._cidx, self._wfxlen):
+                timesName = 'times_%d'%cidx
+                if ('hsd_%d'%cidx) in self.hsdName:
+                    timesName = 'times_%s'%(self.hsdName['hsd_%d'%cidx])
+                setattr(self, timesName, self._wfx[startidx:(startidx+wfxlen)])
+                startidx+=wfxlen
+                
+        startidx=0
+        for cidx,wfxlen in zip(self._cidx, self._wfxlen):
+            cName = 'hsd_%d'%cidx
+            if ('hsd_%d'%cidx) in self.hsdName:
+                cName = self.hsdName['hsd_%d'%cidx]
+            pass_dict[cName] = data[startidx:(startidx+wfxlen)]
+            startidx+=wfxlen
+
+        #save full waveforms if desired
+        if self.writeHsd:
+            ret_dict = { k:pass_dict[k] for k in pass_dict}
+
+        for cidx,wfxlen in zip(self._cidx, self._wfxlen):
+            tName = 'times_hsd_%d'%cidx
+            tOrgName = 'times_%d'%cidx
+            if ('hsd_%d'%cidx) in self.hsdName:
+                tName = 'times_%s'%self.hsdName['hsd_%d'%cidx]
+                tOrgName = 'times_%s'%self.hsdName['hsd_%d'%cidx]
+
+            pass_dict[tName] = getattr(self, tOrgName)
+
+        self.dat = pass_dict
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict
+
+class hsdROIFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','ROI')
+        super(hsdROIFunc, self).__init__(**kwargs)
+        ## later add different methods.
+        self.ROI = kwargs.get('ROI', {})
+        self.writeArea = kwargs.get('writeArea', False)
+        self.calcPars = kwargs.get('calcPars', True)
+
+    def setFromDet(self, det):
+        super(hsdROIFunc, self).setFromDet(det)
+        self._det=det
+
+    def process(self, data):
+        print('process RF')
+        ret_dict={}
+        pass_dict={}
+
+        for k in self.ROI:
+            print('ROI: ',k, data.keys())
+            if k in data and k.find('times')<0:
+                print('specific ROI:',self.ROI[k])
+                for iROI,ROI in enumerate(self.ROI[k]):
+                    print('ROI....',ROI)
+                    pass_dict['%s_%d'%(k,iROI)] = data[k][ROI[0]:ROI[1]]
+        
+        if self.writeArea:
+            ret_dict = { k:pass_dict[k] for k in pass_dict}
+        if self.calcPars:
+            for k in pass_dict:
+                ret_dict['%s_sum'%(k)] = np.nansum(pass_dict[k])
+                #ret_dict['%s_com'%(k)] = np.nansum(pass_dict[k]*np.arange(pass_dict[k].shape[0]))/np.nansum(pass_dict[k])
+
+        self.dat = pass_dict
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict
+
+
+class hsdBaselineCorrectFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','baseline')
+        #print('init baselinefunc')
+        super(hsdBaselineCorrectFunc, self).__init__(**kwargs)
+        ## later add different methods.
+        self._method = kwargs.get('method','Fourier')
+
+    def setFromDet(self, det):
+        super(hsdBaselineCorrectFunc, self).setFromDet(det)
+        self._det=det
+
+    def process(self, data):
+        ret_dict={}
+        pass_dict={}
+        if self._method == 'Fourier':
+            if isinstance(data, np.ndarray):
+                ret_dict['wf'] = hsdBaselineFourierEliminate(wf, self._det.wfx)
+            elif isinstance(data, dict):
+                for k in data:
+                    if k.find('times')>=0: continue
+                    if 'times_%s'%k in data:
+                        ret_dict[k] = hsdBaselineFourierEliminate(data[k], data['times_%s'%k])
+                        pass_dict['times_%s'%k] = data['times_%s'%k]
+                    else:
+                        ret_dict[k] = hsdBaselineFourierEliminate(data[k], self._det.wfx)
+                        pass_dict['times_%s'%k] = dataself._det.wfx
+                    pass_dict[k]=ret_dict[k]
+
+        self.dat = pass_dict
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict
+
+class hitFinderCFDFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','hitFinderCFD')
+        super(hitFinderCFDFunc, self).__init__(**kwargs)
+        self.convFilterLength = kwargs.get('convFilterLength', 35)
+        self.CFDOffset = kwargs.get('CFDOffset', 25)
+        self.inverseMultiplier = kwargs.get('inverseMultiplier',-0.75)
+        self.threshold = kwargs.get('threshold', 4)
+        self.nmax_hits = kwargs.get('nmax_hits', 100)
+
+    def setFromDet(self, det):
+        super(hitFinderCFDFunc, self).setFromDet(det)
+        self._det=det
+
+    def hitFinder(self, trace):
+        hitIndices = hitFinder_CFD(trace, self.convFilterLength, self.CFDOffset, 
+                                   self.inverseMultiplier, self.threshold)
+        nHits = len(hitIndices)
+        if nHits>self.nmax_hits: 
+            hitIndices = hitIndices[:self.nmax_hits]
+        elif len(hitIndices)<self.nmax_hits: 
+            hitIndices.extend([0]*(self.nmax_hits-nHits))
+        return nHits, np.array(hitIndices)
+
+    def process(self, data):
+        ret_dict={}
+        pass_dict={}
+        #
+        if isinstance(data, np.ndarray):
+            nHits, hitIndices = self.hitFinder(data)
+            ret_dict['nHits'] = nHits
+            ret_dict['hitIndices'] = hitIndices
+
+        elif isinstance(data, dict):
+            for k in data:
+                if k.find('times')>=0: continue
+                nHits, hitIndices = self.hitFinder(data[k])
+                ret_dict['%s_nHits'%k] = nHits
+                ret_dict['%s_hitIndices'%k] = hitIndices
+
+        #self.dat = pass_dict
+        #subfuncResults = self.processFuncs()
+        #for k in subfuncResults:
+        #    for kk in subfuncResults[k]:
+        #        ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict

@@ -68,7 +68,7 @@ QUEUE=${QUEUE:='psanaq'}
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source /reg/g/psdm/etc/psconda.sh -py3
-conda activate ana-4.0.15-py3
+#conda activate ana-4.0.16-py3
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
 PLOT_PY=DataqualityPlots
 if [[ -v PEDESTAL ]]; then
