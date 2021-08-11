@@ -318,8 +318,8 @@ class azimuthalBinning(DetObjectFunc):
             I=np.bincount(self.Cake_idxs, weights = img/self.correction.ravel(), minlength=nradial*self.nphi); I=I[:nradial*self.nphi]
         else:
             #I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-            I=np.bincount(self.Cake_idxs, weights = img                        , minlength=nradial*self.nphi); I=I[:nradial*self.nphi]
-        I = np.reshape(I,(self.nphi,nradial))
+            I=np.bincount(self.Cake_idxs, weights = img, minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
+        I = np.reshape(I,(self.nphi,self.nq))
         #don't calculate this - I don't think this is stored.
         #self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
         self.Icake = I/self.Cake_norm
