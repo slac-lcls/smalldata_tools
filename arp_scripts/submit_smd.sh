@@ -65,17 +65,17 @@ do
 			shift
 			shift
 			;;
-                --nparallel)
-                        TASKS_PER_NODE="$2"
+        --nparallel)
+            TASKS_PER_NODE="$2"
 			shift
 			shift
 			;;
-                 --interactive)
-                        INTERACTIVE=1
+        --interactive)
+            INTERACTIVE=1
 			shift
 			;;
-                 *)
-                        POSITIONAL+=("$1")
+        *)
+            POSITIONAL+=("$1")
 			shift
 			;;                     
 	esac
@@ -83,17 +83,20 @@ done
 set -- "${POSITIONAL[@]}"
 
 #Define cores if we don't have them
-#Set to 1 if single is set
+#Set to 1 by default
 CORES=${CORES:=1}
 QUEUE=${QUEUE:='psanaq'}
 # QUEUE=${QUEUE:='ffbh3q'}
 # QUEUE=${QUEUE:='psfehq'}
+# select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 elif [[ $QUEUE == *psfeh* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=16}
-else
+elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+else:
+    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
 
 if [ $TASKS_PER_NODE -gt $CORES ]; then

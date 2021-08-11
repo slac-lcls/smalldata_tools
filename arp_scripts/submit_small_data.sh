@@ -51,29 +51,29 @@ do
 			exit
 			;;
 		-e|--experiment)
-                        POSITIONAL+=("--experiment $2")
-                        EXP=$2
+            POSITIONAL+=("--experiment $2")
+            EXP=$2
 			shift
 			shift
 			;;
 		-r|--run)
-                        POSITIONAL+=("--run $2")
+            POSITIONAL+=("--run $2")
 			shift
 			shift
 			;;
 		-n|--nevents)
-		        NEVENTS=$2
-                        POSITIONAL+=("--nevents $2")
+		    NEVENTS=$2
+            POSITIONAL+=("--nevents $2")
 			shift
 			shift
 			;;
 		-d|--directory)
-                        POSITIONAL+=("--directory $2")
+            POSITIONAL+=("--directory $2")
 			shift
 			shift
 			;;
-                 *)
-                        POSITIONAL+=("$1")
+        *)
+            POSITIONAL+=("$1")
 			shift
 			;;                     
 	esac
