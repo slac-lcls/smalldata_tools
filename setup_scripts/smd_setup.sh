@@ -97,6 +97,7 @@ if [ $PSANA -eq 1 ]; then
         echo "Smalldata_tools already on PSANA"
     else
         git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
+        git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch updateInstead
     fi
     echo "... Done."
 fi
