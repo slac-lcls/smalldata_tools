@@ -1,0 +1,93 @@
+#!/bin/bash
+# 
+# Batch Control Submission script for auto run stats creation.
+#
+# see:  https://confluence.slac.stanford.edu/display/PSDM/Automatic+Run+Processing
+#
+unset PYTHONPATH
+unset LD_LIBRARY_PATH
+unset DISPLAY XAUTHORITY
+export PYTHONPATH=
+echo "$@"
+cd /reg/g/xpp/xppcode/python/smalldata_tools/examples
+
+source /reg/g/psdm/etc/psconda.sh
+source activate ana-1.3.47
+
+SOURCE="${BASH_SOURCE[0]}"
+# resolve $SOURCE until the file is no longer a symlink
+while [ -h "$SOURCE" ]; do 
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" 
+  # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+cd $DIR
+
+EXP=$1
+shift
+RUN=$1
+INSTRUMENT=${EXP:0:3}
+
+shift
+if [[ $1 ]]; then
+  QUEUEREQ=$1
+  shift
+  if [[ $1 ]]; then
+    OPTION=$1
+    shift
+  fi
+fi
+
+PSANA=`which psana`
+PSANADIR=`dirname $PSANA`
+RUNNUM=`python "$PSANADIR/../lib/python2.7/site-packages/PyDataSource/get_run_from_runid.py" $EXP $RUN`
+RUNNUM=`echo $RUNNUM |  sed 's/^0*//'`
+RUNNUM=`printf "%0*d\n" 4 $RUNNUM`
+RUNSTR="Run$RUNNUM"
+EXPRUN="$EXP_$RUNSTR"
+BATCHUSER=`whoami`
+OPRNAME="$INSTRUMENT"opr
+#LOGDIR="/reg/d/psdm/$INSTRUMENT/$EXP/stats/logs"
+LOGDIR="/reg/neh/operator/$OPRNAME/experiments/$EXP/arp_logs"
+OUTLOG="$LOGDIR/$BATCHUSER/$RUNSTR"
+if [[ ! -a $OUTLOG ]];  then
+    mkdir -p $OUTLOG
+fi
+
+: ${PYFILE:="SmallDataProducer_default.py"}
+: ${QUEUEREQ:="psanaq"}
+#: ${QUEUEREQ:="psnehq"}
+RUNFILE="$DIR/$PYFILE"
+JOBNAME="smdd_$EXPRUN"
+
+CURR_EXP=`/reg/g/pcds/engineering_tools/$INSTRUMENT/scripts/get_info --hutch $INSTRUMENT --exp`
+#echo 'current exp: ' $CURR_EXP
+
+NJOBS=12
+NWAIT=0
+if [ $EXP == $CURR_EXP ]; then
+    NJOBS=16
+    if [ $QUEUEREQ == "psanaq" ]; then
+	QUEUEREQ=psnehq
+    fi
+fi
+
+LOGSUM="$LOGDIR/batch_jobs.log"
+echo '--------------------------------' >> $LOGSUM
+date >> $LOGSUM
+echo Processing $EXP Run $RUN >> $LOGSUM
+echo `uname -a` >> $LOGSUM
+echo 'User: '$BATCHUSER >> $LOGSUM
+echo 'Run:    '$RUNSTR >> $LOGSUM
+echo 'Log Path: '$OUTLOG >> $LOGSUM
+echo 'Run File: '$RUNFILE >> $LOGSUM
+echo '##' bsub -n $NJOBS -q "$QUEUEREQ" -J "$JOBNAME" -o $OUTLOG/%J.log mpirun python "$RUNFILE" "$OPTION" --exp="$EXP" --run=$RUNNUM >> $LOGSUM
+
+bsub -n $NJOBS -q "$QUEUEREQ" -J "$JOBNAME" -o $OUTLOG/%J.log mpirun python "$RUNFILE" --exp="$EXP" --run=$RUNNUM 
+#for testing.
+#bsub -q psnehq -J "$JOBNAME" -o $OUTLOG/%J.log mpirun python "$RUNFILE" --exp "$EXP" --run $RUNNUM --nevt 10
+

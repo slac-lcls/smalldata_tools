@@ -96,7 +96,7 @@ if [ $PSANA -eq 1 ]; then
     if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
         echo "Smalldata_tools already on PSANA"
     else
-        git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
+        git clone ssh://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
         git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch updateInstead
     fi
     echo "... Done."
@@ -114,7 +114,7 @@ if [ $FFB -eq 1 ]; then
             git clone $PSANA_BASE/results/smalldata_tools $FFB_BASE/smalldata_tools
         else
             echo "Cloning from the remote."
-            git clone https://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
+            git clone ssh://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
         fi
     fi
     echo "... Done."

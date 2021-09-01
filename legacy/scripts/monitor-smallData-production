@@ -1,0 +1,35 @@
+#!/bin/bash
+
+export PATH=$PATH:/reg/g/pcds/engineering_tools/xpp/scripts:/reg/neh/operator/xppopr/bin
+HUTCH=`get_hutch_name`
+THISEXP=`get_curr_exp`
+cd /reg/d/psdm/$HUTCH/$THISEXP/results/smalldata_tools
+#FIX ME
+#NEED TO CHECK THIS IS A NUMBER! 
+LASTRUN=`get_lastRun`
+echo 'Start automatic production with run '$LAST_RUN
+while [[ $LASTRUN == 'no runs yet' ]]; do
+    sleep 60 
+    LASTRUN=`get_lastRun`
+done
+while true; do
+	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
+	EXP_RUN=`get_lastRun`
+        LDATRUN_H5=`ls -t /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*h5 | head -n1 | sed s:/reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP\_Run::g | sed s/.h5//g`
+        HASH5=`ls -t /reg/d/psdm/$HUTCH/$THISEXP/hdf5/smalldata/$THISEXP*Run*$LASTRUN*h5 | wc | awk {'print $1'}`
+	echo 'Last Run: '$EXP_RUN ', latest smallData file: ' $LDATRUN_H5 ', checked at ' $CREATE_TIME ', checking to process run ' $LASTRUN
+	CURREXP=`get_curr_exp`
+
+	if [[ $EXP_RUN -ge $LASTRUN ]] && [[ $CURREXP == $THISEXP ]]; then
+	    if [ $HASH5 -eq 1 ]; then
+		echo 'we have processed run ' $LASTRUN 'offline already'
+		let "LASTRUN+=1" 
+	    else
+		echo 'send ffb job for run ' $LASTRUN 
+		./examples/smallDataRun -r $LASTRUN
+		let "LASTRUN+=1" 
+		sleep 30
+	    fi
+	fi
+	sleep 10
+done

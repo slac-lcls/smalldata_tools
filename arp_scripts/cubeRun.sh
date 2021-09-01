@@ -77,8 +77,17 @@ set -- "${POSITIONAL[@]}"
 CORES=${CORES:=1}
 QUEUE=${QUEUE:='psanaq'}
 #QUEUE=${QUEUE:='ffbh3q'}
-# QUEUE=${QUEUE:='psfehq'}
-TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+#QUEUE=${QUEUE:='psfehq'}
+# select tasks per node to match the number of cores:
+if [[ $QUEUE == *psanaq* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
+elif [[ $QUEUE == *psfeh* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=16}
+elif [[ $QUEUE == *ffb* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+else:
+    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
+fi
 
 if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 

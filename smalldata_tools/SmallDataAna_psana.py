@@ -19,6 +19,7 @@ import bokeh.plotting as bp
 from matplotlib import gridspec
 import psana
 import logging
+import time
 import requests
 try:
     basestring
@@ -47,6 +48,9 @@ from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectio
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+
+import smalldata_tools.cube.cube_mpi_fun as mpi_fun
+
 from mpi4py import MPI
 import h5py
 comm = MPI.COMM_WORLD
@@ -54,7 +58,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class SmallDataAna_psana(object):
-    def __init__(self, expname='', run=-1,dirname='', filename='', plotWith='matplotlib'):
+    def __init__(self, expname='', run=-1, dirname='', filename='', plotWith='matplotlib'):
         self.run=int(run)
         self.expname=expname
         self.hutch=expname[0:3]
@@ -80,11 +84,12 @@ class SmallDataAna_psana(object):
                 return None
         except:
             lastRun = -1
-
+    
+        isLive = False
         if self.run == lastRun:
-            isLive = (rundoc.get('end_time', None) == None)
-        else:
-            isLive = False
+            end_time = rundoc.get('end_time', None)
+            if end_time is None:
+                isLive = True
         self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
         hostname = socket.gethostname()
         if hostname.find('drp-srcf')>=0:
@@ -94,6 +99,7 @@ class SmallDataAna_psana(object):
         if isLive:
             self.dsname=self.dsname+':live:stream=0-79'
             self.dsnameIdx=None
+        comm.bcast(self.dsnameIdx, root=0)
 
         printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
@@ -687,8 +693,6 @@ class SmallDataAna_psana(object):
 
         #have issues with Jupyter notebook io size.
         if plotWith is None:
-            if returnIt:
-                return image
             plotWith=self.plotWith
         if plotWith=='bokeh_notebook':
             plot_title="%s in Run %d"%(avImage, self.run)
@@ -699,7 +703,7 @@ class SmallDataAna_psana(object):
             layout, p, im = plotImageBokeh(img, plot_title=plot_title, plotMaxP=np.nanpercentile(img,99),plotMinP=np.nanpercentile(img,1), plotWidth=700, plotHeight=700)
             bp.output_notebook()
             bp.show(layout)
-        elif plotWith=='matplotlib':
+        else:
             fig=plt.figure(figsize=(10,6))
             if ROI!=[]:
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
@@ -1105,21 +1109,8 @@ class SmallDataAna_psana(object):
                 plt.plot([x.min(),x.max()],[res['yCen'],res['yCen']],'r')
                 plt.show()
 
-    def MakeMask(self, detname=None, imgName=None, limits=[5,99.5], singleTile=-1, inImage={}):
-        if inImage!={}:
-            img=inImage['image']
-            if 'mask' in inImage:
-                mask=inImage['mask']
-            else:
-                mask=np.ones_like(img)
-            detname=inImage['detname']
-            avImage='input Image'
-            if 'name' in inImage:
-                avImage=inImage['name']
-            if not detname in self.__dict__.keys():
-                self.addDetInfo(detname=detname)
-        else:
-            detname, img, avImage = self.getAvImage(detname=detname, imgName=imgName)
+    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
+        detname, img, avImage = self.getAvImage(detname=None)
 
         plotMax = np.nanpercentile(img, limits[1])
         plotMin = np.nanpercentile(img, limits[0])
@@ -1173,12 +1164,12 @@ class SmallDataAna_psana(object):
             #needs to be pixel coordinates for rectable selection to work.
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
-            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n), edgepixels(e), center pixels(cen,center) or statistics(s)?:\n")
+            shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
             #shape = raw_input()
             #this definitely works for the rayonix...
             if shape=='r':
                 print('select two corners: ')
-                p =np.array(ginput(2)).astype(int)
+                p =np.array(ginput(2))
                 mask_roi=np.zeros_like(image)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
                 if needsGeo:
@@ -1302,7 +1293,7 @@ class SmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
                 else:
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
-            elif shape=='e':
+            if shape=='e':
                 ctot=raw_input("Enter number of edge rows that should be masked:")
                 try:
                     nEdge = int(ctot)
@@ -1325,7 +1316,7 @@ class SmallDataAna_psana(object):
                     tile[:,nEdge:-1]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
 
-            elif shape=='cen' or shape=='center':
+            if shape=='cen' or shape=='center':
                 ctot=raw_input("Enter number of center rows that should be masked:")
                 try:
                     nEdge = int(ctot)
@@ -1343,10 +1334,6 @@ class SmallDataAna_psana(object):
                     tile[int(tile.shape[0]/2-nEdge):int(tile.shape[0]/2+nEdge),:]=1
                     tile[:,int(tile.shape[1]/2-nEdge):int(tile.shape[1]/2+nEdge)]=1
                     plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
-
-            elif shape=='s':
-                #XXX
-                print('statistical masking...')
 
             if mask_r_nda is not None:
                 print('created a mask....',len(mask))
@@ -1444,20 +1431,10 @@ class SmallDataAna_psana(object):
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==13:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype in [5,6,8,9,19,27,36]:
+            elif det.dettype==19:
                 dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==26:
-                dirname='/reg/d/psdm/%s/%s/calib/Jungfrau::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             elif det.dettype==32:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==33:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10kaQuad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==29:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            else:
-                print('This detector type is not yet supported, we will return.')
-                return mask
-
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
@@ -1582,7 +1559,7 @@ class SmallDataAna_psana(object):
         azintNames = [ key for key in getattr(self,detname).__dict__.keys() if isinstance(getattr(getattr(self, detname),key), azimuthalBinning) ]
         return azintNames, azintArray
 
-    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, inImage={}, imgName=None, plotGrid=0):
+    def AzInt(self, detname=None, use_mask=False, use_mask_local=False, plotIt=False, azintName=None, inImage={}, imgName=None):
         avImage=None
         if inImage!={}:
             img=inImage['image']
@@ -1630,12 +1607,6 @@ class SmallDataAna_psana(object):
             elif len(azintValues.shape)==2:
                 plt.imshow(azintValues,aspect='auto',interpolation='none')
                 plt.colorbar()
-                ymin=0;ymax=azintValues.shape[1]-1
-                for il,lineVal in enumerate(np.linspace(ymin,ymax,int(plotGrid))):
-                    lw=1
-                    if plotGrid>15 and il%5>0:
-                        lw=0.5
-                    plt.plot([lineVal,lineVal],[0, azintValues.shape[0]],'r',linewidth=lw,linestyle='dotted')
         else:
             return azintValues
 
@@ -2204,27 +2175,27 @@ class SmallDataAna_psana(object):
 
         if isinstance(nEvtsPerBin, basestring): nEvtsPerBin=int(nEvtsPerBin)
 
-        detInData=[]
-        for k in self.Keys():
-            if k.alias()!='':
-                detInData.append(k.alias())
-
-        detNames=[]
-        targetVarsXtc=[]
-        for idet,det in enumerate(myCube.targetVarsXtc):
-            if isinstance(det, dict):
-                dName = det['source']
-            else:
-                dName = det
-            #print('DEBUG dName ',dName)
-            if dName in detInData:
-                detNames.append(dName)
-                targetVarsXtc.append(det)
-            else:
-                printR(rank, 'Detector with alias %s not in data '%det)
-        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
-        for det in myCube.targetVarsXtc:
-            self.addDetInfo(det)
+#         detInData=[]
+#         for k in self.Keys():
+#             if k.alias()!='':
+#                 detInData.append(k.alias())
+# 
+#         detNames=[]
+#         targetVarsXtc=[]
+#         for idet,det in enumerate(myCube.targetVarsXtc):
+#             if isinstance(det, dict):
+#                 dName = det['source']
+#             else:
+#                 dName = det
+#             #print('DEBUG dName ',dName)
+#             if dName in detInData:
+#                 detNames.append(dName)
+#                 targetVarsXtc.append(det)
+#             else:
+#                 printR(rank, 'Detector with alias %s not in data '%det)
+#         myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
+#         for det in myCube.targetVarsXtc:
+#             self.addDetInfo(det)
 
         #smallData only version: only run on single core
         if len(myCube.targetVarsXtc)<=0:
@@ -2237,7 +2208,7 @@ class SmallDataAna_psana(object):
                 fout = h5py.File(outFileName, "w")
                 #ADD CNF STUFF HERE!
                 printR(rank, 'no big data, bin the data now....be patient')
-                cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
+                cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)
                 printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
@@ -2245,11 +2216,10 @@ class SmallDataAna_psana(object):
                 for cfgVar in myCube.targetVarsCfg:
                     addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
                     print('add cfgVar to hdf5', cfgVar.replace('/','_'))
-
                 fout.close()
-            return
+            return cubeData
 
-        printR(rank, 'now make big cube')
+        printR(rank,'Now make big cube')
         #only run on rank=0 & broadcast.
         outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5.inprogress'%cubeName)
         if (onoff==0):
@@ -2257,75 +2227,26 @@ class SmallDataAna_psana(object):
         elif (onoff==1):
             outFileName=outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
-        try:
-            print('DEBUG: open file %s in rank %d '%(outFileName, rank))
-            fout = h5py.File(outFileName, "w",driver='mpio',comm=MPI.COMM_WORLD)
-            print('DEBUG: opened file %s in rank %d '%(outFileName, rank))
-        except:
-            try:
-                print('write a test tile -- foutu1')
-                fout1 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w")
-                fout1.close()
-                print('write a test tile - mpio')
-                fout2 = h5py.File('/tmp/%d.h5'%(int(np.random.rand()*1000)), "w",driver='mpio',comm=MPI.COMM_WORLD)
-                printR(rank, 'could not open the desired file for MPI writing. Likely a permission issue:')
-                fout2.close()
-                try:
-                    import pwd
-                    print('A: ',oct(os.stat(outFileName).st_mode)[-3:])
-                    print('B: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_name)
-                    print('C: ',pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos)
-                    printR(rank, 'owner: %s (%s), permissions: %s '%(pwd.getpwuid(os.stat(outFileName).st_uid).pw_name,pwd.getpwuid(os.stat(outFileName).st_uid).pw_gecos,oct(os.stat(outFileName).st_mode)[-3:]))
-                except:
-                    printR(rank, 'failed at printing info about file')
-            except:
-                printR(rank, 'you will need an analysis release < ana.1.3.21 or >= ana-1.3.42 for the cube to work. Solution in progress...')
-            printR(rank, 'we will save the small cubed data only and return')
-            if rank==0:
-                outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
-                if (onoff==0):
-                    outFileName=outFileName.replace('.h5','_off.h5')
-                elif (onoff==1):
-                    outFileName=outFileName.replace('.h5','_on.h5')
-                fout = h5py.File(outFileName, "w")
-
-                print('bin the data now....be patient')
-                cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)  
-                print('now write outputfile (only small data) to : ',outFileName)
-                for key in cubeData.variables:
-                    addToHdf5(fout, key, cubeData[key].values)
-                #FIX ME: TEST THIS!!!!
-                sel = self.sda.Sels[myCube.useFilter]
-                selString=''
-                for icut,cut in enumerate(sel.cuts):
-                    selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
-                dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
-                dsetcnf.attrs['cubeSelection'] = selString
-
-                for cfgVar in myCube.targetVarsCfg:
-                    addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
-                    print('add cfgVar to hdf5', cfgVar.replace('/','_'))
-
-                fout.close()
-            return
-
+        
         #configuration for cube making
-        cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
+#         cube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         #compare the number of bins to mpi jobs.
-        nBins=myCube.binBounds.shape[0]-1
-        for key in cube.addBinVars:
-            nBins*=cube.addBinVars[key].shape[0]-1
-        if nBins<size:
-            if 'random/random' not in self.sda.Keys('random'):
-                myrandom=np.random.rand(self.sda.xrData.time.shape[0])
-                self.sda.addVar('random/random',myrandom)
-            if size/nBins > 1:
-                cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)]})
+#         nBins=myCube.binBounds.shape[0]-1
+#         for key in cube.addBinVars:
+#             nBins*=cube.addBinVars[key].shape[0]-1
+#         if nBins<size:
+#             if 'random/random' not in self.sda.Keys('random'):
+#                 myrandom=np.random.rand(self.sda.xrData.time.shape[0])
+#                 self.sda.addVar('random/random',myrandom)
+#             if size/nBins > 1:
+#                 cube.add_BinVar({'random/random':[0.,1.,int(size/nBins)]})
 
-        sel = self.sda.Sels[cube.useFilter]
+        sel = self.sda.Sels[myCube.useFilter]
         selString=''
         for icut,cut in enumerate(sel.cuts):
             selString+=('Cut %i: %f < %s < %f\n'%(icut, cut[1], cut[0],cut[2]))
+            
+        fout = h5py.File(outFileName, "w")
         dsetcnf = fout.create_dataset('cubeSelection', [1.], dtype='f')
         dsetcnf.attrs['cubeSelection'] = selString
 
@@ -2335,275 +2256,361 @@ class SmallDataAna_psana(object):
             self.sda.getOffVar('event_time','xon',nNbr=offEventsCube, mean=False)
             addVars = [ 'offNbrs_event_time_xon_nNbr%02d'%offEventsCube,'offNbrs_fiducials_xon_nNbr%02d'%offEventsCube]
             self.sda.cubes[cubeName].addIdxVar(addVars)
-        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True,onoff=onoff)
+        cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True, onoff=onoff)
         
         #add small data to hdf5
         for key in cubeData.variables:
             addToHdf5(fout, key, cubeData[key].values)
 
-        runIdx = self.dsIdxRun
-        numBin = np.array(cubeData.nEntries).flatten().shape[0]
-        bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
-        #this is the done correctly....
-        #print('DEBUG: bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
+#         runIdx = self.dsIdxRun
+#         numBin = np.array(cubeData.nEntries).flatten().shape[0]
+#         bins_per_job = numBin/size + int((numBin%size)/max(1,numBin%size))
+#         #this is the done correctly....
+#         #print('DEBUG: bins_per_job', numBin, size, ' -- ', numBin/size ,' + ', int((numBin%size)/max(1,numBin%size)), ' = ', bins_per_job, bins_per_job*size
 
-        binID=np.ones(bins_per_job,dtype=int); binID*=-1
-        detShapes=[]
-        detArrays=[]
-        detSArrays=[] #for error calculation
-        detMArrays=[] #for error calculation
-        detOffArrays=[]
-        detIArrays=[]#for photon image
-        for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
-            detShape = self.__dict__[thisdetName].ped.shape
-            if self.__dict__[thisdetName].isGainswitching:
-                detShape = (self.__dict__[thisdetName].ped[0]).shape
-            lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
-            detShapes.append(csShape)
-            #print('DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape)
-            det_arrayBin=np.zeros(csShape)
-            detArrays.append(np.zeros(csShape))#det_arrayBin)
-            detSArrays.append(np.zeros(csShape))#det_arrayBin)
-            detMArrays.append(np.zeros(csShape))#det_arrayBin)
-            detOffArrays.append(np.zeros(csShape))#det_arrayBin)
-            detIArrays.append(np.zeros(csShape))#det_arrayBin)
-            if rank==0:
-                print('for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape)
+#         binID=np.ones(bins_per_job,dtype=int); binID*=-1
+#         detShapes=[]
+#         detArrays=[]
+#         detSArrays=[] #for error calculation
+#         detMArrays=[] #for error calculation
+#         detOffArrays=[]
+#         detIArrays=[]#for photon image
+#         for thisdetName,thisdetDict in zip(detNames, (myCube.targetVarsXtc)):
+#             detShape = self.__dict__[thisdetName].ped.shape
+#             if self.__dict__[thisdetName].isGainswitching:
+#                 detShape = (self.__dict__[thisdetName].ped[0]).shape
+#             lS = list(detShape);lS.insert(0,bins_per_job);csShape=tuple(lS)
+#             detShapes.append(csShape)
+#             #print('DEBUG detshape C: ',detShape, thisdetName, csShape, np.array(detArrays).shape)
+#             det_arrayBin=np.zeros(csShape)
+#             detArrays.append(np.zeros(csShape))#det_arrayBin)
+#             detSArrays.append(np.zeros(csShape))#det_arrayBin)
+#             detMArrays.append(np.zeros(csShape))#det_arrayBin)
+#             detOffArrays.append(np.zeros(csShape))#det_arrayBin)
+#             detIArrays.append(np.zeros(csShape))#det_arrayBin)
+#             if rank==0:
+#                 print('for detector %s assume shape: '%thisdetName, csShape, det_arrayBin.shape)
 
         ###
         #nominal cube
         ###
-        for ib,fids,evttimes in itertools.izip(itertools.count(), eventIdxDict['fiducial'],eventIdxDict['evttime']):
-            if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
-                continue
-            print('bin: %d has %d events, will be treated in rank %d'%(ib, len(fids),rank))
-            binID[ib%bins_per_job]=ib
-
-            nEvts_bin=0
-            for ievt,evtfid, evttime in itertools.izip(itertools.count(),fids,evttimes):
-                if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin-1:
-                    break
-                nEvts_bin=nEvts_bin+1
-
-                evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
-                evt = runIdx.event(evtt)                #now loop over detectors in this event
-                for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
-                    det = self.__dict__[thisdetName]
-                    try:
-                        det.getData(evt)
-                        det.processFuncs()
-
-                        thisDetDataDict=getUserData(det)
-                        for key in thisDetDataDict.keys():
-                            if not (key=='full_area' or key.find('ROI')>=0 or key.find('photon_img')>=0):
-                                continue
-                            if (key=='full_area' or key.find('ROI')>=0):
-                                if thisdetDict.has_key('thresADU'):
-                                    thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
-                                elif thisdetDict.has_key('thresRms'):
-                                    thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
-                                dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
-                            else: #if key.find('photon_img')
-                                dIArray[ib%bins_per_job]=dIArray[ib%bins_per_job]+thisDetDataDict[key]
-
-                            x = thisDetDataDict[key]
-                            oldM = dMArray
-                            dMArray = dMArray + (x-dMArray)/(ievt+1)
-                            dSArray = dSArray + (x-dMArray)*(x-oldM)
-                    except: 
-                        print('Failed to get data for this event (possible common mode correction in old release....')
-                        
-        ###
-        #off events cube
-        ###
-        if offEventsCube>0:
-            nEntries_off=[]
-            for ib,fids,evttimes in itertools.izip(itertools.count(), eventIdxDict['offNbrs_fiducials_xon_nNbr%02d'%offEventsCube],eventIdxDict['offNbrs_event_time_xon_nNbr%02d'%offEventsCube]):
-                if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
-                    continue
-                binID[ib%bins_per_job]=ib
-
-                nEvts_bin=0
-                try:
-                    allfids = fids.values.flatten()
-                    allevttimes = evttimes.values.flatten()
-                except:
-                    if fids==[] and evttimes==[]:
-                        nEntries_off.append(0)
-                        continue
-                    else:
-                        print('something is wrong with this bin, got fiducials like: ',fids)
-                        break
-                #get unique event time
-                evttimes, evtIdx = np.unique(allevttimes, return_inverse=True)
-                #count how often each of these appears to get right mean/sum later
-                noff_evt = np.bincount(evtIdx)
-                nEntries_off.append(np.array(noff_evt).sum())
-                print('bin: %d has %d off events with %d unique off events'%(ib, nEntries_off[-1], len(evttimes)))
-                #get matching fiducials
-                off_fids = np.bincount(evtIdx, allfids)
-                off_fids = off_fids/noff_evt
-                for ievt,evtfid, evttime, noff_evts in itertools.izip(itertools.count(),off_fids,evttimes,noff_evt):
-                    if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin:
-                        break
-                    nEvts_bin=nEvts_bin+noff_evts
-
-                    #evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
-                    evtt = psana.EventTime(int(evttime),int(evtfid))
-                    evt = runIdx.event(evtt)
-                    #now loop over detectors in this event
-                    for thisdetName,thisdetDict,dArray in zip(detNames, (myCube.targetVarsXtc), detOffArrays):
-                        det = self.__dict__[thisdetName]
-                        det.getData(evt)
-                        det.processDetector()
-                        
-                        thisDetDataDict=getUserData(det)
-                        for key in thisDetDataDict.keys():
-                            if not (key=='full_area' or key.find('ROI')>=0):
-                                continue
-                            if thisdetDict.has_key('thresADU'):
-                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
-                                dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts
-                            elif thisdetDict.has_key('thresRms'):
-                                thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
-                                dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts
-                            else:
-                                dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts        
-            addToHdf5(fout, 'nEntries_off', np.array(nEntries_off))
-
-        #loop over arrays & bins, make image & rebin if requested.
-        for detName, dArray, dOArray, dSArray, dMArray, dIArray, detDict in zip(detNames, detArrays, detOffArrays, detSArrays,detMArrays, detIArrays, (myCube.targetVarsXtc)):
-            det = self.__dict__[detName]
-            imgArray=[]
-            imgOArray=[]
-            imgSArray=[]
-            imgMArray=[]
-            imgIArray=[]
-
-            nEntries = cubeData['nEntries'].values
-            if len(nEntries.shape)>1:
-                #print('DEBUG reshape rank %d '%(rank),' nEntries shape/rank ',nEntries.shape, rank*bins_per_job,)(rank+1)*bins_per_job
-                nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job]#, ' -- ',nEntries
-            #this goes wrong for bins w/o entries. Split this?
-            for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
-                #now divide mean & std sums to be correct.
-                if (isinstance(nent, int) and nent!=0) or not isinstance(nent, int):
-                    binMData = binMData/nent
-                if (isinstance(nent, int) and nent!=1) or not isinstance(nent, int):
-                    binSData = np.sqrt(binSData/(nent-1))
-                if  detDict.has_key('image'):
-                    thisImg = det.det.image(self.run, binData)
-                    thisImgO = det.det.image(self.run, binOData)
-                    thisImgS = det.det.image(self.run, binSData)
-                    thisImgM = det.det.image(self.run, binMData)
-                    thisImgI = det.det.image(self.run, binIData)
-                else:
-                    thisImg = binData
-                    thisImgO = binOData
-                    thisImgS = binSData
-                    thisImgM = binMData
-                    thisImgI = binIData
-                if  detDict.has_key('rebin'):
-                    thisImg = rebin(thisImg, detDict['rebin'])
-                    imgArray.append(thisImg)
-                    thisImgO = rebin(thisImgO, detDict['rebin'])
-                    imgOArray.append(thisImgO)
-                    thisImgS = rebin(thisImgS, detDict['rebin'])
-                    imgSArray.append(thisImgS)
-                    thisImgM = rebin(thisImgS, detDict['rebin'])
-                    imgMArray.append(thisImgM)
-                else:
-                    imgArray.append(thisImg)
-                    imgOArray.append(thisImgO)
-                    imgSArray.append(thisImgS)
-                    imgMArray.append(thisImgM)
-                    imgIArray.append(thisImgI)
-                    #print('DEBUG append images here  : ',thisImg[0][11])
-                    #print('DEBUG append images photon: ',thisImgI[0][11])
-                #print('imgArray length: rank %d '%rank,len(imgArray))
-                
-            if rank==0:
-                imgArrayShape=imgArray[0].shape
+        t0 = time.time()
+        bins_info = []
+        for f,t in zip(eventIdxDict['fiducial'], eventIdxDict['evttime']):
+            if nEvtsPerBin>0:
+                bins_info.append([np.asarray(f[:nEvtsPerBin]), np.asarray(t[:nEvtsPerBin])])
             else:
-                imgArrayShape=None
-            imgArrayShape=comm.bcast(imgArrayShape, root=0)
+                bins_info.append([np.asarray(f), np.asarray(t)])
+        nbins = len(bins_info)
+        print('****** Total number of bins: {}'.format(nbins))
+        #print('****** BINS: {}'.format(bin))
+        print('****** Make big data placeholder dataset')
+        dets = []
+        for detname in self.detNames:
+            det = self.__dict__[detname]
+            det_shape = det.imgShape
+            try:
+                self.make_det_data_dset(fout, detname, det_shape, nbins)
+            except Exception as e:
+                logger.warning('Could not make dataset for detector {}. Exit. {}'.format(detname, e))
+                comm.Abort()
+                
+        save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
+        mpi_fun.bin_distribution(bins_info, func=save_fct)
+        t3 = time.time()
 
-            #write hdf5 file w/ mpi for big array
-            arShape=(numBin,)
-            for i in range(0,len(imgArrayShape)):
-                arShape+=(imgArrayShape[i],)
-#            if rank==0:
-            #print('DEBUG: print(array shape before saving: ',arShape,' rank ',rank)
+        print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))
+        
+#         for ib,fids,evttimes in zip(itertools.count(), eventIdxDict['fiducial'],eventIdxDict['evttime']):
+            #if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
+            #    continue
+            #print('bin: %d has %d events, will be treated in rank %d'%(ib, len(fids),rank))
+            #binID[ib%bins_per_job]=ib
+#             nEvts_bin=0
+#             for ievt,evtfid, evttime in zip(itertools.count(),fids,evttimes):
+#                 if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin-1:
+#                     break
+#                 nEvts_bin=nEvts_bin+1
 
-            cubeBigData = fout.create_dataset('%s'%detName,arShape)
-            if storeMeanStd:
-                cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
-                cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
-            if offEventsCube>0:
-                cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
-            hasPhoton=False
-            for k in detDict.keys():
-                if k.find('photon')>=0: hasPhoton=True
-            if hasPhoton:
-                cubeBigIData = fout.create_dataset('%s_photon'%detName,arShape)
+#                 evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
+#                 evt = runIdx.event(evtt)                #now loop over detectors in this event
+#                 for thisdetName,thisdetDict,dArray,dMArray,dSArray,dIArray in zip(detNames, (myCube.targetVarsXtc), detArrays, detMArrays, detSArrays, detIArrays):
+#                     det = self.__dict__[thisdetName]
+#                     try:
+#                         det.getData(evt)
+#                         det.processFuncs()
 
-            for iSlice,Slice,SliceO, SliceS,SliceM,SliceI in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray,imgIArray):
-                if np.nansum(Slice)!=0:
-                    cubeBigData[rank*bins_per_job+iSlice,:] = Slice
-                    print('bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:])))
+#                         thisDetDataDict=getUserData(det)
+#                         for key in thisDetDataDict.keys():
+#                             if not (key=='full_area' or key.find('ROI')>=0 or key.find('photon_img')>=0):
+#                                 continue
+#                             if (key=='full_area' or key.find('ROI')>=0):
+#                                 if thisdetDict.has_key('thresADU'):
+#                                     thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
+#                                 elif thisdetDict.has_key('thresRms'):
+#                                     thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
+#                                 dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]
+#                             else: #if key.find('photon_img')
+#                                 dIArray[ib%bins_per_job]=dIArray[ib%bins_per_job]+thisDetDataDict[key]
 
-                if offEventsCube>0 and np.nansum(SliceO)>0:
-                    cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
-                if storeMeanStd and np.nansum(SliceS)>0:
-                    cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
-                if storeMeanStd and np.nansum(SliceM)>0:
-                    cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
-                if hasPhoton and np.nansum(SliceI)!=0 and np.nansum(np.array(imgIArray))>0:
-                    cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
+#                             x = thisDetDataDict[key]
+#                             oldM = dMArray
+#                             dMArray = dMArray + (x-dMArray)/(ievt+1)
+#                             dSArray = dSArray + (x-dMArray)*(x-oldM)
+#                     except: 
+#                         print('Failed to get data for this event (possible common mode correction in old release....')
+                        
+#         ###
+#         #off events cube
+#         ###
+#         if offEventsCube>0:
+#             nEntries_off=[]
+#             for ib,fids,evttimes in zip(itertools.count(), eventIdxDict['offNbrs_fiducials_xon_nNbr%02d'%offEventsCube],eventIdxDict['offNbrs_event_time_xon_nNbr%02d'%offEventsCube]):
+#                 if not (ib>=(bins_per_job*rank) and ib < bins_per_job*(rank+1)):
+#                     continue
+#                 binID[ib%bins_per_job]=ib
 
-            if det.rms is not None:
-                if not detDict.has_key('image'):
-                    addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
-                    addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
-                    if det.gain is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
-                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
-                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
-                    if det.x is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
-                    if det.ix is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
-                else:
-                    if det.det.dettype==26:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
-                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
-                    else:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
-                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
-                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
-                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
-                    if det.x is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
-                    if det.ix is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
+#                 nEvts_bin=0
+#                 try:
+#                     allfids = fids.values.flatten()
+#                     allevttimes = evttimes.values.flatten()
+#                 except:
+#                     if fids==[] and evttimes==[]:
+#                         nEntries_off.append(0)
+#                         continue
+#                     else:
+#                         print('something is wrong with this bin, got fiducials like: ',fids)
+#                         break
+#                 #get unique event time
+#                 evttimes, evtIdx = np.unique(allevttimes, return_inverse=True)
+#                 #count how often each of these appears to get right mean/sum later
+#                 noff_evt = np.bincount(evtIdx)
+#                 nEntries_off.append(np.array(noff_evt).sum())
+#                 print('bin: %d has %d off events with %d unique off events'%(ib, nEntries_off[-1], len(evttimes)))
+#                 #get matching fiducials
+#                 off_fids = np.bincount(evtIdx, allfids)
+#                 off_fids = off_fids/noff_evt
+#                 for ievt,evtfid, evttime, noff_evts in itertools.izip(itertools.count(),off_fids,evttimes,noff_evt):
+#                     if nEvtsPerBin>0 and nEvts_bin >= nEvtsPerBin:
+#                         break
+#                     nEvts_bin=nEvts_bin+noff_evts
+
+#                     #evtt = psana.EventTime(int(evttime.values),int(evtfid.values))
+#                     evtt = psana.EventTime(int(evttime),int(evtfid))
+#                     evt = runIdx.event(evtt)
+#                     #now loop over detectors in this event
+#                     for thisdetName,thisdetDict,dArray in zip(detNames, (myCube.targetVarsXtc), detOffArrays):
+#                         det = self.__dict__[thisdetName]
+#                         det.getData(evt)
+#                         det.processDetector()
+                        
+#                         thisDetDataDict=getUserData(det)
+#                         for key in thisDetDataDict.keys():
+#                             if not (key=='full_area' or key.find('ROI')>=0):
+#                                 continue
+#                             if thisdetDict.has_key('thresADU'):
+#                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresADU']]=0
+#                                 dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts
+#                             elif thisdetDict.has_key('thresRms'):
+#                                 thisDetDataDict[key][thisDetDataDict[key]<thisdetDict['thresRms']*det.rms]=0
+#                                 dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts
+#                             else:
+#                                 dArray[ib%bins_per_job]=dArray[ib%bins_per_job]+thisDetDataDict[key]*noff_evts        
+#             addToHdf5(fout, 'nEntries_off', np.array(nEntries_off))
+
+#         #loop over arrays & bins, make image & rebin if requested.
+#         for detName, dArray, dOArray, dSArray, dMArray, dIArray, detDict in zip(detNames, detArrays, detOffArrays, detSArrays,detMArrays, detIArrays, (myCube.targetVarsXtc)):
+#             det = self.__dict__[detName]
+#             imgArray=[]
+#             imgOArray=[]
+#             imgSArray=[]
+#             imgMArray=[]
+#             imgIArray=[]
+
+#             nEntries = cubeData['nEntries'].values
+#             if len(nEntries.shape)>1:
+#                 #print('DEBUG reshape rank %d '%(rank),' nEntries shape/rank ',nEntries.shape, rank*bins_per_job,)(rank+1)*bins_per_job
+#                 nEntries = np.array(nEntries).flatten()[rank*bins_per_job:(rank+1)*bins_per_job]#, ' -- ',nEntries
+#             #this goes wrong for bins w/o entries. Split this?
+#             for binData,binOData, binSData,binMData,binIData,nent in zip(dArray,dOArray, dSArray,dMArray,dIArray,nEntries):
+#                 #now divide mean & std sums to be correct.
+#                 if (isinstance(nent, int) and nent!=0) or not isinstance(nent, int):
+#                     binMData = binMData/nent
+#                 if (isinstance(nent, int) and nent!=1) or not isinstance(nent, int):
+#                     binSData = np.sqrt(binSData/(nent-1))
+#                 if  detDict.has_key('image'):
+#                     thisImg = det.det.image(self.run, binData)
+#                     thisImgO = det.det.image(self.run, binOData)
+#                     thisImgS = det.det.image(self.run, binSData)
+#                     thisImgM = det.det.image(self.run, binMData)
+#                     thisImgI = det.det.image(self.run, binIData)
+#                 else:
+#                     thisImg = binData
+#                     thisImgO = binOData
+#                     thisImgS = binSData
+#                     thisImgM = binMData
+#                     thisImgI = binIData
+#                 if  detDict.has_key('rebin'):
+#                     thisImg = rebin(thisImg, detDict['rebin'])
+#                     imgArray.append(thisImg)
+#                     thisImgO = rebin(thisImgO, detDict['rebin'])
+#                     imgOArray.append(thisImgO)
+#                     thisImgS = rebin(thisImgS, detDict['rebin'])
+#                     imgSArray.append(thisImgS)
+#                     thisImgM = rebin(thisImgS, detDict['rebin'])
+#                     imgMArray.append(thisImgM)
+#                 else:
+#                     imgArray.append(thisImg)
+#                     imgOArray.append(thisImgO)
+#                     imgSArray.append(thisImgS)
+#                     imgMArray.append(thisImgM)
+#                     imgIArray.append(thisImgI)
+#                     #print('DEBUG append images here  : ',thisImg[0][11])
+#                     #print('DEBUG append images photon: ',thisImgI[0][11])
+#                 #print('imgArray length: rank %d '%rank,len(imgArray))
+                
+#             if rank==0:
+#                 imgArrayShape=imgArray[0].shape
+#             else:
+#                 imgArrayShape=None
+#             imgArrayShape=comm.bcast(imgArrayShape, root=0)
+
+#             #write hdf5 file w/ mpi for big array
+#             arShape=(numBin,)
+#             for i in range(0,len(imgArrayShape)):
+#                 arShape+=(imgArrayShape[i],)
+# #            if rank==0:
+#             #print('DEBUG: print(array shape before saving: ',arShape,' rank ',rank)
+
+#             cubeBigData = fout.create_dataset('%s'%detName,arShape)
+#             if storeMeanStd:
+#                 cubeBigSData = fout.create_dataset('%s_std'%detName,arShape)
+#                 cubeBigMData = fout.create_dataset('%s_mean'%detName,arShape)
+#             if offEventsCube>0:
+#                 cubeBigOData = fout.create_dataset('%s_off'%detName,arShape)
+#             hasPhoton=False
+#             for k in detDict.keys():
+#                 if k.find('photon')>=0: hasPhoton=True
+#             if hasPhoton:
+#                 cubeBigIData = fout.create_dataset('%s_photon'%detName,arShape)
+
+#             for iSlice,Slice,SliceO, SliceS,SliceM,SliceI in itertools.izip(itertools.count(),imgArray,imgOArray, imgSArray,imgMArray,imgIArray):
+#                 if np.nansum(Slice)!=0:
+#                     cubeBigData[rank*bins_per_job+iSlice,:] = Slice
+#                     print('bin %d (%d per job)  mean %g std %g'%(rank*bins_per_job+iSlice,iSlice,np.nanmean(cubeBigData[rank*bins_per_job+iSlice,:]), np.nanstd(cubeBigData[rank*bins_per_job+iSlice,:])))
+
+#                 if offEventsCube>0 and np.nansum(SliceO)>0:
+#                     cubeBigOData[rank*bins_per_job+iSlice,:] = SliceO
+#                 if storeMeanStd and np.nansum(SliceS)>0:
+#                     cubeBigSData[rank*bins_per_job+iSlice,:] = SliceS
+#                 if storeMeanStd and np.nansum(SliceM)>0:
+#                     cubeBigMData[rank*bins_per_job+iSlice,:] = SliceM
+#                 if hasPhoton and np.nansum(SliceI)!=0 and np.nansum(np.array(imgIArray))>0:
+#                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
+
+#             if det.rms is not None:
+#                 if not detDict.has_key('image'):
+#                     addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
+#                     addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
+#                     if det.gain is not None:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
+#                     addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
+#                     addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
+#                     if det.x is not None:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+#                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+#                     if det.ix is not None:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+#                         addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
+#                 else:
+#                     if det.det.dettype==26:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
+#                         addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
+#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
+#                     else:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
+#                         addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
+#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
+#                     addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
+#                     addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
+#                     if det.x is not None:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+#                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+#                     if det.ix is not None:
+#                         addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+#                         addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
 
 
-        comm.Barrier()
-        printR(rank, 'first,last img mean: %s %g %g '%(detName,np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
+#         comm.Barrier()
+#         printR(rank, 'first,last img mean: %s %g %g '%(detName,np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
 
-        for cfgVar in myCube.targetVarsCfg:
-            addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
-            print('add cfgVar to hdf5', cfgVar.replace('/','_'))
+#         for cfgVar in myCube.targetVarsCfg:
+#             addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
+#             print('add cfgVar to hdf5', cfgVar.replace('/','_'))
 
-        fout.close()
-        comm.Barrier()
-        #print('in rank now: ',rank)
-        if rank==0:
-            print('renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress','')))
-            rename_reduceRandomVar(outFileName)
+#         fout.close()
+#         comm.Barrier()
+#         #print('in rank now: ',rank)
+        print('renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress','')))
+        rename_reduceRandomVar(outFileName)
+        return
+
+    def broadcast_xtc_dets(self, cubeName):
+        """ Sends the xtc det info to worker so that they can instantiate the DetObjects. Most
+        of it is legacy from the old cube.
+        """
+        myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
+        detInData=[]
+        for k in self.Keys():
+            if k.alias()!='':
+                detInData.append(k.alias())
+        self.detNames=[]
+        targetVarsXtc=[]
+        for idet,det in enumerate(myCube.targetVarsXtc):
+            if isinstance(det, dict):
+                dName = det['source']
+            else:
+                dName = det
+            if dName in detInData:
+                self.detNames.append(dName)
+                targetVarsXtc.append(det)
+            else:
+                printR(rank, 'Detector with alias %s not in data '%det)
+        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
+        for det in myCube.targetVarsXtc:
+            self.addDetInfo(det)
+        to_worker = myCube.targetVarsXtc
+        comm.bcast(to_worker, root=0)
+        return
+        
+
+    @staticmethod
+    def make_det_data_dset(fout, detname, det_shape, nbins):
+        # data dset
+        dset_name = '{}_data'.format(detname)
+        shape = tuple(np.r_[nbins,det_shape])
+        dset = fout.create_dataset(dset_name, shape)
+        # n_in_bin dset
+        dset_name = '{}_nEntries'.format(detname)
+        dset = fout.create_dataset(dset_name, (nbins,))
+        return
+    
+    @staticmethod
+    def save_bin_to_h5(fout=None, bin_idx=None, data=None):
+        """ data[0]: summed_data, data[1]: n_in_bin
+        """
+        for detname in data[0].keys():
+            # data
+            dset_name = '{}_data'.format(detname)
+            dset = fout[dset_name]
+            dset[bin_idx] = data[0][detname]
+            # n_in_bin
+            dset_name = '{}_nEntries'.format(detname)
+            dset = fout[dset_name]
+            dset[bin_idx] = data[1][detname]
+        return
+    
+    @staticmethod
+    def print_me(data=None, bin_idx=None):
+        print(data)
+        return

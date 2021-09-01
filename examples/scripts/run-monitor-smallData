@@ -1,9 +1,0 @@
-#!/bin/bash
-source /reg/d/iocCommon/All/xpp_env.sh
-#export PROCSERV="/reg/g/pcds/package/epics/3.14/extensions/R3.14.12/bin/$EPICS_HOST_ARCH/procServ --allow --ignore ^D^C --logstamp --noautorestart"
-export TIME=`date +%s`
-export NAME="monitor-lsmallData.$HOSTNAME.$TIME"
-
-CURREXP=`/reg/g/pdcs/engineering_tools/xpp/scripts/get_curr_exp`
-cd /reg/d/psdm/${CURRECP:0:3}/$CURREXP/results/smalldata_tools/examples/scripts
-$PROCSERV --logfile /tmp/$NAME --name monitor-smallData 40002 ./monitor-smallData
