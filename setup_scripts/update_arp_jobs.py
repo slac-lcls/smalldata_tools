@@ -21,13 +21,29 @@ r = requests.get(ws_url, headers=krbheaders)
 job_defs = r.json()['value']
 
 for job in job_defs:
-    if 'smd' in job['name'] and job['location']=='SRCF_FFB':
+    if job['name']==smd and job['location']=='SRCF_FFB':
         print('MODIFYING JOB {}'.format(job))
         id = job['_id']
         job_def = {
             '_id': id,
             'name': 'smd',
             'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh'),
+            'trigger': 'MANUAL',
+            'location': 'SLAC',
+            'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
+        }
+        ws_url = 'https://pswww.slac.stanford.edu/ws-kerb/lgbk/lgbk/{}/ws/create_update_workflow_def'.format(exp)
+        r = requests.post(ws_url, headers=krbheaders, json=job_def)
+        r.raise_for_status()
+        print('\nJOB MODIFICATION LOG: {}'.format(r.json()))
+
+    elif job['name']==cube and job['location']=='SRCF_FFB':
+        print('MODIFYING JOB {}'.format(job))
+        id = job['_id']
+        job_def = {
+            '_id': id,
+            'name': 'cube',
+            'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh'),
             'trigger': 'MANUAL',
             'location': 'SLAC',
             'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 

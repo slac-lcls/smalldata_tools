@@ -12,12 +12,13 @@ $(basename "$0"):
 		-e
 			Experiment name (i.e. cxilr6716)
         -q
-            Queue (only for ffb)
+            Queue. Jobs are not setup if a queue is not given
         --nopsana
             Do not setup smalldata on psana.
         --noffb
         	Do not setup smalldata on the FFB.
-            If exists on psana, will clone the repo from psana.
+        --cube
+            Make cube job
 EOF
 }
 
@@ -44,6 +45,10 @@ do
         ;;
     --nopsana)
         PSANA=0
+        shift 1
+        ;;
+    --cube)
+        CUBE=1
         shift 1
         ;;
     *) # all other possibilities
@@ -127,10 +132,8 @@ if [ $FFB -eq 1 ]; then
     mkdir -p $FFB_BASE/hdf5/cube
     mkdir -p $FFB_BASE/hdf5/debug
 fi
-# if [ $PSANA -eq 1 ]; then
-#     mkdir -p $PSANA_BASE/hdf5/smalldata/debug
-#     mkdir -p $PSANA_BASE/hdf5/cube
-# fi
 
 # make arp jobs
-python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --psana $PSANA --ffb $FFB
+if [ $QUEUE -ne 0 ]; then
+    python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
+fi

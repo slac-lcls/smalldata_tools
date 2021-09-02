@@ -57,7 +57,7 @@ MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the 
 # update FFB repo and get it on psana
 git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch=updateInstead # necessary to be able to push ffb repo
 git -C $FFB_BASE/smalldata_tools add .
-git -C $FFB_BASE/smalldata_tools commit -m "Before going offline"
+git -C $FFB_BASE/smalldata_tools commit -m "Going offline"
 git -C $FFB_BASE/smalldata_tools push -f
 
 # change jobs definition
