@@ -36,7 +36,7 @@ parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_N
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument("--indirectory", help="directory w/ smallData file if not default")
 parser.add_argument("--outdirectory", help="directory w/ smallData for cube if not same as smallData", default='')
-parser.add_argument("--nevents", help="number of events/bin")
+parser.add_argument("--nevents", help="number of events/bin", default=-1)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 args = parser.parse_args()
@@ -157,7 +157,7 @@ if rank==0:
 
     print('Bin name: {}, bins: {}'.format(binName, binSteps))
 
-    if args.nevents:
+    if args.nevents>0:
         cubeName+='_%sEvents'%args.nevents
     
     for filterName in ana.Sels:
@@ -173,14 +173,14 @@ if rank==0:
         # do not use nEvtsPerBin for now, it's not correctly implemented
         if config.laser:
             #request 'on' events base on input filter (add optical laser filter)
-            anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=-10, dirname=args.outdirectory) 
+            anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, dirname=args.outdirectory) 
             comm.bcast('Work!', root=0)
             time.sleep(1) # is this necessary? Just putting it here in case...
             #request 'off' events base on input filter (switch optical laser filter, drop tt
-            anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=-10, dirname=args.outdirectory) 
+            anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, dirname=args.outdirectory) 
         else:
             # no laser filters
-            anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=10, dirname=args.outdirectory)
+            anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
     comm.bcast('Go home!', root=0)
         
     if config.save_tiff is True:
