@@ -1,0 +1,163 @@
+#!/bin/bash
+
+usage()
+{
+cat << EOF
+usage: $0 options
+
+OPTIONS:
+-r run# (NEEDED!)
+-e expname (def: current experiment, example: xppe7815)
+-d directory for output files (default: hdf5/smalldata diretory of specified experiment)
+-i directory for input files (default: hdf5/smalldata diretory of specified experiment)
+-q queue name (default: psanaq if exp specified, psneh(hi)prioq for current exp)
+-n number of events (for testing)
+-s run locally
+EOF
+}
+
+export PATH=$PATH:/reg/g/xpp/scripts:/reg/neh/operator/xppopr/bin
+CURREXP=`get_curr_exp`
+
+RUN=-1
+#
+EXP='xxx'
+QUEUE=psanaq
+DIRNAME='xxx'
+NUMBER_OF_EVENTS=0
+SINGLEJOB=0
+DAYSHIFT=1
+QUEUEREQ='xxx'
+
+while getopts "e:d:r:n:q:hs" OPTION
+do
+    case $OPTION in
+	h)
+	    usage
+	    exit 1
+	    ;;
+	r) 
+	    RUN=$OPTARG
+	    ;;
+	e)
+	    EXP=$OPTARG
+	    ;;
+	n)
+	    NUMBER_OF_EVENTS=$OPTARG
+	    ;;
+	q)
+	    QUEUEREQ=$OPTARG
+	    ;;
+	d)
+	    DIRNAME=$OPTARG
+	    ;;
+	s)
+	    SINGLEJOB=1
+	    ;;
+	?)
+	    usage
+	    exit
+	    ;;
+	esac
+done
+
+#currently ongoing exp
+if [ $EXP == 'xxx' ]; then
+    QUEUE=psnehprioq
+    HOUR=`date +"%H"`
+    ISDAY=0
+    if [ $HOUR -ge 9 ]; then ISDAY=1; fi
+    if [ $HOUR -ge 21 ]; then ISDAY=0; fi
+    if [ $DAYSHIFT==1 -a $ISDAY==1 ]; then
+	QUEUE=psnehhiprioq
+    fi
+    if [ $DAYSHIFT==0 -a $ISDAY==0 ]; then
+	QUEUE=psnehhiprioq
+    fi
+fi    
+
+if [ $QUEUEREQ != 'xxx' ]; then
+    QUEUE=$QUEUEREQ
+fi
+
+if [ $RUN -le 0 ]; then
+    echo 'we need a run as input, use -r option'
+    exit
+fi
+
+RUN=`echo $RUN |  sed 's/^0*//'`
+RUN=`printf "%0*d\n" 4 $RUN`
+
+echo 'will use queue: ' $QUEUE
+
+ARGSTR=''
+if [ $NUMBER_OF_EVENTS -ne 0 ]; then
+    ARGSTR=$ARGSTR' --nev '$NUMBER_OF_EVENTS
+fi
+if [ $EXP != 'xxx' ]; then
+    ARGSTR=$ARGSTR' --exp '$EXP
+else
+    EXP=$CURREXP
+fi
+
+if [[ $EXP =~ 'xpp' ]]; then
+    HUTCH='xpp'
+else
+    HUTCH='xcs'
+    if [ $QUEUE == 'psnehhiprioq' ]; then
+	QUEUE='psfehhiprioq';
+    fi
+    if [ $QUEUE == 'psnehprioq' ]; then
+	QUEUE='psfehprioq';
+    fi
+fi
+
+BASEDIR=/reg/d/psdm/$HUTCH/$EXP/results
+if [ ! -d  $BASEDIR ]; then
+    BASEDIR=/reg/d/psdm/$HUTCH/$EXP/res
+fi
+LOGDIR=$BASEDIR/logs
+if [ $DIRNAME != 'xxx' ]; then
+    ARGSTR=$ARGSTR' --dir '$DIRNAME
+    LOGDIR=$DIRNAME/logs
+    if [ ! -d  $DIRNAME ]; then
+	echo 'now we will make ' $DIRNAME
+	mkdir $DIRNAME
+    fi
+fi
+
+if [ ! -d  $LOGDIR ]; then
+    echo 'now we will make '$LOGDIR
+    mkdir $LOGDIR
+fi
+
+source /reg/g/pcds/setup/pathmunge.sh
+LDAP='./'
+pythonpathmunge $LDAP
+pythonpathmunge $LDAP'/smalldata_tools'
+
+PYTHON_EXE='./examples/SaveAvImage.py'
+
+# necessary because xarray check if it can use the set DISPLAY variable and
+# that is not possible when in batch mode but it is also absolutely not needed
+unset DISPLAY
+
+
+if [ $SINGLEJOB -eq 1 ]; then
+    echo 'so I will run a new job for run ' $RUN
+    CMD=`echo python $PYTHON_EXE \
+	$ARGSTR \
+        --run $RUN`
+else
+    CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
+    echo 'so I will submit a new job for run ' $RUN ' now....' $CREATE_TIME
+    CMD=`echo bsub -q $QUEUE -o $LOGDIR/avImage_$EXP\_$RUN\_%J.out \
+        python $PYTHON_EXE \
+	$ARGSTR \
+        --run $RUN`
+fi
+
+source /reg/g/psdm/bin/conda_setup ""
+
+echo $CMD
+$CMD

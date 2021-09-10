@@ -71,16 +71,13 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
-#
-#use the old analysis release to set up with old mpi-parallel hdf5 writing.
-#
-source /reg/g/psdm/etc/psconda.sh.old
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
+source /reg/g/psdm/etc/psconda.sh -py3
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
 #run all imports on batch node before calling mpirun on that node.
-$ABS_PATH/preimport.py
+#$ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 10 ]; then
-    $ABS_PATH/MakeCube.py $@
+    python -u $ABS_PATH/letsCube.py $@
 else
-    mpirun $ABS_PATH/MakeCube.py $@
+    mpirun python -u $ABS_PATH/letsCube.py $@
 fi

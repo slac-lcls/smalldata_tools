@@ -8,9 +8,8 @@ import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
-parser.add_argument('--psana', help='Setup psana job', type=bool, default=0)
-parser.add_argument('--ffb', help='Setup ffb job', type=bool, default=0)
-parser.add_argument('--queue', help='Queue on the ffb', type=str, default='ffbh3q')
+parser.add_argument('--queue', help='Queue on which to run the jobs', type=str, default='psanaq')
+parser.add_argument('--cube', help='Make cube job as well', type=bool, default=0)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -18,26 +17,32 @@ hutch = exp[:3].lower()
 FFB_BASE = Path("/cds/data/drpsrcf/{}/{}/scratch".format(hutch, exp))
 PSANA_BASE = Path("/cds/data/psdm/{}/{}".format(hutch, exp))
 
-if args.psana and not args.ffb:
-    job_def = {
-        'name': 'smd',
-        'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh'),
-        'trigger': 'MANUAL',
-        'location': 'SLAC',
-        'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
-        }
-elif args.ffb:
-    job_def = {
-        'name': 'smd',
-        'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh'),
-        'trigger': 'START_OF_RUN',
-        'location': 'SRCF_FFB',
-        'parameters': '--queue {} --norecorder --postRuntable --cores 60 --wait'.format(args.queue)
-        }
+if 'ffb' in args.queue:
+    location = 'SRCF_FFB'
+    cores = 60
 else:
-    job_def = None
+    location = 'SLAC'
+    cores = 12
 
-if job_def is not None:
+job_defs = []
+job_defs.append( {
+    'name': 'smd',
+    'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh'),
+    'trigger': 'START_OF_RUN',
+    'location': location,
+    'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
+    } )
+
+if cube:
+    job_defs.append( {
+        'name': 'cube',
+        'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh'),
+        'trigger': 'MANUAL',
+        'location': location,
+        'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
+        } )
+
+for job_def in job_defs:
     krbheaders = KerberosTicket('HTTP@pswww.slac.stanford.edu').getAuthHeaders()
     ws_url = 'https://pswww.slac.stanford.edu/ws-kerb/lgbk/lgbk/{}/ws/create_update_workflow_def'.format(exp)
     r = requests.post(ws_url, headers=krbheaders, json=job_def)

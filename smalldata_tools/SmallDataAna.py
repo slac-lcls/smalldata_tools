@@ -43,9 +43,9 @@ except:
 from bokeh.layouts import column
 import sys
 try:
-    basestring
+    str
 except NameError:
-    basestring = str
+    str = str
 
 #including xarray means that you have to unset DISPLAY when submitting stuff to batch
 import xarray as xr
@@ -134,7 +134,7 @@ class Cube(object):
                            SmallDataAna_psana class
                   example: epixDict = {'source':'epix_2','full':1,'image':1}
         """
-        if isinstance(tVar, basestring):
+        if isinstance(tVar, str):
             self.targetVars.append(tVar)
         elif isinstance(tVar, list):
             for tv in tVar:
@@ -149,7 +149,7 @@ class Cube(object):
             rather than the sum. Will be returned as extra dictionary in addition 
             to the binned xArray
         """
-        if isinstance(tVar, basestring):
+        if isinstance(tVar, str):
             self.addIdxVars.append(tVar)
         elif isinstance(tVar, list):
             for tv in tVar:
@@ -272,7 +272,7 @@ class SmallDataAna(object):
         self.cubes = {}
         self.jobIds=[]
         if intable is not None:
-            if isinstance(intable, basestring) and path.isfile(intable):
+            if isinstance(intable, str) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
                 print('pass unknown input parameter or file cannot be found: ',intable)
@@ -638,7 +638,7 @@ class SmallDataAna(object):
                     continue
                 if areaDet and key.find('Cfg')>=0:
                     continue
-                if isinstance(name, basestring) and key.find(name)<0:
+                if isinstance(name, str) and key.find(name)<0:
                     continue
                 thiskey=''
                 if not isinstance(node, tables.group.Group):
@@ -658,7 +658,7 @@ class SmallDataAna(object):
                             keyShapes.append(shapeFromKey_h5(fh5, thiskey))
 
         for thiskey,thiskeyshape in zip(keys,keyShapes):
-            if isinstance(name, basestring) and thiskey.find(name)<0:
+            if isinstance(name, str) and thiskey.find(name)<0:
                 continue
             if areaDet and thiskey.find('Cfg')>=0:
                 continue
@@ -697,7 +697,7 @@ class SmallDataAna(object):
         if scanVar is not None and scanVar!='':
             isScan=True
         if isScan:
-            if isinstance(scanVar, basestring):
+            if isinstance(scanVar, str):
                 scanVar=[scanVar]
             nPoints=[]
             for thisScanVar in scanVar:
@@ -752,7 +752,7 @@ class SmallDataAna(object):
         if varmin!=varmax:
             self.Sels[useFilter].addCut(varName, varmin, varmax)
         else:
-            if isinstance(varName, basestring):
+            if isinstance(varName, str):
                 if varName in self.Sels:
                     self.Sels[useFilter].add(self.Sels[varName])
                 else:
@@ -907,7 +907,7 @@ class SmallDataAna(object):
         else:
             sigROI=[]
 
-        if isinstance(useFilter,basestring):
+        if isinstance(useFilter,str):
             Filter = self.getFilter(useFilter)
         else:
             Filter = useFilter
@@ -1059,7 +1059,7 @@ class SmallDataAna(object):
 
         isDaqDelayScan=False
         scanVar = self.getScanName()
-        if isinstance(scanVar,basestring):
+        if isinstance(scanVar,str):
             scanVar=[scanVar]
         for scanVN in scanVar:
             if scanVN.find('lxt')>=0:
@@ -1126,7 +1126,7 @@ class SmallDataAna(object):
     def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None, plotMultidimMean=False):
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
-        if isinstance(plotvar, basestring) or (len(plotvar)==2 and (isinstance(plotvar[0], basestring) and not isinstance(plotvar[1], basestring))):
+        if isinstance(plotvar, str) or (len(plotvar)==2 and (isinstance(plotvar[0], str) and not isinstance(plotvar[1], str))):
             if len(numBins)!=1:
                 print('bin# needs to be of same dimensions as plotvariables (1d)')
                 return
@@ -1299,7 +1299,7 @@ class SmallDataAna(object):
         #get the scan variable & time correct if desired
         scanVarName = self.getScanName()
         scanValues=[]
-        if isinstance(scanVarName, basestring):
+        if isinstance(scanVarName, str):
             scanVarName=[scanVarName]
         for scanVN in scanVarName:
             if scanVN.find('lxt')>=0 or scanVN=='':
@@ -1332,7 +1332,7 @@ class SmallDataAna(object):
 
         #have no input at all, assume we have unique values in scan. If not, return empty list 
         scanVarName, scan =  self.getScanValues()
-        if isinstance(scanVarName, basestring):
+        if isinstance(scanVarName, str):
             scanVarName=[scanVarName]
         BinList=[]
         if len(bindef)==0:
@@ -1399,7 +1399,7 @@ class SmallDataAna(object):
         if sig!='':
             sigVal = self.get1dVar(sig)
             for sigp in sig:
-                if isinstance(sigp,basestring):
+                if isinstance(sigp,str):
                     plotVar+=sigp.replace('/','__')
                 elif isinstance(sigp,list):
                     for bound in sigp:
@@ -1412,7 +1412,7 @@ class SmallDataAna(object):
             i0Val = self.get1dVar(i0)
             plotVar+='/'
             for i0p in i0:
-                if isinstance(i0p,basestring):
+                if isinstance(i0p,str):
                     plotVar+=i0p.replace('/','__')
                 elif isinstance(i0p,list):
                     for bound in i0p:
@@ -1427,7 +1427,7 @@ class SmallDataAna(object):
         #get the binning variable here so that points where this is not good can be thrown out.
         if binVar is not None:
             if binVar[0] != 'delay':
-                if isinstance(binVar, basestring): binVar=[binVar]
+                if isinstance(binVar, str): binVar=[binVar]
                 binVal = self.get1dVar(binVar[0])
             else:
                 binVal=self.getDelay()
@@ -1704,7 +1704,7 @@ class SmallDataAna(object):
         #now look through targetVars & split out ones not in xarray/hdf5
         targetVarsLocal = []
         for tVar in cube.targetVars:
-            if isinstance(tVar, basestring):
+            if isinstance(tVar, str):
                 if tVar.split(':')[0]=='droplet': #ex: droplet:epix_2/droplet:image
                     dropBaseName = tVar.split(':')[1]
                     dropDet = dropBaseName.split('/')[0]
@@ -1985,7 +1985,7 @@ class SmallDataAna(object):
 
         evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
         evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
-        evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])       
+        evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ]) 
 
         for thisIdxVar in cube.addIdxVars:
             varData = self.getVar(thisIdxVar,cubeFilter)
@@ -2013,7 +2013,7 @@ class SmallDataAna(object):
                 
         cubeIdxData = evtIDXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False)
         keys = cubeIdxData.groups.keys()
-        keys.sort()
+        #keys.sort()
 
         fidArray=[]
         timeArray=[]

@@ -86,8 +86,8 @@ set -- "${POSITIONAL[@]}"
 #Set to 1 by default
 CORES=${CORES:=1}
 QUEUE=${QUEUE:='psanaq'}
-# QUEUE=${QUEUE:='ffbh3q'}
-# QUEUE=${QUEUE:='psfehq'}
+#QUEUE=${QUEUE:='ffbh3q'}
+#QUEUE=${QUEUE:='psfehq'}
 # select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
@@ -110,5 +110,4 @@ if [ -v INTERACTIVE ]; then
     exit 0
 fi
 
-#echo sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
 sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@

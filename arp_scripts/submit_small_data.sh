@@ -84,7 +84,7 @@ set -- "${POSITIONAL[@]}"
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
-EXP="${EXPERIMENT:=$EXP}" # look for the environment variable for if submitted from the elog
+EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo"
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
@@ -93,17 +93,17 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     conda deactivate
     conda activate ps-4.2.6
     PYTHONEXE=smd2_producer.py
+    export PS_SRV_NODES 1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
     source /reg/g/psdm/etc/psconda.sh -py3
-    PYTHONEXE=smalldata_producer.py
+    PYTHONEXE=smd_producer.py
 fi
 
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
 #run all imports on batch node before calling mpirun on that node.
-$ABS_PATH/preimport.py # do we still need that?
-export PS_SRV_NODES 1 # what is that?
+#$ABS_PATH/preimport.py # do we still need that?
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
     python -u $ABS_PATH/$PYTHONEXE $@
 else
