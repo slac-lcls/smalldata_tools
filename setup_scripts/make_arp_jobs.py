@@ -9,7 +9,7 @@ import os
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--queue', help='Queue on which to run the jobs', type=str, default='psanaq')
-parser.add_argument('--cube', help='Make cube job as well', type=bool, default=0)
+parser.add_argument('--cube', help='Make cube job as well', type=int, default=0)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -33,7 +33,7 @@ job_defs.append( {
     'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
     } )
 
-if cube:
+if args.cube>0:
     job_defs.append( {
         'name': 'cube',
         'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh'),

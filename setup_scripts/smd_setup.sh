@@ -7,16 +7,16 @@ $(basename "$0"):
 	Script to setup smalldata_tools for an experiment.
 	
 	OPTIONS:
-		-h|--help
-			Definition of options
-		-e
-			Experiment name (i.e. cxilr6716)
+        -h|--help
+            Definition of options
+        -e
+            Experiment name (i.e. cxilr6716)
         -q
             Queue. Jobs are not setup if a queue is not given
         --nopsana
             Do not setup smalldata on psana.
         --noffb
-        	Do not setup smalldata on the FFB.
+            Do not setup smalldata on the FFB.
         --cube
             Make cube job
 EOF
@@ -59,8 +59,11 @@ do
     esac
 done
 
+
 FFB=${FFB:=1}
 PSANA=${PSANA:=1}
+QUEUE=${QUEUE:=psanaq}
+CUBE=${CUBE:=0}
 MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
@@ -101,13 +104,13 @@ if [ $PSANA -eq 1 ]; then
     if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
         echo "Smalldata_tools already on PSANA"
     else
-        git clone ssh://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
+        git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
         git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch updateInstead
     fi
     echo "... Done."
 fi
-echo "Sleep 2"
-sleep 2
+echo "Sleep 1"
+sleep 1
 # On FFB
 if [ $FFB -eq 1 ]; then
     echo "Cloning smalldata to FFB experiment directory..."
@@ -119,7 +122,7 @@ if [ $FFB -eq 1 ]; then
             git clone $PSANA_BASE/results/smalldata_tools $FFB_BASE/smalldata_tools
         else
             echo "Cloning from the remote."
-            git clone ssh://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
+            git clone https://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
         fi
     fi
     echo "... Done."
@@ -134,6 +137,6 @@ if [ $FFB -eq 1 ]; then
 fi
 
 # make arp jobs
-if [ $QUEUE -ne 0 ]; then
+if [ $QUEUE != "0" ]; then
     python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
 fi
