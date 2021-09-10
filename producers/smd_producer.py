@@ -75,7 +75,7 @@ def define_dets(run):
                 common_mode=0 # no cm
                 #common_mode=-1 # raw
             else:
-                common_mode=0 #no common mode
+                common_mode=None #default common mode
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
             
             # Analysis functions
