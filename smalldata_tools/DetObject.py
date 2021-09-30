@@ -971,7 +971,7 @@ class Epix10kObject(TiledCameraObject):
             pass
 
 class Epix10k2MObject(TiledCameraObject): 
-    def __init__(self, det,env,run,**kwargs):
+    def __init__(self, det, env, run, **kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
         self._common_mode_list = [84, 81, 82, 85, 80, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
@@ -985,7 +985,7 @@ class Epix10k2MObject(TiledCameraObject):
 
         configs = ['Config10ka2MV1', 'Config10ka2MV2', 'Config10kaQuadV1']
         for config in configs:
-            epixCfg = ds.env().configStore().get(getattr(ps.Epix, config), det.source)
+            epixCfg = env.configStore().get(getattr(psana.Epix, config), det.source)
             if epixCfg is not None:
                 print('Loaded config {}'.format(config))
                 break
