@@ -21,16 +21,16 @@ import psana
     
 #epix10k: thermisotr value to temp in C
 def getThermistorTemp(x):
-  if x==0: return 0.
-  u = x/16383.0 * 2.5
-  i = u / 100000
-  r = (2.5 - u)/i
-  try:
-    l = np.log(r/10000)
-    t = 1.0 / (3.3538646E-03 + 2.5654090E-04 * l + 1.9243889E-06 * (l*l) + 1.0969244E-07 * (l*l*l))
-    return t - 273.15
-  except:
-    return np.nan
+    if x==0: return 0.
+    u = x/16383.0 * 2.5
+    i = u / 100000
+    r = (2.5 - u)/i
+    try:
+        l = np.log(r/10000)
+        t = 1.0 / (3.3538646E-03 + 2.5654090E-04 * l + 1.9243889E-06 * (l*l) + 1.0969244E-07 * (l*l*l))
+        return t - 273.15
+    except:
+        return np.nan
 
 #this class is a container which will hold the event based data. It will be created in the getData step.            
 class event(object):
@@ -294,8 +294,9 @@ class DetObjectClass(object):
             try:
                 retData=func.process(self.evt.dat)
                 self.evt.__dict__['_write_%s'%func._name] = retData
-            except:
+            except Exception as E:
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
+                print('Error message: {}'.format(E))
 
     def processSums(self):
         for key in self._storeSum.keys():

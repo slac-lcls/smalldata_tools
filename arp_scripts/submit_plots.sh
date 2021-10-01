@@ -53,8 +53,8 @@ do
 			PEDESTAL=true
 			shift
 			;;
-                 *)
-                        POSITIONAL+=("$1")
+        *)
+            POSITIONAL+=("$1")
 			shift
 			;;                     
 	esac
@@ -69,7 +69,7 @@ export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source /reg/g/psdm/etc/psconda.sh -py3
 #conda activate ana-4.0.16-py3
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/examples/g`
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/legacy/g`
 PLOT_PY=DataqualityPlots
 if [[ -v PEDESTAL ]]; then
     PLOT_PY=PedestalPlot
