@@ -138,5 +138,6 @@ fi
 
 # make arp jobs
 if [ $QUEUE != "0" ]; then
+    source /reg/g/psdm/etc/psconda.sh -py3
     python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
 fi

@@ -61,6 +61,7 @@ git -C $FFB_BASE/smalldata_tools commit -m "Going offline"
 git -C $FFB_BASE/smalldata_tools push -f
 
 # change jobs definition
+source /reg/g/psdm/etc/psconda.sh -py3
 python $MYDIR/update_arp_jobs.py --experiment $EXP
 
 
