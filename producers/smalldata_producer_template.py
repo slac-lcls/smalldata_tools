@@ -100,9 +100,6 @@ def getFullImage(run):
 
 # 6) autocorrelation
 def getAutocorrParams(run):
-    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
-    See roi_rebin.py for more info
-    """
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}

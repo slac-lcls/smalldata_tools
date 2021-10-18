@@ -44,24 +44,6 @@ def getROIs(run):
         ret_dict['epix_2'] = roi_dict
     return ret_dict
 
-# 1) REGIONS OF INTEREST
-def getAutocorrParams(run):
-    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
-    See roi_rebin.py for more info
-    """
-    if isinstance(run,str):
-        run=int(run)
-    ret_dict = {}
-    if run>0:
-        autocorr_dict = {}
-#         autocorr_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
-        autocorr_dict['mask'] = '/cds/home/e/espov/dataAna/mask_epix.npy' # path to mask saved as a npy file. Can define multiple mask if 3D.
-        autocorr_dict['thresADU'] = [72.,1e6]
-        autocorr_dict['save_range'] = [70,50] # range to save around the autcorrelation center
-        autocorr_dict['save_lineout'] = True # save horiz / vert lineout through center instead of autocorr array
-        ret_dict['epix_2'] = autocorr_dict
-    return ret_dict
-
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
