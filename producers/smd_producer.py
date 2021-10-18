@@ -96,7 +96,7 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
-            # Photon count
+            # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
             # SVD waveform analysis
