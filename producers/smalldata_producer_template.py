@@ -253,6 +253,7 @@ from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat
+from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
