@@ -59,6 +59,7 @@ do
     esac
 done
 
+umask 002
 
 FFB=${FFB:=1}
 PSANA=${PSANA:=1}

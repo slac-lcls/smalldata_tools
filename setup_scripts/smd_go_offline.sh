@@ -66,4 +66,4 @@ python $MYDIR/update_arp_jobs.py --experiment $EXP
 
 
 # copy h5 files to offline
-#cp -uv $FFB_BASE/hdf5/smalldata/*.h5 $PSANA_BASE/hdf5/smalldata
+cp -uv $FFB_BASE/hdf5/smalldata/*.h5 $PSANA_BASE/hdf5/smalldata

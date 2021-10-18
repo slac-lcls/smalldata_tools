@@ -29,7 +29,23 @@ from requests.auth import HTTPBasicAuth
 ##########################################################
 
 # 1) REGIONS OF INTEREST
-def getROIs(run):
+# def getROIs(run):
+#     """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
+#     See roi_rebin.py for more info
+#     """
+#     if isinstance(run,str):
+#         run=int(run)
+#     ret_dict = {}
+#     if run>0:
+#         roi_dict = {}
+#         roi_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
+#         roi_dict['writeArea'] = True
+#         roi_dict['thresADU'] = None
+#         ret_dict['epix_2'] = roi_dict
+#     return ret_dict
+
+# 1) REGIONS OF INTEREST
+def getAutocorrParams(run):
     """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
     See roi_rebin.py for more info
     """
@@ -37,11 +53,13 @@ def getROIs(run):
         run=int(run)
     ret_dict = {}
     if run>0:
-        roi_dict = {}
-        roi_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
-        ret_dict['epix_2'] = roi_dict
+        autocorr_dict = {}
+#         autocorr_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
+        autocorr_dict['mask'] = '/cds/home/e/espov/dataAna/mask_epix.npy' # path to mask saved as a npy file. Can define multiple mask if 3D.
+        autocorr_dict['thresADU'] = [72.,1e6]
+        autocorr_dict['save_range'] = [70,50] # range to save around the autcorrelation center
+        autocorr_dict['save_lineout'] = True # save horiz / vert lineout through center instead of autocorr array
+        ret_dict['epix_2'] = autocorr_dict
     return ret_dict
 
 
@@ -62,6 +80,10 @@ def define_dets(run):
         phot = getPhotonParams(run)
     except:
         phot = []
+    try:
+        auto = getAutocorrParams(run)
+    except:
+        auto = []
     try:
         svd = getSvdParams(run)
     except:
@@ -92,6 +114,9 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
+            # Photon count
+            if detname in auto:
+                det.addFunc(Autocorrelation(**auto[detname]))
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
@@ -166,6 +191,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
+from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)

@@ -21,7 +21,7 @@ r = requests.get(ws_url, headers=krbheaders)
 job_defs = r.json()['value']
 
 for job in job_defs:
-    if job['name']==smd and job['location']=='SRCF_FFB':
+    if job['name']=='smd' and job['location']=='SRCF_FFB':
         print('MODIFYING JOB {}'.format(job))
         id = job['_id']
         job_def = {
@@ -37,7 +37,7 @@ for job in job_defs:
         r.raise_for_status()
         print('\nJOB MODIFICATION LOG: {}'.format(r.json()))
 
-    elif job['name']==cube and job['location']=='SRCF_FFB':
+    elif job['name']=='cube' and job['location']=='SRCF_FFB':
         print('MODIFYING JOB {}'.format(job))
         id = job['_id']
         job_def = {
