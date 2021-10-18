@@ -29,20 +29,20 @@ from requests.auth import HTTPBasicAuth
 ##########################################################
 
 # 1) REGIONS OF INTEREST
-# def getROIs(run):
-#     """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
-#     See roi_rebin.py for more info
-#     """
-#     if isinstance(run,str):
-#         run=int(run)
-#     ret_dict = {}
-#     if run>0:
-#         roi_dict = {}
-#         roi_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
-#         roi_dict['writeArea'] = True
-#         roi_dict['thresADU'] = None
-#         ret_dict['epix_2'] = roi_dict
-#     return ret_dict
+def getROIs(run):
+    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
+    See roi_rebin.py for more info
+    """
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        roi_dict = {}
+        roi_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
+        roi_dict['writeArea'] = True
+        roi_dict['thresADU'] = None
+        ret_dict['epix_2'] = roi_dict
+    return ret_dict
 
 # 1) REGIONS OF INTEREST
 def getAutocorrParams(run):
