@@ -454,27 +454,100 @@ class SmallDataAna_psana(object):
                     print('Returned event is None, skip')
                     continue
                 print((evt.get(psana.EventId)).fiducials())
-
         return times
+    
+    
+    def pixelHistogram(self, detname=None, numEvts=100, nBins=180, useFilter=None, nSkip=0,minIpm=-1., common_mode=None, std=False, median=False, printFid=False,useMask=True, uniform=False, returnEnv=False):
+        """ Return a pixel histogram
+        
+        Arguments:
+            detname: detector name
+            numEvts: number of events to be used
+            nSkip: number of events to be skipped
+            common_mode: calibration applied, including optional correction for common mode noise. Default choice will be used if none are passed if not supplied
+            useFilter: use a filter defined using anaps
+            uniform: pick events respecting nSkip&useFilter across whole run (default: False, pick first numEvts events)
+            printFid: print the picked fiducials (debug)
+        """
+        
+        if detname=='None':
+            detname = self._getDetName()
+            if isinstance(detname, list):
+                detsString='detectors in event: \n'
+                for alias in detname:
+                    detsString+=alias+', '
+                print(detsString)
+                detname = raw_input("Select detector to get detector info for?:\n")
+                
+        if not detname in self.__dict__.keys() or self.__dict__[detname].common_mode!=common_mode:
+            self.addDetInfo(detname=detname, common_mode=common_mode)
+        det=self.__dict__[detname]
+        
+        imgAr = []
+        run = self.dsIdxRun
+        times = self._getEventTimestamps(numEvts=numEvts, useFilter=useFilter, nSkip=nSkip, uniform=uniform, printFid=printFid)
+        envDict={'timestamp':[]}
+        
+        data = []
+        for tm in times[:10]:
+            if numEvts<=0:
+                break
+            try:
+                evt=run.event(tm)
+            except:
+                print('Could not get this event, skip ')
+                continue
+            if evt is None:
+                print('Returned event is None, skip')
+                continue
 
+            det.getData(evt)
+            data.append(det.evt.dat.copy())
+        data = np.asarray(data).ravel()
+        
+        bmin, bmax = np.percentile(data,0.1), 2.5*np.percentile(data,99.5)
+        bin_centers = np.linspace(bmin,bmax,nBins)
+        hist, bin_edges = np.histogram(data, bins=bin_centers)
+        
+        for tm in times[10:]:
+            #print('numEvts ',numEvts)
+            #this loop here is used for the minIpm option when no smallData file is available.
+            if numEvts<=0:
+                break
+            try:
+                evt=run.event(tm)
+            except:
+                print('Could not get this event, skip ')
+                continue
+            if evt is None:
+                print('Returned event is None, skip')
+                continue
+
+            det.getData(evt)
+            data = det.evt.dat.copy()
+            hist+=np.histogram(data, bins=bin_centers)[0]
+        return hist, bin_centers, bin_edges
+
+    
     def AvImage(self, detname='None', numEvts=100, thresADU=0., thresRms=0., useFilter=None, nSkip=0,minIpm=-1., common_mode=None, std=False, median=False, printFid=False,useMask=True, uniform=False, returnEnv=False):
         """
         make an average (summed) image for a given detector
-        if a detector ame is not passed, you will be presented with a choice.
-        argument:
-        numEvts: number of events to be used
-        nSkip: number of events to be skipped
-        common_mode: calibration applied, including optional correction for common mode noise. Default choice will be used if none are passed if not supplied
-        thresADU: threshold  each images at thresADU (in units after calibration)
-        thresRms: threshhold in multtiples of pixels noise. Currently does not work for gain switching detectors.
-        median: get the median, rather than mean image
-        std: get the standard deviation as image, rather than mean image
-        useMask: apply the user mask to the average image.
-        useFilter: use a filter definied using anaps
-        uniform: pick events respecting nSkip&useFilter across whole run (default: False, pick first numEvts events)
-        printFid: print the picked fiducials (debug)
-        minIpm: require a minimal IPM value (if hdf5 file needed to use a filter does not exist). Currently IPM setup only (not wave8)!
-        returnEnv: return dictionary of timestamps & enviroment variables if detector provides them
+        if a detector name is not passed, you will be presented with a choice.
+        
+        Arguments:
+            numEvts: number of events to be used
+            nSkip: number of events to be skipped
+            common_mode: calibration applied, including optional correction for common mode noise. Default choice will be used if none are passed if not supplied
+            thresADU: threshold  each images at thresADU (in units after calibration)
+            thresRms: threshhold in multtiples of pixels noise. Currently does not work for gain switching detectors.
+            median: get the median, rather than mean image
+            std: get the standard deviation as image, rather than mean image
+            useMask: apply the user mask to the average image.
+            useFilter: use a filter definied using anaps
+            uniform: pick events respecting nSkip&useFilter across whole run (default: False, pick first numEvts events)
+            printFid: print the picked fiducials (debug)
+            minIpm: require a minimal IPM value (if hdf5 file needed to use a filter does not exist). Currently IPM setup only (not wave8)!
+            returnEnv: return dictionary of timestamps & enviroment variables if detector provides them
         """
         if not isinstance(detname, basestring):
             print('please give parameter name unless specifying arguments in right order. detname is first')
@@ -2173,7 +2246,7 @@ class SmallDataAna_psana(object):
         if (rank==0):
             print('Variables to be read from xtc: ',myCube.targetVarsXtc)
 
-        if isinstance(nEvtsPerBin, basestring): nEvtsPerBin=int(nEvtsPerBin)
+        if isinstance(nEvtsPerBin, str): nEvtsPerBin=int(nEvtsPerBin)
 
 #         detInData=[]
 #         for k in self.Keys():
@@ -2316,7 +2389,7 @@ class SmallDataAna_psana(object):
                 comm.Abort()
                 
         save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
-        mpi_fun.bin_distribution(bins_info, func=save_fct)
+        sum_data = mpi_fun.bin_distribution(bins_info, func=save_fct)
         t3 = time.time()
 
         print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))

@@ -608,7 +608,7 @@ class SmallDataAna(object):
         """ return list of variables names in data that contain 2d data for each event """
         return self.Keys(inh5 = inh5, printKeys=printKeys, areaDet=True)
 
-    def Keys(self, name=None, inh5 = None, printKeys=False, areaDet=False, cfgOnly=False, returnShape=False):
+    def Keys(self, name=None, inh5=None, printKeys=False, areaDet=False, cfgOnly=False, returnShape=False):
         """
         return list of available keys, allowing for filter to only print subsets/
         returnShape=True will fill the initial _fields dict
