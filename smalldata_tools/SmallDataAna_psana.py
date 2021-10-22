@@ -2555,7 +2555,7 @@ class SmallDataAna_psana(object):
         rename_reduceRandomVar(outFileName)
         return
 
-    def broadcast_xtc_dets(self, cubeName):
+    def _broadcast_xtc_dets(self, cubeName):
         """ Sends the xtc det info to worker so that they can instantiate the DetObjects. Most
         of it is legacy from the old cube.
         """
