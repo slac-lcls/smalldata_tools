@@ -49,12 +49,9 @@ do
 unset PYTHONPATH
 unset LD_LIBRARY_PATH
 	    
-source /reg/g/psdm/etc/psconda.sh
-#source /reg/g/psdm/sw/conda1/manange/psconda.sh -py3
-##if special release is needed
-conda activate ana-4.0.15
+source /reg/g/psdm/etc/psconda.sh -py3
 
-LDAP='./examples'
+LDAP='./producers'
 
 if [ $RUN -le 0 ]; then
     CMD="%run $LDAP/LoadSmallDataAna.py"
