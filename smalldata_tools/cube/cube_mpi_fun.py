@@ -99,7 +99,7 @@ class BinWorker(object):
         for det_info in self.targetVarsXtc:
             try:
                 detname = det_info['source']
-                cm = det_info.get('common_monde',0)
+                cm = det_info.get('common_monde',None)
                 det = DetObject(detname, self.dsIdx.env(), self.run, common_mode=cm, name=detname)
                 self.dets.append(det)
                 # add detector analysis function (only support full image for now)
