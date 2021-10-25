@@ -165,7 +165,8 @@ if rank==0:
             cubeName = cubeName+'_'+filterName
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
-    anaps.broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list. Only filters might change.
+
+    anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
     for ii,cubeName in enumerate(ana.cubes):
         print('Cubing {}'.format(cubeName))
