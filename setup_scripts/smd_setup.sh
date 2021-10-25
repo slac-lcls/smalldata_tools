@@ -63,7 +63,7 @@ umask 002
 
 FFB=${FFB:=1}
 PSANA=${PSANA:=1}
-QUEUE=${QUEUE:=psanaq}
+QUEUE=${QUEUE:=0}
 CUBE=${CUBE:=0}
 MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 

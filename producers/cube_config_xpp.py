@@ -5,7 +5,7 @@ def binBoundaries(run):
     if isinstance(run,str):
         run=int(run)
     if run>0:
-        return np.arange(-5.,15.,0.05)
+        return np.arange(-5.,50.,0.2)
     return None
 
 
@@ -14,11 +14,20 @@ def binBoundaries(run):
 # 'filter1' is the standard name and will not be added to the h5 file name.
 filters = [
     ['lightStatus/xray',0.5,1.5,'filter1'],
+<<<<<<< HEAD
     # ['ipm2/sum',3e2,6e4,'filter1'],
     ['ipm3/sum',200,3e3,'filter1'],
     ['tt/FLTPOSFWHM',60,230,'filter1'],
     ['tt/AMPL',0.005,0.19,'filter1']
 #     ['evr/code_41',0.5,1.5,'custom']
+=======
+    # ['ipm2/sum',1000,4e4,'filter1'],
+    ['ipm3/sum',100,3e3,'filter1'],
+    # ['tt/FLTPOS_PS',-0.3,0.3,'filter1'],
+    ['tt/FLTPOSFWHM',60,250,'filter1'],
+    ['tt/AMPL',0.005,0.19,'filter1'],
+    # ['evr/code_41',0.5,1.5,'custom']
+>>>>>>> 8cc04664378b8740160ef3ef2eaf4dace27b30f0
 ]
 
 # Laser on/off
@@ -36,14 +45,14 @@ detDict = {'source':'jungfrau1M',
 varList = ['ipm2/sum','ipm3/sum','diodeU/channels', detDict]
 
 
-# histogram configuration. Usually does not need to be changed (not yet implemented)
-# field: destination in smd, list: [low,high,n] or [n]
+# histogram configuration. Usually does not need to be changed
+# field: destination in smd, list: [low,high,n] or None (then default to some percentile)
 hist_list = {
-    'ipm2/sum': [],
-    'ipm3/sum': [],
-    'tt/FLTPOS_PS': [],
-    'tt/AMPL': [],
-    'tt/FLTPOSFWHM': []
+    'ipm2/sum': [0, 5e4, 70],
+    'ipm3/sum': [0, 5e3, 70],
+    'tt/FLTPOS_PS': [-0.5, 0.5, 70],
+    'tt/AMPL': [0, 0.2, 70],
+    'tt/FLTPOSFWHM': [0, 300, 70]
 }
 
 
