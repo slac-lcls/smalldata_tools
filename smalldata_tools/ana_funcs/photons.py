@@ -29,7 +29,8 @@ class photonFunc(DetObjectFunc):
         self._name = kwargs.get('name','photon')
         super(photonFunc, self).__init__(**kwargs)
         self.ADU_per_photon = kwargs.get('ADU_per_photon',154)
-        self.thresADU = kwargs.get('thresADU',0.9)
+        self.thr_fraction = kwargs.get('thr_fraction',0.9)
+        self.thresADU = kwargs.get('thresADU',None)
         self._mask = kwargs.get('mask',None)
         print('photon init mask ',self._mask)
 
@@ -45,6 +46,8 @@ class photonFunc(DetObjectFunc):
         convert image from ADU to (fractional) photons
         #apply the ROI if applicable (to both image&mask)
         """
+        if self.thresADU is not None:
+            image[image<self.thresADU]=0
         image = image/self.ADU_per_photon
         return image
 
@@ -58,13 +61,15 @@ class photonFunc(DetObjectFunc):
         locMask = self._mask
         #photons_nda_nomask = photons(fimage, np.ones_like(self._mask),thr_fraction=self.thresADU)
         #note: this works on tiled detectors.
-        photons_nda = photons(fimage, locMask)
+        photons_nda = photons(fimage, locMask,thr_fraction=self.thr_fraction)
+        #photons_nda = photons(fimage, locMask)
 
         #make filling of histogram a function to be run on dict with nphot(ADU?),row,col 
         ret_dict = {'nPhot': photons_nda.sum()}
-        ret_dict['nPhot_mask']=photons_nda[locMask>0].sum() 
+        #ret_dict['nPhot_mask']=photons_nda[locMask>0].sum() 
         #ret_dict = {'pHist': np.histogram(photons_nda.flatten(), np.arange(0,self.nphotMax))[0]}
         #the masked array will _mask_ the 1 in the mask!
+        #given that the mask is used above, it should not do anything...
         self.dat = np.ma.masked_array(photons_nda, mask=(~(locMask.astype(bool))).astype(np.uint8))
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
