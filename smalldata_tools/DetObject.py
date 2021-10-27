@@ -132,6 +132,7 @@ def DetObject(srcName, env, run, **kwargs):
        15: AndOrObject,
        16: AcqirisObject,
        19: RayonixObject,
+       23: FliObject,
        26: JungfrauObject,
        27: ZylaObject,
        28: ControlsCameraObject,
@@ -566,6 +567,25 @@ class AndOrObject(CameraObject):
         self.imgShape = (andorCfg.numPixelsY(), andorCfg.numPixelsX())
         if self.ped is None:
             self.ped = np.zeros([andorCfg.numPixelsY(), andorCfg.numPixelsX()])
+        if self.imgShape != self.ped.shape:            
+            print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
+            if self.common_mode != -1:
+                print('We will use the raw data for Detector %s in run %s'%(self._name,run))
+            self.common_mode = -1
+        self.imgShape = self.ped.shape
+        if self.x is None:
+            self._get_coords_from_ped()
+        if self.mask is None or self.mask.shape!=self.imgShape:
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
+
+class FliObject(CameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        super(FliObject, self).__init__(det,env,run, **kwargs)
+        fliCfg = env.configStore().get(psana.Fli.ConfigV1,self._src)
+        self.imgShape = (fliCfg.numPixelsY(), fliCfg.numPixelsX())
+        if self.ped is None:
+            self.ped = np.zeros([fliCfg.numPixelsY(), fliCfg.numPixelsX()])
         if self.imgShape != self.ped.shape:            
             print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
             if self.common_mode != -1:
