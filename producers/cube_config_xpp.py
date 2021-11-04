@@ -14,20 +14,11 @@ def binBoundaries(run):
 # 'filter1' is the standard name and will not be added to the h5 file name.
 filters = [
     ['lightStatus/xray',0.5,1.5,'filter1'],
-<<<<<<< HEAD
     # ['ipm2/sum',3e2,6e4,'filter1'],
     ['ipm3/sum',200,3e3,'filter1'],
     ['tt/FLTPOSFWHM',60,230,'filter1'],
     ['tt/AMPL',0.005,0.19,'filter1']
 #     ['evr/code_41',0.5,1.5,'custom']
-=======
-    # ['ipm2/sum',1000,4e4,'filter1'],
-    ['ipm3/sum',100,3e3,'filter1'],
-    # ['tt/FLTPOS_PS',-0.3,0.3,'filter1'],
-    ['tt/FLTPOSFWHM',60,250,'filter1'],
-    ['tt/AMPL',0.005,0.19,'filter1'],
-    # ['evr/code_41',0.5,1.5,'custom']
->>>>>>> 8cc04664378b8740160ef3ef2eaf4dace27b30f0
 ]
 
 # Laser on/off
