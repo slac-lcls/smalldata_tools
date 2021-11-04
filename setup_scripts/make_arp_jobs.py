@@ -20,15 +20,21 @@ PSANA_BASE = Path("/cds/data/psdm/{}/{}".format(hutch, exp))
 if 'ffb' in args.queue:
     location = 'SRCF_FFB'
     cores = 60
+    executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
+    executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
+    trigger = 'START_OF_RUN'
 else:
     location = 'SLAC'
     cores = 12
+    executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
+    executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
+    trigger = 'ALL_FILES_TRANSFERRED'
 
 job_defs = []
 job_defs.append( {
     'name': 'smd',
-    'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh'),
-    'trigger': 'START_OF_RUN',
+    'executable': executable,
+    'trigger': trigger,
     'location': location,
     'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
     } )
@@ -36,7 +42,7 @@ job_defs.append( {
 if args.cube>0:
     job_defs.append( {
         'name': 'cube',
-        'executable': str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh'),
+        'executable': executable_cube,
         'trigger': 'MANUAL',
         'location': location,
         'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
