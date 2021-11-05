@@ -1,0 +1,32 @@
+These scripts are meant to facilitate the management of smalldata_tools on both the anafs and ffb.
+
+Two main scripts are to be used:
+
+1) smd_setup.sh
+    This script will clone smalldata_tools from the current master on the remote repository.
+    OPTIONS:
+        -h|--help
+            Definition of options
+        -e
+            Experiment name (i.e. cxilr6716)
+        -q
+            Queue. Jobs are not setup if a queue is not given
+        --nopsana
+            Do not setup smalldata on psana.
+        --noffb
+            Do not setup smalldata on the FFB.
+        --cube
+            Make cube job
+
+
+2) smd_go_offline.sh
+    This script pushes the changes from the smalldata_tools on the ffb to the smalldata_tools on anafs.
+    Can also copy h5 files over for you.
+    OPTIONS:
+    -h|--help
+        Definition of options
+    -e
+        Experiment name (i.e. cxilr6716)
+    -c|--copy
+        If given, will make procserv to copy h5 files from the ffb to anafs
+

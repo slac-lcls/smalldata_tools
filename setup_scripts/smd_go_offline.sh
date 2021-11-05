@@ -11,6 +11,8 @@ $(basename "$0"):
 			Definition of options
 		-e
 			Experiment name (i.e. cxilr6716)
+        -c|--copy
+            If given, will make procserv to copy h5 files from the ffb to anafs
 EOF
 }
 
