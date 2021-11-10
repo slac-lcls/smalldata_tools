@@ -157,7 +157,7 @@ if rank==0:
 
     print('Bin name: {}, bins: {}'.format(binName, binSteps))
 
-    if args.nevents>0:
+    if int(args.nevents)>0: # not really implemented
         cubeName+='_%sEvents'%args.nevents
     
     for filterName in ana.Sels:
@@ -165,22 +165,23 @@ if rank==0:
             cubeName = cubeName+'_'+filterName
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
-    anaps.broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
+
+    anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
-    for ii,cube in enumerate(ana.cubes):
+    for ii,cubeName in enumerate(ana.cubes):
+        print('Cubing {}'.format(cubeName))
         comm.bcast('Work!', root=0)
         time.sleep(1) # is this necessary? Just putting it here in case...
-        # do not use nEvtsPerBin for now, it's not correctly implemented
         if config.laser:
             #request 'on' events base on input filter (add optical laser filter)
-            anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, dirname=args.outdirectory) 
+            anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
             comm.bcast('Work!', root=0)
             time.sleep(1) # is this necessary? Just putting it here in case...
             #request 'off' events base on input filter (switch optical laser filter, drop tt
-            anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, dirname=args.outdirectory) 
+            anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
         else:
             # no laser filters
-            anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
+            anaps.makeCubeData(cube.cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
     comm.bcast('Go home!', root=0)
         
     if config.save_tiff is True:
@@ -202,7 +203,7 @@ if rank==0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
     
     # Make histogram summary plots
-    utils.make_report(ana, config.hist_list, config.filters, exp, run)
+    tabs = utils.make_report(anaps, config.hist_list, config.filters, config.varList, exp, run)
         
 else:
     work = 1

@@ -428,7 +428,7 @@ Config={'UserDataCfg':userDataCfg}
 small_data.save(Config)
 
 if args.tiff:
-    dirname = '/reg/d/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
+    dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 

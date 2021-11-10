@@ -55,10 +55,13 @@ class ROIFunc(DetObjectFunc):
             try:
                 self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
             except:
-                try:
-                    self.mask = ~(np.ones_like(det.ped).astype(bool))
-                except:
+                if det.ped is None:
                     self.mask = None
+                else:
+                    try:
+                        self.mask = ~(np.ones_like(det.ped).astype(bool))
+                    except:
+                        self.mask = None
         if self.mask is not None:
             try:
                 self.mask = self.applyROI(self.mask)
