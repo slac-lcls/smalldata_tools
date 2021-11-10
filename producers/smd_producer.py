@@ -63,6 +63,10 @@ def define_dets(run):
     except:
         phot = []
     try:
+        auto = getAutocorrParams(run)
+    except:
+        auto = []
+    try:
         svd = getSvdParams(run)
     except:
         svd = []
@@ -92,6 +96,9 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
+            # Autocorrelation
+            if detname in auto:
+                det.addFunc(Autocorrelation(**auto[detname]))
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
@@ -166,6 +173,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
+from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)

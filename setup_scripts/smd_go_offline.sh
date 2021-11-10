@@ -72,6 +72,7 @@ source /reg/g/psdm/etc/psconda.sh -py3
 python $MYDIR/update_arp_jobs.py --experiment $EXP
 
 
+
 # copy h5 files to offline in a procserver
 if [[ $COPY -ne 0 ]]; then
     #cp -uv $FFB_BASE/hdf5/smalldata/*.h5 $PSANA_BASE/hdf5/smalldata
