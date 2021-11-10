@@ -54,6 +54,7 @@ then
     echo "No experiment name given. Exit."
     exit
 fi
+COPY=${COPY:=0}
 
 export HUTCH=${EXP:0:3}
 export FFB_BASE="/reg/data/drpsrcf/$HUTCH/$EXP/scratch"
