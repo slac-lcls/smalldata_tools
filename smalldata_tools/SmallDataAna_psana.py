@@ -2377,7 +2377,7 @@ class SmallDataAna_psana(object):
         nbins = len(bins_info)
         print('****** Total number of bins: {}'.format(nbins))
         #print('****** BINS: {}'.format(bin))
-        print('****** Make big data placeholder dataset')
+        print('****** Make big data placeholder dataset and save det config.')
         dets = []
         for detname in self.detNames:
             det = self.__dict__[detname]
@@ -2387,6 +2387,38 @@ class SmallDataAna_psana(object):
             except Exception as e:
                 logger.warning('Could not make dataset for detector {}. Exit. {}'.format(detname, e))
                 comm.Abort()
+            # save detector config
+            if det.rms is not None:
+                if not detDict.has_key('image'):
+                    addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
+                    addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
+                    if det.gain is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
+                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
+                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
+                    if det.x is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                    if det.ix is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
+                else:
+                    if det.det.dettype==26:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
+                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
+                    else:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
+                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
+                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
+                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
+                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
+                    if det.x is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
+                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                    if det.ix is not None:
+                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
+                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
                 
         save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
         sum_data = mpi_fun.bin_distribution(bins_info, func=save_fct)
@@ -2581,39 +2613,6 @@ class SmallDataAna_psana(object):
 #                 if hasPhoton and np.nansum(SliceI)!=0 and np.nansum(np.array(imgIArray))>0:
 #                     cubeBigIData[rank*bins_per_job+iSlice,:] = SliceI
 
-#             if det.rms is not None:
-#                 if not detDict.has_key('image'):
-#                     addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
-#                     addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
-#                     if det.gain is not None:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
-#                     addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
-#                     addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
-#                     if det.x is not None:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-#                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
-#                     if det.ix is not None:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-#                         addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
-#                 else:
-#                     if det.det.dettype==26:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
-#                         addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
-#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
-#                     else:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
-#                         addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
-#                         addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
-#                     addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
-#                     addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
-#                     if det.x is not None:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-#                         addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
-#                     if det.ix is not None:
-#                         addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-#                         addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
-
-
 #         comm.Barrier()
 #         printR(rank, 'first,last img mean: %s %g %g '%(detName,np.nanmean(fout['%s'%detName][0]),np.nanmean(fout['%s'%detName][-1])))
 
@@ -2649,7 +2648,7 @@ class SmallDataAna_psana(object):
                 targetVarsXtc.append(det)
             else:
                 printR(rank, 'Detector with alias %s not in data '%det)
-        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, basestring) else det for det in targetVarsXtc]
+        myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, str) else det for det in targetVarsXtc]
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)
         to_worker = myCube.targetVarsXtc
