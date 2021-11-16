@@ -1,5 +1,6 @@
 # return boundary sums for droplets.
 import numpy as np
+
 def frontiers(pp0,pp1,npixs,img):
     pos=np.append(0,np.cumsum(npixs))
     fadus=np.zeros(len(npixs))

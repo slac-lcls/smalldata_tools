@@ -60,6 +60,7 @@ def getAzIntParams(run):
 
 
 # 3) PHOTON COUNTING AND DROPLET
+# Photon
 def getPhotonParams(run):
     """ Parameters for droplet algorithm
     See photons.py for more info
@@ -72,6 +73,27 @@ def getPhotonParams(run):
         photon_dict['ADU_per_photon'] = 9.5
         photon_dict['thresADU'] = 0.8 # fraction of ADU_per_photon
         ret_dict['jungfrau1M'] = photon_dict
+    return ret_dict
+
+# Droplet algo 1
+# TO DO
+
+# Droplet algo 2 (greedy guess)
+def getDropletParams(run):
+    """ Parameters for droplet algorithm
+    See droplet2Func.py for more info
+    """
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        droplet_dict = {}
+        droplet_dict['return_img'] = True
+        droplet_dict['threshold'] = 15
+        droplet_dict['mask'] = None
+        droplet_dict['aduspphot'] = 162
+        droplet_dict['offset'] = 81
+        ret_dict['epix_alc'] = droplet_dict
     return ret_dict
 
 
@@ -95,7 +117,27 @@ def getFullImage(run):
     ret_dict = {}
     if run>0:
         ret_dict['jungfrau1M'] = True
-    return ret_dict        
+    return ret_dict
+
+
+##########################################################
+# run independent parameters 
+##########################################################
+#aliases for experiment specific PVs go here
+#epicsPV = ['slit_s1_hw'] 
+epicsPV = []
+#fix timetool calibration if necessary
+#ttCalib=[0.,2.,0.]
+ttCalib=[]
+#ttCalib=[1.860828, -0.002950]
+#decide which analog input to save & give them nice names
+#aioParams=[[1],['laser']]
+aioParams=[]
+########################################################## 
+##
+## <-- User Input end
+##
+##########################################################
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
@@ -116,6 +158,10 @@ def define_dets(run):
         phot = getPhotonParams(run)
     except:
         phot = []
+    try:
+        drop = getDropletParams(run)
+    except:
+        drop = []
     try:
         svd = getSvdParams(run)
     except:
@@ -151,6 +197,9 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
+            # Droplet algo 2
+            if detname in drop:
+                det.addFunc(droplet2Func(**drop[detname]))
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
@@ -164,26 +213,6 @@ def define_dets(run):
             dets.append(det)
     return dets
 
-
-
-##########################################################
-# run independent parameters 
-##########################################################
-#aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
-epicsPV = []
-#fix timetool calibration if necessary
-#ttCalib=[0.,2.,0.]
-ttCalib=[]
-#ttCalib=[1.860828, -0.002950]
-#decide which analog input to save & give them nice names
-#aioParams=[[1],['laser']]
-aioParams=[]
-########################################################## 
-##
-## <-- User Input end
-##
-##########################################################
 
 ##########################################################
 # Custom exception handler to make job abort if a single rank fails.
@@ -224,8 +253,9 @@ from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetecto
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat

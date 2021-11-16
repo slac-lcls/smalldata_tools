@@ -2,6 +2,7 @@ import numpy as np
 import time as time
 from droplet import dropletfind,dropletanal
 from frontiers import *
+
 def convert(a,goodimgs,thres,photpts,avgflag=True,mask=None,prflag=None):
     #loop
     # setup arrays
