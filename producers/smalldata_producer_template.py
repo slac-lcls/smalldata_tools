@@ -60,6 +60,7 @@ def getAzIntParams(run):
 
 
 # 3) PHOTON COUNTING AND DROPLET
+# Photon
 def getPhotonParams(run):
     """ Parameters for droplet algorithm
     See photons.py for more info
@@ -72,6 +73,27 @@ def getPhotonParams(run):
         photon_dict['ADU_per_photon'] = 9.5
         photon_dict['thresADU'] = 0.8 # fraction of ADU_per_photon
         ret_dict['jungfrau1M'] = photon_dict
+    return ret_dict
+
+# Droplet algo 1
+# TO DO
+
+# Droplet algo 2 (greedy guess)
+def getDropletParams(run):
+    """ Parameters for droplet algorithm
+    See droplet2Func.py for more info
+    """
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        droplet_dict = {}
+        droplet_dict['return_img'] = True
+        droplet_dict['threshold'] = 15
+        droplet_dict['mask'] = None
+        droplet_dict['aduspphot'] = 162
+        droplet_dict['offset'] = 81
+        ret_dict['epix_alc'] = droplet_dict
     return ret_dict
 
 
@@ -95,74 +117,23 @@ def getFullImage(run):
     ret_dict = {}
     if run>0:
         ret_dict['jungfrau1M'] = True
-    return ret_dict        
+    return ret_dict
 
 
-# DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
-def define_dets(run):
-    detnames = ['jungfrau1M'] # add detector here
-    dets = []
-    
-    # Load DetObjectFunc parameters (if defined)
-    try:
-        ROIs = getROIs(run)
-    except:
-        ROIs = []
-    try:
-        az = getAzIntParams(run)
-    except:
-        az = []
-    try:
-        phot = getPhotonParams(run)
-    except:
-        phot = []
-    try:
-        svd = getSvdParams(run)
-    except:
-        svd = []
-    try:
-        image = getFullImage(run)
-    except:
-        image = []
-        
-    # Define detectors and their associated DetObjectFuncs
-    for detname in detnames:
-        havedet = checkDet(ds.env(), detname)
-        # Common mode
-        if havedet:
-            if detname=='jungfrau1M':
-                #common_mode=71 #also try 71
-                common_mode=0
-            else:
-                common_mode=0 #no common mode
-            det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
-            
-            # Analysis functions
-            # ROIs:
-            if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                        ROI=ROI,
-                                        writeArea=ROIs[detname]['writeArea'],
-                                        thresADU=ROIs[detname]['thresADU']))
-            # Azimuthal binning
-            if detname in az:
-                det.addFunc(azimuthalBinning(**az[detname]))
-            # Photon count
-            if detname in phot:
-                det.addFunc(photonFunc(**phot[detname]))
-            # SVD waveform analysis
-            if detname in svd:
-                det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
-
-            det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_img')
-            det.storeSum(sumAlgo='square_img')
-            dets.append(det)
-    return dets
+# 6) autocorrelation
+def getAutocorrParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        autocorr_dict = {}
+#         autocorr_dict['ROIs'] = [ [[100,200], [100,200]] ] # can define more than one ROI
+        autocorr_dict['mask'] = '/cds/home/e/espov/dataAna/mask_epix.npy' # path to mask saved as a npy file. Can define multiple mask if 3D.
+        autocorr_dict['thresADU'] = [72.,1e6]
+        autocorr_dict['save_range'] = [70,50] # range to save around the autcorrelation center
+        autocorr_dict['save_lineout'] = True # save horiz / vert lineout through center instead of autocorr array
+        ret_dict['epix_2'] = autocorr_dict
+    return ret_dict
 
 
 
@@ -184,6 +155,88 @@ aioParams=[]
 ## <-- User Input end
 ##
 ##########################################################
+
+
+# DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
+def define_dets(run):
+    detnames = ['jungfrau1M'] # add detector here
+    dets = []
+    
+    # Load DetObjectFunc parameters (if defined)
+    try:
+        ROIs = getROIs(run)
+    except:
+        ROIs = []
+    try:
+        az = getAzIntParams(run)
+    except:
+        az = []
+    try:
+        phot = getPhotonParams(run)
+    except:
+        phot = []
+    try:
+        drop = getDropletParams(run)
+    except:
+        drop = []
+    try:
+        svd = getSvdParams(run)
+    except:
+        svd = []
+    try:
+        image = getFullImage(run)
+    except:
+        image = []
+    try:
+        auto = getAutocorrParams(run)
+    except:
+        auto = []
+        
+    # Define detectors and their associated DetObjectFuncs
+    for detname in detnames:
+        havedet = checkDet(ds.env(), detname)
+        # Common mode
+        if havedet:
+            if detname=='jungfrau1M':
+                #common_mode=71 #also try 71
+                common_mode=0
+            else:
+                common_mode=None # default common mode
+            det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
+            
+            # Analysis functions
+            # ROIs:
+            if detname in ROIs:
+                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
+                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
+                                        ROI=ROI,
+                                        writeArea=ROIs[detname]['writeArea'],
+                                        thresADU=ROIs[detname]['thresADU']))
+            # Azimuthal binning
+            if detname in az:
+                det.addFunc(azimuthalBinning(**az[detname]))
+            # Photon count
+            if detname in phot:
+                det.addFunc(photonFunc(**phot[detname]))
+            # Droplet algo 2
+            if detname in drop:
+                det.addFunc(droplet2Func(**drop[detname]))
+            # SVD waveform analysis
+            if detname in svd:
+                det.addFunc(svdFit(**svd[detname]))
+            # image
+            if detname in image:
+                det.addFunc(image_from_dat())
+            # autocorrelation
+            if detname in auto:
+                det.addFunc(Autocorrelation(**auto[detname]))
+
+            det.storeSum(sumAlgo='calib')
+            det.storeSum(sumAlgo='calib_img')
+            det.storeSum(sumAlgo='square_img')
+            dets.append(det)
+    return dets
+
 
 ##########################################################
 # Custom exception handler to make job abort if a single rank fails.
@@ -224,11 +277,13 @@ from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetecto
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat
+from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

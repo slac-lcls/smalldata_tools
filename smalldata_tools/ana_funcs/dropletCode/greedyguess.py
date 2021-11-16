@@ -2,6 +2,7 @@ import numpy as np
 #Greedy assignment of photons
 #from fitdrop import placephots
 #from numba import jit
+
 #@jit
 def greedyguess(img,nophots,aduspphot):
     #relative indices for the 4 tiles, order is carefully chosen

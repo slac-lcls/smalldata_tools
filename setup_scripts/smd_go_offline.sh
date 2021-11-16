@@ -54,6 +54,7 @@ then
     echo "No experiment name given. Exit."
     exit
 fi
+COPY=${COPY:=0}
 
 export HUTCH=${EXP:0:3}
 export FFB_BASE="/reg/data/drpsrcf/$HUTCH/$EXP/scratch"
@@ -69,6 +70,7 @@ git -C $FFB_BASE/smalldata_tools push -f
 # change jobs definition
 source /reg/g/psdm/etc/psconda.sh -py3
 python $MYDIR/update_arp_jobs.py --experiment $EXP
+
 
 
 # copy h5 files to offline in a procserver
