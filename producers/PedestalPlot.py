@@ -220,7 +220,7 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
 
     print(expname, run, det_name)
     for i in range(min(5,nCycles)):
-        cmmon_mode=None
+        common_mode=None
         if det_name.find('Epix')>=0:
             common_mode=80
         anaps.AvImage(det_name, common_mode=common_mode, nSkip=1200*i, numEvts=10)

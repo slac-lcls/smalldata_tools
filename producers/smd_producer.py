@@ -106,6 +106,10 @@ def define_dets(run):
     except:
         drop = []
     try:
+        auto = getAutocorrParams(run)
+    except:
+        auto = []
+    try:
         svd = getSvdParams(run)
     except:
         svd = []
@@ -143,6 +147,9 @@ def define_dets(run):
             # Droplet algo 2
             if detname in drop:
                 det.addFunc(droplet2Func(**drop[detname]))
+            # Autocorrelation
+            if detname in auto:
+                det.addFunc(Autocorrelation(**auto[detname]))
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
@@ -201,6 +208,7 @@ from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat
+from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
