@@ -342,6 +342,7 @@ class WaveformObject(DetObjectClass):
         #super().__init__(det,env,run, **kwargs)
         super(WaveformObject, self).__init__(det,env,run, **kwargs)
         self.common_mode = kwargs.get('common_mode', -1)
+        self.ped = None
         self.rms = None
         self.mask = None
         self.wfx = None
