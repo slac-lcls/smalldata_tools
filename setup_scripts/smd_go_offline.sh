@@ -48,8 +48,7 @@ then
    exit
 fi
 
-EXP=${EXP:=0}
-if [ $EXP -eq 0 ];
+if [ -z $EXP ];
 then
     echo "No experiment name given. Exit."
     exit
