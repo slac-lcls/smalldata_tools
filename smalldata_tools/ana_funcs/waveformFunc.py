@@ -245,6 +245,7 @@ class hsdsplitFunc(DetObjectFunc):
             startidx+=wfxlen
 
         #save full waveforms if desired
+        ret_dict = {}
         if self.writeHsd:
             ret_dict = { k:pass_dict[k] for k in pass_dict}
 
@@ -282,16 +283,12 @@ class hsdROIFunc(DetObjectFunc):
         self._det=det
 
     def process(self, data):
-        print('process RF')
         ret_dict={}
         pass_dict={}
 
         for k in self.ROI:
-            print('ROI: ',k, data.keys())
             if k in data and k.find('times')<0:
-                print('specific ROI:',self.ROI[k])
                 for iROI,ROI in enumerate(self.ROI[k]):
-                    print('ROI....',ROI)
                     pass_dict['%s_%d'%(k,iROI)] = data[k][ROI[0]:ROI[1]]
         
         if self.writeArea:
