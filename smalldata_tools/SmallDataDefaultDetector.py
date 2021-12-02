@@ -802,15 +802,22 @@ class ttlcls2Detector(defaultDetector):
         dl={}
         fex=getattr( self.det, 'ttfex')
         veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw' ]
-        if not self.saveTraces: 
-            veto_fields.append('proj_ref')
-            veto_fields.append('proj_sig')
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:
                if getattr(fex, field)(evt) is None: continue
                dl[field]=getattr(fex, field)(evt)
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+
+        if self.saveTraces:
+            fex=getattr( self.det, 'ttproj')
+            veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw' ]
+            if fex is not None:
+               fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
+               for field in fields:
+                   if getattr(fex, field)(evt) is None: continue
+                   dl[field]=getattr(fex, field)(evt)
+                   if isinstance(dl[field], list): dl[field]=np.array(dl[field])        
         return dl
 
 class fimfexDetector(defaultDetector):

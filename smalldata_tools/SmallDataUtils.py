@@ -43,7 +43,8 @@ def tmoDetectors(run, beamCodes=[[162],[91]]):
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
     dets.append(genlcls2Detector('pcav',run))
-    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
+    #for now.
+    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=False))
     dets.append(lcls2_lightStatus(beamCodes,run))
     dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
     dets.append(fimfexDetector('tmo_fim0',run))
@@ -51,21 +52,20 @@ def tmoDetectors(run, beamCodes=[[162],[91]]):
 
     return dets
 
-def rixDetectors(run, beamCodes=[[162],[91]]):
+def rixDetectors(run, beamCodes=[[-136],[77]]):
     dets=[]
     dets.append(scanDetector('scan', run))
     dets.append(genlcls2Detector('timing',run))
-    dets.append(lcls2_lightStatus(beamCodes,run))
-    dets.append(fimfexDetector('rix_fim0',run))
-    dets.append(fimfexDetector('rix_fim1',run))
-    dets.append(fimfexDetector('rix_fim2',run))
-    dets.append(genlcls2Detector('mono_encoder',run))
-
-    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
     dets.append(genlcls2Detector('gmd',run))
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
     dets.append(genlcls2Detector('pcav',run))
+    dets.append(fimfexDetector('rix_fim0',run))
+    dets.append(fimfexDetector('rix_fim1',run))
+    dets.append(fimfexDetector('rix_fim2',run))
+    dets.append(genlcls2Detector('mono_encoder',run))
+    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
+    dets.append(lcls2_lightStatus(beamCodes,run))
 
     #check a RIX scan to figure out controlDetector.
     return dets

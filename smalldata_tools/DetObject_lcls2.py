@@ -115,7 +115,7 @@ class DetObjectClass_lcls2(object):
 
     def processFuncs(self):
         if self.evt.dat is None:
-            print('This event has no data to be processed')
+            print('This event has no data to be processed for %s'%self._name)
             return 
         for func in [self.__dict__[k] for k in  self.__dict__ if isinstance(self.__dict__[k], DetObjectFunc)]:
             try:
@@ -154,13 +154,15 @@ class DetObjectClass_lcls2(object):
                     pass
 
             if self._storeSum[key] is None:
-                self._storeSum[key] = dat_to_be_summed.copy()
+                if dat_to_be_summed is not None:
+                    self._storeSum[key] = dat_to_be_summed.copy()
             else:
                 try:
                     self._storeSum[key] += dat_to_be_summed
                 except:
                     print('could not add ',dat_to_be_summed)
                     print('could not to ',self._storeSum[key])
+            #print('%s'%key, self._storeSum[key] )
 
 class CameraObject_lcls2(DetObjectClass_lcls2): 
     def __init__(self, det,run,**kwargs):
@@ -174,6 +176,7 @@ class CameraObject_lcls2(DetObjectClass_lcls2):
         self.pixelsize=[25e-6]
         self.isGainswitching=False
 
+        self.ped = None
         self.rms = None
         self.mask = None
         #self.det.calibconst['pop_rbfs'][1] return meta data for the calib data.
@@ -189,9 +192,7 @@ class CameraObject_lcls2(DetObjectClass_lcls2):
         self.y = None
 
     def getData(self, evt):
-        #print('DEBUG getdata - cameralcls2 - pre super')
         super(CameraObject_lcls2, self).getData(evt)
-        #print('DEBUG getdata - cameralcls2 - post super')
 
     #this is not important until we get to tiled detectors w/ geometry.
     def _getImgShape(self):
@@ -201,7 +202,6 @@ class CameraObject_lcls2(DetObjectClass_lcls2):
 class OpalObject_lcls2(CameraObject_lcls2): 
     def __init__(self, det, run,**kwargs):
         super(OpalObject_lcls2, self).__init__(det, run, **kwargs)
-        self._calib = self.det.calibconst['pop_rbfs'][0]
 
     def getData(self, evt):
         super(OpalObject_lcls2, self).getData(evt)
@@ -266,7 +266,6 @@ class WaveformObject_lcls2(DetObjectClass_lcls2):
         
 class HsdObject(WaveformObject_lcls2): 
     def __init__(self, det,run,**kwargs):
-        print('create an HSD objects')
         super(HsdObject, self).__init__(det,run, **kwargs)
         self.cidx = [k for k in self.det.raw._seg_chans()]
 
