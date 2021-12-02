@@ -1237,6 +1237,15 @@ class SmallDataAna_psana(object):
             #needs to be pixel coordinates for rectable selection to work.
             plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
 
+            #edgepixels(e)?:\n")
+            #polygon(p), 
+            #rectangle(r-click,
+            #rectangle(R-enter), 
+
+            #circle(c), 
+            #dark(d), 
+            #noise(n) or 
+
             shape = raw_input("rectangle(r-click, R-enter), circle(c), polygon(p), dark(d), noise(n) or edgepixels(e)?:\n")
             #shape = raw_input()
             #this definitely works for the rayonix...
@@ -1244,6 +1253,7 @@ class SmallDataAna_psana(object):
                 print('select two corners: ')
                 p =np.array(ginput(2))
                 mask_roi=np.zeros_like(image)
+                p=p.astype(int)
                 mask_roi[p[:,1].min():p[:,1].max(),p[:,0].min():p[:,0].max()]=1
                 if needsGeo:
                     mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
@@ -1260,7 +1270,7 @@ class SmallDataAna_psana(object):
                 htot = raw_input("horizontal,vertical h1 h2 v1 v2 ?\n")
                 h = htot.split(' ');h1=float(h[0]);h2=float(h[1]);v1=float(h[2]);v2=float(h[3]);
                 mask_roi=np.zeros_like(image)
-                mask_roi[h1:h2,v1:v2]=1
+                mask_roi[int(h1):int(h2),int(v1):int(v2)]=1
                 if needsGeo:
                     mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(ix,iy)] )
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
@@ -1302,6 +1312,9 @@ class SmallDataAna_psana(object):
                 mask_rinner_nda = np.array( [(ix-cx)**2+(iy-cy)**2<ri**2 for ix, iy in zip(x,y)] )
                 mask_r_nda = mask_router_nda&~mask_rinner_nda
                 print('mask from circle (shape):',mask_r_nda.shape)
+                if raw_input("Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n") in ["y","Y"]:
+                    mask_r_nda = ~mask_r_nda
+
                 if needsGeo:
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
@@ -1339,12 +1352,12 @@ class SmallDataAna_psana(object):
                 gsPed=gridspec.GridSpec(1,2,width_ratios=[1,1])
                 if shape=='d':
                     pedResult = det.pedestals(self.run)
-                    if det.dettype==26:
+                    if det.dettype in [26,29,32,33]:
                         pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05))
                 else:
                     pedResult = det.rms(self.run)
-                    if det.dettype==26:
+                    if det.dettype in [26,29,32,33]:
                         pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05,0.05))
                 if needsGeo:
@@ -1356,16 +1369,13 @@ class SmallDataAna_psana(object):
                 ctot=raw_input("Enter allowed pedestal range (min max)")
                 c = ctot.split(' ');pedMin=float(c[0]);pedMax=float(c[1]);
                 mask_r_nda=np.zeros_like(pedResult)
-                print(mask_r_nda.sum())
                 mask_r_nda[pedResult<pedMin]=1
                 mask_r_nda[pedResult>pedMax]=1
-                print(mask_r_nda.sum())
                 mask_r_nda = (mask_r_nda.astype(bool)).astype(int)
-                print(mask_r_nda.sum())
                 if needsGeo:
-                    plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda.astype(bool)))
+                    plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
-                    plt.subplot(gs[1]).imshow(mask_r_nda.astype(bool))
+                    plt.subplot(gs[1]).imshow(mask_r_nda)
             if shape=='e':
                 ctot=raw_input("Enter number of edge rows that should be masked:")
                 try:
