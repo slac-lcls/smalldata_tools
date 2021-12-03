@@ -77,6 +77,5 @@ if [[ $COPY -ne 0 ]]; then
     #cp -uv $FFB_BASE/hdf5/smalldata/*.h5 $PSANA_BASE/hdf5/smalldata
     export NAME="smd_ffb_anafs_transfer"
     export PROCSERV="/cds/group/pcds/pkg_mgr/release/procServ/2.8.0-1.3.0/rhel7-x86_64/bin/procServ --oneshot --ignore ^D^C"
-    #$PROCSERV --logfile $PSANA_BASE/scratch/$NAME.log --name $NAME 43400 rsync -avu $FFB_BASE/hdf5/smalldata/*.h5 $PSANA_BASE/hdf5/smalldata
     $PROCSERV --logfile $PSANA_BASE/scratch/$NAME.log --name $NAME 43400 $MYDIR/sync_h5.cmd
 fi

@@ -129,7 +129,7 @@ if rank==0:
     if scanName!='':
         if scanName.find('delay')<0:
             scanSteps = np.unique(scanValues)
-            scanSteps = np.append(scanSteps, scanSteps[-1]+abs(scanSteps[1]-scanSteps[0]))#catch value at right edge?
+            scanSteps = np.append(scanSteps, scanSteps[-1]+abs(scanSteps[1]-scanSteps[0])) #catch value at right edge?
             scanSteps = np.append(scanSteps[0]-abs(scanSteps[1]-scanSteps[0]),scanSteps) #catch values at left edge
             binSteps = scanSteps
             cubeName = scanName
@@ -181,7 +181,7 @@ if rank==0:
             anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
         else:
             # no laser filters
-            anaps.makeCubeData(cube.cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
+            anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
     comm.bcast('Go home!', root=0)
         
     if config.save_tiff is True:

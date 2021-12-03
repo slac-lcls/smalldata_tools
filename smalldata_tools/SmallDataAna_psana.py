@@ -2379,9 +2379,12 @@ class SmallDataAna_psana(object):
         #print('****** BINS: {}'.format(bin))
         print('****** Make big data placeholder dataset')
         dets = []
-        for detname in self.detNames:
+        for detname, detDict in zip(self.detNames, myCube.targetVarsXtc):
             det = self.__dict__[detname]
-            det_shape = det.imgShape
+            if detDict['image']==1:
+                det_shape = det.imgShape
+            else:
+                det_shape = det.mask.shape
             try:
                 self.make_det_data_dset(fout, detname, det_shape, nbins)
             except Exception as e:
