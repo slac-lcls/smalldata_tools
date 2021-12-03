@@ -147,13 +147,13 @@ class BinWorker(object):
             for detname in data.keys():
                 n_in_bin[detname]+=1
                 summed_data[detname]+=data[detname]
-        # make full image for each det
+        # make full image for each det if requested
         for det, thisDetDict in zip(self.dets, self.targetVarsXtc):
             if isinstance(summed_data[det._name],int):
                 logger.info('No data in bin {}.'.format(bin_idx))
                 summed_data[det._name] = np.nan
                 continue
-            if hasattr(det, 'x'):
+            if hasattr(det, 'x') and thisDetDict['image']==1:
                 summed_data[det._name] = det.det.image(self.run, summed_data[det._name])
 #             if 'image' in thisDetDict:
 #                 if thisDetDict['image']==True:

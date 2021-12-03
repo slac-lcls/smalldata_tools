@@ -14,15 +14,15 @@ def binBoundaries(run):
 # 'filter1' is the standard name and will not be added to the h5 file name.
 filters = [
     ['lightStatus/xray',0.5,1.5,'filter1'],
-    # ['ipm2/sum',3e2,6e4,'filter1'],
-    ['ipm3/sum',200,3e3,'filter1'],
-    ['tt/FLTPOSFWHM',60,230,'filter1'],
-    ['tt/AMPL',0.005,0.19,'filter1']
-#     ['evr/code_41',0.5,1.5,'custom']
+    ['ipm2/sum',3e2,6e4,'filter1'],
+    # ['ipm3/sum',200,3e3,'filter1'],
+    # ['tt/FLTPOSFWHM',60,230,'filter1'],
+    # ['tt/AMPL',0.005,0.19,'filter1']
+    # ['evr/code_41',0.5,1.5,'custom']
 ]
 
 # Laser on/off
-laser = True
+laser = False
 
 # List detectors to be cubed. Area detector have additional options such as threshold
 # For now only full image work. TODO: Add photon maps. And then any detObjectFunc

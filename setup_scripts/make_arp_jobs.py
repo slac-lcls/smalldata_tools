@@ -23,12 +23,14 @@ if 'ffb' in args.queue:
     executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'START_OF_RUN'
+    cube_args = f'-- indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/cube'
 else:
     location = 'SLAC'
     cores = 12
     executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'ALL_FILES_TRANSFERRED'
+    cube_args = f'--indirectory {FFB_BASE} --outdirectory {FFB_BASE}'
 
 job_defs = []
 job_defs.append( {
@@ -36,7 +38,7 @@ job_defs.append( {
     'executable': executable,
     'trigger': trigger,
     'location': location,
-    'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
+    'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait'
     } )
 
 if args.cube>0:
@@ -45,7 +47,7 @@ if args.cube>0:
         'executable': executable_cube,
         'trigger': 'MANUAL',
         'location': location,
-        'parameters': '--queue {} --norecorder --postRuntable --cores {} --wait'.format(args.queue, cores)
+        'parameters': f'--queue {args.queue} --cores {cores} {cube_args}'
         } )
 
 for job_def in job_defs:
