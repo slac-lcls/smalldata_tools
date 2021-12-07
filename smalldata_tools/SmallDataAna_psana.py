@@ -2390,6 +2390,7 @@ class SmallDataAna_psana(object):
             except Exception as e:
                 logger.warning('Could not make dataset for detector {}. Exit. {}'.format(detname, e))
                 comm.Abort()
+                
             # save detector config
             if det.rms is not None:
                 if not detDict.has_key('image'):
@@ -2625,7 +2626,7 @@ class SmallDataAna_psana(object):
 
 #         fout.close()
 #         comm.Barrier()
-#         #print('in rank now: ',rank)
+#         #print('in rank now: ',rank)                        
         print('renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress','')))
         rename_reduceRandomVar(outFileName)
         return
