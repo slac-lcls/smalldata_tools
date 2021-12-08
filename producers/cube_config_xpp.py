@@ -22,7 +22,7 @@ filters = [
 ]
 
 # Laser on/off
-laser = False
+laser = True
 
 # List detectors to be cubed. Area detector have additional options such as threshold
 # For now only full image work. TODO: Add photon maps. And then any detObjectFunc

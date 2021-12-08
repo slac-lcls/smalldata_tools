@@ -57,6 +57,9 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class SmallDataAna_psana(object):
     def __init__(self, expname='', run=-1, dirname='', filename='', plotWith='matplotlib'):
         self.run=int(run)
@@ -66,8 +69,6 @@ class SmallDataAna_psana(object):
         self.sda=None
 
         ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
         if self.hutch == 'cxi':
             print('Will assume the first CXI station, if this is wrong, make sure to add  -e <expname> on commandline')
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": self.hutch.upper(), 
@@ -2392,38 +2393,41 @@ class SmallDataAna_psana(object):
                 comm.Abort()
                 
             # save detector config
+            logger.info(f'Save config for det {detname}.')
             if det.rms is not None:
-                if not detDict.has_key('image'):
-                    addToHdf5(fout, 'Cfg__'+detName+'__ped', det.ped)
-                    addToHdf5(fout, 'Cfg__'+detName+'__rms', det.rms)
+                grp = fout.create_group(f'{detname}_cfg')
+                if detDict['image']==0:
+                    addToHdf5(grp, 'ped', det.ped)
+                    addToHdf5(grp, 'rms', det.rms)
                     if det.gain is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.gain)
-                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.mask)
-                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.cmask)
+                        addToHdf5(grp, 'gain', det.gain)
+                    addToHdf5(grp, 'mask', det.mask)
+                    addToHdf5(grp, 'calib_mask', det.cmask)
                     if det.x is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                        addToHdf5(grp, 'x', det.x)
+                        addToHdf5(grp, 'y', det.y)
                     if det.ix is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
+                        addToHdf5(grp, 'ix', det.ix)
+                        addToHdf5(grp, 'iy', det.iy)
                 else:
                     if det.det.dettype==26:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped[0]))
-                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms[0]))
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain[0]))
+                        addToHdf5(grp, 'ped', det.det.image(self.run,det.ped[0]))
+                        addToHdf5(grp, 'rms', det.det.image(self.run,det.rms[0]))
+                        addToHdf5(grp, 'gain', det.det.image(self.run,det.gain[0]))
                     else:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ped', det.det.image(self.run,det.ped))
-                        addToHdf5(fout, 'Cfg__'+detName+'__rms', det.det.image(self.run,det.rms))
-                        addToHdf5(fout, 'Cfg__'+detName+'__gain', det.det.image(self.run,det.gain))
-                    addToHdf5(fout, 'Cfg__'+detName+'__mask', det.det.image(self.run,det.mask))
-                    addToHdf5(fout, 'Cfg__'+detName+'__calib_mask', det.det.image(self.run,det.cmask))
+                        addToHdf5(grp, 'ped', det.det.image(self.run,det.ped))
+                        addToHdf5(grp, 'rms', det.det.image(self.run,det.rms))
+                        addToHdf5(grp, 'gain', det.det.image(self.run,det.gain))
+                    addToHdf5(grp, 'mask', det.det.image(self.run,det.mask))
+                    addToHdf5(grp, 'calib_mask', det.det.image(self.run,det.cmask))
                     if det.x is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__x', det.x)
-                        addToHdf5(fout, 'Cfg__'+detName+'__y', det.y)
+                        addToHdf5(grp, 'x', det.x)
+                        addToHdf5(grp, 'y', det.y)
                     if det.ix is not None:
-                        addToHdf5(fout, 'Cfg__'+detName+'__ix', det.ix)
-                        addToHdf5(fout, 'Cfg__'+detName+'__iy', det.iy)
-                
+                        addToHdf5(grp, 'ix', det.ix)
+                        addToHdf5(grp, 'iy', det.iy)
+        
+        print('Start binning area detectors')                
         save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
         sum_data = mpi_fun.bin_distribution(bins_info, func=save_fct)
         t3 = time.time()
@@ -2629,7 +2633,9 @@ class SmallDataAna_psana(object):
 #         #print('in rank now: ',rank)                        
         print('renaming file from %s to %s, remove random variable if applicable'%(outFileName,outFileName.replace('.inprogress','')))
         rename_reduceRandomVar(outFileName)
-        return
+
+        bins, nEntries = cubeData.binVar_bins.values, cubeData.nEntries.values
+        return cubeName, bins, nEntries
 
     def _broadcast_xtc_dets(self, cubeName):
         """ Sends the xtc det info to worker so that they can instantiate the DetObjects. Most

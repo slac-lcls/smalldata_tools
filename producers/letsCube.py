@@ -168,20 +168,27 @@ if rank==0:
 
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
+    cube_infos = []
     for ii,cubeName in enumerate(ana.cubes):
         print('Cubing {}'.format(cubeName))
         comm.bcast('Work!', root=0)
         time.sleep(1) # is this necessary? Just putting it here in case...
         if config.laser:
             #request 'on' events base on input filter (add optical laser filter)
-            anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, \
+                dirname=args.outdirectory)
+            cube_infos.append([f'{cubeName}_on', bins, nEntries])
             comm.bcast('Work!', root=0)
             time.sleep(1) # is this necessary? Just putting it here in case...
             #request 'off' events base on input filter (switch optical laser filter, drop tt
-            anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, \
+                dirname=args.outdirectory)
+            cube_infos.append([f'{cubeName}_off', bins, nEntries])
         else:
             # no laser filters
-            anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, \
+                dirname=args.outdirectory)
+            cube_infos.append([cubeName, bins, nEntries])
     comm.bcast('Go home!', root=0)
         
     if config.save_tiff is True:
@@ -203,7 +210,7 @@ if rank==0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
     
     # Make histogram summary plots
-    tabs = utils.make_report(anaps, config.hist_list, config.filters, config.varList, exp, run)
+    tabs = utils.make_report(anaps, cube_infos, config.hist_list, config.filters, config.varList, exp, run)
         
 else:
     work = 1
