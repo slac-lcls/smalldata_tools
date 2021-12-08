@@ -162,35 +162,42 @@ def define_dets(run):
     detnames = ['jungfrau1M'] # add detector here
     dets = []
     
-    # Load DetObjectFunc parameters (if defined)
+# Load DetObjectFunc parameters (if defined)
     try:
         ROIs = getROIs(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate ROI args: {e}')
         ROIs = []
     try:
         az = getAzIntParams(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate azimuthalBinning args: {e}')
         az = []
     try:
         phot = getPhotonParams(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate Photon args: {e}')
         phot = []
     try:
         drop = getDropletParams(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate Droplet2 args: {e}')
         drop = []
     try:
+        auto = getAutocorrParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate Autocorrelation args: {e}')
+        auto = []
+    try:
         svd = getSvdParams(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate SVD args: {e}')
         svd = []
     try:
         image = getFullImage(run)
-    except:
+    except Exception as e:
+        print(f'Can\'t instantiate full image args: {e}')
         image = []
-    try:
-        auto = getAutocorrParams(run)
-    except:
-        auto = []
         
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
