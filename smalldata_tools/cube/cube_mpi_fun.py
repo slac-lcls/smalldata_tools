@@ -89,9 +89,9 @@ class BinWorker(object):
         print('********** Start setup.')
         t0 = time.time()
         self.dsIdx = psana.DataSource(str(dsname))
-        print('********** Datasource on rank {}: {}'.format(rank, time.time()-t0))
+        logger.info('********** Datasource on rank {}: {}s'.format(rank, time.time()-t0))
         self.dsIdxRun = next(self.dsIdx.runs())
-        print('********** Setup on rank {}: {}'.format(rank, time.time()-t0))
+        logger.info('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
         bcast_var = None
         self.targetVarsXtc = comm.bcast(bcast_var, root=0) # get det info from rank 0
         logger.debug('Detectors info received on rank {}. {}'.format(rank, self.targetVarsXtc))
@@ -147,13 +147,13 @@ class BinWorker(object):
             for detname in data.keys():
                 n_in_bin[detname]+=1
                 summed_data[detname]+=data[detname]
-        # make full image for each det
+        # make full image for each det if requested
         for det, thisDetDict in zip(self.dets, self.targetVarsXtc):
             if isinstance(summed_data[det._name],int):
                 logger.info('No data in bin {}.'.format(bin_idx))
                 summed_data[det._name] = np.nan
                 continue
-            if hasattr(det, 'x'):
+            if hasattr(det, 'x') and thisDetDict['image']==1:
                 summed_data[det._name] = det.det.image(self.run, summed_data[det._name])
 #             if 'image' in thisDetDict:
 #                 if thisDetDict['image']==True:

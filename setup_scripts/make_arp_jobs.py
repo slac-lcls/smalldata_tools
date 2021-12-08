@@ -30,7 +30,7 @@ else:
     executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'ALL_FILES_TRANSFERRED'
-    cube_args = f'-- indirectory {FFB_BASE} --outdirectory {FFB_BASE}'
+    cube_args = f'--indirectory {FFB_BASE} --outdirectory {FFB_BASE}'
 
 job_defs = []
 job_defs.append( {
