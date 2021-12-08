@@ -89,9 +89,9 @@ class BinWorker(object):
         print('********** Start setup.')
         t0 = time.time()
         self.dsIdx = psana.DataSource(str(dsname))
-        print('********** Datasource on rank {}: {}s'.format(rank, time.time()-t0))
+        logger.info('********** Datasource on rank {}: {}s'.format(rank, time.time()-t0))
         self.dsIdxRun = next(self.dsIdx.runs())
-        print('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
+        logger.info('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
         bcast_var = None
         self.targetVarsXtc = comm.bcast(bcast_var, root=0) # get det info from rank 0
         logger.debug('Detectors info received on rank {}. {}'.format(rank, self.targetVarsXtc))
