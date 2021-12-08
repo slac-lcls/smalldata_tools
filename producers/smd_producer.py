@@ -39,8 +39,8 @@ def getROIs(run):
     if run>0:
         roi_dict = {}
         roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
-        roi_dict['writeArea'] = 4.5
-        roi_dict['thresADU'] = test
+        roi_dict['writeArea'] = True
+        roi_dict['thresADU'] = None
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
