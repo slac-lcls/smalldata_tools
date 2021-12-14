@@ -290,59 +290,59 @@ def getTTstr(fh5):
   return ttCorr, ttBaseStr
 
 def getDelay(fh5, use_ttCorr=True, addEnc=False):
-  """
-  function to get the xray-laser delay from the data
-  usage:
-  getDelay(fh5): get the delay from lxt and/or encoder stage, add the timetool correction
-  getDelay(fh5, use_ttCorr=False): get the delay from lxt and/or encoder stage, NO timetool correction
-  getDelay(fh5, addEnc=True): get the delay from lxt, add encoder stage and timetool correction
-  fh5 is the pointer to the h5py or tables objext
-  """
-  ttCorrStr, ttBaseStr = getTTstr(fh5)
-  if ttCorrStr is not None:
-    ttCorr=getVar(fh5,ttCorrStr)
-    if (np.nanstd(ttCorr)==0):
-      ttCorr=getVar(fh5,ttBaseStr+'FLTPOS_PS')
-  nomDelay=np.zeros_like(ttCorr)
+    """
+    function to get the xray-laser delay from the data
+    usage:
+    getDelay(fh5): get the delay from lxt and/or encoder stage, add the timetool correction
+    getDelay(fh5, use_ttCorr=False): get the delay from lxt and/or encoder stage, NO timetool correction
+    getDelay(fh5, addEnc=True): get the delay from lxt, add encoder stage and timetool correction
+    fh5 is the pointer to the h5py or tables objext
+    """
+    ttCorrStr, ttBaseStr = getTTstr(fh5)
+    if ttCorrStr is not None:
+        ttCorr=getVar(fh5,ttCorrStr)
+        if (np.nanstd(ttCorr)==0):
+            ttCorr=getVar(fh5,ttBaseStr+'FLTPOS_PS')
+    nomDelay=np.zeros_like(ttCorr)
 
-  isDaqDelayScan=False
-  for node in fh5.get_node('/scan')._f_list_nodes():
-    if node.name.find('var')<0 and node.name.find('none')<0 and node.name.find('lxt')>=0 and node.name.find('damage')<0:
-      isDaqDelayScan=True
-      #print('DEBUG: found that we have a delay scan')
-      nomDelay=node.read()*1e12
+    isDaqDelayScan=False
+    for node in fh5.get_node('/scan')._f_list_nodes():
+        if node.name.find('var')<0 and node.name.find('none')<0 and node.name.find('lxt')>=0 and node.name.find('damage')<0:
+            isDaqDelayScan=True
+            #print('DEBUG: found that we have a delay scan')
+            nomDelay=node.read()*1e12
 
-  if not isDaqDelayScan:
-    if hasKey('enc/lasDelay',fh5):
-      encVal = getVar(fh5,'enc/lasDelay')
-      #print('DEBUG: encoder info',encVal.std())
-      if encVal.std()>1e-9:
-        nomDelay=encVal
-        addEnc=False
-      elif encVal.std()>1e-15:
-        nomDelay=encVal*1e12
-        addEnc=False
-    elif hasKey('enc/ch0',fh5):
-      encVal = getVar(fh5,'enc/ch0')
-      if encVal.std()>1e-15 and encVal.std()<1e-9:
-        nomDelay=encVal*1e12
-        #now look at the EPICS PV if everything else has failed.
+    if not isDaqDelayScan:
+        if hasKey('enc/lasDelay',fh5):
+            encVal = getVar(fh5,'enc/lasDelay')
+            #print('DEBUG: encoder info',encVal.std())
+            if encVal.std()>1e-9:
+                nomDelay=encVal
+                addEnc=False
+            elif encVal.std()>1e-15:
+                nomDelay=encVal*1e12
+                addEnc=False
+        elif hasKey('enc/ch0',fh5):
+            encVal = getVar(fh5,'enc/ch0')
+            if encVal.std()>1e-15 and encVal.std()<1e-9:
+                nomDelay=encVal*1e12
+            #now look at the EPICS PV if everything else has failed.
+            else:
+                epics_delay = getVar(fh5,'epics/lxt_ttc')
+                if epics_delay.std()!=0:
+                    nomDelay = epics_delay
+
+    if addEnc and not hasKey('enc/lasDelay',fh5):
+        print('required to add encoder value, did not find encoder!')
+    if addEnc and hasKey('enc/lasDelay',fh5):            
+        if getVar(fh5,'enc/lasDelay').std()>1e-6:
+            nomDelay+=getVar(fh5,'enc/lasDelay').value
+
+    if use_ttCorr:
+        #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
+        return (ttCorr+nomDelay)
     else:
-      epics_delay = getVar(fh5,'epics/lxt_ttc')
-      if epics_delay.std()!=0:
-        nomDelay = epics_delay
-
-  if addEnc and not hasKey('enc/lasDelay',fh5):
-    print('required to add encoder value, did not find encoder!')
-  if addEnc and hasKey('enc/lasDelay',fh5):            
-    if getVar(fh5,'enc/lasDelay').std()>1e-6:
-      nomDelay+=getVar(fh5,'enc/lasDelay').value
-
-  if use_ttCorr:
-    #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
-    return (ttCorr+nomDelay)
-  else:
-    return nomDelay
+        return nomDelay
 
 
 def addToHdf5(fh5, key, npAr):
@@ -758,12 +758,13 @@ def rename_reduceRandomVar(outFileName):
         if len(fin[k].shape)>=len(nEntryShape):
             kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
         else:
-            print('cannot determine shape for reshaping: ',fin[k].shape, len(nEntryShape))
+            print(f'Cannot determine shape for reshaping {k}: {fin[k].shape}, {len(nEntryShape)}')
             continue
 
         if kShape == nEntryShape:
             if randomNbins>1 and randomNbins in nEntryShape:
-                data=fin[k].value.sum(axis=randAxis)
+                # data=fin[k].value.sum(axis=randAxis)
+                data=fin[k][:].sum(axis=randAxis)
                 fout.create_dataset(k, data=data)
             else:
                 fin.copy(k, fout)
@@ -773,8 +774,9 @@ def rename_reduceRandomVar(outFileName):
                 if iShp==0: continue
                 newShp.append(shp)
             newShp=tuple(newShp)
-            print('I am reshaping ',k,' -- ',kShape,' -- ',newShp)
-            newArray=fin[k].value.reshape(newShp)
+            print(f'I am reshaping {k}, -- {fin[k].shape} -- {newShp}')
+            # newArray=fin[k].value.reshape(newShp)
+            newArray=fin[k][:].reshape(newShp)
             if randomNbins>1 and randomNbins in newArray.shape:
                 data=newArray.sum(axis=randAxis)
                 fout.create_dataset(k, data=data)

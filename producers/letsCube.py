@@ -125,7 +125,7 @@ if rank==0:
     scanName, scanValues = ana.getScanValues()
     binSteps=[]
     binName=''
-#     filterName='filter1'
+    
     if scanName!='':
         if scanName.find('delay')<0:
             scanSteps = np.unique(scanValues)
@@ -165,6 +165,12 @@ if rank==0:
             cubeName = cubeName+'_'+filterName
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
+    
+    addBinVars = config.get_addBinVars(run)
+    if addBinVars is not None and isinstance(addBinVars, dict):
+        for cubeName, cube in ana.cubes.items():
+            cube.add_BinVar(addBinVars)
+            
 
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     

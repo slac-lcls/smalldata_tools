@@ -2387,7 +2387,7 @@ class SmallDataAna_psana(object):
 
         print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))
 
-        print(f'renaming file from {outFilname} to {outFileName.replace('.inprogress','')}, remove random variable if applicable')
+        print(f'Renaming file from {outFileName} to {outFileName.replace(".inprogress","")}, remove random variable if applicable')
         rename_reduceRandomVar(outFileName)
 
         bins, nEntries = cubeData.binVar_bins.values, cubeData.nEntries.values
