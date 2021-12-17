@@ -5,7 +5,8 @@ def binBoundaries(run):
     if isinstance(run,str):
         run=int(run)
     if run>0:
-        return np.arange(-5.,50.,0.2)
+        # return np.arange(-5.,50.,0.2)
+        return np.arange(-5.,10.,1)
     return None
 
 # Multi-dimensional binning
@@ -15,12 +16,12 @@ def get_addBinVars(run):
     if isinstance(run,str):
         run=int(run)
     addBinVars = None
-    if run==128:
+    if run==127:
         addBinVars = {'ipm2/sum': np.linspace(0,4e4,4)}
     return addBinVars
 
 
-# filters to apply ont the data
+# filters to apply to the data
 # format: list of [det (field), low, high, name]
 # 'filter1' is the standard name and will not be added to the h5 file name.
 filters = [

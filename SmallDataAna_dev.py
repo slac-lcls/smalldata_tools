@@ -1881,7 +1881,7 @@ class SmallDataAna(object):
         #could add error using the std of the values.
         cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=Bins[:-1],include_lowest=True, right=False).std(dim='time')
         #cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).std(dim='time')
-        
+            
         if len(cube.addBinVars.keys())>0:
             newXr = None
             for key in cubeData.variables:
@@ -1889,19 +1889,15 @@ class SmallDataAna(object):
                 #if key in cubeData.dims:
                 #    continue
                 #get dimensions & coords for reshaped data
-                dim = f'bins_{cube.binVar}'
-                dims = [dim]
+                dims = [cube.binVar]
                 #this is better for linearly spaced floating point variable
                 #coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
-                coords={dim: (orgBins[1:])}
+                coords={cube.binVar: (orgBins[1:])}
                 #print('coords: ',coords)
                 for addVar in cube.addBinVars.keys():
-                    dim = f'bins_{addVar}'
-                    dim = dim.replace('/','_')
-                    dims.append(dim)
-                    coords[dim]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
+                    dims.append(addVar)
+                    coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
                 for thisdim in cubeData[key].dims:
-                    print(f'this dim: {thisdim}')
                     if thisdim=='binVar_bins':
                         continue
                     dims.append(thisdim)
@@ -1930,16 +1926,12 @@ class SmallDataAna(object):
                 if key == 'nEntries' or key == 'binVar':
                     continue
                 #get dimensions & coords for reshaped data
-                dim = f'bins_{cube.binVar}'
-                dims = [dim]
-                coords={dim: (orgBins[1:])}
+                dims = [cube.binVar]
+                coords={cube.binVar: (orgBins[1:])}
                 #coords={cube.binVar: (orgBins[1:]+orgBins[:-1])*0.5}
                 for addVar in cube.addBinVars.keys():
-                    dim = f'bins_{addVar}'
-                    dim = dim.replace('/','_')
-                    dims.append(dim)
-                    coords[dim]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
-                    # coords[addVar] = cube.addBinVars[addVar]
+                    dims.append(addVar)
+                    coords[addVar]=0.5*(cube.addBinVars[addVar][1:]+cube.addBinVars[addVar][:-1])
                 for thisdim in cubeDataErr[key].dims:
                     if thisdim=='binVar_bins':
                         continue

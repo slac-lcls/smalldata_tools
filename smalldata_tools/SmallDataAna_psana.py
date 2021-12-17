@@ -2250,8 +2250,7 @@ class SmallDataAna_psana(object):
 
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
-        if (rank==0):
-            print('Variables to be read from xtc: ',myCube.targetVarsXtc)
+        print('Variables to be read from xtc: ',myCube.targetVarsXtc)
 
         if isinstance(nEvtsPerBin, str): nEvtsPerBin=int(nEvtsPerBin)
 
@@ -2316,7 +2315,7 @@ class SmallDataAna_psana(object):
             self.sda.cubes[cubeName].addIdxVar(addVars)
         cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True, onoff=onoff)
         
-        #add small data to hdf5
+        # add small data to hdf5
         for key in cubeData.variables:
             addToHdf5(fout, key, cubeData[key].values)
 

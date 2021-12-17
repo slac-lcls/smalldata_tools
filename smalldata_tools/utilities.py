@@ -733,6 +733,10 @@ def rename_reduceRandomVar(outFileName):
     #groups (binning Variables)
     randomNbins=1
     for k in fin.keys():
+        # try:
+        #     print(f'{k} shape: {fin[k].shape}')
+        # except:
+        #     print(f'{k}')
         #deal with groups first. 
         if isinstance(fin[k],  h5py.Group):
             if k!='random':
@@ -752,13 +756,15 @@ def rename_reduceRandomVar(outFileName):
         if idim==randomNbins:randAxis=idc
         
     for k in fin.keys():
-        if isinstance(fin[k],  h5py.Group): continue
+        if isinstance(fin[k], h5py.Group): continue
         if k.find('Cfg')>=0 or k=='cubeSelection' or k.find('dim')>=0: continue
         
         if len(fin[k].shape)>=len(nEntryShape):
             kShape=tuple([ishp for ishp,nShp in zip(fin[k].shape,nEntryShape)])
         else:
-            print(f'Cannot determine shape for reshaping {k}: {fin[k].shape}, {len(nEntryShape)}')
+            print(f'Cannot determine shape for reshaping {k}: {fin[k].shape} to {nEntryShape}')
+            print(f'{k} cannot be reshaped. Save as is. Shape: {fin[k].shape}')
+            fin.copy(k, fout)
             continue
 
         if kShape == nEntryShape:
