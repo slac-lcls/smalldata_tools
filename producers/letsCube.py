@@ -39,6 +39,7 @@ parser.add_argument("--outdirectory", help="directory w/ smallData for cube if n
 parser.add_argument("--nevents", help="number of events/bin", default=-1)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
+parser.add_argument('--config', default=None, type=str)
 args = parser.parse_args()
     
 exp = args.experiment
@@ -80,11 +81,16 @@ if rank==0:
     if hutch not in HUTCHES:
         logger.debug('Could not find {0} in list of available hutches'.format(hutch))
         sys.exit()
-    # load config file for hutch
-    if hutch=='XPP':
-        import cube_config_xpp as config
-    elif hutch=='XCS':
-        import cube_config_xcs as config
+    # load config file
+    if args.config is None:
+        if hutch=='XPP':
+            import cube_config_xpp as config
+        elif hutch=='XCS':
+            import cube_config_xcs as config
+    else:
+        print('Importing custom config')
+        config = importlib.import_module(args.config)
+
 
     dirname=''
 #     dirname='/cds/data/psdm/xpp/xpplv9818/scratch/ffb/hdf5/smalldata'

@@ -16,7 +16,7 @@ def get_addBinVars(run):
     if isinstance(run,str):
         run=int(run)
     addBinVars = None
-    if run==127:
+    if run==128:
         addBinVars = {'ipm2/sum': np.linspace(0,4e4,4)}
     return addBinVars
 

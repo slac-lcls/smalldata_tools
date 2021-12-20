@@ -95,7 +95,7 @@ elif [[ $QUEUE == *psfeh* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=16}
 elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
-else:
+else
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
 
