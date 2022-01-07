@@ -25,6 +25,7 @@ def DetObject_lcls2(srcName, run, **kwargs):
     detector_classes = {
         'opal': OpalObject_lcls2,
         'hsd':  HsdObject,
+        'wave8':  Wave8Object,
         'pv':   PVObject_lcls2
     }
     cls = detector_classes[det._dettype]
@@ -243,6 +244,7 @@ class WaveformObject_lcls2(DetObjectClass_lcls2):
     def __init__(self, det,run,**kwargs):
         super(WaveformObject_lcls2, self).__init__(det,run, **kwargs)
         self.common_mode = kwargs.get('common_mode', -1)
+        self.ped = None
         self.rms = None
         self.mask = None
         self.wfx = None
@@ -292,4 +294,18 @@ class HsdObject(WaveformObject_lcls2):
                 self.evt.dat = np.array(self.evt.dat)
             except:
                 print('HsdObject: could not cast waveform times to array ',self.evt.dat)
+
+class Wave8Object(WaveformObject_lcls2): 
+    def __init__(self, det,run,**kwargs):
+        super(Wave8Object, self).__init__(det,run, **kwargs)
+        self._chan_names = [name for name in dir(det.raw) if name[0]!='_']
+        self.chan_names = ' '.join(self._chan_names)
+
+    def getData(self, evt):
+        super(Wave8Object, self).getData(evt)
+        self.evt.dat = [ getattr(self.det.raw, name)(evt) for name in self._chan_names]
+        try:
+            self.evt.dat = np.array(self.evt.dat)
+        except:
+            print('Wave8: could not cast waveform times to array ',self.evt.dat)
 
