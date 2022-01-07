@@ -201,11 +201,16 @@ class epicsDetector(defaultDetector):
         self.name = name
         self.detname='epics'
         self.PVlist = []
+        self.PVlist_PV = []
         self.pvs = []
+        enames = psana.DetNames('epics')
+        aliases = [k[1] for k in enames if k[1]!='']
+        pvnames = [k[0] for k in enames if k[1]!='']
         for pv in PVlist:
             try:
                 self.pvs.append(psana.Detector(pv))
                 self.PVlist.append(pv)
+                self.PVlist_PV.append(pvnames[aliases.index(pv)])
             except:
                 print('could not find EPICS PV %s in data'%pv)
 
@@ -459,6 +464,10 @@ class ttRawDetector(defaultDetector):
         for cfgKey in env.configStore().keys():
             if cfgKey.type() == psana.TimeTool.ConfigV2:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
+                self.detname = cfgKey.alias()
+                defaultDetector.__init__(self, self.detname, 'ttRaw')
+            elif cfgKey.type() == psana.TimeTool.ConfigV3:
+                ttCfg = env.configStore().get(psana.TimeTool.ConfigV3, cfgKey.src())
                 self.detname = cfgKey.alias()
                 defaultDetector.__init__(self, self.detname, 'ttRaw')
         if ttCfg is not None:
