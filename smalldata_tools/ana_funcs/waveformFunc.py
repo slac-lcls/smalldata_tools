@@ -396,3 +396,43 @@ class hitFinderCFDFunc(DetObjectFunc):
         #    for kk in subfuncResults[k]:
         #        ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
+
+class fimSumFunc(DetObjectFunc):
+    """
+    function to rebin input data to new shape
+    shape: desired shape of array
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','fimSum')
+        super(fimSumFunc, self).__init__(**kwargs)
+        ## later add different methods.
+        self._bkgROI = kwargs.get('bkgROI',None)
+        if self._bkgROI is not None:
+            if isinstance(self._bkgROI, slice):
+                self.bkgROI=[self._bkgROI.start, self._bkgROI.stop]
+            else:
+                self.bkgROI = self._bkgROI.copy()
+                self._bkgROI=slice(self.bkgROI[0], self.bkgROI[1])
+        self._sigROI = kwargs.get('sigROI',[0,-1])
+        if isinstance(self._sigROI, slice):
+            self.sigROI=[self._sigROI.start, self._sigROI.stop]
+        else:
+            self.sigROI = self._sigROI.copy()
+            self._sigROI=slice(self.sigROI[0], self.sigROI[1])
+
+    def process(self, data):
+        ret_dict={}
+        bkgData=np.zeros(data.shape[0])
+        if self._bkgROI is not None:
+            bkgData = data[:,self._bkgROI].mean(axis=1)
+        data = data-(bkgData.reshape((bkgData.shape[0],1)))
+        dataS = data[:,self._sigROI]
+        ret_dict['fimSum'] = data[:,self._sigROI].sum(axis=1)
+
+        #self.dat = ret_dict
+        #subfuncResults = self.processFuncs()
+        #for k in subfuncResults:
+        #    for kk in subfuncResults[k]:
+        #        ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+        return ret_dict
+
