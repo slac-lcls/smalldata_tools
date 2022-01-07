@@ -126,6 +126,7 @@ def DetObject(srcName, env, run, **kwargs):
         2: CsPadObject,
         5: PulnixObject,
         6: OpalObject,
+        7: OpalObject,
         8: OpalObject,
         9: OpalObject,
        13: EpixObject,
@@ -142,6 +143,7 @@ def DetObject(srcName, env, run, **kwargs):
        33: Epix10k2MObject, #this is a quad-lookds like a 2M
        34: CameraObject,
        36: iStarObject,
+       37: AlviumObject,
        98: OceanOpticsObject,
        99: ImpObject,
     }
@@ -517,6 +519,27 @@ class iStarObject(CameraObject):
         self.imgShape = (iStarCfg.numPixelsY(), iStarCfg.numPixelsX())
         if self.ped is None:
             self.ped = np.zeros([iStarCfg.numPixelsY(), iStarCfg.numPixelsX()])
+        if self.imgShape != self.ped.shape:            
+            print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
+            if self.common_mode != -1:
+                print('We will use the raw data for Detector %s in run %s'%(self._name,run))
+            self.common_mode = -1
+        self.imgShape = self.ped.shape
+        if self.x is None:
+            self._get_coords_from_ped()
+        if self.mask is None or self.mask.shape!=self.imgShape:
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
+
+class AlviumObject(CameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        #super().__init__(det,env,run, **kwargs)
+        super(AlviumObject, self).__init__(det,env,run, **kwargs)
+        alviumCfg = env.configStore().get(psana.Vimba.AlviumConfigV1, self._src)
+        #needs to be this way around to match shape of data.....
+        self.imgShape = (alviumCfg.numPixelsY(), alviumCfg.numPixelsX())
+        if self.ped is None:
+            self.ped = np.zeros([alviumCfg.numPixelsY(), alviumCfg.numPixelsX()])
         if self.imgShape != self.ped.shape:            
             print('Detector %s does not have a pedestal taken for run %s, this might lead to issues later on!'%(self._name,run))
             if self.common_mode != -1:
