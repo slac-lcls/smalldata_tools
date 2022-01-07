@@ -90,8 +90,8 @@ LCLS2_HUTCHES="rix, tmo"
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
     source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
-    conda deactivate
-    conda activate ps-4.2.6
+    #conda deactivate
+    #conda activate ps-4.2.6
     PYTHONEXE=smd2_producer.py
     export PS_SRV_NODES 1 # 1 is plenty enough for the 120 Hz operation
 else
