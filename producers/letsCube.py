@@ -39,7 +39,7 @@ parser.add_argument("--outdirectory", help="directory w/ smallData for cube if n
 parser.add_argument("--nevents", help="number of events/bin", default=-1)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
-parser.add_argument('--config', default=None, type=str)
+parser.add_argument('--config', help='Name of the config file module to use (without .py extension)', default=None, type=str)
 args = parser.parse_args()
     
 exp = args.experiment
@@ -88,7 +88,7 @@ if rank==0:
         elif hutch=='XCS':
             import cube_config_xcs as config
     else:
-        print('Importing custom config')
+        print(f'Importing custom config {args.config}')
         config = importlib.import_module(args.config)
 
 
