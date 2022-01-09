@@ -215,6 +215,7 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     dets.append(bmmonDetector('MEC-XT2-BMMON-03','xt2_ipm3'))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(ttDetector(baseName='MEC:TIMETOOL:'))
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
     dets.append(epicsDetector(PVlist=['belens_z',

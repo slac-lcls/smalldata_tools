@@ -20,6 +20,8 @@ $(basename "$0"):
 			Run interactively
 		-p|--pedestal
 			plot the pedestals instead
+		-b|--bld
+			output selected BLD data in a text file (MEC style)
 EOF
 
 }
@@ -53,6 +55,10 @@ do
 			PEDESTAL=true
 			shift
 			;;
+		-b|--bld)
+			BLD=true
+			shift
+			;;
         *)
             POSITIONAL+=("$1")
 			shift
@@ -69,10 +75,12 @@ export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source /reg/g/psdm/etc/psconda.sh -py3
 #conda activate ana-4.0.16-py3
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/legacy/g`
-PLOT_PY=DataqualityPlots
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
+PLOT_PY=FirstEventPlots
 if [[ -v PEDESTAL ]]; then
     PLOT_PY=PedestalPlot
+elif [[ -v BLD ]]; then
+    PLOT_PY=BldEpics
 fi
 
 if [[ -v INTERACTIVE ]]; then
