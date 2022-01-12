@@ -2250,8 +2250,7 @@ class SmallDataAna_psana(object):
 
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
-        if (rank==0):
-            print('Variables to be read from xtc: ',myCube.targetVarsXtc)
+        print('Variables to be read from xtc: ',myCube.targetVarsXtc)
 
         if isinstance(nEvtsPerBin, str): nEvtsPerBin=int(nEvtsPerBin)
 
@@ -2316,7 +2315,7 @@ class SmallDataAna_psana(object):
             self.sda.cubes[cubeName].addIdxVar(addVars)
         cubeData, eventIdxDict = self.sda.makeCubeData(cubeName, returnIdx=True, onoff=onoff)
         
-        #add small data to hdf5
+        # add small data to hdf5
         for key in cubeData.variables:
             addToHdf5(fout, key, cubeData[key].values)
 
@@ -2387,7 +2386,7 @@ class SmallDataAna_psana(object):
 
         print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))
 
-        print(f'renaming file from {outFilname} to {outFileName.replace('.inprogress','')}, remove random variable if applicable')
+        print(f'Renaming file from {outFileName} to {outFileName.replace(".inprogress","")}, remove random variable if applicable')
         rename_reduceRandomVar(outFileName)
 
         bins, nEntries = cubeData.binVar_bins.values, cubeData.nEntries.values
@@ -2402,6 +2401,8 @@ class SmallDataAna_psana(object):
         for k in self.Keys():
             if k.alias()!='':
                 detInData.append(k.alias())
+            elif k.src().__repr__()!='':
+                detInData.append(k.src().__repr__())
         self.detNames=[]
         targetVarsXtc=[]
         for idet,det in enumerate(myCube.targetVarsXtc):
@@ -2409,11 +2410,13 @@ class SmallDataAna_psana(object):
                 dName = det['source']
             else:
                 dName = det
-            if dName in detInData:
-                self.detNames.append(dName)
-                targetVarsXtc.append(det)
-            else:
-                printR(rank, 'Detector with alias %s not in data '%det)
+            for d in detInData:
+                if dName in d:
+                    self.detNames.append(dName)
+                    targetVarsXtc.append(det)
+                    break
+            if det not in targetVarsXtc:
+                print(f'Could not find detector {dName} in data.')
         myCube.targetVarsXtc = [ {'source':det, 'full':1} if isinstance(det, str) else det for det in targetVarsXtc]
         for det in myCube.targetVarsXtc:
             self.addDetInfo(det)

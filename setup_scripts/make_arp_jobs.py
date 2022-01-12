@@ -23,7 +23,7 @@ if 'ffb' in args.queue:
     executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'START_OF_RUN'
-    cube_args = f'-- indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/cube'
+    cube_args = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/cube'
 else:
     location = 'SLAC'
     cores = 12

@@ -91,7 +91,13 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
         # edges = np.append(bins, edges[0]+np.diff(bins)[-1])
         # fig.quad(top=nEntries, bottom=0, left=edges[:-1], right=edges[1:], line_color='black', 
         #     fill_color=colors[ii], legend_label=cubeName, alpha=0.6)
-        fig.line(bins, nEntries, legend_label=cubeName, line_color=colors[ii], line_width=3)
+        if bins.ndim==1:
+            fig.line(bins, nEntries, legend_label=cubeName, line_color=colors[ii], line_width=3)
+        else:
+            print('Multidimensional bins, only show main axis')
+            fig.line(bins[0], nEntries[0], legend_label=cubeName, line_color=colors[ii], line_width=3)
+        #     for jj,(bs,nE) in enumerate(zip(bins,nEntries)):
+        #         fig.line(bs, nE, legend_label=f'{cubeName}_bin{jj}', line_color=colors[ii], line_width=3)
     bin_tab = pn.GridSpec(height=500, width=TOTAL_WIDTH, name='Bin counts')
     bin_tab[:,:] = fig
     tabs.append(bin_tab)

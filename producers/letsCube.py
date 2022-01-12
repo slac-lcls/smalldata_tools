@@ -39,6 +39,7 @@ parser.add_argument("--outdirectory", help="directory w/ smallData for cube if n
 parser.add_argument("--nevents", help="number of events/bin", default=-1)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
+parser.add_argument('--config', help='Name of the config file module to use (without .py extension)', default=None, type=str)
 args = parser.parse_args()
     
 exp = args.experiment
@@ -80,11 +81,16 @@ if rank==0:
     if hutch not in HUTCHES:
         logger.debug('Could not find {0} in list of available hutches'.format(hutch))
         sys.exit()
-    # load config file for hutch
-    if hutch=='XPP':
-        import cube_config_xpp as config
-    elif hutch=='XCS':
-        import cube_config_xcs as config
+    # load config file
+    if args.config is None:
+        if hutch=='XPP':
+            import cube_config_xpp as config
+        elif hutch=='XCS':
+            import cube_config_xcs as config
+    else:
+        print(f'Importing custom config {args.config}')
+        config = importlib.import_module(args.config)
+
 
     dirname=''
 #     dirname='/cds/data/psdm/xpp/xpplv9818/scratch/ffb/hdf5/smalldata'
@@ -125,7 +131,7 @@ if rank==0:
     scanName, scanValues = ana.getScanValues()
     binSteps=[]
     binName=''
-#     filterName='filter1'
+    
     if scanName!='':
         if scanName.find('delay')<0:
             scanSteps = np.unique(scanValues)
@@ -165,6 +171,12 @@ if rank==0:
             cubeName = cubeName+'_'+filterName
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
+    
+    addBinVars = config.get_addBinVars(run)
+    if addBinVars is not None and isinstance(addBinVars, dict):
+        for cubeName, cube in ana.cubes.items():
+            cube.add_BinVar(addBinVars)
+            
 
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
