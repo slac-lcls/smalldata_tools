@@ -58,6 +58,21 @@ def getAzIntParams(run):
         ret_dict['jungfrau1M'] = az_dict
     return ret_dict
 
+def getAzIntPyFAIParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        az_dict = {}
+        pix_size = 176e-6
+        ai_kwargs = {'dist':1, 'poni1':960*pix_size, 'poni2':960*pix_size}
+        az_dict['ai_kwargs'] = ai_kwargs
+        az_dict['npts'] = 512
+        az_dict['int_units'] = '2th_deg'
+        az_dict['return2d'] = False
+        ret_dict['Rayonix'] = az_dict
+    return ret_dict
+
 
 # 3) PHOTON COUNTING AND DROPLET
 # Photon
@@ -174,6 +189,11 @@ def define_dets(run):
         print(f'Can\'t instantiate azimuthalBinning args: {e}')
         az = []
     try:
+        az_pyfai = getAzIntPyFAIParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate AzIntPyFAI args: {e}')
+        az_pyfai = []
+    try:
         phot = getPhotonParams(run)
     except Exception as e:
         print(f'Can\'t instantiate Photon args: {e}')
@@ -222,6 +242,8 @@ def define_dets(run):
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
+            if detname in az_pyfai:
+                det.addFunc(azav_pyfai(**az_pyfai[detname]))
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
