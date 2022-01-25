@@ -17,7 +17,7 @@ class azav_pyfai(DetObjectFunc):
     return2d: bool, optional
         Return a 2d (q,phi). Default: False
     
-    calib_file: str, Path object, optional
+    poni_file: str, Path object, optional
         Path to a pyFAI calibration file
     
     ai_kwargs: dict, optional
@@ -46,9 +46,9 @@ class azav_pyfai(DetObjectFunc):
         self.return2d = kwargs.pop('return2d','False')
         
         # azimuthal integrator argument
-        self.calib_file = kwargs.pop('calib_file',None)
-        if self.calib_file is not None:
-            self.ai = pyFAI.load(str(self.calib_file))
+        self.poni_file = kwargs.pop('poni_file',None)
+        if self.poni_file is not None:
+            self.ai = pyFAI.load(str(self.poni_file))
         else:
             self._ai_kwargs = kwargs.pop('ai_kwargs',None)
             assert self._ai_kwargs is not None, \
@@ -73,7 +73,7 @@ class azav_pyfai(DetObjectFunc):
         self.ix = det.ix
         self.iy = det.iy
         
-        if self.calib_file is None: # use calib value if calib file is given
+        if self.poni_file is None: # use calib value if calib file is given
             if len(det.pixelsize)==2:
                 if det.pixelsize[0]>1:
                     self.ai.pixel1 = det.pixelsize[0]*1e-6
