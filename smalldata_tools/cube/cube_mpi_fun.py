@@ -117,60 +117,7 @@ class Bin_distribution(object):
                 dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
                 dset[bin_idx] = dat
         return
-        
-        
-# def bin_distribution(bins_info, func=None):
-#     """ Distribute bin analysis to worker on a per bin basis. Generally should be run 
-#     from rank 0 in MPI.
-#     Workflow: if a worker is not busy, it gets the first bin with a 'not done'
-#     or 'not in progress' status. Workers' status is stored in array 'working' and the bin 
-#     processing status is in 'bin_done'.
-    
-#     Args:
-#         bins_info: bin-dependent parameter to pass to the worker. Typically a list of idx
-#             corresponding to the bin. For cube: list of fiducials and event time array.
-#         func: what to do with returned results. Must accept bin_idx and data as kw argument. Generally
-#             a function to write data to file.
-#     """
-#     nBins = len(bins_info)
-#     logger.info('Total number of bins: {}'.format(nBins))
-#     working = np.zeros((size-1, 2)) # rank currently working and bin_idx on which it is working
-#     bin_status = np.zeros(nBins) # whether bin has been processed or not. 0.5=in progress, 1=done
-#     while(not np.all(bin_status==1)):
-#         for worker_id, at_work in enumerate(working):
-#             if at_work[0]==0:
-#                 try:
-#                     bin_idx = np.argwhere(bin_status==0)[0][0]
-#                 except Exception as e:
-#                     continue
-#                 job_info = {'bin_idx': bin_idx, 'info': []}
-#                 for info in bins_info[bin_idx]:
-#                     job_info['info'].append(info)
-#                 logger.debug('Send job to rank {}: {}'.format(worker_id+1, len(job_info)))
-#                 bin_status[bin_idx] = 0.5
-#                 comm.send(job_info, dest=worker_id+1) # rank 0 does not do jobs
-#                 working[worker_id,:] = [1, bin_idx]
-# #         logger.debug('Working: {}'.format(working))
-        
-#         t1 = time.time()
-#         job_done = comm.recv(source=MPI.ANY_SOURCE)
-#         t2 = time.time()
-#         bin_idx = job_done['idx']
-#         logger.info('Bin {} received on rank 0 after {}s.'.format(bin_idx, t2-t1))
-#         if func is not None:
-#             output = func(data=job_done['data'], bin_idx=bin_idx)
-        
-#         bin_status[bin_idx] = 1
-#         worker_id = np.argwhere(working[:,1]==bin_idx)[0][0]
-#         working[worker_id,0] = 0
-#         logger.debug('New bin status: {}'.format(bin_status))
-#     logger.info('**** DONE ****')
-    
-#     """ Closing worker's while loop """
-#     for worker_id, at_work in enumerate(working):
-#         if at_work[0]==0:
-#             comm.send('done', dest=worker_id+1)
-#     return
+
 
 
 class BinWorker(object):
@@ -183,6 +130,7 @@ class BinWorker(object):
         bcast_var = None
         dsname = comm.bcast(bcast_var, root=0)
         print(dsname)
+        
         print('********** Start setup.')
         t0 = time.time()
         self.dsIdx = psana.DataSource(str(dsname))
@@ -190,7 +138,7 @@ class BinWorker(object):
         self.dsIdxRun = next(self.dsIdx.runs())
         self.parse_detectors()
         logger.info('Rank {} has datasource and detectors.'.format(rank))
-        logger.info('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
+        print('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
         return
     
     

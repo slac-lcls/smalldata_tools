@@ -40,6 +40,7 @@ pix_size = 176e-6
 func_kwargs = {
     'name': 'azav_pyfai', # must be the name of the smalldata_tools ana_func
     'ai_kwargs': {'dist':1, 'poni1':960*pix_size, 'poni2':960*pix_size},
+    # 'poni_file': '<poni_file_path>' # alternative to ai_kwargs if a pyfai poni file exists
     'npts': 512,
     'int_units' : '2th_deg',
     'return2d' : False
