@@ -136,11 +136,10 @@ if rank==0:
 
     varList = config.varList
 
-    #CHANGE ME
     ####
     # if you are interested in laser-xray delay, please select the delay of choice here!
     ####
-    ana.setDelay(use_ttCorr=True, addEnc=False, addLxt=False, reset=True)
+    ana.setDelay(use_ttCorr=config.use_tt, addEnc=False, addLxt=False, reset=True)
     
     cubeName='cube' #initial name
     scanName, scanValues = ana.getScanValues()
