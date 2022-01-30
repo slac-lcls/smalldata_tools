@@ -38,23 +38,73 @@ def getROIs(run):
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
-    ret_dict['andor'] = []
-    if run>0:
-        #this is currently saving the full traces for input detectors.
-        ROI_area_dict={'thresADU': None}
-        ROI_area_dict['writeArea']=True
-        ROI_area_dict['calcPars']=False
-        ROI_area_dict['ROI']=None
-        ret_dict['andor'].append(ROI_area_dict)
+
+    #dict for HSD is simple: values is list of ROIs, no options.
+    ret_dict['andor_dir'] = []
+    ret_dict['andor_vls'] = []
+    ret_dict['atmopal'] = []
+    ret_dict['rix_fim0'] = []
+    ret_dict['rix_fim1'] = []
+    ret_dict['rix_fim2'] = []
+
+    ROI_area_dict_FullWrite={'thresADU': None}
+    ROI_area_dict_FullWrite['writeArea']=True
+    ROI_area_dict_FullWrite['calcPars']=False
+    ROI_area_dict_FullWrite['ROI']=None
+
+    #save the full ANDOR.
+    ret_dict['andor_dir'].append(ROI_area_dict_FullWrite)
+    ret_dict['andor_vls'].append(ROI_area_dict_FullWrite)
+    #and the FIM waveforms.
+    ret_dict['rix_fim0'].append(ROI_area_dict_FullWrite)
+    ret_dict['rix_fim1'].append(ROI_area_dict_FullWrite)
+    ret_dict['rix_fim2'].append(ROI_area_dict_FullWrite)
+
+    #ideally, the ROIs for all detectors (if used) are set here in a run-dependent way
+    # the ROIs are saved in the hdf5 file so that we could figure out what was used later
+    # if we have a run-dependent function here, we can simply reprocess all runs w/o any further editing
+
+    #if the settings for any ROIs will change during the experiment, please create a setup like: 
+    # if run <= 5:
+    #   <settings1>
+    # elif run <= 22:
+    #   <settings2>
+
+    ##adding ROIs to the ANDOR: this is basically two sums, meant to be signal&background.
+    #ret_dict['andor_dir'].append({'name': 'ROI_sig', 'ROI': [ [0,1],[900, 1300] ]})
+    #ret_dict['andor_dir'].append({'name': 'ROI_bkg', 'ROI': [ [0,1],[50, 600] ]})
+
+    ROI =  [ [[840,900], [0,1023]] ] 
+
+    ROI_dict={'thresADU': None}
+    ROI_dict['calcPars']=False
+    ROI_dict['writeArea']=False #save only projection (defined later)
+    ROI_dict['ROI']=ROI
+    ROI_dict['name']='ROI0'
+    ret_dict['atmopal'].append(ROI_dict)
+       
+    #this is currently saving the full traces for input detectors.
+
+    #ROIs of the HSDs are set here: we are setting the ranges here
+    #[0,-1] is the full waveform (115k pixels). 
+    #Names will be as: full_ROI_hsd_X_Y
+    #   X is hsd# (0-4)
+    #   Y is the ROI # - usually 0 or higher, depending on the list length
+    hsd_dict = {}
+    #hsd_dict['hsd_0']=[[25000,31500]]
+    if not args.nohsd:
+        #hsd_dict['hsd_0']=[[0,-1],[25000,31500]]
+        hsd_dict['hsd_0']=[0,-1]
+        hsd_dict['hsd_1']=[0,-1]
+        hsd_dict['hsd_2']=[0,-1]
+        ret_dict['hsd'] = hsd_dict
 
     return ret_dict
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    #detnames = ['hsd']
-    detnames = ['andor', 'hsd']
-    #detnames = []
+    detnames = ['andor_dir', 'andor_vls', 'hsd','rix_fim0' ,'rix_fim1' ,'rix_fim2', 'atmopal']
     dets = []
     # Load DetObjectFunc parameters (if defined)
     try:
@@ -67,32 +117,40 @@ def define_dets(run):
         # Common mode
         common_mode=0
         if havedet:
-            det = DetObject_lcls2(detname , thisrun, common_mode=common_mode)
-            
+            if detname.find('fim')>=0:
+                det = DetObject_lcls2(detname , thisrun, common_mode=common_mode, name='det_%s'%detname)
+            else:
+                det = DetObject_lcls2(detname , thisrun, common_mode=common_mode)
             # Analysis functions
             # ROIs:
-            if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]):
-                    det.addFunc(ROIFunc(**ROI))
-            ## SVD waveform analysis
-            #if detname in svd:
-            #     det.addFunc(svdFit(**svd[detname]))
-            if detname.find('hsd')>=0:
-                #det.addFunc(hsdsplitFunc())
-                hsdsplit = hsdsplitFunc()
-                #hsdsplit.addFunc(hsdBaselineCorrectFunc())
-                hsdBaselineCorrect =  hsdBaselineCorrectFunc()
-                hitFinderCFD =  hitFinderCFDFunc()
-                hsdBaselineCorrect.addFunc(hitFinderCFD)
-                hsdsplit.addFunc(hsdBaselineCorrect)
+            
+            #HSD need special treatment due to their data structure.
+            if detname.find('hsd')>=0:# and not args.nohsd:
+                hsdsplit = hsdsplitFunc(writeHsd=False)
+                if detname in ROIs:
+                    for sdetname in ROIs[detname]:
+                        funcname='%s__%s'%(sdetname, 'ROI')
+                        RF = hsdROIFunc(name='%s__%s'%(sdetname, 'ROI'),writeArea=True, ROI = ROIs[detname][sdetname])
+                        hsdsplit.addFunc(RF)
                 det.addFunc(hsdsplit)
 
+            elif detname in ROIs:
+                for iROI,ROI in enumerate(ROIs[detname]):
+                    thisROIFunc = ROIFunc(**ROI)
+                    # this is to treat the FIM data. Should move settings up.
+                    # adding projections down here. Should be rewritten.
+                    if detname.find('fim')>=0:
+                        fimFunc = fimSumFunc(sigROI=slice(105,135),bkgROI=slice(0,50))
+                        thisROIFunc.addFunc(fimFunc)
+                    elif detname.find('atmopal')>=0:
+                        projFunc = projectionFunc(axis=0, thresADU=None)
+                        thisROIFunc.addFunc(projFunc)
+                    det.addFunc(thisROIFunc)
+
             det.storeSum(sumAlgo='calib')
-            #det.storeSum(sumAlgo='calib_img')
-            #det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
-
+    
 
 
 ##########################################################
@@ -130,7 +188,7 @@ def global_except_hook(exctype, value, exc_traceback):
     sys.__excepthook__(exctype, value, exc_traceback)
     return
 
-#sys.excepthook = global_except_hook
+sys.excepthook = global_except_hook
 ##########################################################
 
 
@@ -152,7 +210,8 @@ from smalldata_tools.DetObject_lcls2 import DetObject_lcls2
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdBaselineCorrectFunc
-from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc
+from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc, hsdROIFunc
+from smalldata_tools.ana_funcs.waveformFunc import fimSumFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
@@ -198,6 +257,8 @@ parser.add_argument('--tiff', help='save all images also as single tiff (use wit
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
 parser.add_argument("--rawFim", help="save raw Fim data", action='store_true', default=False)
+parser.add_argument("--nohsd", help="dont save HSD data", action='store_true', default=False)
+parser.add_argument("--nosum", help="dont save sums", action='store_true', default=False)
 args = parser.parse_args()
 
 logger.debug('Args to be used for small data run: {0}'.format(args))
@@ -216,9 +277,9 @@ def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
     if write_dir is None:
         if useFFB:
-            write_dir = ''.join([FFB_BASE, '/', hutch, '/', exp, '/scratch', SD_EXT])
+            write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
         else:
-            write_dir = ''.join([PSDM_BASE, '/', hutch, '/', exp, SD_EXT])
+            write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
     if args.default:
         if useFFB:
             write_dir = write_dir.replace('hdf5','hdf5_def')
@@ -226,11 +287,11 @@ def get_sd_file(write_dir, exp, hutch):
             write_dir = write_dir.replace('hdf5','scratch')
     h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
     if not os.path.isdir(write_dir):
-        logger.debug('{0} does not exist, creating directory'.format(write_dir))
+        logger.info('{0} does not exist, creating directory'.format(write_dir))
         try:
             os.mkdir(write_dir)
         except OSError as e:
-            logger.debug('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
+            logger.info('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
             sys.exit()
     logger.debug('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
@@ -273,7 +334,7 @@ if hostname.find('drp')>=0:
                 print('We have no xtc files for run %s in %s in the FFB system, we will wait for 10 second and check again.'%(run,exp))
                 time.sleep(10)
     waitFilesEnd=datetime.now()
-    print('Files appeared after %s seconds'%(str(waitFilesStart-waitFilesEnd)))
+    print('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
     useFFB = True
 
 # If not a current experiment or files in ffb, look in psdm
@@ -284,8 +345,10 @@ else:
         print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
         sys.exit()
 
+print('deifne output')
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
+print(h5_f_name)
 #if args.default:
 #    if useFFB:
 #        h5_f_name = h5_f_name.replace('hdf5','hdf5_def')
@@ -294,14 +357,15 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 
 # Define data source name and generate data source object, don't understand all conditions yet
 os.environ['PS_SRV_NODES']='1'
+
 if rank==0: print('Opening the data source:')
 try:
     if useFFB:
         xtcdir = '/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
         if args.nevents<1e9:
-            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, max_events=args.nevents)
+            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, max_events=args.nevents, live=True)
         else:
-            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir)
+            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, live=True)
     else:
         if args.nevents<1e9:
             ds = psana.DataSource(exp=exp, run=int(run), max_events=args.nevents)
@@ -333,7 +397,10 @@ default_dets = defaultDetectors(hutch.lower(), thisrun)
 #
 if args.full or args.epicsAll:
     epicsPV = [k[0] for k in thisrun.epicsinfo]
-    logger.info('epicsStore names for epicsAll', epicsPV)
+    try:
+        logger.info('epicsStore names for epicsAll', epicsPV)
+    except:
+        pass
     if len(epicsPV)>0:
         logger.info('adding all epicsPVs....')
         default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
@@ -353,42 +420,35 @@ if not args.default:
     #try-except as not every rank seems to know thisdet....
     try:
         dets = define_dets(args.run)
+        print([d for d in dets])
     except:
         pass
 
 det_presence={}
 if args.full:
-    aliases = [ dn for dn in thisrun.detnames ]
-    #vetoDets = [ 'epicsinfo' ]
-    vetoDets = [ 'epicsinfo'] #at least for run 339 of rixx43518
-    #vetoDets = [ 'epicsinfo' ,'andor','hsd'] #manta only has little data for run 339, same for andor
+    try:
+        aliases = [ dn for dn in thisrun.detnames ]
+        vetoDets = [ 'epicsinfo'] #at least for run 339 of rixx43518
 
-    for alias in aliases:
-        det_presence[alias]=1
-        if alias in default_det_aliases: continue
-        if alias in vetoDets: continue
-        try:
-            thisDet = DetObject_lcls2(alias , thisrun)
-            #thisDet = DetObject(alias, ds.env(), int(run), name=alias)
-            hasGeom=False
-            for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
-                if alias.find(keyword)>=0 and args.image: hasGeom=True
-            if alias.find('hsd')>=0:
-                #thisDet.addFunc(ROIFunc())
-                hsdsplit = hsdsplitFunc()
-                #hsdsplit.addFunc(hsdBaselineCorrectFunc())
-                thisDet.addFunc(hsdsplit)
-            else:
-                if hasGeom:
-                    fullROI=ROIFunc()
-                    fullROI.addFunc(imageFunc(coords=['x','y']))
-                else:    
+        for alias in aliases:
+            det_presence[alias]=1
+            if alias in default_det_aliases: continue
+            if alias in vetoDets: continue
+            try:
+                thisDet = DetObject_lcls2(alias , thisrun)
+                if alias.find('hsd')>=0 and not args.nohsd:
+                    hsdsplit = hsdsplitFunc()
+                    thisDet.addFunc(hsdsplit)
+                else:
                     fullROI = ROIFunc(writeArea=True)
-                thisDet.addFunc(fullROI)
-            print('adding detector for %s'%alias)
-            dets.append(thisDet)
-        except:
-            pass
+                    thisDet.addFunc(fullROI)
+                print('adding detector for %s'%alias)
+                dets.append(thisDet)
+            except:
+                pass
+
+    except:
+        pass
 
 event_iter = thisrun.events()
 
@@ -431,7 +491,7 @@ for evt_num, evt in enumerate(event_iter):
             try:
                 if size == 1:
                     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
-                elif rank == size-1:
+                elif size > 2 and rank == 2:
                     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
             except:
                 if rank==0: print('Processed evt %d'%evt_num)
@@ -442,10 +502,12 @@ print('Sums:')
 sumDict={'Sums': {}}
 for det in dets:
     for key in det.storeSum().keys():
-        sumData=small_data.sum(det.storeSum()[key])
-        sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
+        try:
+            sumData=small_data.sum(det.storeSum()[key])
+            sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
+        except:
+            print('Problem with data sum for %s and key %s'%(det._name,key))
 if len(sumDict['Sums'].keys())>0 and small_data.summary:
-#     print(sumDict)
     small_data.save_summary(sumDict)
 
 userDataCfg={}
@@ -479,7 +541,7 @@ except:
     pass
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
-    if size > 1 and rank == 0:
+    if size > 2 and rank == 2:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
