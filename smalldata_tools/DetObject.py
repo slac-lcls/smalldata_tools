@@ -1028,7 +1028,7 @@ class Epix10k2MObject(TiledCameraObject):
         self.pixelsize=[100e-6]
         self.isGainswitching=True
 
-        configs = ['Config10ka2MV1', 'Config10ka2MV2', 'Config10kaQuadV1']
+        configs = ['Config10ka2MV1', 'Config10ka2MV2', 'Config10kaQuadV1', 'Config10kaQuadV2']
         for config in configs:
             epixCfg = env.configStore().get(getattr(psana.Epix, config), det.source)
             if epixCfg is not None:

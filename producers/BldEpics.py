@@ -63,16 +63,19 @@ def SafeFloat(self, string, precision=None):
     return res
 
 def get_bld_data(key):
-    if key == 'FEEGasDetEnergy':
-        return 0.25*(dat.gas_detector.f_11_ENRC.read()+dat.gas_detector.f_12_ENRC.read()+dat.gas_detector.f_21_ENRC.read()+dat.gas_detector.f_22_ENRC.read())
-    elif key == 'MEC-XT2-BMMON-02':    
-        return dat.xt2_ipm2.sum.read()
-    elif key == 'MEC-XT2-BMMON-03':    
-        return dat.xt2_ipm3.sum.read()
-    elif key == 'event':
-        return np.arange(dat.fiducials.shape[0])
-    else: 
-        return None
+    data = None
+    try:
+        if key == 'FEEGasDetEnergy':
+            data = 0.25*(dat.gas_detector.f_11_ENRC.read()+dat.gas_detector.f_12_ENRC.read()+dat.gas_detector.f_21_ENRC.read()+dat.gas_detector.f_22_ENRC.read())
+        elif key == 'MEC-XT2-BMMON-02':    
+            data = dat.xt2_ipm2.sum.read()
+        elif key == 'MEC-XT2-BMMON-03':    
+            data = dat.xt2_ipm3.sum.read()
+        elif key == 'event':
+            data = np.arange(dat.fiducials.shape[0])
+    except:
+        pass
+    return data
 
 
 

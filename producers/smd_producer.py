@@ -271,9 +271,9 @@ def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
     if write_dir is None:
         if useFFB:
-            write_dir = ''.join([FFB_BASE, '/', hutch, '/', exp, '/scratch', SD_EXT])
+            write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
         else:
-            write_dir = ''.join([PSDM_BASE, '/', hutch, '/', exp, SD_EXT])
+            write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
     if args.default:
         if useFFB:
             write_dir = write_dir.replace('hdf5','hdf5_def')
@@ -328,7 +328,7 @@ if hostname.find('drp')>=0:
                 print('We have no xtc files for run %s in %s in the FFB system, we will wait for 10 second and check again.'%(run,exp))
                 time.sleep(10)
     waitFilesEnd=datetime.now()
-    print('Files appeared after %s seconds'%(str(waitFilesStart-waitFilesEnd)))
+    print('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
     useFFB = True
 
 # If not a current experiment or files in ffb, look in psdm
