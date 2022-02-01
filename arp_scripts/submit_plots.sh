@@ -33,6 +33,7 @@ EOF
 #by the ARP args in the os.environment
 
 POSITIONAL=()
+EXP=$EXPERIMENT
 while [[ $# -gt 0 ]]
 do
         key="$1"
@@ -44,6 +45,12 @@ do
 			;;
 		-q|--queue)
 			QUEUE="$2"
+			shift
+			shift
+			;;
+		-e|--experiment)
+            POSITIONAL+=("--experiment $2")
+            EXP=$2
 			shift
 			shift
 			;;
@@ -73,16 +80,20 @@ QUEUE=${QUEUE:='psanaq'}
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
+HUTCH=${EXP:0:3}
+
 source /reg/g/psdm/etc/psconda.sh -py3
 #conda activate ana-4.0.16-py3
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
-PLOT_PY=FirstEventPlots
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
+PLOT_PY=BeamlineSummaryPlots_$HUTCH
 if [[ -v PEDESTAL ]]; then
     PLOT_PY=PedestalPlot
 elif [[ -v BLD ]]; then
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
     PLOT_PY=BldEpics
 fi
 
+echo calling $ABS_PATH/$PLOT_PY.py $@
 if [[ -v INTERACTIVE ]]; then
     $ABS_PATH/$PLOT_PY.py $@
 else
