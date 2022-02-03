@@ -293,7 +293,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     plotInfo = [xrange, yrange, xDim, yDim]
     
     nCycles=1
-    if len(peds.shape)>=3:
+    if len(peds.shape)>=3 and det_name.find('CsPad')<0:
         nCycles=peds.shape[0]
 
     if peds_pre is not None:
@@ -349,8 +349,8 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
                  detImgMaxSize=400):
     dsname = 'exp={}:run={}:smd'.format(expname,run)
     ds = psana.DataSource(dsname)
-    det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0]
-    aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0]
+    det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0]
+    aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0]
 
     tabs = None
     for det_name, alias in zip(det_names, aliases):
