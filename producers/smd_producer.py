@@ -44,6 +44,35 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
+def getAzIntPyFAIParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        az_dict = {}
+        pix_size = 176e-6
+        ai_kwargs = {'dist':1, 'poni1':960*pix_size, 'poni2':960*pix_size}
+        az_dict['ai_kwargs'] = ai_kwargs
+        az_dict['npts'] = 512
+        az_dict['int_units'] = '2th_deg'
+        az_dict['return2d'] = False
+        ret_dict['Rayonix'] = az_dict
+    return ret_dict
+
+# def getAzIntParams(run):
+#     if isinstance(run,str):
+#         run=int(run)
+#     ret_dict = {}
+#     if run>0:
+#         pix_size = 100e-6
+#         az_dict = {'eBeam': 18.0} # keV
+#         az_dict['center'] = [833*pix_size*1000, 832*pix_size*1000] # um
+#         az_dict['dis_to_sam'] = 80. # mm
+#         az_dict['tx'] = 0 # deg
+#         az_dict['ty'] = 0 # deg
+#         ret_dict['epix10k2M'] = az_dict
+#     return ret_dict
+
 # Droplet algo 2 (greedy guess)
 # def getDropletParams(run):
 #     """ Parameters for droplet algorithm
@@ -85,7 +114,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M'] # add detector here
+    detnames = ['jungfrau1M', 'Rayonix', 'epix10k2M'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -99,6 +128,11 @@ def define_dets(run):
     except Exception as e:
         print(f'Can\'t instantiate azimuthalBinning args: {e}')
         az = []
+    try:
+        az_pyfai = getAzIntPyFAIParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate AzIntPyFAI args: {e}')
+        az_pyfai = []
     try:
         phot = getPhotonParams(run)
     except Exception as e:
@@ -148,6 +182,8 @@ def define_dets(run):
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
+            if detname in az_pyfai:
+                det.addFunc(azav_pyfai(**az_pyfai[detname]))
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
@@ -166,7 +202,7 @@ def define_dets(run):
 
             det.storeSum(sumAlgo='calib')
             det.storeSum(sumAlgo='calib_img')
-            det.storeSum(sumAlgo='square_img')
+            # det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
 
@@ -213,6 +249,7 @@ from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.full_det import image_from_dat
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
@@ -260,12 +297,11 @@ logger.debug('Args to be used for small data run: {0}'.format(args))
 ###### Helper Functions ##########
 
 def get_xtc_files(base, hutch, run):
-	"""File all xtc files for given experiment and run"""
-	run_format = ''.join(['r', run.zfill(4)])
-	data_dir = ''.join([base, '/', hutch.lower(), '/', exp, '/xtc'])
-	xtc_files = glob(''.join([data_dir, '/', '*', '-', run_format, '*']))
-
-	return xtc_files
+    """File all xtc files for given experiment and run"""
+    run_format = ''.join(['r', run.zfill(4)])
+    data_dir = ''.join([base, '/', hutch.lower(), '/', exp, '/xtc'])
+    xtc_files = glob(''.join([data_dir, '/', '*', '-', run_format, '*']))
+    return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""

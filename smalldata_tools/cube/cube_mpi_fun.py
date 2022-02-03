@@ -4,9 +4,14 @@ import time
 import itertools
 
 import psana
-from smalldata_tools.DetObject import DetObject
+from smalldata_tools.DetObject import DetObject, DetObjectFunc
 from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
+from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
@@ -22,8 +27,8 @@ def lengthy_computation(*args):
     return 1
 
 
-def bin_distribution(bins_info, func=None):
-    """ Distribute bin analysis to worker on a per bin basis. Generally should be run 
+class Bin_distribution(object):
+    """ Handles the distribution of the bin analysis to worker on a per bin basis. Generally should be run 
     from rank 0 in MPI.
     Workflow: if a worker is not busy, it gets the first bin with a 'not done'
     or 'not in progress' status. Workers' status is stored in array 'working' and the bin 
@@ -35,45 +40,84 @@ def bin_distribution(bins_info, func=None):
         func: what to do with returned results. Must accept bin_idx and data as kw argument. Generally
             a function to write data to file.
     """
-    nBins = len(bins_info)
-    logger.info('Total number of bins: {}'.format(nBins))
-    working = np.zeros((size-1, 2)) # rank currently working and bin_idx on which it is working
-    bin_status = np.zeros(nBins) # whether bin has been processed or not. 0.5=in progress, 1=done
-    while(not np.all(bin_status==1)):
-        for worker_id, at_work in enumerate(working):
-            if at_work[0]==0:
-                try:
-                    bin_idx = np.argwhere(bin_status==0)[0][0]
-                except Exception as e:
-                    continue
-                job_info = {'bin_idx': bin_idx, 'info': []}
-                for info in bins_info[bin_idx]:
-                    job_info['info'].append(info)
-                logger.debug('Send job to rank {}: {}'.format(worker_id+1, len(job_info)))
-                bin_status[bin_idx] = 0.5
-                comm.send(job_info, dest=worker_id+1) # rank 0 does not do jobs
-                working[worker_id,:] = [1, bin_idx]
-#         logger.debug('Working: {}'.format(working))
-        
-        t1 = time.time()
-        job_done = comm.recv(source=MPI.ANY_SOURCE)
-        t2 = time.time()
-        bin_idx = job_done['idx']
-        logger.info('Bin {} received on rank 0 after {}s.'.format(bin_idx, t2-t1))
-        if func is not None:
-            output = func(data=job_done['data'], bin_idx=bin_idx)
-        
-        bin_status[bin_idx] = 1
-        worker_id = np.argwhere(working[:,1]==bin_idx)[0][0]
-        working[worker_id,0] = 0
-        logger.debug('New bin status: {}'.format(bin_status))
-    logger.info('**** DONE ****')
     
-    """ Closing worker's while loop """
-    for worker_id, at_work in enumerate(working):
-        if at_work[0]==0:
-            comm.send('done', dest=worker_id+1)
-    return
+    def __init__(self, bins_info, file):
+        self.bins_info = bins_info
+        self.nBins = len(self.bins_info)
+        logger.info('Total number of bins: {}'.format(self.nBins))
+        self.working = np.zeros((size-1, 2)) # rank currently working and bin_idx on which it is working
+        self.bin_status = np.zeros(self.nBins) # whether bin has been processed or not. 0.5=in progress, 1=done
+        self.file = file
+        return
+    
+    
+    def distribute(self):
+        while(not np.all(self.bin_status==1)):
+            for worker_id, at_work in enumerate(self.working):
+                if at_work[0]==0:
+                    try:
+                        bin_idx = np.argwhere(self.bin_status==0)[0][0]
+                    except Exception as e:
+                        continue
+                    job_info = {'bin_idx': bin_idx, 'info': []}
+                    for info in self.bins_info[bin_idx]:
+                        job_info['info'].append(info)
+                    logger.debug('Send job to rank {}: {}'.format(worker_id+1, len(job_info)))
+                    self.bin_status[bin_idx] = 0.5
+                    comm.send(job_info, dest=worker_id+1) # rank 0 does not do jobs
+                    self.working[worker_id,:] = [1, bin_idx]
+            # logger.debug('Working: {}'.format(self.working))
+
+            t1 = time.time()
+            job_done = comm.recv(source=MPI.ANY_SOURCE)
+            t2 = time.time()
+            bin_idx = job_done['idx']
+            logger.info('Bin {} received on rank 0 after {}s.'.format(bin_idx, t2-t1))
+            
+            self.save_bin_to_h5(bin_idx, job_done['data'])
+            
+            self.bin_status[bin_idx] = 1
+            worker_id = np.argwhere(self.working[:,1]==bin_idx)[0][0]
+            self.working[worker_id,0] = 0
+            logger.debug('New bin status: {}'.format(self.bin_status))
+        logger.info('**** DONE ****')
+
+        """ Send stop signal to workers """
+        for worker_id, at_work in enumerate(self.working):
+            if at_work[0]==0:
+                comm.send('done', dest=worker_id+1)
+        return
+    
+    
+    def save_bin_to_h5(self, bin_idx, data):
+        """ data[0]: summed_data, data[1]: n_in_bin, data[2]: proc_data
+        """
+        for detname in data[0].keys():
+            # data
+            dset_name = f'{detname}_data'
+            # dset = self.file[dset_name]
+            # dset[bin_idx] = data[0][detname]
+            dat = data[0][detname]
+            shape = (self.nBins,)+dat.shape
+            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
+            dset[bin_idx] = dat
+            # n_in_bin
+            dset_name = f'{detname}_nEntries'
+            # dset = self.file[dset_name]
+            # dset[bin_idx] = data[1][detname]
+            dat = data[1][detname]
+            shape = (self.nBins,)
+            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
+            dset[bin_idx] = dat
+            # proc data
+            for key in data[2][detname].keys():
+                dset_name = f'{detname}_{key}'
+                dat = data[2][detname][key]
+                shape = (self.nBins,)+dat.shape
+                dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
+                dset[bin_idx] = dat
+        return
+
 
 
 class BinWorker(object):
@@ -86,12 +130,19 @@ class BinWorker(object):
         bcast_var = None
         dsname = comm.bcast(bcast_var, root=0)
         print(dsname)
+        
         print('********** Start setup.')
         t0 = time.time()
         self.dsIdx = psana.DataSource(str(dsname))
         logger.info('********** Datasource on rank {}: {}s'.format(rank, time.time()-t0))
         self.dsIdxRun = next(self.dsIdx.runs())
-        logger.info('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
+        self.parse_detectors()
+        logger.info('Rank {} has datasource and detectors.'.format(rank))
+        print('********** Setup on rank {}: {}s'.format(rank, time.time()-t0))
+        return
+    
+    
+    def parse_detectors(self):
         bcast_var = None
         self.targetVarsXtc = comm.bcast(bcast_var, root=0) # get det info from rank 0
         logger.debug('Detectors info received on rank {}. {}'.format(rank, self.targetVarsXtc))
@@ -102,14 +153,24 @@ class BinWorker(object):
                 cm = det_info.get('common_monde',None)
                 det = DetObject(detname, self.dsIdx.env(), self.run, common_mode=cm, name=detname)
                 self.dets.append(det)
-                # add detector analysis function (only support full image for now)
-                det.addFunc(ROIFunc(writeArea=True))
+                # add full ROI analysis
+                det.addFunc(ROIFunc(writeArea=True)) # add full image (always)
+                
+                # add other to process on the image of each bin
+                if 'det_proc' in det_info.keys():
+                    for func_args in det_info['det_proc']:
+                        fname = func_args.pop('name')
+                        print(f'Add DetObjectFunc {fname} as post-process.')
+                        func = globals()[fname]
+                        func = func(**func_args)
+                        func._proc = False # not process every event
+                        det.addFunc(func)
             except Exception as e:
                 print('Could not make detector {}. Abort'.format(detname))
                 print(e)
                 comm.Abort()
-        logger.info('Rank {} has datasource and detectors.'.format(rank))
         return
+    
     
     def work(self):
         done = 0
@@ -124,11 +185,13 @@ class BinWorker(object):
             if DUMMY: # just to test things
                 out = lengthy_computation()
             else:
-                out = self.process_bin(job_info['info'], job_info['bin_idx']) # out[0]: summed_data, out[1]: n_in_bin
+                out = self.process_bin(job_info['info'], job_info['bin_idx']) 
+                # out[0]: summed_data, out[1]: n_in_bin, out[3]: proc_data
             job_done = {'idx': job_info['bin_idx'], 'data': out}
             comm.send(job_done, dest=0)
         logger.debug('Rank {} out of while loop.'.format(rank))
         return
+    
     
     def process_bin(self, bin_info, bin_idx):
         """ bin_info[0]: fiducials, bin_info[1]: evttime
@@ -139,29 +202,22 @@ class BinWorker(object):
         for det in self.dets:
             summed_data[det._name] = 0
             n_in_bin[det._name] = 0
-        # get detectors data for the bin
+        
+        # get summed detectors data for the bin
         for ievt, evtfid, evttime in zip(itertools.count(), bin_info[0], bin_info[1]):
             evtt = psana.EventTime(int(evttime),int(evtfid))
             evt = self.dsIdxRun.event(evtt)
-            data = self.process_area_dets(evt)
+            data = self.process_event(evt)
             for detname in data.keys():
                 n_in_bin[detname]+=1
-                summed_data[detname]+=data[detname]
-        # make full image for each det if requested
-        for det, thisDetDict in zip(self.dets, self.targetVarsXtc):
-            if isinstance(summed_data[det._name],int):
-                logger.info('No data in bin {}.'.format(bin_idx))
-                summed_data[det._name] = np.nan
-                continue
-            if hasattr(det, 'x') and thisDetDict['image']==1:
-                summed_data[det._name] = det.det.image(self.run, summed_data[det._name])
-#             if 'image' in thisDetDict:
-#                 if thisDetDict['image']==True:
-#                     summed_data[thisDetDict['source']] = \
-#                         det.det.image(self.run, summed_data[thisDetDict['source']])
-        return summed_data, n_in_bin
+                summed_data[detname]+=data[detname]        
         
-    def process_area_dets(self, evt):
+        # post-process on the summed data in the bin
+        summed_data, proc_data = self.process_summed_bin(summed_data, bin_idx)
+        return summed_data, n_in_bin, proc_data
+    
+    
+    def process_event(self, evt):
         """ Process area detectors defined in self.targetVarXtc for a given events. """
         det_data = {}
         for det, thisDetDict in zip(self.dets, self.targetVarsXtc):
@@ -205,6 +261,26 @@ class BinWorker(object):
             except Exception as e:
                 print('Failed to get data for this event for det {}.\n{}'.format(det._name, e))
         return det_data
+    
+    
+    def process_summed_bin(self, summed_data, bin_idx):
+        proc_data = {}
+        for det, thisDetDict in zip(self.dets, self.targetVarsXtc):
+            if isinstance(summed_data[det._name],int):
+                logger.info('No data in bin {}.'.format(bin_idx))
+                summed_data[det._name] = np.nan
+                continue
+            # make full image for each det if requested
+            if hasattr(det, 'x') and thisDetDict['image']==1:
+                summed_data[det._name] = det.det.image(self.run, summed_data[det._name])
+            # process the additional functions
+            for func in [det.__dict__[k] for k in det.__dict__ if isinstance(det.__dict__[k], DetObjectFunc)]:
+                if isinstance(func, (ROIFunc, photonFunc, dropletFunc, droplet2Func)):
+                    continue
+                proc_data[det._name] = func.process(summed_data[det._name])
+                logger.debug(f'Processed data keys: {proc_data[det._name].keys()}')
+        return summed_data, proc_data
+
     
     
 class mpi_bin_data(object):

@@ -2380,8 +2380,10 @@ class SmallDataAna_psana(object):
                         addToHdf5(grp, 'iy', det.iy)
         
         print('Start binning area detectors')                
-        save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
-        sum_data = mpi_fun.bin_distribution(bins_info, func=save_fct)
+        # save_fct = lambda data=None, bin_idx=None: self.save_bin_to_h5(fout=fout, data=data, bin_idx=bin_idx)
+        # sum_data = mpi_fun.bin_distribution(bins_info, func=save_fct)
+        bin_distrib = mpi_fun.Bin_distribution(bins_info, fout)
+        bin_distrib.distribute()
         t3 = time.time()
 
         print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))
@@ -2426,28 +2428,14 @@ class SmallDataAna_psana(object):
         
     @staticmethod
     def make_det_data_dset(fout, detname, det_shape, nbins):
+        """ Is that really necessary? """
         # data dset
         dset_name = '{}_data'.format(detname)
         shape = tuple(np.r_[nbins,det_shape])
-        dset = fout.create_dataset(dset_name, shape)
+        dset = fout.create_dataset(dset_name, shape, dtype=float)
         # n_in_bin dset
         dset_name = '{}_nEntries'.format(detname)
-        dset = fout.create_dataset(dset_name, (nbins,))
-        return
-    
-    @staticmethod
-    def save_bin_to_h5(fout=None, bin_idx=None, data=None):
-        """ data[0]: summed_data, data[1]: n_in_bin
-        """
-        for detname in data[0].keys():
-            # data
-            dset_name = '{}_data'.format(detname)
-            dset = fout[dset_name]
-            dset[bin_idx] = data[0][detname]
-            # n_in_bin
-            dset_name = '{}_nEntries'.format(detname)
-            dset = fout[dset_name]
-            dset[bin_idx] = data[1][detname]
+        dset = fout.create_dataset(dset_name, (nbins,), dtype=float)
         return
     
     @staticmethod

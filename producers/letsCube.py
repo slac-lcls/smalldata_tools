@@ -8,7 +8,7 @@ import numpy as np
 import argparse
 import socket
 import logging 
-import os
+import re
 import requests
 from requests.auth import HTTPBasicAuth
 from mpi4py import MPI
@@ -22,11 +22,24 @@ sys.path.append(fpathup)
 print(fpathup)
 import smalldata_tools.cube.cube_mpi_fun as mpi_fun
 
-# exp = 'xpplv9818'
-# run = 127
+##########################################################
+# Custom exception handler to make job abort if a single rank fails.
+# Avoid jobs hanging forever and report actual error message to the log file.
+import traceback as tb
 
-# exp = 'xpplw8919'
-# run = 63
+def global_except_hook(exctype, value, exc_traceback):
+    tb.print_exception(exctype, value, exc_traceback)
+    sys.stderr.write("except_hook. Calling MPI_Abort().\n")
+    sys.stdout.flush() # Command to flush the output - stdout
+    sys.stderr.flush() # Command to flush the output - stderr
+    # Note: mpi4py must be imported inside exception handler, not globally.
+    import mpi4py.MPI
+    mpi4py.MPI.COMM_WORLD.Abort(1)
+    sys.__excepthook__(exctype, value, exc_traceback)
+    return
+
+sys.excepthook = global_except_hook
+##########################################################
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -87,6 +100,8 @@ if rank==0:
             import cube_config_xpp as config
         elif hutch=='XCS':
             import cube_config_xcs as config
+        elif hutch=='MFX':
+            import cube_config_mfx as config
     else:
         print(f'Importing custom config {args.config}')
         config = importlib.import_module(args.config)
@@ -111,7 +126,7 @@ if rank==0:
         if 'fh5' not in ana.__dict__.keys():
             ana = None
     if ana is None:
-        print('Non ana instance found. Abort')
+        print('No ana instance found. Abort')
         comm.Abort()
 
     ana.printRunInfo()
@@ -121,11 +136,10 @@ if rank==0:
 
     varList = config.varList
 
-    #CHANGE ME
     ####
     # if you are interested in laser-xray delay, please select the delay of choice here!
     ####
-    ana.setDelay(use_ttCorr=True, addEnc=False, addLxt=False, reset=True)
+    ana.setDelay(use_ttCorr=config.use_tt, addEnc=False, addLxt=False, reset=True)
     
     cubeName='cube' #initial name
     scanName, scanValues = ana.getScanValues()
@@ -157,7 +171,8 @@ if rank==0:
             binName = 'delay'
     else:
         cubeName='randomTest'
-        binName='ipm2/sum'
+        binName = [key for key in ana.Keys() if re.search("ipm.*/sum",key)][0]
+        # binName='ipm2/sum'
         binVar=ana.getVar(binName)
         binSteps=np.percentile(binVar,[0,25,50,75,100])
 
@@ -172,7 +187,12 @@ if rank==0:
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
     
-    addBinVars = config.get_addBinVars(run)
+    try:
+        addBinVars = config.get_addBinVars(run)
+    except Exception as e:
+        print('Error when setting additional binVar. Will assume that 1D cube is requested. Fix if this is not the case')
+        print(f'Error: {e}')
+        addBinVars = None
     if addBinVars is not None and isinstance(addBinVars, dict):
         for cubeName, cube in ana.cubes.items():
             cube.add_BinVar(addBinVars)

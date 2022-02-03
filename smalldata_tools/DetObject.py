@@ -42,7 +42,8 @@ class event(object):
 #
 class DetObjectFunc(object):
     def __init__(self, **kwargs):
-        self._debug=False
+        self._debug = False
+        self._proc = True # Will be set to False in cube only
         if '_name' not in kwargs and '_name' not in self.__dict__.keys():
             print('Function needs to have _name as parameter, will return None')
             return None
@@ -259,20 +260,20 @@ class DetObjectClass(object):
 
     #make this a private function?
     def getMask(self, ROI):
-      ROI = np.array(ROI)
-      #print 'DEBUG getMask: ',ROI.shape
-      if ROI.shape != (2,2):
-        return np.ones_like(self.ped) 
+        ROI = np.array(ROI)
+        #print 'DEBUG getMask: ',ROI.shape
+        if ROI.shape != (2,2):
+            return np.ones_like(self.ped) 
 
-      mask_roi=np.zeros(self.imgShape)#<-- no, like image. Need image size.
-      #print 'DEBUG getMask: img shape ',self.imgShape, self.ped.shape
-      mask_roi[ROI[0,0]:ROI[0,1],ROI[1,0]:ROI[1,1]]=1
-      if self._needsGeo:
-        mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(self.ix,self.iy)] )
-      else:
-        mask_r_nda = mask_roi
-      #print 'mask from rectangle (shape):',mask_r_nda.shape
-      return mask_r_nda
+        mask_roi=np.zeros(self.imgShape)#<-- no, like image. Need image size.
+        #print 'DEBUG getMask: img shape ',self.imgShape, self.ped.shape
+        mask_roi[ROI[0,0]:ROI[0,1],ROI[1,0]:ROI[1,1]]=1
+        if self._needsGeo:
+            mask_r_nda = np.array( [mask_roi[ix, iy] for ix, iy in zip(self.ix,self.iy)] )
+        else:
+            mask_r_nda = mask_roi
+        #print 'mask from rectangle (shape):',mask_r_nda.shape
+        return mask_r_nda
 
     def getData(self, evt):
         try:
@@ -294,6 +295,8 @@ class DetObjectClass(object):
             print('This event has no data to be processed')
             return 
         for func in [self.__dict__[k] for k in  self.__dict__ if isinstance(self.__dict__[k], DetObjectFunc)]:
+            if func._proc == False: # so that we don't process all events in cube
+                continue
             try:
                 retData=func.process(self.evt.dat)
                 self.evt.__dict__['_write_%s'%func._name] = retData
