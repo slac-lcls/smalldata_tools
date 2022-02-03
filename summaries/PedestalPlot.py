@@ -48,19 +48,15 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Ped=1e6
     max95Ped=-1e6
     max95Noise=-1e6
-    min5Diff=1e6
-    max95Diff=-1e6
 
     if nCycles > 5: nCycles = 5
     for i in range(nCycles):
         if nCycles>1:
             thisPed = peds[i]
             thisNoise = noise[i]
-            thisDiff = diff[i]
         else:
             thisPed = peds
             thisNoise = noise
-            thisDiff = diff
 
         if np.nanpercentile(thisNoise,95) > max95Noise:
             max95Noise = np.nanpercentile(thisNoise,95)
@@ -68,14 +64,69 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
             max95Ped = np.nanpercentile(thisPed,95)
         if np.nanpercentile(thisPed,5) < min5Ped:
             min5Ped = np.nanpercentile(thisPed,5)
+
+    max95Noise*=1.25
+    max95Ped*=1.25
+    min5Ped*=0.9
+    
+    pedBins = np.linspace(min5Ped, max95Ped, 200)
+    pedHistograms = []
+    pedBinDim = hv.Dimension(('ped_bin%s'%alias,'pedestal in ADU'), range=(min5Ped, max95Ped))
+    noiseBins = np.linspace(0, max95Noise, 200)
+    noiseHistograms = []
+    noiseBinDim = hv.Dimension(('rms_bin%s'%alias,'noise in ADU'), range=(0, max95Noise))
+
+    noiseMax=0
+    pedMax=0
+    for i in range(max(1, nCycles)):
+        if nCycles>1:
+            thisNoise = noise[i]
+            thisPed = peds[i]
+        else:
+            thisPed = peds
+            thisNoise = noise
+
+        pedHistograms.append(np.histogram(thisPed.flatten(), pedBins))
+        noiseHistograms.append(np.histogram(thisNoise.flatten(), noiseBins))
+        if pedMax < np.nanmax(pedHistograms[-1][0]):
+            pedMax = np.nanmax(pedHistograms[-1][0])
+        if noiseMax < np.nanmax(noiseHistograms[-1][0]):
+            noiseMax = np.nanmax(noiseHistograms[-1][0])
+    pedMax*=1.1 
+    noiseMax*=1.1 
+    evtsPDim = hv.Dimension(('evtsP%s'%alias,'N pixels / pedestal'), range=(0,pedMax))
+    evtsDim = hv.Dimension(('evtsN%s'%alias,'N pixels / noise'), range=(0,noiseMax))
+
+    pedHists = []
+    noiseHists = []
+    i=0
+    for pedH,noiseH in zip(pedHistograms, noiseHistograms):
+        pedHists.append(hv.Points((0.5*(pedBins[1:]+pedBins[:-1]), pedH[0]), label='Cycle %d'%i, 
+                                    kdims=[pedBinDim, evtsPDim]) *
+                         hv.Curve((0.5*(pedBins[1:]+pedBins[:-1]), pedH[0])))
+        noiseHists.append(hv.Points((0.5*(noiseBins[1:]+noiseBins[:-1]), noiseH[0]), label='Cycle %d'%i, 
+                                    kdims=[noiseBinDim, evtsDim]) *
+                         hv.Curve((0.5*(noiseBins[1:]+noiseBins[:-1]), noiseH[0])))
+        i+=1
+
+    if diff is None:
+        return pedHists, noiseHists, None
+
+    min5Diff=1e6
+    max95Diff=-1e6
+
+    if nCycles > 5: nCycles = 5
+    for i in range(nCycles):
+        if nCycles>1:
+            thisDiff = diff[i]
+        else:
+            thisDiff = diff
+
         if np.nanpercentile(thisDiff,98) > max95Diff:
             max95Diff = np.nanpercentile(thisDiff,98)
         if np.nanpercentile(thisDiff,2) < min5Diff:
             min5Diff = np.nanpercentile(thisDiff,2)
 
-    max95Noise*=1.25
-    max95Ped*=1.25
-    min5Ped*=0.9
     if max95Diff >= 0:
         max95Diff*=1.25
     else:
@@ -85,61 +136,32 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     else:
         min5Diff*=1.25
     
-    pedBins = np.linspace(min5Ped, max95Ped, 200)
-    pedHistograms = []
-    pedBinDim = hv.Dimension(('ped_bin%s'%alias,'pedestal in ADU'), range=(min5Ped, max95Ped))
-    noiseBins = np.linspace(0, max95Noise, 200)
-    noiseHistograms = []
-    noiseBinDim = hv.Dimension(('rms_bin%s'%alias,'noise in ADU'), range=(0, max95Noise))
     diffBins = np.linspace(min5Diff, max95Diff, 200)
     diffHistograms = []
     diffBinDim = hv.Dimension(('diff_bin%s'%alias,'diff in ADU'), range=(min5Diff, max95Diff))
 
-    noiseMax=0
-    pedMax=0
     diffMax=0
     for i in range(max(1, nCycles)):
         if nCycles>1:
-            thisNoise = noise[i]
-            thisPed = peds[i]
             thisDiff = diff[i]
         else:
-            thisPed = peds
-            thisNoise = noise
             thisDiff = diff
 
-        pedHistograms.append(np.histogram(thisPed.flatten(), pedBins))
-        noiseHistograms.append(np.histogram(thisNoise.flatten(), noiseBins))
         diffHistograms.append(np.histogram(thisDiff.flatten(), diffBins))
-        if pedMax < np.nanmax(pedHistograms[-1][0]):
-            pedMax = np.nanmax(pedHistograms[-1][0])
-        if noiseMax < np.nanmax(noiseHistograms[-1][0]):
-            noiseMax = np.nanmax(noiseHistograms[-1][0])
         if diffMax < np.nanmax(diffHistograms[-1][0]):
             diffMax = np.nanmax(diffHistograms[-1][0])
-    pedMax*=1.1 
-    noiseMax*=1.1 
     diffMax*=1.1
-    evtsPDim = hv.Dimension(('evtsP%s'%alias,'N pixels / pedestal'), range=(0,pedMax))
-    evtsDim = hv.Dimension(('evtsN%s'%alias,'N pixels / noise'), range=(0,noiseMax))
     evtsDDim = hv.Dimension(('evtsD%s'%alias,'N pixels / diff'), range=(0,diffMax))
 
-    pedHists = []
-    noiseHists = []
     diffHists = []
     i=0
-    for pedH,noiseH,diffH in zip(pedHistograms, noiseHistograms, diffHistograms):
-        pedHists.append(hv.Points((0.5*(pedBins[1:]+pedBins[:-1]), pedH[0]), label='Cycle %d'%i, 
-                                    kdims=[pedBinDim, evtsPDim]) *
-                         hv.Curve((0.5*(pedBins[1:]+pedBins[:-1]), pedH[0])))
-        noiseHists.append(hv.Points((0.5*(noiseBins[1:]+noiseBins[:-1]), noiseH[0]), label='Cycle %d'%i, 
-                                    kdims=[noiseBinDim, evtsDim]) *
-                         hv.Curve((0.5*(noiseBins[1:]+noiseBins[:-1]), noiseH[0])))
+    for diffH in diffHistograms:
         diffHists.append(hv.Points((0.5*(diffBins[1:]+diffBins[:-1]), diffH[0]), label='Cycle %d'%i, 
                                     kdims=[diffBinDim, evtsDDim]) *
                          hv.Curve((0.5*(diffBins[1:]+diffBins[:-1]), diffH[0])))
         i+=1
         
+
     return pedHists, noiseHists, diffHists
 
 def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=500, plotInfo=None):
@@ -274,12 +296,17 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     if len(peds.shape)>=3:
         nCycles=peds.shape[0]
 
-    pedHists, noiseHists, diffHists = ped_rms_histograms(nCycles, peds, noise, (peds-peds_pre), det_name)
+    if peds_pre is not None:
+        diffPeds = (peds-peds_pre)
+    else:
+        diffPeds = None
+    pedHists, noiseHists, diffHists = ped_rms_histograms(nCycles, peds, noise, diffPeds, det_name)
     gspecH = pn.GridSpec(sizing_mode='stretch_width', max_width=500, name='Histogram - %s'%det_name)
     gspecH[0,0:8] = pn.Row('# Pedestals&RMS Histograms - Run %04d'%(run))
     gspecH[1:4,0:8] = pn.Column(hv.Overlay(pedHists))
     gspecH[4:7,0:8] = pn.Column(hv.Overlay(noiseHists))
-    gspecH[7:10,0:8] = pn.Column(hv.Overlay(diffHists))
+    if diffHists is not None:
+        gspecH[7:10,0:8] = pn.Column(hv.Overlay(diffHists))
     if tabs is None:
         tabs = pn.Tabs(gspecH)
         #this is for debugging.....
