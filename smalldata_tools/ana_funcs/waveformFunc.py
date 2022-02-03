@@ -271,12 +271,13 @@ class hsdROIFunc(DetObjectFunc):
     shape: desired shape of array
     """
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','ROI')
+        self._name = kwargs.get('name','hsd_0__ROI')
         super(hsdROIFunc, self).__init__(**kwargs)
         ## later add different methods.
-        self.ROI = kwargs.get('ROI', {})
+        self._hsdname = kwargs.get('name','hsd_0__ROI').split('__')[0]
+        self.ROI = kwargs.get('ROI', [0,-1])
         self.writeArea = kwargs.get('writeArea', False)
-        self.calcPars = kwargs.get('calcPars', True)
+        self.calcPars = kwargs.get('calcPars', True)            
 
     def setFromDet(self, det):
         super(hsdROIFunc, self).setFromDet(det)
@@ -286,16 +287,16 @@ class hsdROIFunc(DetObjectFunc):
         ret_dict={}
         pass_dict={}
 
-        for k in self.ROI:
-            if k in data and k.find('times')<0:
-                for iROI,ROI in enumerate(self.ROI[k]):
-                    pass_dict['%s_%d'%(k,iROI)] = data[k][ROI[0]:ROI[1]]
-        
+        kdata = None
+        if self._hsdname in data:
+            kdata = data[self._hsdname]
+        if kdata is not None:
+            pass_dict['data'] = kdata[self.ROI[0]:self.ROI[1]]
         if self.writeArea:
-            ret_dict = { k:pass_dict[k] for k in pass_dict}
+            ret_dict = {'wf':pass_dict[k] for k in pass_dict}
         if self.calcPars:
             for k in pass_dict:
-                ret_dict['%s_sum'%(k)] = np.nansum(pass_dict[k])
+                ret_dict['sum'] = np.nansum(pass_dict[k])
                 #ret_dict['%s_com'%(k)] = np.nansum(pass_dict[k]*np.arange(pass_dict[k].shape[0]))/np.nansum(pass_dict[k])
 
         self.dat = pass_dict
@@ -427,7 +428,7 @@ class fimSumFunc(DetObjectFunc):
             bkgData = data[:,self._bkgROI].mean(axis=1)
         data = data-(bkgData.reshape((bkgData.shape[0],1)))
         dataS = data[:,self._sigROI]
-        ret_dict['fimSum'] = data[:,self._sigROI].sum(axis=1)
+        ret_dict['sum'] = data[:,self._sigROI].sum(axis=1)
 
         #self.dat = ret_dict
         #subfuncResults = self.processFuncs()

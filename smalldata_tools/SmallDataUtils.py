@@ -39,16 +39,15 @@ def tmoDetectors(run, beamCodes=[[162],[91]]):
     dets=[]
     dets.append(scanDetector('scan', run))
     dets.append(genlcls2Detector('timing',run))
+    dets.append(lcls2_lightStatus(beamCodes,run))
     dets.append(genlcls2Detector('gmd',run))
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
     dets.append(genlcls2Detector('pcav',run))
-    #for now.
-    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=False))
-    dets.append(lcls2_lightStatus(beamCodes,run))
-    dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
     dets.append(fimfexDetector('tmo_fim0',run))
     dets.append(fimfexDetector('tmo_fim1',run))
+    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
+    dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
 
     return dets
 
@@ -56,6 +55,7 @@ def rixDetectors(run, beamCodes=[[-136],[77]]):
     dets=[]
     dets.append(scanDetector('scan', run))
     dets.append(genlcls2Detector('timing',run))
+    dets.append(lcls2_lightStatus(beamCodes,run))
     dets.append(genlcls2Detector('gmd',run))
     dets.append(genlcls2Detector('xgmd',run))
     dets.append(genlcls2Detector('ebeam',run))
@@ -64,9 +64,8 @@ def rixDetectors(run, beamCodes=[[-136],[77]]):
     dets.append(fimfexDetector('rix_fim1',run))
     dets.append(fimfexDetector('rix_fim2',run))
     dets.append(genlcls2Detector('mono_encoder',run))
-    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
-    dets.append(lcls2_lightStatus(beamCodes,run))
 
+    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
     #check a RIX scan to figure out controlDetector.
     return dets
 
@@ -181,7 +180,6 @@ def cxiDetectors(beamCodes=[[162, 120],[]]):
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
-    #dets.append(ttDetector(baseName='CXI:TTSPEC:'))
     dets.append(ttDetector(baseName='CXI:TIMETOOL:'))
     try:
         dets.append(impDetector('Sc1Imp'))
@@ -214,9 +212,9 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-02','xt2_ipm2'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-03','xt2_ipm3'))
+    dets.append(ttDetector(baseName='MEC:TIMETOOL:'))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
-    dets.append(ttDetector(baseName='MEC:TIMETOOL:'))
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
     dets.append(epicsDetector(PVlist=['belens_z',

@@ -36,7 +36,6 @@ class ROIFunc(DetObjectFunc):
         if ROI.ndim==1 and ROI.shape[0]>2:
             ROI = ROI.reshape(ROI.shape[0]/2,2)
         self.bound = ROI.squeeze()
-        #print 'DEBUG: def ROI', self.bound
         self.writeArea = kwargs.get('writeArea',False)
         self._calcPars = kwargs.get('calcPars',True)
         self.mask =  kwargs.get('userMask',None)
@@ -157,6 +156,7 @@ class ROIFunc(DetObjectFunc):
             ret_dict['area'] = ROIdata.data.squeeze()
         if self._calcPars:
             ret_dict['sum'] = ROIdata.filled(fill_value=0).sum()
+            ret_dict['mean'] = ROIdata.filled(fill_value=0).mean()
             ret_dict['max'] = ROIdata.filled(fill_value=0).max()
             ret_dict['com'] = self.centerOfMass(ROIdata)
         if 'Nsat' in self.__dict__.keys():
@@ -173,7 +173,6 @@ class ROIFunc(DetObjectFunc):
 
                 else:
                     ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
-        #print 'ret_dict ',ret_dict.keys()
         return ret_dict
 
 #DEBUG ME WITH MASKED ARRAY#
