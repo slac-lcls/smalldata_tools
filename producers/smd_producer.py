@@ -67,7 +67,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M', 'Rayonix', 'epix10k2M'] # add detector here
+    detnames = ['jungfrau1M'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -495,12 +495,12 @@ for evt_num, evt in enumerate(ds.events()):
                     if key=='callib':
                         det._storeSum[key] = np.zeros_like(det.cmask)
                     elif key=='image':
-                        det._storeSum[key] = det.det.image(run, det._storeSum[key])
+                        det._storeSum[key] = np.zeros_like(det.det.image(run, det.cmask))
                 else:
                     if key=='calib':
                         det._storeSum[key]+=np.zeros_like(det.cmask)
                     elif key=='image':
-                        det._storeSum[key] = det.det.image(run, np.zeros_like(det.cmask))
+                        det._storeSum[key]+=det.det.image(run, np.zeros_like(det.cmask))
 
     small_data.event(userDict)
 
