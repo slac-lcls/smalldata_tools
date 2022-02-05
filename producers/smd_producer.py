@@ -44,53 +44,6 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
-def getAzIntPyFAIParams(run):
-    if isinstance(run,str):
-        run=int(run)
-    ret_dict = {}
-    if run>0:
-        az_dict = {}
-        pix_size = 176e-6
-        ai_kwargs = {'dist':1, 'poni1':960*pix_size, 'poni2':960*pix_size}
-        az_dict['ai_kwargs'] = ai_kwargs
-        az_dict['npts'] = 512
-        az_dict['int_units'] = '2th_deg'
-        az_dict['return2d'] = False
-        ret_dict['Rayonix'] = az_dict
-    return ret_dict
-
-# def getAzIntParams(run):
-#     if isinstance(run,str):
-#         run=int(run)
-#     ret_dict = {}
-#     if run>0:
-#         pix_size = 100e-6
-#         az_dict = {'eBeam': 18.0} # keV
-#         az_dict['center'] = [833*pix_size*1000, 832*pix_size*1000] # um
-#         az_dict['dis_to_sam'] = 80. # mm
-#         az_dict['tx'] = 0 # deg
-#         az_dict['ty'] = 0 # deg
-#         ret_dict['epix10k2M'] = az_dict
-#     return ret_dict
-
-# Droplet algo 2 (greedy guess)
-# def getDropletParams(run):
-#     """ Parameters for droplet algorithm
-#     See droplet2Func.py for more info
-#     """
-#     if isinstance(run,str):
-#         run=int(run)
-#     ret_dict = {}
-#     if run>0:
-#         droplet_dict = {}
-#         droplet_dict['return_img'] = True
-#         droplet_dict['threshold'] = 15
-#         droplet_dict['mask'] = None
-#         droplet_dict['aduspphot'] = 162
-#         droplet_dict['offset'] = 81
-#         ret_dict['epix_alc'] = droplet_dict
-#     return ret_dict
-
 
 ##########################################################
 # run independent parameters 
@@ -222,7 +175,7 @@ def global_except_hook(exctype, value, exc_traceback):
     sys.__excepthook__(exctype, value, exc_traceback)
     return
 
-#sys.excepthook = global_except_hook
+sys.excepthook = global_except_hook
 ##########################################################
 
 
@@ -536,7 +489,19 @@ for evt_num, evt in enumerate(ds.events()):
             det.processSums()
 #             print(userDict[det._name])
         except:
-            pass
+            # handle when sum is bad for all shots on a rank (rare, but happens)
+            for key in det._storeSum.keys():
+                if det._storeSum[key] is None:
+                    if key=='callib':
+                        det._storeSum[key] = np.zeros_like(det.cmask)
+                    elif key=='image':
+                        det._storeSum[key] = det.det.image(run, det._storeSum[key])
+                else:
+                    if key=='calib':
+                        det._storeSum[key]+=np.zeros_like(det.cmask)
+                    elif key=='image':
+                        det._storeSum[key] = det.det.image(run, np.zeros_like(det.cmask))
+
     small_data.event(userDict)
 
     if args.tiff:

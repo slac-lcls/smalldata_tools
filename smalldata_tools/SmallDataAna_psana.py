@@ -503,7 +503,8 @@ class SmallDataAna_psana(object):
                 continue
 
             det.getData(evt)
-            data.append(det.evt.dat.copy())
+            if det.evt.dat is not None:
+                data.append(det.evt.dat.copy())
         data = np.asarray(data).ravel()
         
         bmin, bmax = np.percentile(data,0.1), 2.5*np.percentile(data,99.5)
@@ -2428,7 +2429,7 @@ class SmallDataAna_psana(object):
         
     @staticmethod
     def make_det_data_dset(fout, detname, det_shape, nbins):
-        """ Is that really necessary? """
+        """ Is that really necessary? Yes, because of empty bins! """
         # data dset
         dset_name = '{}_data'.format(detname)
         shape = tuple(np.r_[nbins,det_shape])

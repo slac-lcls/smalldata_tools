@@ -95,27 +95,20 @@ class Bin_distribution(object):
         for detname in data[0].keys():
             # data
             dset_name = f'{detname}_data'
-            # dset = self.file[dset_name]
-            # dset[bin_idx] = data[0][detname]
-            dat = data[0][detname]
-            shape = (self.nBins,)+dat.shape
-            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-            dset[bin_idx] = dat
+            dset = self.file[dset_name]
+            dset[bin_idx] = data[0][detname]
             # n_in_bin
             dset_name = f'{detname}_nEntries'
-            # dset = self.file[dset_name]
-            # dset[bin_idx] = data[1][detname]
-            dat = data[1][detname]
-            shape = (self.nBins,)
-            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-            dset[bin_idx] = dat
+            dset = self.file[dset_name]
+            dset[bin_idx] = data[1][detname]
             # proc data
-            for key in data[2][detname].keys():
-                dset_name = f'{detname}_{key}'
-                dat = data[2][detname][key]
-                shape = (self.nBins,)+dat.shape
-                dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-                dset[bin_idx] = dat
+            if data[2]:
+                for key in data[2][detname].keys():
+                    dset_name = f'{detname}_{key}'
+                    dat = data[2][detname][key]
+                    shape = (self.nBins,)+dat.shape
+                    dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
+                    dset[bin_idx] = dat
         return
 
 
@@ -210,7 +203,7 @@ class BinWorker(object):
             data = self.process_event(evt)
             for detname in data.keys():
                 n_in_bin[detname]+=1
-                summed_data[detname]+=data[detname]        
+                summed_data[detname]+=data[detname]
         
         # post-process on the summed data in the bin
         summed_data, proc_data = self.process_summed_bin(summed_data, bin_idx)
@@ -228,9 +221,9 @@ class BinWorker(object):
                 img = None
                 for key in thisDetDataDict.keys():
                     if key=='full_area':
-                        img = thisDetDataDict[key]
+                        img = thisDetDataDict[key].astype(float) # needed for detectors whose data are uint16 (Rayonix)
                     elif key.find('ROI')>=0:
-                        img = thisDetDataDict[key]
+                        img = thisDetDataDict[key].astype(float)
                 if img is None:
                     print('Problem with getting detector area data.')
                     continue
