@@ -155,7 +155,6 @@ def define_dets(run):
 
             det.storeSum(sumAlgo='calib')
             det.storeSum(sumAlgo='calib_img')
-            # det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
 
@@ -479,7 +478,6 @@ for evt_num, evt in enumerate(ds.events()):
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
-            #print('userdata ',det)
             try:
                 envData=getUserEnvData(det)
                 if len(envData.keys())>0:
@@ -492,7 +490,7 @@ for evt_num, evt in enumerate(ds.events()):
             # handle when sum is bad for all shots on a rank (rare, but happens)
             for key in det._storeSum.keys():
                 if det._storeSum[key] is None:
-                    if key=='callib':
+                    if key=='calib':
                         det._storeSum[key] = np.zeros_like(det.cmask)
                     elif key=='image':
                         det._storeSum[key] = np.zeros_like(det.det.image(run, det.cmask))
@@ -557,7 +555,7 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
 logger.debug('Saved all small data')
 
 if args.postRuntable and ds.rank==0:
-    print('posting to the run tables.')
+    print('Posting to the run tables.')
     locStr=''
     if useFFB:
         locStr='_ffb'

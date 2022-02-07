@@ -179,7 +179,7 @@ class BinWorker(object):
                 out = lengthy_computation()
             else:
                 out = self.process_bin(job_info['info'], job_info['bin_idx']) 
-                # out[0]: summed_data, out[1]: n_in_bin, out[3]: proc_data
+                # INFO: out[0]: summed_data, out[1]: n_in_bin, out[3]: proc_data
             job_done = {'idx': job_info['bin_idx'], 'data': out}
             comm.send(job_done, dest=0)
         logger.debug('Rank {} out of while loop.'.format(rank))
@@ -201,9 +201,12 @@ class BinWorker(object):
             evtt = psana.EventTime(int(evttime),int(evtfid))
             evt = self.dsIdxRun.event(evtt)
             data = self.process_event(evt)
-            for detname in data.keys():
-                n_in_bin[detname]+=1
-                summed_data[detname]+=data[detname]
+            for detname, dat in data.items():
+                if dat is None:
+                    continue
+                else:
+                    n_in_bin[detname]+=1
+                    summed_data[detname]+=dat
         
         # post-process on the summed data in the bin
         summed_data, proc_data = self.process_summed_bin(summed_data, bin_idx)
@@ -253,6 +256,7 @@ class BinWorker(object):
 #                     dSArray = dSArray + (x-dMArray)*(x-oldM)
             except Exception as e:
                 print('Failed to get data for this event for det {}.\n{}'.format(det._name, e))
+                det_data[det._name] = None
         return det_data
     
     
