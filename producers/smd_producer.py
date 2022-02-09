@@ -490,15 +490,9 @@ for evt_num, evt in enumerate(ds.events()):
             # handle when sum is bad for all shots on a rank (rare, but happens)
             for key in det._storeSum.keys():
                 if det._storeSum[key] is None:
-                    if key=='calib':
-                        det._storeSum[key] = np.zeros_like(det.cmask)
-                    elif key=='image':
-                        det._storeSum[key] = np.zeros_like(det.det.image(run, det.cmask))
+                    det._storeSum[key] = 0
                 else:
-                    if key=='calib':
-                        det._storeSum[key]+=np.zeros_like(det.cmask)
-                    elif key=='image':
-                        det._storeSum[key]+=det.det.image(run, np.zeros_like(det.cmask))
+                    det._storeSum[key] += 0
 
     small_data.event(userDict)
 
