@@ -19,7 +19,7 @@ from read_uxi import read_uxi, get_uxi_timestamps, getDarks
 import psana
 #from collections import Counter
     
-#epix10k: thermisotr value to temp in C
+#epix10k: thermisotr value to temp in CRa
 def getThermistorTemp(x):
     if x==0: return 0.
     u = x/16383.0 * 2.5
@@ -318,7 +318,7 @@ class DetObjectClass(object):
             if self.evt.dat is None:
                 return
             dat_to_be_summed = self.evt.dat
-            if thres>1e-9:
+            if thres>-1e9:
                 dat_to_be_summed[self.evt.dat<thres]=0.
 
             if key.find('nhits')>=0:
