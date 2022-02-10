@@ -190,7 +190,7 @@ if rank==0:
     try:
         addBinVars = config.get_addBinVars(run)
     except Exception as e:
-        print('Error when setting additional binVar. Will assume that 1D cube is requested. Fix if this is not the case')
+        print('Error when setting additional binVar. Will assume that 1D cube is requested. Fix if this is not the case.')
         print(f'Error: {e}')
         addBinVars = None
     if addBinVars is not None and isinstance(addBinVars, dict):

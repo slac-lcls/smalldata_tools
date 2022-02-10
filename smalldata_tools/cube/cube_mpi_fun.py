@@ -95,27 +95,20 @@ class Bin_distribution(object):
         for detname in data[0].keys():
             # data
             dset_name = f'{detname}_data'
-            # dset = self.file[dset_name]
-            # dset[bin_idx] = data[0][detname]
-            dat = data[0][detname]
-            shape = (self.nBins,)+dat.shape
-            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-            dset[bin_idx] = dat
+            dset = self.file[dset_name]
+            dset[bin_idx] = data[0][detname]
             # n_in_bin
             dset_name = f'{detname}_nEntries'
-            # dset = self.file[dset_name]
-            # dset[bin_idx] = data[1][detname]
-            dat = data[1][detname]
-            shape = (self.nBins,)
-            dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-            dset[bin_idx] = dat
+            dset = self.file[dset_name]
+            dset[bin_idx] = data[1][detname]
             # proc data
-            for key in data[2][detname].keys():
-                dset_name = f'{detname}_{key}'
-                dat = data[2][detname][key]
-                shape = (self.nBins,)+dat.shape
-                dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
-                dset[bin_idx] = dat
+            if data[2]:
+                for key in data[2][detname].keys():
+                    dset_name = f'{detname}_{key}'
+                    dat = data[2][detname][key]
+                    shape = (self.nBins,)+dat.shape
+                    dset = self.file.require_dataset(dset_name, shape=shape, dtype=float)
+                    dset[bin_idx] = dat
         return
 
 
@@ -186,7 +179,7 @@ class BinWorker(object):
                 out = lengthy_computation()
             else:
                 out = self.process_bin(job_info['info'], job_info['bin_idx']) 
-                # out[0]: summed_data, out[1]: n_in_bin, out[3]: proc_data
+                # INFO: out[0]: summed_data, out[1]: n_in_bin, out[3]: proc_data
             job_done = {'idx': job_info['bin_idx'], 'data': out}
             comm.send(job_done, dest=0)
         logger.debug('Rank {} out of while loop.'.format(rank))
@@ -208,9 +201,12 @@ class BinWorker(object):
             evtt = psana.EventTime(int(evttime),int(evtfid))
             evt = self.dsIdxRun.event(evtt)
             data = self.process_event(evt)
-            for detname in data.keys():
-                n_in_bin[detname]+=1
-                summed_data[detname]+=data[detname]        
+            for detname, dat in data.items():
+                if dat is None:
+                    continue
+                else:
+                    n_in_bin[detname]+=1
+                    summed_data[detname]+=dat
         
         # post-process on the summed data in the bin
         summed_data, proc_data = self.process_summed_bin(summed_data, bin_idx)
@@ -228,9 +224,9 @@ class BinWorker(object):
                 img = None
                 for key in thisDetDataDict.keys():
                     if key=='full_area':
-                        img = thisDetDataDict[key]
+                        img = thisDetDataDict[key].astype(float) # needed for detectors whose data are uint16 (Rayonix)
                     elif key.find('ROI')>=0:
-                        img = thisDetDataDict[key]
+                        img = thisDetDataDict[key].astype(float)
                 if img is None:
                     print('Problem with getting detector area data.')
                     continue
@@ -260,6 +256,7 @@ class BinWorker(object):
 #                     dSArray = dSArray + (x-dMArray)*(x-oldM)
             except Exception as e:
                 print('Failed to get data for this event for det {}.\n{}'.format(det._name, e))
+                det_data[det._name] = None
         return det_data
     
     

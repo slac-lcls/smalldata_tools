@@ -44,53 +44,6 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
-def getAzIntPyFAIParams(run):
-    if isinstance(run,str):
-        run=int(run)
-    ret_dict = {}
-    if run>0:
-        az_dict = {}
-        pix_size = 176e-6
-        ai_kwargs = {'dist':1, 'poni1':960*pix_size, 'poni2':960*pix_size}
-        az_dict['ai_kwargs'] = ai_kwargs
-        az_dict['npts'] = 512
-        az_dict['int_units'] = '2th_deg'
-        az_dict['return2d'] = False
-        ret_dict['Rayonix'] = az_dict
-    return ret_dict
-
-# def getAzIntParams(run):
-#     if isinstance(run,str):
-#         run=int(run)
-#     ret_dict = {}
-#     if run>0:
-#         pix_size = 100e-6
-#         az_dict = {'eBeam': 18.0} # keV
-#         az_dict['center'] = [833*pix_size*1000, 832*pix_size*1000] # um
-#         az_dict['dis_to_sam'] = 80. # mm
-#         az_dict['tx'] = 0 # deg
-#         az_dict['ty'] = 0 # deg
-#         ret_dict['epix10k2M'] = az_dict
-#     return ret_dict
-
-# Droplet algo 2 (greedy guess)
-# def getDropletParams(run):
-#     """ Parameters for droplet algorithm
-#     See droplet2Func.py for more info
-#     """
-#     if isinstance(run,str):
-#         run=int(run)
-#     ret_dict = {}
-#     if run>0:
-#         droplet_dict = {}
-#         droplet_dict['return_img'] = True
-#         droplet_dict['threshold'] = 15
-#         droplet_dict['mask'] = None
-#         droplet_dict['aduspphot'] = 162
-#         droplet_dict['offset'] = 81
-#         ret_dict['epix_alc'] = droplet_dict
-#     return ret_dict
-
 
 ##########################################################
 # run independent parameters 
@@ -114,7 +67,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M', 'Rayonix', 'epix10k2M'] # add detector here
+    detnames = ['jungfrau1M'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -202,7 +155,6 @@ def define_dets(run):
 
             det.storeSum(sumAlgo='calib')
             det.storeSum(sumAlgo='calib_img')
-            # det.storeSum(sumAlgo='square_img')
             dets.append(det)
     return dets
 
@@ -222,7 +174,7 @@ def global_except_hook(exctype, value, exc_traceback):
     sys.__excepthook__(exctype, value, exc_traceback)
     return
 
-#sys.excepthook = global_except_hook
+sys.excepthook = global_except_hook
 ##########################################################
 
 
@@ -526,7 +478,6 @@ for evt_num, evt in enumerate(ds.events()):
             det.getData(evt)
             det.processFuncs()
             userDict[det._name]=getUserData(det)
-            #print('userdata ',det)
             try:
                 envData=getUserEnvData(det)
                 if len(envData.keys())>0:
@@ -536,7 +487,13 @@ for evt_num, evt in enumerate(ds.events()):
             det.processSums()
 #             print(userDict[det._name])
         except:
-            pass
+            # handle when sum is bad for all shots on a rank (rare, but happens)
+            for key in det._storeSum.keys():
+                if det._storeSum[key] is None:
+                    det._storeSum[key] = 0
+                else:
+                    det._storeSum[key] += 0
+
     small_data.event(userDict)
 
     if args.tiff:
@@ -592,7 +549,7 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
 logger.debug('Saved all small data')
 
 if args.postRuntable and ds.rank==0:
-    print('posting to the run tables.')
+    print('Posting to the run tables.')
     locStr=''
     if useFFB:
         locStr='_ffb'

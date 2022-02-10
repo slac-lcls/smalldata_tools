@@ -157,7 +157,6 @@ def mfxDetectors(beamCodes=[[162, 120],[]]):
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(aiDetector('MFX-AIN-01','ai')) 
-    # dets.append(ttDetector(baseName='MFX:TTSPEC:'))
     dets.append(ttDetector(baseName='MFX:TIMETOOL:'))
     dets.append(bmmonDetector('MFX-DG1-BMMON','ipm_dg1'))
     dets.append(bmmonDetector('MFX-DG2-BMMON','ipm_dg2'))
