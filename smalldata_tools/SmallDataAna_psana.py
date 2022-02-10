@@ -80,7 +80,8 @@ class SmallDataAna_psana(object):
             if not rundoc:
                 logger.error("Invalid response from server")
             lastRun = int(rundoc['num'])
-            if self.run > lastRun:
+            #the tutorial data has missing run numbers, breaking this check
+            if self.run > lastRun and self.expname.find('tut')<0:
                 printR(rank, 'experiment %s does only have %d runs, requested %d'%(expname, lastRun, self.run))
                 return None
         except:
