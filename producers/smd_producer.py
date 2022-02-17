@@ -117,11 +117,11 @@ def define_dets(run):
         havedet = checkDet(ds.env(), detname)
         # Common mode
         if havedet:
-            if detname=='jungfrau1M':
-                #common_mode=71 #also try 71
+            if detname=='': 
+                # change here to specify common mode for detname if desired. Else default is used
                 common_mode=0
             else:
-                common_mode=0 #no common mode
+                common_mode=None
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
             
             # Analysis functions
