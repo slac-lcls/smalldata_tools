@@ -1022,7 +1022,7 @@ class Epix10k2MObject(TiledCameraObject):
     def __init__(self, det, env, run, **kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(Epix10k2MObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [84, 81, 82, 85, 80, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
+        self._common_mode_list = [80, 84, 81, 82, 85, 180, 181, 0, -1, -2, 30] # official, sn kludge, ped sub, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]

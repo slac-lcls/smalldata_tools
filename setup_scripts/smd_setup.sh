@@ -133,7 +133,6 @@ fi
 # Create h5 directories
 if [ $FFB -eq 1 ]; then
     mkdir -p $FFB_BASE/hdf5/smalldata
-    mkdir -p $FFB_BASE/hdf5/cube
     mkdir -p $FFB_BASE/hdf5/debug
 fi
 
