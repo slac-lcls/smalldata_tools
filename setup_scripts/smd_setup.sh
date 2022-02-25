@@ -134,7 +134,6 @@ fi
 if [ $FFB -eq 1 ]; then
     mkdir -p $FFB_BASE/hdf5/smalldata
     mkdir -p $FFB_BASE/hdf5/smalldata/cube
-    mkdir -p $FFB_BASE/hdf5/debug
 fi
 
 # make arp jobs

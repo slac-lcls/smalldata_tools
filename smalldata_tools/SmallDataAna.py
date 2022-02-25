@@ -186,6 +186,7 @@ class Selection(object):
     def __init__(self):
         self.cuts=[]
         self._filter=None
+    
     def _setFilter(self,newFilter):
         if isinstance(newFilter, np.ndarray):
             self._filter = newFilter
@@ -193,6 +194,7 @@ class Selection(object):
             self._filter = np.array(newFilter)
         else:
             print('cannot set filter array with this ',newFilter)
+    
     def addCut(self, varName, varmin, varmax):
         """
         add a variable to the selection
@@ -204,6 +206,7 @@ class Selection(object):
         self.removeCut(varName)
         self.cuts.append([varName, varmin, varmax])
         self._filter=None
+    
     def removeCut(self, varName):
         """
         remove a variable from the selection
@@ -212,12 +215,14 @@ class Selection(object):
         for cut in self.cuts:
             if cut[0]==varName: self.cuts.remove(cut)
         self._filter=None
+    
     def printCuts(self):
         """ print the currently defined list of square cuts for selection/filter"""
         for icut,cut in enumerate(self.cuts):
             print('Cut %i: %f < %s < %f'%(icut, cut[1], cut[0],cut[2]))
         if isinstance(self._filter, np.ndarray):
             print('of %d events %d pass filter'%(self._filter.shape[0], self._filter.sum()))
+    
     def add(self, additionalSel):
         """ add all cuts defined in a different filter to this one"""
         for cut in additionalSel.cuts:
