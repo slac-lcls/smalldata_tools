@@ -23,14 +23,14 @@ if 'ffb' in args.queue:
     executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'START_OF_RUN'
-    cube_args = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/cube'
+    cube_args = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/smalldata/cube'
 else:
     location = 'SLAC'
     cores = 12
     executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
     executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'ALL_FILES_TRANSFERRED'
-    cube_args = f'--indirectory {FFB_BASE} --outdirectory {FFB_BASE}'
+    cube_args = f''
 
 job_defs = []
 job_defs.append( {
