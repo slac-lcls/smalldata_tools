@@ -8,7 +8,6 @@ try:
 except:
     from urllib2 import urlopen
 import matplotlib.pyplot as plt
-# import simplejson as json
 import json
 
 base_url = "http://pscaa02"
