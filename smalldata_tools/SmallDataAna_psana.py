@@ -52,7 +52,8 @@ from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 try:
     import smalldata_tools.cube.cube_mpi_fun as mpi_fun
 except:
-    print("Can't import mpi_fun. If you are not on a LCLS-II experiment, consider debugging.")
+    print("Can't import smalldata_tools.cube.cube_mpi_fun." \
+          + " If you are not on a LCLS-II experiment, consider debugging.")
 
 from mpi4py import MPI
 import h5py
