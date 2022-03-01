@@ -65,6 +65,22 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
         if np.nanpercentile(thisPed,5) < min5Ped:
             min5Ped = np.nanpercentile(thisPed,5)
 
+    #for the UXI, most pixels read back as 0. Widen the range to look for decent min/max values.
+    if max95Ped == min5Ped:
+        for i in range(nCycles):
+            if nCycles>1:
+                thisPed = peds[i]
+                thisNoise = noise[i]
+            else:
+                thisPed = peds
+                thisNoise = noise
+            if np.nanpercentile(thisNoise,99.9) > max95Noise:
+                max95Noise = np.nanpercentile(thisNoise,99.9)
+            if np.nanpercentile(thisPed,99.9) > max95Ped:
+                max95Ped = np.nanpercentile(thisPed,99.9)
+            if np.nanpercentile(thisPed,0.1) < min5Ped:
+                min5Ped = np.nanpercentile(thisPed,0.1)
+
     max95Noise*=1.25
     max95Ped*=1.25
     min5Ped*=0.9
@@ -349,8 +365,8 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
                  detImgMaxSize=400):
     dsname = 'exp={}:run={}:smd'.format(expname,run)
     ds = psana.DataSource(dsname)
-    det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0]
-    aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0]
+    det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
+    aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
 
     tabs = None
     for det_name, alias in zip(det_names, aliases):
