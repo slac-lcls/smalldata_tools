@@ -49,7 +49,6 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     max95Ped=-1e6
     max95Noise=-1e6
 
-    if nCycles > 5: nCycles = 5
     for i in range(nCycles):
         if nCycles>1:
             thisPed = peds[i]
@@ -131,7 +130,6 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Diff=1e6
     max95Diff=-1e6
 
-    if nCycles > 5: nCycles = 5
     for i in range(nCycles):
         if nCycles>1:
             thisDiff = diff[i]
@@ -180,10 +178,11 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
 
     return pedHists, noiseHists, diffHists
 
-def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=500, plotInfo=None):
+def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=500, plotInfo=None, isLCLS2=False):
     pedImgs=[]
     rmsImgs=[]
     diffImgs=[]
+
     for i in range(nCycles):
         if nCycles>1:
             thisPed = peds[i]
@@ -214,10 +213,17 @@ def plotPedImgs(nCycles, det, run, peds, noise, peds_pre = None, detImgMaxSize=5
                 except:
                     peds_pre = None
 
-        pedImg = det.image(run,thisPed)    
-        rmsImg = det.image(run,thisNoise)       
-        if peds_pre is not None:
-            diffImg = det.image(run,thisDiff)       
+        if not isLCLS2:
+            pedImg = det.image(run,thisPed)    
+            rmsImg = det.image(run,thisNoise)       
+            if peds_pre is not None:
+                diffImg = det.image(run,thisDiff)       
+        else:
+            pedImg = det.raw.image(run,thisPed)    
+            rmsImg = det.raw.image(run,thisNoise)       
+            if peds_pre is not None:
+                diffImg = det.raw.image(run,thisDiff)       
+
         if pedImg is None:
             pedImg = thisPed
             rmsImg = thisNoise
@@ -280,16 +286,33 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
     return gspecI
 
 def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=None, 
-             detImgMaxSize=400):
-    det = psana.Detector(det_name)
+             detImgMaxSize=400, isLCLS2=False):
+    if not isLCLS2:
+        det = psana.Detector(det_name)
+        peds = det.pedestals(run)
+        try:
+            peds_pre = det.pedestals(run-1)
+        except:
+            peds_pre = None
+        noise = det.rms(run)
+        runnum=run
+    else:    
+        det = run.Detector(det_name)
+        runnum = run.runnum
+        detrawid = det.raw._uniqueid
+        from psana.pscalib.calib.MDBWebUtils import calib_constants
+        peds = calib_constants(detrawid, exp=expname, ctype='pedestals', run=runnum)[0]
+        try:
+            peds_pre = calib_constants(detrawid, exp=expname, ctype='pedestals', run=runnum-1)[0]
+        except:
+            peds_pre = None
+        noise = calib_constants(detrawid, exp=expname, ctype='pixel_rms', run=runnum)[0]
 
-    peds = det.pedestals(run)
-    try:
-        peds_pre = det.pedestals(run-1)
-    except:
-        peds_pre = None
-    noise = det.rms(run)
-    
+        #snelson - debug....this call here is necessary. Not 100% sure why...
+        evt = next(run.events())
+        print('call raw image...',det.raw.image(evt, peds[0]).shape)
+        #snelson end debug
+
     xDim = hv.Dimension(('x','x in micron'))
     yDim = hv.Dimension(('y','y in micron'))
     try:
@@ -305,12 +328,15 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
             ymax=noise[0].shape[1]
         xrange=(0, xmax)
         yrange=(0, ymax)
+        xDim = hv.Dimension(('x','x in pixel'))
+        yDim = hv.Dimension(('y','y in pixel'))
         
     plotInfo = [xrange, yrange, xDim, yDim]
     
     nCycles=1
     if len(peds.shape)>=3 and det_name.find('CsPad')<0:
         nCycles=peds.shape[0]
+    if nCycles > 5: nCycles = 5
 
     if peds_pre is not None:
         diffPeds = (peds-peds_pre)
@@ -318,7 +344,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
         diffPeds = None
     pedHists, noiseHists, diffHists = ped_rms_histograms(nCycles, peds, noise, diffPeds, det_name)
     gspecH = pn.GridSpec(sizing_mode='stretch_width', max_width=500, name='Histogram - %s'%det_name)
-    gspecH[0,0:8] = pn.Row('# Pedestals&RMS Histograms - Run %04d'%(run))
+    gspecH[0,0:8] = pn.Row('# Pedestals&RMS Histograms - Run %04d'%(runnum))
     gspecH[1:4,0:8] = pn.Column(hv.Overlay(pedHists))
     gspecH[4:7,0:8] = pn.Column(hv.Overlay(noiseHists))
     if diffHists is not None:
@@ -332,16 +358,16 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
         
     if make_ped_imgs:
         if nCycles== 1:
-            pedImgs, rmsImgs, diffImgs = plotPedImgs(nCycles, det, run, peds, noise, peds_pre, detImgMaxSize=detImgMaxSize,
-                                                plotInfo=plotInfo)
+            pedImgs, rmsImgs, diffImgs = plotPedImgs(nCycles, det, runnum, peds, noise, peds_pre, detImgMaxSize=detImgMaxSize,
+                                                     plotInfo=plotInfo, isLCLS2=isLCLS2)
         else:
-            pedImgs, rmsImgs, diffImgs = plotPedImgs(nCycles, det, run, peds, noise, detImgMaxSize=detImgMaxSize,
-                                                plotInfo=plotInfo)
+            pedImgs, rmsImgs, diffImgs = plotPedImgs(nCycles, det, runnum, peds, noise, detImgMaxSize=detImgMaxSize,
+                                                plotInfo=plotInfo, isLCLS2=isLCLS2)
    
         gspec = pn.GridSpec(sizing_mode='stretch_both', max_width=1000, name='Det Imgs - %s'%det_name)
         iwidth=3
         iheight=3
-        gspec[0,0:(iwidth*3)] = pn.Row('# Pedestals&RMS - Run %04d'%(run))
+        gspec[0,0:(iwidth*3)] = pn.Row('# Pedestals&RMS - Run %04d'%(runnum))
         if nCycles == 1:
             gspec[1:(1*iheight)+1,0:iwidth] = pn.Column(pedImgs[0])
             gspec[(1*iheight)+1:(2*iheight)+1,0:iwidth] = pn.Column(rmsImgs[0])
@@ -356,30 +382,41 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
         tabs.append(gspec)
 
     if make_ped_data_imgs:
-        gspecI = plotDataImgs(det.env.experiment(), run, det.name.__str__(), nCycles, plotInfo=plotInfo)
+        gspecI = plotDataImgs(det.env.experiment(), runnum, det.name.__str__(), nCycles, plotInfo=plotInfo)
         tabs.append(gspecI)
     
     return tabs
 
 def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
                  detImgMaxSize=400):
-    dsname = 'exp={}:run={}:smd'.format(expname,run)
-    ds = psana.DataSource(dsname)
-    det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
-    aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
+    isLCLS2=False
+    if expname[:3] in ['tmo','rix','ued']: isLCLS2=True
+    if not isLCLS2:
+        dsname = 'exp={}:run={}:smd'.format(expname,run)
+        ds = psana.DataSource(dsname)
+        det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
+        aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
+        runnum=run
+    else:
+        ds = psana.DataSource(exp=expname, run=run)
+        thisrun = next(ds.runs())
+        det_names = [dn for dn in thisrun.detnames if dn.find('epix')>=0]
+        aliases = [dn for dn in thisrun.detnames if dn.find('epix')>=0]
+        runnum=run
+        run=thisrun
 
     tabs = None
     for det_name, alias in zip(det_names, aliases):
         #print(det_name, alias)
         if alias == '':
             tabs = allPlots(det_name, run, make_ped_imgs=make_ped_imgs, 
-                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize)
+                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
         else:
             tabs = allPlots(alias, run, make_ped_imgs=make_ped_imgs, 
-                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize)
+                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
       
     if save_elog:
-        elogDir = '/reg/d/psdm/%s/%s/stats/summary/Pedestals/Pedestals_Run%03d'%(expname[0:3],expname,run)
+        elogDir = '/reg/d/psdm/%s/%s/stats/summary/Pedestals/Pedestals_Run%03d'%(expname[0:3],expname,runnum)
 
         import os
         if not os.path.isdir(elogDir):
