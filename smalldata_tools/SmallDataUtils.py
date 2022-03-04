@@ -26,6 +26,8 @@ def defaultDetectors(hutch, run=None):
         dets = tmoDetectors(run)
     elif hutch.lower()=='rix':
         dets = rixDetectors(run)
+    elif hutch.lower()=='ued':
+        dets = uedDetectors(run)
     else:
         dets = []
     detsInRun= [ det for det in dets if det.inRun() ]
@@ -67,6 +69,15 @@ def rixDetectors(run, beamCodes=[[-136],[77]]):
 
     dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
     #check a RIX scan to figure out controlDetector.
+    return dets
+
+def uedDetectors(run, beamCodes=[[162],[91]]):
+    dets=[]
+    dets.append(scanDetector('scan', run))
+    dets.append(genlcls2Detector('timing',run))
+    dets.append(lcls2_lightStatus(beamCodes,run))
+    dets.append(lcls2_epicsDetector(PVlist=['MOTR_AS01_MC05_CH1'],run=run))
+
     return dets
 
 def sxrDetectors(beamCodes=[[162],[91]]):

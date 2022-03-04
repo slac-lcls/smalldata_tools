@@ -86,7 +86,7 @@ umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
-LCLS2_HUTCHES="rix, tmo"
+LCLS2_HUTCHES="rix, tmo, ued"
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
     source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
