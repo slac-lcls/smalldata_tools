@@ -1,5 +1,8 @@
 import numpy as np
-import pyFAI
+try:
+    import pyFAI
+except ModuleNotFoundError:
+    print("pyFAI not available on LCLS-II env")
 
 from smalldata_tools.DetObject import DetObjectFunc
 from smalldata_tools.utilities import image_from_dxy
