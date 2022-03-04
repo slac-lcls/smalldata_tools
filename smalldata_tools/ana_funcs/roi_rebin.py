@@ -66,10 +66,9 @@ class ROIFunc(DetObjectFunc):
                 self.mask = self.applyROI(self.mask)
             except:
                 pass
-
         try:
-            self._x = self.applyROI(det.x)
-            self._y = self.applyROI(det.y)
+            self._x = self.applyROI(det.x.squeeze())
+            self._y = self.applyROI(det.y.squeeze())
         except:
             pass
 

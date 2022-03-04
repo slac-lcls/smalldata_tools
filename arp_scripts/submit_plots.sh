@@ -80,17 +80,28 @@ QUEUE=${QUEUE:='psanaq'}
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
+EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
-
-source /reg/g/psdm/etc/psconda.sh -py3
-#conda activate ana-4.0.16-py3
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
-PLOT_PY=BeamlineSummaryPlots_$HUTCH
-if [[ -v PEDESTAL ]]; then
-    PLOT_PY=PedestalPlot
-elif [[ -v BLD ]]; then
-    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
-    PLOT_PY=BldEpics
+LCLS2_HUTCHES="rix, tmo, ued"
+if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
+    echo "This is a LCLS-II experiment"
+    source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
+    PLOT_PY=BeamlineSummaryPlots_$HUTCH
+    if [[ -v PEDESTAL ]]; then
+        PLOT_PY=PedestalPlot
+    fi
+else
+    source /reg/g/psdm/etc/psconda.sh -py3
+    #conda activate ana-4.0.16-py3
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
+    PLOT_PY=BeamlineSummaryPlots_$HUTCH
+    if [[ -v PEDESTAL ]]; then
+        PLOT_PY=PedestalPlot
+    elif [[ -v BLD ]]; then
+        ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
+        PLOT_PY=BldEpics
+    fi
 fi
 
 echo calling $ABS_PATH/$PLOT_PY.py $@
