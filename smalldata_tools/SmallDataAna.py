@@ -247,20 +247,21 @@ class SmallDataAna(object):
             if dirname=='':
                 hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
-                    self.dirname='/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = '/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
                 else:
-                    self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
                     print('Directory did not exist? ',self.dirname)
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
                     self.plot_dirname='/reg/d/psdm/%s/%s/res/smalldata_plots/'%(self.hutch,self.expname)
             else:
-                self.dirname=dirname
+                self.dirname = dirname
                 self.plot_dirname = dirname+'/smalldata_plots'
             if not path.isdir(self.plot_dirname):
                 #makedirs(self.plot_dirname)
                 self.plot_dirname = None
+        print(f'dir: {self.dirname}')
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
