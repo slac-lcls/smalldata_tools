@@ -92,9 +92,6 @@ class BaseSmallDataAna_psana(object):
         except:
             lastRun = -1
         
-        print(f'Last run {lastRun}')
-        print(f'Run: {self.run}')
-        
         self.isLive = False
         if self.run == lastRun:
             end_time = rundoc.get('end_time', None)
