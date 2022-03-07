@@ -401,23 +401,39 @@ class imageFunc(DetObjectFunc):
         if self.mask is None:
             self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool)).flatten()
 
-        if isinstance(self._coords, list):
-            for coord in self._coords:
-                self.__dict__[coord] = getattr(det, coord)
-                try:
-                    self.__dict__['i%s'%coord] = getattr(det, 'i%s'%coord).flatten()
-                except:
-                    #
-                    # DEBUG ME: looks right, but not sure
-                    #
-                    intcoord = self.__dict__[coord].copy()
-                    intcoord = intcoord - np.nanmin(intcoord)
-                    intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[0]).astype(int)
-                    self.__dict__['i%s'%coord] = intcoord
+        if isinstance(self._coords, list) or isinstance(self._coords, dict):
+            if isinstance(self._coords, list):
+                for coord in self._coords:
+                    if not hasattr(det, coord): 
+                        print('Could not get information for coordinate ',coord,' from detector')
+                        continue
+                    self.__dict__[coord] = getattr(det, coord)
+                    try:
+                        self.__dict__['i%s'%coord] = getattr(det, 'i%s'%coord).flatten()
+                    except:
+                        #
+                        # DEBUG ME: looks right, but not sure
+                        #
+                        intcoord = self.__dict__[coord].copy()
+                        intcoord = intcoord - np.nanmin(intcoord)
+                        intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[0]).astype(int)
+                        self.__dict__['i%s'%coord] = intcoord
+            else:
+                coordNames=[]
+                for coord, values in self._coords.items():
+                    coordNames.append(coord)
+                    self.__dict__[coord] = values
+                    if isinstance(values.flatten()[0], (int, np.uint64)):
+                        self.__dict__['i%s'%coord] = values
+                    else:
+                        intcoord = self.__dict__[coord].copy()
+                        intcoord = intcoord - np.nanmin(intcoord)
+                        intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[len(coordNames)-1]).astype(int)
+                        self.__dict__['i%s'%coord] = intcoord
+                self._coords = coordNames
 
-            self._coordTuple = tuple( self.__dict__['i%s'%coord] for coord in self._coords)
+            self._coordTuple = tuple( self.__dict__['i%s'%coord].flatten() for coord in self._coords)
             self._n_coordTuple = tuple( np.max(self.__dict__['i%s'%coord]+1) for coord in self._coords)
-            print('coord tuple: ', self._coordTuple)
             try:
                 self._multidim_idxs = np.ravel_multi_index(self._coordTuple, self._n_coordTuple)
                 #DEBUG ME HERE....
@@ -431,7 +447,6 @@ class imageFunc(DetObjectFunc):
                 if self.npix.max()>1: #if we map multiple pixels into one image pixel, we need to normalize
                     self._npix_div = self.npix.copy()
                     self._npix_div[self.npix>1] = 1./self.npix[self.npix>1]
-                    #print self._npix_div.max()
                 
             except:
                 pass
@@ -444,11 +459,11 @@ class imageFunc(DetObjectFunc):
                                      self.imgShape[0])), \
                              int(max(np.max(self.__dict__['i%s'%self._coords[1]])+1, \
                                      self.imgShape[1])))
-            print('image shape ',self.imgShape)
             if self.mask is not None:
-                self.mask_img = np.array(sparse.coo_matrix((self.mask.flatten(),(self.__dict__['i%s'%self._coords[0]],self.__dict__['i%s'%self._coords[1]])), shape=self.imgShape).toarray())
+                maskArray = np.array(self.mask).flatten()
+                self.mask_img = np.array(sparse.coo_matrix((maskArray,(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
                 self.mask_img[self.mask_img!=0]=1
-                ones_mask = np.array(sparse.coo_matrix((np.ones_like(self.mask.flatten()),(self.__dict__['i%s'%self._coords[0]],self.__dict__['i%s'%self._coords[1]])), shape=self.imgShape).toarray())
+                ones_mask = np.array(sparse.coo_matrix((np.ones_like(maskArray),(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
                 self.mask_ones = ones_mask
                 self.mask_img[ones_mask==0]=1
                 self.mask_img = self.mask_img.astype(int)
@@ -518,7 +533,7 @@ class imageFunc(DetObjectFunc):
         #    data = data.filled(data, fill_value=0)
         #    print 'filled'
         elif len(self._coords)==2:
-            ##using the sparse array os slower (1ms versus 0.55ms for bincount)
+            ##using the sparse array is slower (1ms versus 0.55ms for bincount)
             ##also, mapping of multiple pixels into one final pixel will not be normalizable
             ##as a note the normalization costs about 0.2ms
             #data2d = sparse.coo_matrix((data.flatten(),(self.__dict__['i%s'%self._coords[0]],self.__dict__['i%s'%self._coords[1]])), shape=self.imgShape).toarray()            
