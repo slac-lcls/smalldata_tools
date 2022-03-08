@@ -1255,6 +1255,8 @@ def hv_image_ctl(data2plot, **kwargs):
     imgPHigh = np.nanpercentile(data2plot,99.9)
     imgP10 = np.nanpercentile(data2plot,10)
     imgP90 = np.nanpercentile(data2plot,90)
+    if (imgPHigh==imgMin): imgPHigh=imgMax
+    if (imgPLow==imgMax): imgPLow=imgMin
     
     dimColLow = hv.Dimension('imgLow', range=(imgMin,imgPHigh), default=imgPLow)
     dimColHigh = hv.Dimension('imgHigh', range=(imgPLow,imgMax), default=imgPHigh)
