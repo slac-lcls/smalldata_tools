@@ -243,7 +243,6 @@ class SmallDataAna(object):
         if len(expname)>3:
             self.hutch=self.expname[:3]
             self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
-            print('dirname ',self.plot_dirname)
             if dirname=='':
                 hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
@@ -261,18 +260,17 @@ class SmallDataAna(object):
             if not path.isdir(self.plot_dirname):
                 #makedirs(self.plot_dirname)
                 self.plot_dirname = None
-        print(f'dir: {self.dirname}')
 
         if filename == '':
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
                 self.fname='%s/%s_Run%04d.h5'%(self.dirname,self.expname,self.run)
-            print('setting up dirs:')
+            print('Setting up dirs:')
             if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
-        print('and now open in dir: ',self.dirname,' to open file ',self.fname)
+        print(f'and now open in dir: {self.dirname} to open file {self.fname}.')
 
         self.Sels = {}
         self.cubes = {}
@@ -281,7 +279,7 @@ class SmallDataAna(object):
             if isinstance(intable, str) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
-                print('pass unknown input parameter or file cannot be found: ',intable)
+                print('Pass, unknown input parameter or file cannot be found: ',intable)
                 return None
         elif path.isfile(self.fname):
             self.fh5=tables.open_file(self.fname,'r')
@@ -489,7 +487,7 @@ class SmallDataAna(object):
         data = data.squeeze()
         if len(data.shape)==1:
             newArray = xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name)
-            self.xrData = xr.merge([self.xrData,  this_data])
+            self.xrData = xr.merge([self.xrData,  newArray])
         else:
             coords={'time': self._tStamp}
             dims = ['time']
@@ -790,6 +788,7 @@ class SmallDataAna(object):
         self.Sels[useFilter]._setFilter(Filter)
         #if self.Sels[useFilter]._filter is not None:
         #    print('of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum()))
+    
     def removeCut(self, varName, useFilter):
         """
         remove a variable from the selection
