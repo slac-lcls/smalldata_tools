@@ -32,6 +32,7 @@ class dropletFunc(DetObjectFunc):
         #new way to store this info
         self._debug = False
         self.footprint = np.array([[0,1,0],[1,1,1],[0,1,0]])
+        self._footprint2d = np.array([[0,1,0],[1,1,1],[0,1,0]])
         self._saveDrops = None
         self._flagMasked = None
         self._needProps = None
@@ -51,6 +52,9 @@ class dropletFunc(DetObjectFunc):
             else:
                 self._compData = self._rms
         #self._grid = np.meshgrid(range(max(self._compData.shape)),range(max(self._compData.shape)))
+        if len(det.ped.shape)>2:
+            self.footprint = np.array([ [[0,0,0],[0,0,0],[0,0,0]], [[0,1,0],[1,1,1],[0,1,0]],  [[0,0,0],[0,0,0],[0,0,0]] ])
+
 
     def applyThreshold(self,img, donut=False, invert=False, low=False):
         if not donut:
@@ -67,7 +71,7 @@ class dropletFunc(DetObjectFunc):
             img[img>self._compData*self.threshold] = 0.0
 
     def neighborImg(self,img):
-        return filters.maximum_filter(img,footprint=self.footprint)
+        return filters.maximum_filter(img,footprint=self._footprint2d)
 
     def prepareImg(self,img,donut=False,invert=False, low=False):
         imgIn = img.copy()
@@ -118,7 +122,7 @@ class dropletFunc(DetObjectFunc):
         time_start = time.time()
         img = self.prepareImg(data)
         #is faster than measure.label(img, connectivity=1)
-        img_drop = measurements.label(img)
+        img_drop = measurements.label(img, structure=self.footprint)
         time_label = time.time()
         #get all neighbors
 
@@ -131,7 +135,7 @@ class dropletFunc(DetObjectFunc):
             #
             if self.relabel:
                     imgDrop[img==0]=0
-                    img_drop_relabel = measurements.label(imgDrop)
+                    img_drop_relabel = measurements.label(imgDrop, structure=self.footprint)
                     imgDrop = img_drop_relabel[0]
         else:
             imgDrop = img_drop[0]
