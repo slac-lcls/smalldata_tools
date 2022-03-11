@@ -32,7 +32,7 @@ detDict = {'source':'epix_1',
            'thresADU':6.5, 
            'common_mode':0}
 
-varList = ['ipm2/sum','ipm3/sum','diodeU/channels', detDict]
+varList = ['ipm4/sum','ipm5/sum','diodeU/channels', detDict]
 
 
 # histogram configuration. Usually does not need to be changed (not yet implemented)

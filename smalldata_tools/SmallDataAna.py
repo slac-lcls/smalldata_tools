@@ -1095,21 +1095,34 @@ class SmallDataAna(object):
         
         if not isDaqDelayScan:
             if self.hasKey('enc/lasDelay'):
+                # try to get lasDelay first
                 encVal = self.getVar('enc/lasDelay')
                 if len(np.unique(encVal))>10:
+                    print('Use lasDelay as delay axis.')
                     if np.nanstd(encVal)>1e-9:
-                        nomDelay=encVal
-                        addEnc=False
+                        nomDelay = encVal
+                        addEnc = False
                     elif np.nanstd(encVal)>1e-15:
-                        nomDelay=encVal*1e12
-                        addEnc=False
+                        nomDelay = encVal*1e12
+                        addEnc = False
+                elif self.hasKey('enc/lasDelay2'):
+                    # if lasDelay was deemed invalid, try lasDelay2
+                    encVal = self.getVar('enc/lasDelay2')
+                    if len(np.unique(encVal))>10:
+                        print('Use lasDelay2 as delay axis.')
+                        if np.nanstd(encVal)>1e-9:
+                            nomDelay = encVal
+                            addEnc = False
+                        elif np.nanstd(encVal)>1e-15:
+                            nomDelay = encVal*1e12
+                            addEnc = False
             elif self.hasKey('enc/ch0'):
                     encVal = self.getVar('enc/ch0')
                     if np.nanstd(encVal)>1e-15 and np.nanstd(encVal)<1e-9:
-                        nomDelay=encVal*1e12
+                        nomDelay = encVal*1e12
                         #now look at the EPICS PV if everything else has failed.
                     elif np.nanstd(encVal)>1e-3:
-                        nomDelay=encVal
+                        nomDelay = encVal
                     else:
                         print('strange encoder value for runs taken before encoder FEX....', encCal.std())
             else:
