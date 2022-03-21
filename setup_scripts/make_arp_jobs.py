@@ -17,22 +17,44 @@ hutch = exp[:3].lower()
 FFB_BASE = Path("/cds/data/drpsrcf/{}/{}/scratch".format(hutch, exp))
 PSANA_BASE = Path("/cds/data/psdm/{}/{}".format(hutch, exp))
 
+# job arguments
 if 'ffb' in args.queue:
     location = 'SRCF_FFB'
     cores = 60
+    # smd
     executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
-    executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'START_OF_RUN'
-    cube_args = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/smalldata/cube'
+    
+    # cube
+    executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
+    args_cube = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/smalldata/cube'
+    
+    # summaries
+    executable_summaries = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_plots.sh')
+    queue_summaries = args.queue.replace('h','l')
+    args_summaries = f'--directory {FFB_BASE}/hdf5/smalldata'
+    run_param_name = 'SmallData_ffb'
 else:
     location = 'SLAC'
     cores = 12
+    
+    # smd
     executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
-    executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
     trigger = 'ALL_FILES_TRANSFERRED'
-    cube_args = f''
+    
+    # cube
+    executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
+    args_cube = f''
+    
+    # summaries
+    executable_summaries = str(ANA_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
+    queue_summaries = args.queue.replace('h','l')
+    run_param_name = 'SmallData'
 
+    
 job_defs = []
+
+# smallData job
 job_defs.append( {
     'name': 'smd',
     'executable': executable,
@@ -41,14 +63,29 @@ job_defs.append( {
     'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait'
     } )
 
+# cube job
 if args.cube>0:
     job_defs.append( {
         'name': 'cube',
         'executable': executable_cube,
         'trigger': 'MANUAL',
         'location': location,
-        'parameters': f'--queue {args.queue} --cores {cores} {cube_args}'
+        'parameters': f'--queue {args.queue} --cores {cores} {args_cube}'
         } )
+
+# summary plots job
+if hutch in ['rix','xcs','xpp']:
+    job_defs.append( {
+        'name': 'run_summary',
+        'executable': executable_summaries,
+        'trigger': 'RUN_PARAM_IS_VALUE',
+        'run_param_name' : run_param_name,
+        'run_param_value' : 'done',
+        'location': location,
+        'parameters': f'--queue {queue_summaries} {args_summaries}'
+    } )
+
+
 
 for job_def in job_defs:
     krbheaders = KerberosTicket('HTTP@pswww.slac.stanford.edu').getAuthHeaders()
