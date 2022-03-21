@@ -27,13 +27,14 @@ if 'ffb' in args.queue:
     
     # cube
     executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
+    run_param_name = 'SmallData_ffb'
     args_cube = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/smalldata/cube'
     
     # summaries
     executable_summaries = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_plots.sh')
     queue_summaries = args.queue.replace('h','l')
     args_summaries = f'--directory {FFB_BASE}/hdf5/smalldata'
-    run_param_name = 'SmallData_ffb'
+    
 else:
     location = 'SLAC'
     cores = 12
@@ -44,12 +45,12 @@ else:
     
     # cube
     executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
+    run_param_name = 'SmallData'
     args_cube = f''
     
     # summaries
     executable_summaries = str(ANA_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
     queue_summaries = args.queue.replace('h','l')
-    run_param_name = 'SmallData'
 
     
 job_defs = []
@@ -68,7 +69,9 @@ if args.cube>0:
     job_defs.append( {
         'name': 'cube',
         'executable': executable_cube,
-        'trigger': 'MANUAL',
+        'trigger': 'RUN_PARAM_IS_VALUE',
+        'run_param_name' : run_param_name,
+        'run_param_value' : 'done',
         'location': location,
         'parameters': f'--queue {args.queue} --cores {cores} {args_cube}'
         } )
