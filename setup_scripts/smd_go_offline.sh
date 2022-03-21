@@ -62,9 +62,17 @@ export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # ge
 
 # update FFB repo and get it on psana
 git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch=updateInstead # necessary to be able to push ffb repo
-git -C $FFB_BASE/smalldata_tools add .
-git -C $FFB_BASE/smalldata_tools commit -m "Going offline"
-git -C $FFB_BASE/smalldata_tools push -f
+git -C $PSANA_BASE/results/smalldata_tools stash # stash whatever changes were made on the psana folder (in case users tinkered with it)
+# if Wilko has already moved things, work from moved directory
+if [ -d $PSANA_BASE/scratch/ffb/ ]; then
+    git -C $PSANA_BASE/scratch/ffb/smalldata_tools add .
+    git -C $PSANA_BASE/scratch/ffb/smalldata_tools commit -m "Going offline"
+    git -C $PSANA_BASE/scratch/ffb/smalldata_tools push -f
+else
+    git -C $FFB_BASE/smalldata_tools add .
+    git -C $FFB_BASE/smalldata_tools commit -m "Going offline"
+    git -C $FFB_BASE/smalldata_tools push -f
+fi
 
 # change jobs definition
 source /reg/g/psdm/etc/psconda.sh -py3

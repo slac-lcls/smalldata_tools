@@ -46,7 +46,7 @@ for job in job_defs:
             'executable': str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh'),
             'trigger': 'MANUAL',
             'location': 'SLAC',
-            'parameters': '--queue psanaq --norecorder --postRuntable --cores 12 --wait' 
+            'parameters': '--queue psanaq --cores 12 --outdirectory $PSANA_BASE/hdf5/smalldata/cube'
         }
         ws_url = 'https://pswww.slac.stanford.edu/ws-kerb/lgbk/lgbk/{}/ws/create_update_workflow_def'.format(exp)
         r = requests.post(ws_url, headers=krbheaders, json=job_def)
