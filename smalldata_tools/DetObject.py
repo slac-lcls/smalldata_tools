@@ -52,12 +52,11 @@ class DetObjectFunc(object):
     def setFromDet(self, det):
         for k, sfunc in iteritems(self.__dict__): 
             if isinstance(sfunc, DetObjectFunc):
-                print('DEBUG: call set from det for %s with detector %s: '%(self._name, det._name))
                 sfunc.setFromDet(det) #pass parameters from det (rms, geometry, .....)
+
     def setFromFunc(self, parentFunc=None):
         for k, sfunc in iteritems(self.__dict__): 
             if isinstance(sfunc, DetObjectFunc):
-                print('DEBUG: call set from func for %s from %s: '%(sfunc._name, self._name))
                 sfunc.setFromFunc(self) #pass parameters from function (rms, boundaries, .....)
 
     def params_as_dict(self):

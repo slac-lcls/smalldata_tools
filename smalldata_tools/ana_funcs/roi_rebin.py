@@ -297,6 +297,7 @@ class sparsifyFunc(DetObjectFunc):
         self._flagMasked = kwargs.get('flagMasked',False)
         self._needProps = kwargs.get('needProps',False)
         self._saveint = kwargs.get('saveInt',True)
+        self._saveintadu = kwargs.get('saveIntADU',False)
 
     def process(self, data):
         #apply mask - set to zero, so pixels will fall out in sparify step.
@@ -347,6 +348,7 @@ class sparsifyFunc(DetObjectFunc):
                 else:
                     ret_dict[key]=(np.append(ret_dict[key], np.zeros(self.nData-len(ret_dict[key]))))
                     if self._saveint:
+                        if not self._saveintadu and key == 'data': continue
                         ret_dict[key] = ret_dict[key].astype(int)
 
         subfuncResults = self.processFuncs()
@@ -366,7 +368,7 @@ class imageFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','image')
         super(imageFunc, self).__init__(**kwargs)
-        self.coords = kwargs.get('coords',None)
+        self._coords = kwargs.get('coords',None)
         self.imgShape = kwargs.get('imgShape',None)
         self.correction = kwargs.get('correction',None)
         self.mask = kwargs.get('mask',None)
@@ -374,6 +376,7 @@ class imageFunc(DetObjectFunc):
 
     def setFromDet(self, det):
         super(imageFunc, self).setFromDet(det)
+        self._pedShape = det.ped.shape
         #set imgShape if obvious (and not previously set)
         if self.imgShape is None:
             try:
@@ -398,22 +401,39 @@ class imageFunc(DetObjectFunc):
         if self.mask is None:
             self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool)).flatten()
 
-        if isinstance(self.coords, list):
-            for coord in self.coords:
-                self.__dict__[coord] = getattr(det, coord)
-                try:
-                    self.__dict__['i%s'%coord] = getattr(det, 'i%s'%coord).flatten()
-                except:
-                    #
-                    # DEBUG ME: looks right, but not sure
-                    #
-                    intcoord = self.__dict__[coord].copy()
-                    intcoord = intcoord - np.nanmin(intcoord)
-                    intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[0]).astype(int)
-                    self.__dict__['i%s'%coord] = intcoord
+        if isinstance(self._coords, list) or isinstance(self._coords, dict):
+            if isinstance(self._coords, list):
+                for coord in self._coords:
+                    if not hasattr(det, coord): 
+                        print('Could not get information for coordinate ',coord,' from detector')
+                        continue
+                    self.__dict__[coord] = getattr(det, coord)
+                    try:
+                        self.__dict__['i%s'%coord] = getattr(det, 'i%s'%coord).flatten()
+                    except:
+                        #
+                        # DEBUG ME: looks right, but not sure
+                        #
+                        intcoord = self.__dict__[coord].copy()
+                        intcoord = intcoord - np.nanmin(intcoord)
+                        intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[0]).astype(int)
+                        self.__dict__['i%s'%coord] = intcoord
+            else:
+                coordNames=[]
+                for coord, values in self._coords.items():
+                    coordNames.append(coord)
+                    self.__dict__[coord] = values
+                    if isinstance(values.flatten()[0], (int, np.uint64)):
+                        self.__dict__['i%s'%coord] = values
+                    else:
+                        intcoord = self.__dict__[coord].copy()
+                        intcoord = intcoord - np.nanmin(intcoord)
+                        intcoord = (intcoord/np.nanmax(intcoord)*self.imgShape[len(coordNames)-1]).astype(int)
+                        self.__dict__['i%s'%coord] = intcoord
+                self._coords = coordNames
 
-            self._coordTuple = tuple( self.__dict__['i%s'%coord] for coord in self.coords)
-            self._n_coordTuple = tuple( np.max(self.__dict__['i%s'%coord]+1) for coord in self.coords)
+            self._coordTuple = tuple( self.__dict__['i%s'%coord].flatten() for coord in self._coords)
+            self._n_coordTuple = tuple( np.max(self.__dict__['i%s'%coord]+1) for coord in self._coords)
             try:
                 self._multidim_idxs = np.ravel_multi_index(self._coordTuple, self._n_coordTuple)
                 #DEBUG ME HERE....
@@ -427,7 +447,6 @@ class imageFunc(DetObjectFunc):
                 if self.npix.max()>1: #if we map multiple pixels into one image pixel, we need to normalize
                     self._npix_div = self.npix.copy()
                     self._npix_div[self.npix>1] = 1./self.npix[self.npix>1]
-                    #print self._npix_div.max()
                 
             except:
                 pass
@@ -435,15 +454,16 @@ class imageFunc(DetObjectFunc):
         if self.imgShape is None:
             self.imgShape = det.imgShape
 
-        if self.coords is not None and len(self.coords)==2:
-            self.imgShape = (int(max(np.max(self.__dict__['i%s'%self.coords[0]])+1, \
+        if self._coords is not None and len(self._coords)==2:
+            self.imgShape = (int(max(np.max(self.__dict__['i%s'%self._coords[0]])+1, \
                                      self.imgShape[0])), \
-                             int(max(np.max(self.__dict__['i%s'%self.coords[1]])+1, \
+                             int(max(np.max(self.__dict__['i%s'%self._coords[1]])+1, \
                                      self.imgShape[1])))
             if self.mask is not None:
-                self.mask_img = np.array(sparse.coo_matrix((self.mask.flatten(),(self.__dict__['i%s'%self.coords[0]],self.__dict__['i%s'%self.coords[1]])), shape=self.imgShape).todense())
+                maskArray = np.array(self.mask).flatten()
+                self.mask_img = np.array(sparse.coo_matrix((maskArray,(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
                 self.mask_img[self.mask_img!=0]=1
-                ones_mask = np.array(sparse.coo_matrix((np.ones_like(self.mask.flatten()),(self.__dict__['i%s'%self.coords[0]],self.__dict__['i%s'%self.coords[1]])), shape=self.imgShape).todense())
+                ones_mask = np.array(sparse.coo_matrix((np.ones_like(maskArray),(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
                 self.mask_ones = ones_mask
                 self.mask_img[ones_mask==0]=1
                 self.mask_img = self.mask_img.astype(int)
@@ -458,20 +478,35 @@ class imageFunc(DetObjectFunc):
             #
             # should ideally specify the output shape if possible.
             #
-            #img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense()
+            #img = sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).toarray()
             if 'tile' not in data or max(data['tile'])==0:
                 aduData = data['data']
                 rowData = data['row'].astype(int)[aduData>0]
                 colData = data['col'].astype(int)[aduData>0]
                 if self.imgShape is not None:
                     data = sparse.coo_matrix((aduData[aduData>0],(rowData, colData)), 
-                                                 shape=(self.imgShape[1], self.imgShape[0])).todense()
+                                                 shape=(self.imgShape[1], self.imgShape[0])).toarray()
                 else:
-                    data = sparse.coo_matrix(aduData[aduData>0],
-                                             (data['col'][aduData>0].astype(int),
-                                              data['row'][aduData>0].astype(int))).todense()
+                    data = sparse.coo_matrix((aduData[aduData>0],(rowData, colData))).toarray()
             else:
-                data = np.array([ sparse.coo_matrix(data['data'][data['tile']==itile],(data['row'][data['tile']==itile],data['col'][data['tile']==itile])).todense() for itile in range(1+max(data['tile'])) ])
+                rowData = data['row'].astype(int)[data['data']>0]
+                colData = data['col'].astype(int)[data['data']>0]
+                tileData = data['tile'].astype(int)[data['data']>0]
+                taduData = data['data'].copy()[data['data']>0]
+                dataList=[]
+                for itile in range(self._pedShape[-3]):
+                    if len(taduData[tileData==itile])==0:
+                        dataList.append(np.zeros((self._pedShape[-2], self._pedShape[-1])))
+                    else:
+                        tileD = taduData[tileData==itile]
+                        tileR = rowData[tileData==itile]
+                        tileC = colData[tileData==itile]
+                        dataTile = sparse.coo_matrix((tileD,(tileR, tileC)), 
+                                                     shape=(self._pedShape[-2], self._pedShape[-1])).toarray()
+                        dataList.append(dataTile)
+                #    print('itile data ',taduData[tileData==itile])
+                #data = np.array([ sparse.coo_matrix(data['data'][data['tile']==itile],(data['row'][data['tile']==itile],data['col'][data['tile']==itile])).toarray() for itile in range(1+max(data['tile'])) ])
+                data = np.array(dataList)
 
         elif not isinstance(data, np.ndarray):
             print('cannot work with this data, need array or sparsified array')
@@ -479,7 +514,8 @@ class imageFunc(DetObjectFunc):
         if self.correction is not None:
             data /= self.correction
 
-        if self.coords is None:
+        retDict={}
+        if self._coords is None:
             if isinstance(data, np.ma.masked_array):
                 if data.dtype==np.uint16:
                     data = data.filled(data, fill_value=0)
@@ -487,7 +523,8 @@ class imageFunc(DetObjectFunc):
                     data = data.filled(data, fill_value=np.nan)
             if isinstance(data, np.matrix):
                 data = np.asarray(data)
-            return {'img': data}
+            self.dat = data
+            retDict['img']=data
 
         #DEBUG ME: masked pixels should be in extra pixel!
         ##data will be used as weights in bincount. Thus masked pixels should be set to 0.
@@ -495,16 +532,14 @@ class imageFunc(DetObjectFunc):
         #    print 'fill'
         #    data = data.filled(data, fill_value=0)
         #    print 'filled'
-        if len(self.coords)==2:
-            retDict={}
-            ##using the sparse array os slower (1ms versus 0.55ms for bincount)
+        elif len(self._coords)==2:
+            ##using the sparse array is slower (1ms versus 0.55ms for bincount)
             ##also, mapping of multiple pixels into one final pixel will not be normalizable
             ##as a note the normalization costs about 0.2ms
-            #data2d = sparse.coo_matrix((data.flatten(),(self.__dict__['i%s'%self.coords[0]],self.__dict__['i%s'%self.coords[1]])), shape=self.imgShape).todense()            
+            #data2d = sparse.coo_matrix((data.flatten(),(self.__dict__['i%s'%self._coords[0]],self.__dict__['i%s'%self._coords[1]])), shape=self.imgShape).toarray()            
             #retDict['img_sparse'] = np.array(data2d)
             I=np.bincount(self._multidim_idxs, weights = data.flatten(), minlength=int(self._n_multidim_idxs))
             I=np.reshape(I[:self._n_multidim_idxs], self._n_coordTuple)
-            retDict['img'] = I
             if self._npix_div is not None:
                 Inorm=I*self._npix_div
                 retDict['img'] = Inorm
@@ -512,13 +547,22 @@ class imageFunc(DetObjectFunc):
                 retDict['img'] = I
             #cast to same type that input array was.
             retDict['img'] = retDict['img'].astype(data.dtype)
-            return retDict
+            self.dat = retDict['img']
 
-        elif len(self.coords)==1: #this might be a special case of the multi dim thing....
-            data = np.bincount(data, self.__dict__['i%s'%self.coord[0]])
-            return {'img_1d': data/self.npix}            
+        elif len(self._coords)==1: #this might be a special case of the multi dim thing....
+            data = np.bincount(data, self.__dict__['i%s'%self._coords[0]])
+            retDict['img_1d']=data/self.npix
+            self.dat = retDict['img_1d']
         else:
             I=np.bincount(self._multidim_idxs, weights = data, minlength=self._n_multidim_idxs)
             I=I[:self._n_multidim_idxs]
-        return {'img_n': np.reshape(I, self._n_coordTuple)}
+            retDict['img_n'] = np.reshape(I, self._n_coordTuple)
+            self.dat = retDict['img_n']
+
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                retDict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+
+        return retDict
 

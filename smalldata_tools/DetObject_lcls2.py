@@ -55,9 +55,11 @@ class DetObjectClass_lcls2(object):
         parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray)))}) 
         #add parameters of function to dict with composite keyt(sf._name, key)
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
+        #we cannot save arraus of chars/strings. There should be a proper test instead of this explicit rejection of coords.
+        #I can't see how to do that in a single line, but that is not a great reason...
         for sf in subFuncs:
             sfPars = sf.params_as_dict()
-            parList.update({'%s__%s'%(sf._name,key): value for key,value in iteritems(sfPars) if (key[0]!='_' and isinstance(value, (basestring, int, float, np.ndarray, tuple)))})
+            parList.update({'%s__%s'%(sf._name,key): value for key,value in iteritems(sfPars) if (key[0]!='_' and isinstance(value, (basestring, int, float, np.ndarray, tuple)) and key.find('coords')<0)})
 
         #remKeys = [key for key in self.__dict__ if (key not in parList)]
         #print('DEBUG: keys which are not parameters:',remKeys)

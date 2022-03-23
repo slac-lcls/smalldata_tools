@@ -97,13 +97,18 @@ class azimuthalBinning(DetObjectFunc):
         if func is None:
             self._setup()
             return
-        print('set params from func ', func.__dict__.keys())
         if func._x is not None: self.x = func._x.flatten()/1e3
         if func._y is not None: self.y = func._y.flatten()/1e3
-        if func._mask is not None and isinstance(func, ROIFunc): 
-            self._mask = func._mask.astype(bool).flatten()
-        else:
-            self._mask = (~(func._mask.astype(bool))).flatten()
+        maskattr='_mask'
+        if not hasattr(func, maskattr):
+            maskattr='mask'
+            if not hasattr(func, maskattr):
+                maskattr=None
+        if maskattr is not None and getattr(func,maskattr) is not None:
+            if isinstance(func, ROIFunc): 
+                self._mask = getattr(func, maskattr).astype(bool).flatten()
+            else:
+                self._mask = (~(getattr(func,maskattr).astype(bool))).flatten()
         #elif func._rms is not None: 
         #    self._mask = np.ones_like(func._rms).flatten()
         self._setup()
