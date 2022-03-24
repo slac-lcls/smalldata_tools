@@ -49,7 +49,11 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 
-import smalldata_tools.cube.cube_mpi_fun as mpi_fun
+try:
+    import smalldata_tools.cube.cube_mpi_fun as mpi_fun
+except:
+    print("Can't import smalldata_tools.cube.cube_mpi_fun." \
+          + " If you are not on a LCLS-II experiment, consider debugging.")
 
 from mpi4py import MPI
 import h5py
