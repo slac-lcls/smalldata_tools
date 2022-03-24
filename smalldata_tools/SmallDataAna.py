@@ -243,20 +243,19 @@ class SmallDataAna(object):
         if len(expname)>3:
             self.hutch=self.expname[:3]
             self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
-            print('dirname ',self.plot_dirname)
             if dirname=='':
                 hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
-                    self.dirname='/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = '/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
                 else:
-                    self.dirname='/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.
                 if not path.isdir(self.dirname):
                     print('Directory did not exist? ',self.dirname)
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
                     self.plot_dirname='/reg/d/psdm/%s/%s/res/smalldata_plots/'%(self.hutch,self.expname)
             else:
-                self.dirname=dirname
+                self.dirname = dirname
                 self.plot_dirname = dirname+'/smalldata_plots'
             if not path.isdir(self.plot_dirname):
                 #makedirs(self.plot_dirname)
@@ -266,12 +265,12 @@ class SmallDataAna(object):
             self.fname='%s/%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
             if not path.isfile(self.fname):
                 self.fname='%s/%s_Run%04d.h5'%(self.dirname,self.expname,self.run)
-            print('setting up dirs:')
+            print('Setting up dirs:')
             if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
-        print('and now open in dir: ',self.dirname,' to open file ',self.fname)
+        print(f'and now open in dir: {self.dirname} to open file {self.fname}.')
 
         self.Sels = {}
         self.cubes = {}
@@ -280,7 +279,7 @@ class SmallDataAna(object):
             if isinstance(intable, str) and path.isfile(intable):
                 self.fh5=tables.open_file(self.fname,'r')
             else:
-                print('pass unknown input parameter or file cannot be found: ',intable)
+                print('Pass, unknown input parameter or file cannot be found: ',intable)
                 return None
         elif path.isfile(self.fname):
             self.fh5=tables.open_file(self.fname,'r')
@@ -302,9 +301,22 @@ class SmallDataAna(object):
                 self._fields['event_time'][1]='inXr'
                 evttime_sec = evttime >> 32
                 evttime_nsec = evttime - (evttime_sec << 32)
-                self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
+                self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') \
+                                         for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
                 #self._tStamp = np.datetime64(int(sec*1e9+nsec), 'ns')
+                self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, 
+                                           dims=('time'),name='event_time')
+            
+            elif 'timestamp' in self._fields.keys(): # lcls-II
+                #cannot use getVar as getVar is using the presence of self._tStamp
+                evttime = self.fh5.get_node('/timestamp').read()
+                self._fields['timestamp'][1]='inXr'
+                evttime_sec = evttime >> 32
+                evttime_nsec = evttime - (evttime_sec << 32)
+                self._tStamp = np.array([np.datetime64(int(tsec*1e9+tnsec), 'ns') \
+                                         for tsec,tnsec in zip(evttime_sec,evttime_nsec)])
                 self.xrData = xr.DataArray(evttime, coords={'time': self._tStamp}, dims=('time'),name='event_time')
+            
             else:
                 timeData = self.fh5.get_node('/EvtID','time').read()
                 if timeData is None:
@@ -401,7 +413,10 @@ class SmallDataAna(object):
                 #if key != '/event_time':
                 if self._fields[fieldkey][1]=='onDisk':
                     try:
-                        self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key).read(), coords={'time': self._tStamp}, dims=('time'),name=key[1:].replace('/','__')) ])
+                        this_node_data = xr.DataArray(self.fh5.get_node(key).read(), 
+                                                      coords={'time': self._tStamp}, 
+                                                      dims=('time'),name=key[1:].replace('/','__'))
+                        self.xrData = xr.merge([self.xrData, this_node_data ])
                         self._fields[fieldkey][1]='inXr'
                     except:
                         print('failed to create dataset for: ',fieldkey, self._fields[fieldkey])
@@ -417,9 +432,11 @@ class SmallDataAna(object):
                     #limit on dimensions here!
                     if len(dataShape)<=2 and coords is not None:
                         if len(dataShape)==2 and dataShape[1]>25 and (dataShape[0]*dataShape[1])>1e7:
-                            print('array for %s is too large (shape %d * %d), will load when asked'%(fieldName,dataShape[0], dataShape[1]))
+                            print(f'Array for {fieldName} is too large (shape {dataShape}), will load when asked.')
                             continue
-                        self.xrData = xr.merge([self.xrData, xr.DataArray(self.fh5.get_node(key,tleaf.name).read().squeeze(), coords=coords, dims=dims,name=tArrName) ])
+                        this_node_data = xr.DataArray(self.fh5.get_node(key,tleaf.name).read().squeeze(), 
+                                                      coords=coords, dims=dims,name=tArrName)
+                        self.xrData = xr.merge([self.xrData,  this_node_data])
                         self._fields[fieldName][1]='inXr'
 
     def addVar(self, name='newVar',data=[]):
@@ -469,7 +486,8 @@ class SmallDataAna(object):
         name = name.replace('/','__')
         data = data.squeeze()
         if len(data.shape)==1:
-            self.xrData = xr.merge([self.xrData, xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name) ])
+            newArray = xr.DataArray(data, coords={'time': self._tStamp}, dims=('time'),name=name)
+            self.xrData = xr.merge([self.xrData,  newArray])
         else:
             coords={'time': self._tStamp}
             dims = ['time']
@@ -770,6 +788,7 @@ class SmallDataAna(object):
         self.Sels[useFilter]._setFilter(Filter)
         #if self.Sels[useFilter]._filter is not None:
         #    print('of %d  event, %d pass:'%(self.Sels[useFilter]._filter.shape[0],self.Sels[useFilter]._filter.sum()))
+    
     def removeCut(self, varName, useFilter):
         """
         remove a variable from the selection
@@ -872,7 +891,9 @@ class SmallDataAna(object):
                     for ft in filters:
                         total_filter_test&=ft     
                         
-                    print('getFilter: Cut %f < %s < %f passes %d events of %d, total passes up to now: %d '%(thiscut[1], thiscut[0], thiscut[2], filters[-1].sum(), thisPlotvar.shape[0], total_filter_test.sum()))
+                    print(f'getFilter: Cut {thiscut[1]} < {thiscut[0]} < {thiscut[2]} passes'\
+                          f'{filters[-1].sum()} events of {thisPlotvar.shape[0]}, total passes'
+                          f'up to now: {total_filter_test.sum()}')
 
         for ft in filters:
             total_filter&=ft     
@@ -1028,7 +1049,7 @@ class SmallDataAna(object):
     def setDelay(self, use_ttCorr=True, addEnc=False, addLxt=True, reset=False):
         delay=self.getDelay(use_ttCorr=use_ttCorr, addEnc=addEnc, addLxt=addLxt, reset=reset)
 
-    #make delay another Xarray variable.
+    # make delay another Xarray variable.
     def getDelay(self, use_ttCorr=True, addEnc=False, addLxt=True, reset=False):
         """
         function to get the xray-laser delay from the data
@@ -1140,15 +1161,30 @@ class SmallDataAna(object):
             return [hst[0].max(), hst[1][hst[0].argmax()]]
         else:
             print('getPeak is not yet implemented for this type of data (need 1d histo)')
-
-    def plotVar(self, plotvar, numBins=[100], useFilter=None, limits=[1,99,'p'],fig=None,asHist=False,plotWith=None, plotMultidimMean=False):
+        return
+            
+    def plotVar(self, plotvar, 
+                numBins=[100], 
+                useFilter=None, 
+                limits=[1,99,'p'],
+                fig=None,
+                asHist=False,
+                plotWith=None, 
+                plotMultidimMean=False):
+        
         if not isinstance(numBins, (list, tuple)):
             numBins = [numBins]
         if isinstance(plotvar, str) or (len(plotvar)==2 and (isinstance(plotvar[0], str) and not isinstance(plotvar[1], str))):
             if len(numBins)!=1:
                 print('bin# needs to be of same dimensions as plotvariables (1d)')
                 return
-            return self.plotVar1d(plotvar, numBins=numBins[0], useFilter=useFilter, limits=limits,fig=fig,plotWith=plotWith, plotMultidimMean=plotMultidimMean)
+            return self.plotVar1d(plotvar, 
+                                  numBins=numBins[0], 
+                                  useFilter=useFilter, 
+                                  limits=limits,
+                                  fig=fig,
+                                  plotWith=plotWith,
+                                  plotMultidimMean=plotMultidimMean)
         elif len(plotvar)>2:
             print('plotting of 3 variables is not defined yet')
             return
@@ -1160,9 +1196,23 @@ class SmallDataAna(object):
             if plotMultidimMean:
                 print('plotting multidim means of two variables is not implemented yet')
                 return
-        return self.plotVar2d(plotvar, numBins=numBins, useFilter=useFilter, limits=limits,fig=fig,asHist=asHist,plotWith=plotWith)
+        return self.plotVar2d(plotvar, 
+                              numBins=numBins, 
+                              useFilter=useFilter, 
+                              limits=limits,
+                              fig=fig,
+                              asHist=asHist,
+                              plotWith=plotWith)
 
-    def plotVar1d(self, plotvar, numBins=100, useFilter=None, limits=[1,99,'p'],fig=None, plotWith=None, plotMultidimMean=False):
+    
+    def plotVar1d(self, plotvar, 
+                  numBins=100, 
+                  useFilter=None, 
+                  limits=[1,99,'p'],
+                  fig=None, 
+                  plotWith=None, 
+                  plotMultidimMean=False):
+        
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1213,10 +1263,16 @@ class SmallDataAna(object):
                 hst = [vals, np.arange(0,vals.shape[0]+1)]
             elif len(vals.shape)==2:
                 if plotWith.find('matplotlib')>=0:
-                    plotImage(vals, ylim=[np.nanpercentile(vals,1),np.nanpercentile(vals,99)], xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel), fig=fig)
+                    plotImage(vals, 
+                              ylim=[np.nanpercentile(vals,1),np.nanpercentile(vals,99)], 
+                              xLabel='', yLabel='', 
+                              plotWith=plotWith, 
+                              plotTitle='%s for %s'%(plotvar, self.runLabel), fig=fig)
                     return
                 elif plotWith.find('bokeh')>=0:
-                    plotImage(vals, xLabel='', yLabel='', plotWith=plotWith, plotTitle='%s for %s'%(plotvar, self.runLabel))
+                    plotImage(vals, xLabel='', yLabel='', 
+                              plotWith=plotWith, 
+                              plotTitle='%s for %s'%(plotvar, self.runLabel))
                     return
                 
             elif len(vals.shape)==3:
@@ -1227,10 +1283,22 @@ class SmallDataAna(object):
             plotXlabel = plotvar[0]
         else:
             plotXlabel = plotvar
-        plotMarker(hst[0], xData=hst[1][:-1], xLabel=plotXlabel, yLabel='entries', plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s histogram for %s"%(plotvar, self.runLabel), plotDirname=self.plot_dirname)
+        plotMarker(hst[0], xData=hst[1][:-1], 
+                   xLabel=plotXlabel, yLabel='entries', 
+                   plotWith=plotWith, 
+                   runLabel=self.runLabel, 
+                   plotTitle="%s histogram for %s"%(plotvar, self.runLabel), 
+                   plotDirname=self.plot_dirname)
         return hst
+    
 
-    def plotVar2d(self, plotvars, useFilter=None, limits=[1,99,'p'], asHist=False,numBins=[100,100],fig=None, plotWith=None):
+    def plotVar2d(self, plotvars, 
+                  useFilter=None, 
+                  limits=[1,99,'p'], 
+                  asHist=False,
+                  numBins=[100,100],
+                  fig=None, 
+                  plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1279,7 +1347,12 @@ class SmallDataAna(object):
                 msize=5
             elif len(vals[1][total_filter])<1000:
                 msize=3
-            plotMarker(vals[0][total_filter], xData=vals[1][total_filter], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotvars[0], plotvars[1], self.runLabel), plotDirname=self.plot_dirname, markersize=msize)
+            plotMarker(vals[0][total_filter], xData=vals[1][total_filter], 
+                       xLabel=plotvars[1], yLabel=plotvars[0], 
+                       plotWith=plotWith, 
+                       runLabel=self.runLabel, 
+                       plotTitle="%s vs %s for %s"%(plotvars[0], plotvars[1], self.runLabel), 
+                       plotDirname=self.plot_dirname, markersize=msize)
             return vals[0][total_filter], vals[1][total_filter]
         
         #asHist only
@@ -1290,10 +1363,17 @@ class SmallDataAna(object):
         ind0 = np.digitize(v0, binEdges0)
         ind1 = np.digitize(v1, binEdges1)
         ind2d = np.ravel_multi_index((ind0, ind1),(binEdges0.shape[0]+1, binEdges1.shape[0]+1)) 
-        iSig = np.bincount(ind2d, minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1)).reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
-        extent=[binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
+        iSig = np.bincount(ind2d, 
+                           minlength=(binEdges0.shape[0]+1)*(binEdges1.shape[0]+1))\
+                                .reshape(binEdges0.shape[0]+1, binEdges1.shape[0]+1) 
+        extent = [binEdges1[1],binEdges1[-1],binEdges0[1],binEdges0[-1]]
 
-        plotImage(iSig, extent=extent, ylim=[np.nanpercentile(iSig,limits[0]),np.percentile(iSig,limits[1])], xLabel=plotvars[1], yLabel=plotvars[0], plotWith=plotWith, fig=fig)
+        plotImage(iSig, 
+                  extent=extent, 
+                  ylim=[np.nanpercentile(iSig,limits[0]),np.percentile(iSig,limits[1])], 
+                  xLabel=plotvars[1], yLabel=plotvars[0], 
+                  plotWith=plotWith, 
+                  fig=fig)
 
         return iSig, extent
 
@@ -1406,10 +1486,26 @@ class SmallDataAna(object):
           print('you passed only one number and the this does not look like a new delay scan or a normal scan')
           return []
 
+        
     def getScan(self, sig='', i0='', Bins=100, useFilter=None):
         return self.plotScan(sig=sig, i0=i0, Bins=Bins, returnData=True, useFilter=useFilter, plotThis=False)
 
-    def plotScan(self, sig='', i0='', Bins=100, plotDiff=True, plotOff=True, saveFig=False,saveData=False, returnData=False, useFilter=None, fig=None, interpolation='', plotThis=True, returnIdx=False, binVar=None, plotWith=None):
+    
+    def plotScan(self, sig='', i0='', 
+                 Bins=100, 
+                 plotDiff=True, 
+                 plotOff=True, 
+                 saveFig=False,
+                 saveData=False, 
+                 returnData=False, 
+                 useFilter=None, 
+                 fig=None, 
+                 interpolation='', 
+                 plotThis=True, 
+                 returnIdx=False, 
+                 binVar=None, 
+                 plotWith=None):
+        
         if plotWith is None:
             plotWith = self.plotWith
 
@@ -1557,9 +1653,16 @@ class SmallDataAna(object):
             returnDict['binVar']=binVar[0]
         if plotThis:
             #print('retData: ',returnDict)
-            self.plotScanDict(returnDict, plotDiff=plotDiff, interpolation=interpolation,fig=fig,plotOff=plotOff,saveFig=saveFig, plotWith=plotWith)
+            self.plotScanDict(returnDict, 
+                              plotDiff=plotDiff, 
+                              interpolation=interpolation,
+                              fig=fig,
+                              lotOff=plotOff,
+                              saveFig=saveFig, 
+                              plotWith=plotWith)
         return returnDict
 
+    
     def plotScanDict(self, returnDict, plotDiff=True, fig=None, plotOff=True, interpolation='', saveFig=False, plotWith=None):
         if plotWith is None:
             plotWith = self.plotWith
@@ -1576,7 +1679,12 @@ class SmallDataAna(object):
         if plotWith=='matplotlib':
             if len(scan.shape)>1:
                 extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
-                plotImage(scan, ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], xLabel=scanVarName, yLabel=returnDict['binVar'], plotWith=plotWith, plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), extent=extent)
+                plotImage(scan, 
+                          ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], 
+                          xLabel=scanVarName, yLabel=returnDict['binVar'], 
+                          plotWith=plotWith, 
+                          plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), 
+                          extent=extent)
                 return
             else:
                 scanYvals=[scan]
@@ -1602,18 +1710,63 @@ class SmallDataAna(object):
                         ydata = (scan[:-1]-scanoff_interp)
                     else:
                         ydata = (scan[:-1]-returnDict['scanOff'][:-1])
-                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], fig=gs[0])
-                    plotMarker( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig=gs[1])
+                    plotMarker(scanYvals, 
+                               xData=scanXvals, 
+                               xLabel=scanVarName, yLabel=plotVarName, 
+                               plotWith=plotWith, 
+                               runLabel=self.runLabel, 
+                               plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), 
+                               plotDirname=self.plot_dirname, 
+                               markersize=5, 
+                               plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), 
+                               line_dash='dashed', 
+                               color=colors, 
+                               marker=markers, 
+                               ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], 
+                               fig=gs[0])
+                    plotMarker( ydata, 
+                               xData=scanPoints[:-1], 
+                               xLabel=scanVarName, yLabel='on-off '+plotVarName, 
+                               plotWith=plotWith, 
+                               runLabel=self.runLabel, 
+                               plotTitle='', 
+                               plotDirname=self.plot_dirname, 
+                               markersize=5, 
+                               plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), 
+                               line_dash='dashed', 
+                               color=['blue'], 
+                               fig=gs[1])
                 else:
                     if saveFig:
                         plotWith='matplotlib_file'
-                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+                    plotMarker(scanYvals, 
+                               xData=scanXvals, 
+                               xLabel=scanVarName, yLabel=plotVarName, 
+                               plotWith=plotWith, 
+                               runLabel=self.runLabel, 
+                               plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), 
+                               plotDirname=self.plot_dirname, 
+                               markersize=5, 
+                               plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), 
+                               line_dash='dashed', 
+                               color=colors, 
+                               marker=markers, 
+                               ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
 
         elif plotWith.find('bokeh')>=0:
             if len(scan.shape)>1:
                 extent = [scanPoints.min(), scanPoints.max(), returnDict['binPoints'].min(), returnDict['binPoints'].max()]
-                output_file='%s/%s_Scan_%s_%s.html'%(self.plot_dirname,self.runLabel, scanVarName.replace('/','_'), plotVarName.replace('/','_'))
-                plotImage(scan, ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], xLabel=scanVarName, yLabel=returnDict['binVar'], plotWith=plotWith, plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), extent=extent,plotFilename=output_file)
+                output_file='%s/%s_Scan_%s_%s.html'%(self.plot_dirname,
+                                                     self.runLabel, 
+                                                     scanVarName.replace('/','_'), 
+                                                     plotVarName.replace('/','_'))
+                plotImage(scan, 
+                          ylim=[np.nanpercentile(scan,1), np.nanpercentile(scan,98)], 
+                          xLabel=scanVarName, yLabel=returnDict['binVar'], 
+                          plotWith=plotWith, 
+                          plotTitle='%s  for %s'%(returnDict['plotVarName'], self.runLabel), 
+                          extent=extent,
+                          plotFilename=output_file)
                 return
             else:
                 scanYvals=[scan]
@@ -1633,13 +1786,38 @@ class SmallDataAna(object):
 
                 if plotDiff and 'scanOffPoints' in returnDict and (interpolation!='' or len(scan)==len(returnDict['scanOff'])):
 
-                    p = plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], width_height=(750,350), fig='return')
+                    p = plotMarker(scanYvals, 
+                                   xData=scanXvals, 
+                                   xLabel=scanVarName, yLabel=plotVarName, 
+                                   plotWith=plotWith, 
+                                   runLabel=self.runLabel, 
+                                   plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), 
+                                   plotDirname=self.plot_dirname, 
+                                   markersize=5, 
+                                   plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), 
+                                   line_dash='dashed', 
+                                   color=colors, 
+                                   marker=markers, 
+                                   ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05], 
+                                   width_height=(750,350), 
+                                   fig='return')
 
                     if interpolation!='':
                         ydata = (scan[:-1]-scanoff_interp)
                     else:
                         ydata = (scan[:-1]-returnDict['scanOff'][:-1])
-                    pdiff = plotMarker( ydata, xData=scanPoints[:-1], xLabel=scanVarName, yLabel='on-off '+plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle='', plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=['blue'], fig='return', width_height=(750,400))
+                    pdiff = plotMarker(ydata, 
+                                       xData=scanPoints[:-1], 
+                                       xLabel=scanVarName, yLabel='on-off '+plotVarName, 
+                                       plotWith=plotWith, 
+                                       runLabel=self.runLabel, 
+                                       plotTitle='', 
+                                       plotDirname=self.plot_dirname,
+                                       markersize=5, 
+                                       plotFilename=('Scan_diff_%s_vs_%s'%(plotVarName, scanVarName)),
+                                       line_dash='dashed', color=['blue'],
+                                       fig='return',
+                                       width_height=(750,400))
 
                     grid = bokeh.plotting.gridplot([[p], [pdiff]])
                     layout = column(Div(text='<h1>%s as a function of %s for %s</h1>'%(plotVarName, scanVarName, self.runLabel)),grid)
@@ -1650,7 +1828,20 @@ class SmallDataAna(object):
                         bp.save(layout)
 
                 else:
-                    plotMarker(scanYvals, xData=scanXvals, xLabel=scanVarName, yLabel=plotVarName, plotWith=plotWith, runLabel=self.runLabel, plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), plotDirname=self.plot_dirname, markersize=5, plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), line_dash='dashed', color=colors, marker=markers, ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
+                    plotMarker(scanYvals, 
+                               xData=scanXvals, 
+                               xLabel=scanVarName, 
+                               yLabel=plotVarName, 
+                               plotWith=plotWith, 
+                               runLabel=self.runLabel, 
+                               plotTitle="%s vs %s for %s"%(plotVarName, scanVarName, self.runLabel), 
+                               plotDirname=self.plot_dirname, 
+                               markersize=5, 
+                               plotFilename=('Scan_%s_vs_%s'%(plotVarName, scanVarName)), 
+                               line_dash='dashed', 
+                               color=colors, 
+                               marker=markers, 
+                               ylim=[np.nanmin(scan)*0.95,np.nanmax(scan)*1.05])
 
         elif plotWith != 'no_plot':
             print('plotting using %s is not implemented yet, options are matplotlib, bokeh_notebook, bokeh_html or no_plot')
@@ -1851,7 +2042,10 @@ class SmallDataAna(object):
                 addBinVar = addBinVar[cubeFilter]
                 addBinIdx = np.digitize(addBinVar, cube.addBinVars[addVar])
                 if np.array(addBinIdx).min()<1:
-                    printR(rank, 'something went wrong in the setting of the cube selection for variable %s for cube %s using the Filter %s, please fix me....'%(addVar,cube.cubeName, cube.useFilter))
+                    printR(rank,
+                           f'something went wrong in the setting of the cube selection'\
+                           f'for variable {addVAr} for cube {cube.cubeName} using the'\
+                           f'Filter {cube.useFilter}, please fix me...')
                     return
                 addBinIdx = (np.array(addBinIdx)-1).tolist()
                 binShp.append(cube.addBinVars[addVar].shape[0]-1)
@@ -1865,8 +2059,14 @@ class SmallDataAna(object):
             Bins = np.arange(0,nTotBins+1)
 
         timeFiltered = self._tStamp[cubeFilter]
-        newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), coords={'time': timeFiltered}, dims=('time'),name='nEntries')
-        newXr = xr.merge([newXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])
+        newXr = xr.DataArray(np.ones(timeFiltered.shape[0]), 
+                             coords={'time': timeFiltered},
+                             dims=('time'),name='nEntries')
+        newXr = xr.merge([newXr, 
+                          xr.DataArray(binVar, 
+                                       coords={'time': timeFiltered}, 
+                                       dims=('time'),name='binVar')
+                         ])
         
         for tVar in cube.targetVars:
             if not self.hasKey(tVar):                
@@ -2009,9 +2209,19 @@ class SmallDataAna(object):
             evttVar='EvtID/time'
         printR(rank, 'we will use fiducials from here: %s'%fidVar)
 
-        evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='fiducial')
-        evtIDXr = xr.merge([evtIDXr,xr.DataArray(self.getVar(evttVar,cubeFilter), coords={'time': timeFiltered}, dims=('time'),name='evttime')])
-        evtIDXr = xr.merge([evtIDXr, xr.DataArray(binVar, coords={'time': timeFiltered}, dims=('time'),name='binVar') ])
+        evtIDXr = xr.DataArray(self.getVar(fidVar,cubeFilter), 
+                               coords={'time': timeFiltered}, 
+                               dims=('time'),name='fiducial')
+        evtIDXr = xr.merge([
+            evtIDXr, xr.DataArray(self.getVar(evttVar,cubeFilter), 
+                                                  coords={'time': timeFiltered}, 
+                                                  dims=('time'),name='evttime')
+        ])
+        evtIDXr = xr.merge([
+            evtIDXr, xr.DataArray(binVar, 
+                                  coords={'time': timeFiltered}, 
+                                  dims=('time'),name='binVar')
+        ])
 
         # for thisIdxVar in cube.addIdxVars:
         #     varData = self.getVar(thisIdxVar,cubeFilter)
@@ -2278,10 +2488,12 @@ class SmallDataAna(object):
         fig=plt.figure(figsize=(10,6))
         if ROI!=[]:
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])        
-            plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],clim=[plotMin,plotMax],interpolation='None')
+            plt.subplot(gs[1]).imshow(img[ROI[0][0],ROI[1][0]:ROI[1][1],ROI[2][0]:ROI[2][1]],
+                                      clim=[plotMin,plotMax],
+                                      interpolation='None')
         else:
             gs=gridspec.GridSpec(1,2,width_ratios=[99,1])        
-        plt.subplot(gs[0]).imshow(image,clim=[plotMin,plotMax],interpolation='None')
+        plt.subplot(gs[0]).imshow(image, clim=[plotMin,plotMax], interpolation='None')
 
         plt.show()
         
@@ -2325,7 +2537,8 @@ class SmallDataAna(object):
         except:
             print('could not import underlying code, this does not work yet')
             return
-        print('nearly done, but there is an issue in the image display and x/y coordinates that needs figuring out with faster x-respose.....')
+        print('nearly done, but there is an issue in the image display and x/y'\
+              'coordinates that needs figuring out with faster x-respose.....')
         #return
         avImages=[]
         for key in self.__dict__.keys():
@@ -2424,11 +2637,14 @@ class SmallDataAna(object):
                     happy=True
 
             #res = fitCircle(x.flatten()[image.flatten()>thresP],y.flatten()[image.flatten()>thresP])
-            res = fitCircle(x.flatten()[imageThres.flatten().astype(bool)],y.flatten()[imageThres.flatten().astype(bool)])
+            res = fitCircle(x.flatten()[imageThres.flatten().astype(bool)],
+                            y.flatten()[imageThres.flatten().astype(bool)])
             print('res',res)
-            print('x,y av: ',(x.flatten()[imageThres.flatten().astype(bool)]).mean(),(y.flatten()[imageThres.flatten().astype(bool)].mean()))
+            print('x,y av: ',(x.flatten()[imageThres.flatten().astype(bool)]).mean(),
+                  (y.flatten()[imageThres.flatten().astype(bool)].mean()))
             circleM = plt.Circle((res['xCen'],res['yCen']),res['R'],color='b',fill=False)
-            fig=plt.figure(figsize=(10,10))
+            
+            fig = plt.figure(figsize=(10,10))
             #will need to check of rotation necessary here???
             #plt.imshow(np.rot90(image),extent=extent,clim=[plotMin,plotMax],interpolation='None')
             plt.imshow(image,extent=extent,clim=[plotMin,plotMax],interpolation='None',aspect='auto')
@@ -2451,7 +2667,16 @@ class SmallDataAna(object):
     ###
     ##########################################################################
 
-    def DropletCube(self, useFilter='', i0='ipm3/sum', rangeAdu=[], rangeX=[], rangeY=[], addName='', returnData=False, writeFile=False):
+    def DropletCube(self, 
+                    useFilter='', 
+                    i0='ipm3/sum', 
+                    rangeAdu=[], 
+                    rangeX=[], 
+                    rangeY=[], 
+                    addName='', 
+                    returnData=False, 
+                    writeFile=False):
+        
         data='DropletCube_Run%d_%s'%(self.run,addName)
         if useFilter!='':
             data+='_'+useFilter
@@ -2508,9 +2733,14 @@ class SmallDataAna(object):
         indX = np.digitize(x, binX)
         indY = np.digitize(y, binY)
         ind3d = np.ravel_multi_index((indA, indX, indY),(binAdu.shape[0]+1, binX.shape[0]+1, binY.shape[0]+1)) 
-        cube = np.bincount(ind3d, minlength=(binAdu.shape[0]+1)*(binX.shape[0]+1)*(binY.shape[0]+1)).reshape(binAdu.shape[0]+1, binX.shape[0]+1, binY.shape[0]+1)
+        cube = np.bincount(ind3d, 
+                           minlength=(binAdu.shape[0]+1)*(binX.shape[0]+1)*(binY.shape[0]+1)).reshape(binAdu.shape[0]+1, binX.shape[0]+1, binY.shape[0]+1)
 
-        returnDict= {'i0_sum':i0_sum, 'binAdu':binAdu.tolist(), 'binX':binX.tolist(), 'binY':binY.tolist(),'cube':cube.tolist()}
+        returnDict= {'i0_sum':i0_sum, 
+                     'binAdu':binAdu.tolist(), 
+                     'binX':binX.tolist(), 
+                     'binY':binY.tolist(),
+                     'cube':cube.tolist()}
         self.__dict__[data]=returnDict        
 
         if writeFile:
@@ -2540,9 +2770,13 @@ class SmallDataAna(object):
             tVar=tVar.replace('/','__')
             if len(filteredVar.shape)==1:
                 if newXr is None:
-                    newXr = xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar)
+                    newXr = xr.DataArray(filteredVar, 
+                                         coords={'time': timeFiltered}, dims=('time'),name=tVar)
                 else:
-                    newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
+                    newXr = xr.merge([
+                        newXr, 
+                        xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) 
+                    ])
             else:
                 coords={'time': timeFiltered}
                 dims = ['time']
@@ -2584,7 +2818,11 @@ class SmallDataAna(object):
         tStop_nsec = tStop - (tStop_sec << 32)
 
         #now get the data.
-        timePoints,valPoints = self._epicsArchive.get_points(PV=PVname, start=tStart_sec, end=tStop_sec, two_lists=True, raw=True)
+        timePoints,valPoints = self._epicsArchive.get_points(PV=PVname, 
+                                                             start=tStart_sec, 
+                                                             end=tStop_sec, 
+                                                             two_lists=True, 
+                                                             raw=True)
 
         #add to data
         if name is None: name = PVname.replace(':','_')

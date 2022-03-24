@@ -181,9 +181,12 @@ if rank==0:
     if int(args.nevents)>0: # not really implemented
         cubeName+='_%sEvents'%args.nevents
     
+    cubeName_base = cubeName
     for filterName in ana.Sels:
         if filterName!='filter1':
-            cubeName = cubeName+'_'+filterName
+            cubeName = cubeName_base+'_'+filterName
+        else:
+            cubeName = cubeName_base
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
     
