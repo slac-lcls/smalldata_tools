@@ -44,7 +44,7 @@ detDict = {'source':'jungfrau1M',
            'full':1, 
            'image':1, 
            'thresADU':6.5, 
-           'common_mode':0}
+           'common_mode':None}
 
 varList = ['ipm2/sum','ipm3/sum','diodeU/channels', detDict]
 
