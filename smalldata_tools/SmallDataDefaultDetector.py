@@ -366,7 +366,7 @@ class ttDetector(defaultDetector):
             #pixel 0 is special:
             #it indicates that fit was not attempted/unsuccessful
             if ttOrg == 0:
-                dl['ttCorr']=np.nan
+                dl['ttCorr'] = 0
         return dl
 
 class damageDetector(defaultDetector):
