@@ -342,10 +342,12 @@ class ttDetector(defaultDetector):
             except:
                 print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
+    
     def inRun(self):
         if len(self.pvs)>0:
             return True
         return False
+    
     def setPars(self, calibPars):
       if calibPars != None:
         self.ttCalib = calibPars

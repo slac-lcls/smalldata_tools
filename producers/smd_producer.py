@@ -448,6 +448,9 @@ if args.full:
 
 userDataCfg={}
 for det in default_dets:
+    if det.name=='tt' and ttCalib is not []:
+        det.setPars(ttCalib)
+        logger.info(f'Using user-defined tt parmeters: {ttCalib}')
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     try:
