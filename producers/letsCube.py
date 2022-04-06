@@ -153,7 +153,7 @@ if rank==0:
             scanSteps = np.append(scanSteps[0]-abs(scanSteps[1]-scanSteps[0]),scanSteps) #catch values at left edge
             binSteps = scanSteps
             cubeName = scanName
-            if scanName == 'lxt':    
+            if scanName == 'lxt':
                 print('bin data using ',scanName,' and bins: ',scanSteps)
                 binName='delay'
             else:
@@ -193,8 +193,8 @@ if rank==0:
     try:
         addBinVars = config.get_addBinVars(run)
     except Exception as e:
-        print('Error when setting additional binVar. Will assume that 1D cube is requested. Fix if this is not the case.')
-        print(f'Error: {e}')
+        print('Not setting additional binVar. Will assume that 1D cube is requested. Fix if this is not the case.')
+        logger.info(f'addBinVars error info: {e}')
         addBinVars = None
     if addBinVars is not None and isinstance(addBinVars, dict):
         for cubeName, cube in ana.cubes.items():
