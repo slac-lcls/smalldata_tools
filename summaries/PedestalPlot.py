@@ -9,6 +9,7 @@ import os
 import argparse
 import sys
 import logging
+import socket
 try:
     basestring
 except NameError:
@@ -287,6 +288,7 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
 
 def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=None, 
              detImgMaxSize=400, isLCLS2=False):
+    print('Working on plots for ',det_name)
     if not isLCLS2:
         det = psana.Detector(det_name)
         peds = det.pedestals(run)
@@ -392,8 +394,12 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
     isLCLS2=False
     if expname[:3] in ['tmo','rix','ued']: isLCLS2=True
     if not isLCLS2:
-        dsname = 'exp={}:run={}:smd'.format(expname,run)
-        ds = psana.DataSource(dsname)
+        ds_name = 'exp={}:run={}:smd'.format(expname,run)
+        hostname = socket.gethostname()
+        if hostname.find('drp')>=0:
+            ds_name += ':dir=/cds/data/drpsrcf/%s/%s/xtc'%(expname[0:3],expname)
+        ds = psana.DataSource(ds_name)
+
         det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
         aliases = [dn[1] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
         runnum=run
