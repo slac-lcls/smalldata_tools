@@ -664,48 +664,37 @@ class xtcavDetector(defaultDetector):
         self.detname = detname
         self.nb=1
         self.size=5000
-        if Xtcav is None:
+        try:
+            from xtcav2.LasingOnCharacterization import LasingOnCharacterization
+            self._XTCAVRetrieval = LasingOnCharacterization()
+        except:
             return None
-        self.ShotToShotCharacterization = Xtcav.ShotToShotCharacterization()
-    def setEnv(self, env):
-        self.ShotToShotCharacterization.SetEnv(env)
-    def setPars(self, xtcavPars):
-        self.nb=xtcavPars[0]
-        self.size=xtcavPars[1]
     def data(self,evt):
         #check if detectors are in event
         dl={}
-        xtcav_success=False
+        xtcav_success=True
         arSize=0
         agreement=-2
         timeAr=np.array([np.nan] * self.size)
-        power=np.array([np.nan] * self.size)
-        ragged_time=np.array([], dtype='float32')
-        ragged_power=np.array([], dtype='float32')
-        #self.ShotToShotCharacterization.SetCurrentEvent(evt)
-        if self.ShotToShotCharacterization.SetCurrentEvent(evt):
-            agreement=-1
-            timeArOrg,power,ok=self.ShotToShotCharacterization.XRayPower()
-            if ok:
-              arSize=timeArOrg[0].shape[0]
-              agreement,ok=self.ShotToShotCharacterization.ReconstructionAgreement()
-              xtcav_success=True
-              ragged_time = timeArOrg
-              ragged_power = power
-              if arSize>=1 and arSize<=self.size:
-                  timeAr = np.append(timeArOrg[0],np.array([np.nan] * (self.size-arSize)))
-                  power = np.append(power[0],np.array([np.nan] * (self.size-arSize)))
-              else:
-                print('Xtcav array is too small in run, please check littleData configuration',env.run())
-                time = timeArOrg[:self.size]
-                power = power[:self.size]
+        powerAr=np.array([np.nan] * self.size)
+        try:
+            self._XTCAVRetrieval.processEvent(evt)
+            t, power = self._XTCAVRetrieval.xRayPower()
+            if t is not None:
+                arSize=t[0].shape[0]
+                if arSize>=1 and arSize<=self.size:
+                    timeAr = np.append(t[0],np.array([np.nan] * (self.size-arSize)))
+                    powerAr = np.append(power[0],np.array([np.nan] * (self.size-arSize)))
+                else:
+                    print('Xtcav array is too small in run, please check configuration',env.run())
+                    timeAr = t[:self.size]
+                    powerAr = power[:self.size]
+        except:
+            xtcav_success=False
 
-        dl['agreement']=agreement
         dl['arSize']=arSize
         dl['time']=timeAr
-        dl['power']=power
-        #dl['ragged_time']=ragged_time
-        #dl['ragged_power']=ragged_power
+        dl['power']=powerAr
         return dl
 
 class gmdDetector(defaultDetector):

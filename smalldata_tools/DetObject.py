@@ -19,7 +19,7 @@ from read_uxi import read_uxi, get_uxi_timestamps, getDarks
 import psana
 #from collections import Counter
     
-#epix10k: thermisotr value to temp in CRa
+#epix10k: thermisotr value to temp in C
 def getThermistorTemp(x):
     if x==0: return 0.
     u = x/16383.0 * 2.5
