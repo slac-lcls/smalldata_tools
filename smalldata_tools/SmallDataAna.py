@@ -549,6 +549,7 @@ class SmallDataAna(object):
                 xrname='%s/xr_%s_%s_Run%03d.nc'%(self.dirname,key.replace('/','__'),self.expname,self.run)
                 print('data for %s is only in memory, write to file with name: %s '%(key,xrname))
                 new_xrData.to_netcdf(xrname,engine='h5netcdf')
+            return
 
     def _readXarrayData(self):
         """ read data previously saved as netcdf files for this run"""

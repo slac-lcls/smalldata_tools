@@ -366,12 +366,10 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                        useFilter=None, 
                        nSkip=0,minIpm=-1., 
                        common_mode=None, 
-                       std=False, 
-                       median=False, 
+                       std=False,
                        printFid=False,
                        useMask=True, 
-                       uniform=False, 
-                       returnEnv=False):
+                       uniform=False):
         """ Return a pixel histogram
         
         Arguments:
@@ -421,7 +419,14 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                 data.append(det.evt.dat.copy())
         data = np.asarray(data).ravel()
         
-        bmin, bmax = np.percentile(data,0.1), 2.5*np.percentile(data,99.5)
+        # Find histogram boundaries
+        # Assumes that most of the signal is around 0,
+        # Roughly take 50 times 0-photon peak
+        # Can be weird in case of particularly high signal...
+        bmin = -2*np.abs(np.percentile(data, 10))
+        bmax = 2*np.abs(np.percentile(data, 90))
+        bmax = 50*np.std(data[np.logical_and(data>bmin, data<bmax)])
+        bmin = -2*np.abs(np.percentile(data, 0.1))
         bin_centers = np.linspace(bmin,bmax,nBins)
         hist, bin_edges = np.histogram(data, bins=bin_centers)
         
@@ -1156,9 +1161,9 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                     outFileName=outFileName.replace('.h5','_on.h5')
                 fout = h5py.File(outFileName, "w")
                 #ADD CNF STUFF HERE!
-                printR(rank, 'no big data, bin the data now....be patient')
+                printR(rank, 'No big data, bin the data now....be patient')
                 cubeData = self.sda.makeCubeData(cubeName,onoff=onoff)
-                printR(rank, 'now write outputfile (only small data) to : %s'%outFileName)
+                printR(rank, f'Now write outputfile (only small data) to : {outFileName}')
                 for key in cubeData.variables:
                     addToHdf5(fout, key, cubeData[key].values)
 
@@ -1166,7 +1171,11 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                     addToHdf5(fout, cfgVar.replace('/','_'), self.sda.getVar(cfgVar))
                     print('add cfgVar to hdf5', cfgVar.replace('/','_'))
                 fout.close()
-            return cubeData
+                # stop worker waiting to process area dets
+                for worker_id in range(size-1):
+                    comm.send('done', dest=worker_id+1)
+                bins, nEntries = cubeData.binVar_bins.values, cubeData.nEntries.values
+            return cubeName, bins, nEntries
 
         printR(rank,'Now make big cube')
         #only run on rank=0 & broadcast.
