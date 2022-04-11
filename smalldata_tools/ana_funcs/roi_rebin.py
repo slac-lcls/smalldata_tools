@@ -67,8 +67,10 @@ class ROIFunc(DetObjectFunc):
             except:
                 pass
         try:
-            self._x = self.applyROI(det.x.squeeze())
-            self._y = self.applyROI(det.y.squeeze())
+            # self._x = self.applyROI(det.x.squeeze())
+            # self._y = self.applyROI(det.y.squeeze())
+            self._x = self.applyROI(det.x)
+            self._y = self.applyROI(det.y)
         except:
             pass
 
@@ -572,8 +574,8 @@ class imageFunc(DetObjectFunc):
             retDict['img_1d']=data/self.npix
             self.dat = retDict['img_1d']
         else:
-            I=np.bincount(self._multidim_idxs, weights=data, minlength=self._n_multidim_idxs)
-            I=I[:self._n_multidim_idxs]
+            I = np.bincount(self._multidim_idxs, weights=data, minlength=self._n_multidim_idxs)
+            I = I[:self._n_multidim_idxs]
             retDict['img_n'] = np.reshape(I, self._n_coordTuple)
             self.dat = retDict['img_n']
 
