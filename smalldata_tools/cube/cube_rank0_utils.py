@@ -118,32 +118,33 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
                 dets.append(var)
         elif var not in anaps.sda._fields:
             dets.append(var)
-    dets_tab = pn.GridSpec(height=500*len(dets), width=TOTAL_WIDTH, name='Detectors')
-    for ii,det in enumerate(dets):
-        threshold = None
-        if isinstance(det, dict):
-            detname = det['source']
-            if 'thresADU' in det:
-                threshold = det['thresADU']
-        else:
-            detname = det
-        counts, bin_centers, bin_edges = anaps.pixelHistogram(detname=detname, numEvts=100, nSkip=0, common_mode=None, nBins=150)
-    #     fig = hv.Histogram((bin_edges, counts))
-    #     fig.opts(title='jungfrau1M', fill_color='#000080', logy=True)
-        fig = figure(title=detname, x_axis_label='Intensity (ADU)', y_axis_label='Count', 
-                     y_axis_type="log", background_fill_color="#fafafa")
-        fig.quad(top=counts, bottom=0.1, left=bin_edges[:-1], right=bin_edges[1:], line_color='black', fill_color='#000080')
-        if threshold is not None:
-            l1 = Span(location=threshold, dimension='height', line_color='orange', line_width=2)
-            fig.renderers.extend([l1])
-        dets_tab[ii:ii+1,0] = fig
-#         anaps.AvImage(detname=det)
-#         detname, img, av_img = anaps.getAvImage(detname=detname)
-#         img = anaps.__dict__[det].det.image(run, img)
-#         xrange, yrange = [0,img.shape[0]], [0,img.shape[1]]
-#         fig = hv.Image(img, bounds=(xrange[0],yrange[0], xrange[1], yrange[1])).opts(cmap='viridis',clim=(0,10))
-#         dets[1:2,0] = fig
-    tabs.append(dets_tab)
+    if dets != []:
+        dets_tab = pn.GridSpec(height=500*len(dets), width=TOTAL_WIDTH, name='Detectors')
+        for ii,det in enumerate(dets):
+            threshold = None
+            if isinstance(det, dict):
+                detname = det['source']
+                if 'thresADU' in det:
+                    threshold = det['thresADU']
+            else:
+                detname = det
+            counts, bin_centers, bin_edges = anaps.pixelHistogram(detname=detname, numEvts=100, nSkip=0, common_mode=None, nBins=150)
+        #     fig = hv.Histogram((bin_edges, counts))
+        #     fig.opts(title='jungfrau1M', fill_color='#000080', logy=True)
+            fig = figure(title=detname, x_axis_label='Intensity (ADU)', y_axis_label='Count', 
+                         y_axis_type="log", background_fill_color="#fafafa")
+            fig.quad(top=counts, bottom=0.1, left=bin_edges[:-1], right=bin_edges[1:], line_color='black', fill_color='#000080')
+            if threshold is not None:
+                l1 = Span(location=threshold, dimension='height', line_color='orange', line_width=2)
+                fig.renderers.extend([l1])
+            dets_tab[ii:ii+1,0] = fig
+    #         anaps.AvImage(detname=det)
+    #         detname, img, av_img = anaps.getAvImage(detname=detname)
+    #         img = anaps.__dict__[det].det.image(run, img)
+    #         xrange, yrange = [0,img.shape[0]], [0,img.shape[1]]
+    #         fig = hv.Image(img, bounds=(xrange[0],yrange[0], xrange[1], yrange[1])).opts(cmap='viridis',clim=(0,10))
+    #         dets[1:2,0] = fig
+        tabs.append(dets_tab)
     
     # save to stats dir
     reports_dir = Path(f'/cds/data/psdm/{exp[:3]}/{exp}/stats/summary/Cube_{int(run):03d}')
