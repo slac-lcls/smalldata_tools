@@ -106,11 +106,6 @@ def define_dets(run):
     except Exception as e:
         print(f'Can\'t instantiate SVD args: {e}')
         svd = []
-    try:
-        image = getFullImage(run)
-    except Exception as e:
-        print(f'Can\'t instantiate full image args: {e}')
-        image = []
         
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
@@ -149,9 +144,6 @@ def define_dets(run):
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
 
             det.storeSum(sumAlgo='calib')
             det.storeSum(sumAlgo='calib_img')
@@ -203,7 +195,6 @@ from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit
-from smalldata_tools.ana_funcs.full_det import image_from_dat
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 # logging.basicConfig(level=logging.DEBUG)

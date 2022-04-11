@@ -127,15 +127,7 @@ def getSvdParams(run):
     return ret_dict
 
 
-# 5) GET FULL IMAGE (not recommended)
-def getFullImage(run):
-    ret_dict = {}
-    if run>0:
-        ret_dict['jungfrau1M'] = True
-    return ret_dict
-
-
-# 6) autocorrelation
+# 5) autocorrelation
 def getAutocorrParams(run):
     if isinstance(run,str):
         run=int(run)
@@ -213,11 +205,6 @@ def define_dets(run):
     except Exception as e:
         print(f'Can\'t instantiate SVD args: {e}')
         svd = []
-    try:
-        image = getFullImage(run)
-    except Exception as e:
-        print(f'Can\'t instantiate full image args: {e}')
-        image = []
         
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
