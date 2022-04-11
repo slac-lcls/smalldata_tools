@@ -368,7 +368,7 @@ class imageFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','image')
         super(imageFunc, self).__init__(**kwargs)
-        self._coords = kwargs.get('coords',None)
+        self._coords = kwargs.get('coords',['x','y'])
         self.imgShape = kwargs.get('imgShape',None)
         self.correction = kwargs.get('correction',None)
         self.mask = kwargs.get('mask',None)
@@ -380,8 +380,8 @@ class imageFunc(DetObjectFunc):
         #set imgShape if obvious (and not previously set)
         if self.imgShape is None:
             try:
-                self.imgShape = [det.ix.max()-det.ix.min(),
-                                 det.iy.max()-det.iy.min()]
+                self.imgShape = [det.ix.max()-det.ix.min()+1,
+                                 det.iy.max()-det.iy.min()+1]
             except:
                 #cspad
                 if det.x.shape==(32,185,388): self.imgShape=[1689,1689]
@@ -461,9 +461,27 @@ class imageFunc(DetObjectFunc):
                                      self.imgShape[1])))
             if self.mask is not None:
                 maskArray = np.array(self.mask).flatten()
-                self.mask_img = np.array(sparse.coo_matrix((maskArray,(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
+                self.mask_img = np.array(
+                        sparse.coo_matrix((
+                            maskArray,
+                            (
+                                self.__dict__['i%s'%self._coords[0]].flatten(),
+                                self.__dict__['i%s'%self._coords[1]].flatten()
+                            )
+                        ), 
+                            shape=self.imgShape).toarray()
+                    )
                 self.mask_img[self.mask_img!=0]=1
-                ones_mask = np.array(sparse.coo_matrix((np.ones_like(maskArray),(self.__dict__['i%s'%self._coords[0]].flatten(),self.__dict__['i%s'%self._coords[1]].flatten())), shape=self.imgShape).toarray())
+                ones_mask = np.array(
+                        sparse.coo_matrix((
+                            np.ones_like(maskArray),
+                            (
+                                self.__dict__['i%s'%self._coords[0]].flatten(),
+                                self.__dict__['i%s'%self._coords[1]].flatten()
+                            )
+                        ), 
+                            shape=self.imgShape).toarray()
+                    )
                 self.mask_ones = ones_mask
                 self.mask_img[ones_mask==0]=1
                 self.mask_img = self.mask_img.astype(int)
@@ -518,9 +536,9 @@ class imageFunc(DetObjectFunc):
         if self._coords is None:
             if isinstance(data, np.ma.masked_array):
                 if data.dtype==np.uint16:
-                    data = data.filled(data, fill_value=0)
+                    data = data.filled(fill_value=0)
                 else:
-                    data = data.filled(data, fill_value=np.nan)
+                    data = data.filled(fill_value=np.nan)
             if isinstance(data, np.matrix):
                 data = np.asarray(data)
             self.dat = data
@@ -538,8 +556,8 @@ class imageFunc(DetObjectFunc):
             ##as a note the normalization costs about 0.2ms
             #data2d = sparse.coo_matrix((data.flatten(),(self.__dict__['i%s'%self._coords[0]],self.__dict__['i%s'%self._coords[1]])), shape=self.imgShape).toarray()            
             #retDict['img_sparse'] = np.array(data2d)
-            I=np.bincount(self._multidim_idxs, weights = data.flatten(), minlength=int(self._n_multidim_idxs))
-            I=np.reshape(I[:self._n_multidim_idxs], self._n_coordTuple)
+            I = np.bincount(self._multidim_idxs, weights=data.flatten(), minlength=int(self._n_multidim_idxs))
+            I = np.reshape(I[:self._n_multidim_idxs], self._n_coordTuple)
             if self._npix_div is not None:
                 Inorm=I*self._npix_div
                 retDict['img'] = Inorm
@@ -554,7 +572,7 @@ class imageFunc(DetObjectFunc):
             retDict['img_1d']=data/self.npix
             self.dat = retDict['img_1d']
         else:
-            I=np.bincount(self._multidim_idxs, weights = data, minlength=self._n_multidim_idxs)
+            I=np.bincount(self._multidim_idxs, weights=data, minlength=self._n_multidim_idxs)
             I=I[:self._n_multidim_idxs]
             retDict['img_n'] = np.reshape(I, self._n_coordTuple)
             self.dat = retDict['img_n']
