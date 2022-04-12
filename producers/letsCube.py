@@ -153,8 +153,11 @@ if rank==0:
             scanSteps = np.append(scanSteps[0]-abs(scanSteps[1]-scanSteps[0]),scanSteps) #catch values at left edge
             binSteps = scanSteps
             cubeName = scanName
-            if scanName == 'lxt':
-                print('bin data using ',scanName,' and bins: ',scanSteps)
+            if 'lxt' in scanName:
+                bins = config.binBoundaries(run)
+                if bins is not None:
+                    binSteps = bins
+                print('bin data using ',scanName,' and bins: ',binSteps)
                 binName='delay'
             else:
                 print('bin data using ',scanName,' and bins: ',scanSteps)

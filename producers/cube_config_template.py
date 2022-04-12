@@ -36,6 +36,7 @@ filters = [
 
 # Laser on/off
 laser = False
+use_tt = True
 
 # ##### DETECTORS ########################################################################
 # List detectors to be cubed. Area detector have additional options such as threshold
