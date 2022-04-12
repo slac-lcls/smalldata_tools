@@ -5,6 +5,7 @@ from skimage.measure import (CircleModel, ransac)
 from scipy.signal import argrelextrema
 from scipy.spatial import cKDTree
 from numba import jit
+from numba.typed import List as NTL
 import itertools
 from matplotlib import pyplot as plt
 plt.ion()
@@ -165,7 +166,9 @@ def iterate_center(sparse_edges, overfill, r_range, r_bin, c_bin, prec, red_fact
     center_x = np.arange(x_range[0], x_range[1], (x_range[1] - x_range[0]) / c_bin)
     center_y = np.arange(y_range[0], y_range[1], (y_range[1] - y_range[0]) / c_bin)
     ar_hough = np.zeros([radii.shape[0], center_x.shape[0], center_y.shape[0]])
-    zip_obj = zip(sparse_edges.row, sparse_edges.col, sparse_edges.data)
+    zip_obj_old = zip(sparse_edges.row, sparse_edges.col, sparse_edges.data)
+    zip_obj = NTL()
+    [zip_obj.append(x) for x in zip_obj_old]
     _transform_hough_array(ar_hough, radii, zip_obj, center_x, center_y, dr, r_low, r_hi)
     r, x, y, maxdim_r = _max_from_hough(ar_hough, radii, center_x, center_y)
 
