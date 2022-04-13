@@ -37,12 +37,74 @@ def getROIs(run):
         run=int(run)
     ret_dict = {}
     if run>0:
-        roi_dict = {}
-        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M'] = roi_dict
+        rdicts = []
+        if args.details:
+            rdict = {}
+            rdict['ROI'] = None 
+            rdict['name'] = 'Full'
+            rdict['thresADU'] = None
+            rdicts.append(rdict)
+        rtdict = {}
+        rtdict['ROI'] = None 
+        rtdict['name'] = 'Full_t50'
+        rtdict['thresADU'] = 50
+        rdicts.append(rtdict)
+        ret_dict['jungfrau4M'] = rdicts
     return ret_dict
+
+def getAzIntParams(run):
+     if isinstance(run,str):
+         run=int(run)
+     ret_dict = {}
+     if run>0:
+         az_dict = {'eBeam': 15.155} # keV
+         az_dict['center'] = [-1240,-470.4] # um
+         az_dict['qbin'] = 0.06 # 
+         az_dict['dis_to_sam'] = 85.924 # mm
+         az_dict['thresADU'] = 50. 
+         ret_dict['jungfrau4M'] = az_dict
+     return ret_dict
+
+def getAzIntParams(run):
+     if isinstance(run,str):
+         run=int(run)
+     ret_dict = {}
+     if run>0:
+         az_dict = {'eBeam': 15.0} # keV
+         az_dict['center'] = [0,0] # um
+         az_dict['qbin'] = 0.2 # 
+         az_dict['dis_to_sam'] = 80. # mm
+         ret_dict['jungfrau4M'] = az_dict
+     return ret_dict
+
+def getPhotonParams(run):
+     if isinstance(run,str):
+         run=int(run)
+     ret_dict = {}
+     if run>0:
+         phot_dict = {'ADU_per_photon': 628.0} # ADU for cxilv1118 - ottherwise keV
+         phot_dict['thr_fraction'] = 0.85 #
+         #phot_dict['thresADU'] = 0.85 #
+         ret_dict['jungfrau4M'] = phot_dict
+     return ret_dict
+
+def getDropletParams(run):
+     """ Parameters for droplet algorithm
+     See droplet2Func.py for more info
+     """
+     if isinstance(run,str):
+         run=int(run)
+     ret_dict = {}
+     
+     if run>0:
+        droplet_dict = {}
+        #std is about 12, FWHM of zero-photon peak about 25
+        droplet_dict['useRms'] = False
+        droplet_dict['threshold'] = 200
+        droplet_dict['thresholdLow'] = 50
+        droplet_dict['thresADU'] = 250.
+        ret_dict['jungfrau4M'] = droplet_dict
+        return ret_dict
 
 
 ##########################################################
@@ -67,25 +129,21 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M'] # add detector here
+    detnames = ['jungfrau4M'] # add detector here
+    #detnames = []
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
     try:
-        ROIs = getROIs(run)
+        ROI = getROIs(run)
     except Exception as e:
         print(f'Can\'t instantiate ROI args: {e}')
-        ROIs = []
+        ROI = []
     try:
         az = getAzIntParams(run)
     except Exception as e:
         print(f'Can\'t instantiate azimuthalBinning args: {e}')
         az = []
-    try:
-        az_pyfai = getAzIntPyFAIParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate AzIntPyFAI args: {e}')
-        az_pyfai = []
     try:
         phot = getPhotonParams(run)
     except Exception as e:
@@ -94,67 +152,64 @@ def define_dets(run):
     try:
         drop = getDropletParams(run)
     except Exception as e:
-        print(f'Can\'t instantiate Droplet2 args: {e}')
+        print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
-    try:
-        auto = getAutocorrParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate Autocorrelation args: {e}')
-        auto = []
-    try:
-        svd = getSvdParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate SVD args: {e}')
-        svd = []
-    try:
-        image = getFullImage(run)
-    except Exception as e:
-        print(f'Can\'t instantiate full image args: {e}')
-        image = []
         
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
         # Common mode
         if havedet:
-            if detname=='': 
-                # change here to specify common mode for detname if desired. Else default is used
-                common_mode=0
+            if detname=='jungfrau4M':
+                #common_mode=71 #standard JF common mode
+                common_mode=0 #faster.
             else:
                 common_mode=None
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
             
             # Analysis functions
-            # ROIs:
-            if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                        ROI=ROI,
-                                        writeArea=ROIs[detname]['writeArea'],
-                                        thresADU=ROIs[detname]['thresADU']))
+            ## ROIs:
+            if detname in ROI:
+                roihist=spectrumFunc(name='roihist',bins=[0,800,1.])
+                detROI = ROI[detname]
+                if not isinstance(detROI, list):
+                    detROI = [detROI]
+                for troi in detROI:
+                    roi = ROIFunc(**troi)
+                    roi.addFunc(roihist)
+                    det.addFunc(roi)
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
-            if detname in az_pyfai:
-                det.addFunc(azav_pyfai(**az_pyfai[detname]))
             # Photon count
-            if detname in phot:
-                det.addFunc(photonFunc(**phot[detname]))
-            # Droplet algo 2
-            if detname in drop:
-                det.addFunc(droplet2Func(**drop[detname]))
-            # Autocorrelation
-            if detname in auto:
-                det.addFunc(Autocorrelation(**auto[detname]))
-            # SVD waveform analysis
-            if detname in svd:
-                det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
+            if detname in phot and args.photons:
+                photon = photonFunc(**phot[detname])
+
+                if args.details:
+                    ##save number/photons per pixel
+                    nPhotPP=spectrumFunc(name='nPhotPP',bins=[0,50,1.])
+                    photon.addFunc(nPhotPP)
+                    ##save sparsified array
+                    #sparse = sparsifyFunc(nData=15000)
+                    #photon.addFunc(sparse)
+                    #fullImg = ROIFunc(writeArea=True)
+                    #photon.addFunc(fullImg)
+                det.addFunc(photon)
+
+            # Droplet algo 
+            if detname in drop and args.droplets:
+                droplet = dropletFunc(**drop[detname])
+                if args.details:
+                    specFunc=spectrumFunc(name='spec',bins=[0,3000,1.])
+                    droplet.addFunc(specFunc) 
+                    #save droplets as rectangular array.
+                    droplet.addFunc(sparsifyFunc(nData=13000))
+                    ##save droplets in image formar
+                    #droplet.addFunc(imageFunc())
+                det.addFunc(droplet)
 
             det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_img')
+            #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
 
@@ -243,6 +298,10 @@ parser.add_argument('--image', help='save everything as image (use with care)', 
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
+parser.add_argument("--details", help="add all details", action='store_true', default=False)
+parser.add_argument("--photons", help="add photons", action='store_true', default=False)
+parser.add_argument("--droplets", help="add roplets", action='store_true', default=False)
+parser.add_argument("--nodetproc", help="dont process area detector", action='store_true', default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -262,11 +321,11 @@ def get_sd_file(write_dir, exp, hutch):
             write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
         else:
             write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
-    if args.default:
-        if useFFB:
-            write_dir = write_dir.replace('hdf5','hdf5_def')
-        else:
-            write_dir = write_dir.replace('hdf5','scratch')
+    #if args.default:
+    #    if useFFB:
+    #        write_dir = write_dir.replace('hdf5','hdf5_def')
+    #    else:
+    #        write_dir = write_dir.replace('hdf5','scratch')
     h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
     if not os.path.isdir(write_dir):
         logger.debug('{0} does not exist, creating directory'.format(write_dir))
@@ -464,6 +523,7 @@ if args.tiff:
 
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
+    #print('event ', evt_num)
     if evt_num > max_iter:
         break
 
@@ -476,6 +536,7 @@ for evt_num, evt in enumerate(ds.events()):
         try:
             #this should be a plain dict. Really.
             det.getData(evt)
+            if args.nodetproc: continue
             det.processFuncs()
             userDict[det._name]=getUserData(det)
             try:
@@ -522,14 +583,15 @@ for evt_num, evt in enumerate(ds.events()):
         elif ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
 
-sumDict={'Sums': {}}
-for det in dets:
-    for key in det.storeSum().keys():
-        sumData=small_data.sum(det.storeSum()[key])
-        sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
-if len(sumDict['Sums'].keys())>0:
-#     print(sumDict)
-    small_data.save(sumDict)
+if not args.nodetproc: 
+    sumDict={'Sums': {}}
+    for det in dets:
+        for key in det.storeSum().keys():
+            sumData=small_data.sum(det.storeSum()[key])
+            sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
+    if len(sumDict['Sums'].keys())>0:
+    #     print(sumDict)
+        small_data.save(sumDict)
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 end_job = time.time()
@@ -543,7 +605,7 @@ small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     if ds.size > 1:
         if ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)},{"key": "<b>Duration</b>", "value": "%f min"%(prod_time)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
@@ -556,14 +618,24 @@ if args.postRuntable and ds.rank==0:
     runtable_data = {"Prod%s_end"%locStr:end_prod_time,
                      "Prod%s_start"%locStr:begin_prod_time,
                      "Prod%s_jobstart"%locStr:begin_job_time,
+                     "Prod%s_duration_mins"%locStr:prod_time,
                      "Prod%s_ncores"%locStr:ds.size}
     if args.default:
         runtable_data["SmallData%s"%locStr]="default"
     else:
         runtable_data["SmallData%s"%locStr]="done"
+    if args.nodetproc:
+        runtable_data["Prod_%s_jf"%locStr]="calib"
+    elif args.photons:
+        runtable_data["Prod_%s_jf"%locStr]="photons"
+    elif args.droplets:
+        runtable_data["Prod_%s_jf"%locStr]="droplets"
+    else:
+        runtable_data["Prod_%s_jf"%locStr]="azav"
     time.sleep(5)
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
+    print('runtable_data:',runtable_data)
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     user=(args.experiment[:3]+'opr').replace('dia','mcc')
