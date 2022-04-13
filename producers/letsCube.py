@@ -102,6 +102,8 @@ if rank==0:
             import cube_config_xcs as config
         elif hutch=='MFX':
             import cube_config_mfx as config
+        elif hutch=='CXI':
+            import cube_config_cxi as config
     else:
         print(f'Importing custom config {args.config}')
         config = importlib.import_module(args.config)
@@ -146,6 +148,10 @@ if rank==0:
     binSteps=[]
     binName=''
     
+    if isinstance(scanName, list):
+       scanName = scanName[0]
+       scanValues = scanValues[0]
+
     if scanName!='':
         if scanName.find('delay')<0:
             scanSteps = np.unique(scanValues)
