@@ -191,6 +191,7 @@ def cxiDetectors(beamCodes=[[162, 120],[]]):
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
     dets.append(ttDetector(baseName='CXI:TIMETOOL:'))
+    dets.append(epicsDetector(PVlist=['lxt', 'lxt_ttc']))
     try:
         dets.append(impDetector('Sc1Imp'))
     except:
