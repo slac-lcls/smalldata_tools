@@ -129,12 +129,6 @@ class ROIFunc(DetObjectFunc):
         self.Nsat = highLim
 
     def process(self, data):
-        if self.thresADU is not None:
-            if isinstance(self.thresADU, list):
-                data[data<self.thresADU[0]] = 0
-                data[data>self.thresADU[1]] = 0
-            else:
-                data[data<self.thresADU] = 0
         ret_dict = {}
         ROIdata=self.applyROI(data)
         if self.mask is not None:
@@ -149,6 +143,12 @@ class ROIFunc(DetObjectFunc):
 ### this is why processFuns works. For droplet & photon, store dict of ADU, x, y (& more?)
 ### photons: row & col. make droplet use that too.
 ###
+        if self.thresADU is not None:
+            if isinstance(self.thresADU, list):
+                ROIdata[ROIdata<self.thresADU[0]] = 0
+                ROIdata[ROIdata>self.thresADU[1]] = 0
+            else:
+                ROIdata[ROIdata<self.thresADU] = 0
         self.dat = ROIdata
 ###
         if self.writeArea:
