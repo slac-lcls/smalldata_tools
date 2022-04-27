@@ -129,6 +129,7 @@ def DetObject(srcName, env, run, **kwargs):
         7: OpalObject,
         8: OpalObject,
         9: OpalObject,
+       10: OrcaObject, #fee_spec
        13: EpixObject,
        15: AndOrObject,
        16: AcqirisObject,
@@ -316,7 +317,6 @@ class DetObjectClass(object):
             
             if self.evt.dat is None:
                 return
-            #need to copy here so that threshold does not get applied to functions furtherr downstream
             dat_to_be_summed = self.evt.dat.copy()
             if thres>-1e9:
                 dat_to_be_summed[self.evt.dat<thres]=0.
@@ -579,6 +579,25 @@ class PulnixObject(CameraObject):
         super(PulnixObject, self).__init__(det,env,run, **kwargs)
         yag2Cfg = env.configStore().get(psana.Pulnix.TM6740ConfigV2,self._src)
         self.ped = np.zeros([yag2Cfg.Row_Pixels, yag2Cfg.Column_Pixels])
+        self.imgShape = self.ped.shape
+        if self.x is None:
+            self._get_coords_from_ped()
+        if self.mask is None or self.mask.shape!=self.imgShape:
+            self.mask = np.ones(self.imgShape)
+            self.cmask = np.ones(self.imgShape)
+
+class OrcaObject(CameraObject): 
+    def __init__(self, det,env,run,**kwargs):
+        #super().__init__(det,env,run, **kwargs)
+        super(OrcaObject, self).__init__(det,env,run, **kwargs)
+        oCfg = env.configStore().get(psana.Orca.ConfigV1,self._src)
+        try:
+            ofCfg = env.configStore().get(psana.Camera.FrameFexConfigV1,self._src)
+            self.ped = np.zeros([ofCfg.roiEnd().row()-ofCfg.roiBegin().row(),
+                                 ofCfg.roiEnd().column()-ofCfg.roiBegin().column()])
+        except:
+            ofCfg = None
+            self.ped = np.zeros([oCfg.Row_Pixels, oCfg.Column_Pixels])
         self.imgShape = self.ped.shape
         if self.x is None:
             self._get_coords_from_ped()
