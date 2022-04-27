@@ -316,7 +316,8 @@ class DetObjectClass(object):
             
             if self.evt.dat is None:
                 return
-            dat_to_be_summed = self.evt.dat
+            #need to copy here so that threshold does not get applied to functions furtherr downstream
+            dat_to_be_summed = self.evt.dat.copy()
             if thres>-1e9:
                 dat_to_be_summed[self.evt.dat<thres]=0.
 
