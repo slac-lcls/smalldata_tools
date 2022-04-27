@@ -104,6 +104,7 @@ def xppDetectors(beamCodes=[[162,120],[91]]):
     dets.append(ipmDetector('XppSb4_Pim','diode2'))
     dets.append(ipmDetector('XppEnds_Ipm0','diodeU'))
     dets.append(aiDetector('XPP-AIN-01','ai'))
+    dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(adcDetector('adc','adc'))
     except:
@@ -151,6 +152,7 @@ def xcsDetectors(beamCodes=[[162, 120],[89]]):
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
     dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
         dets.append(encoderDetector('XCS-USB-ENCODER-01','enc'))
@@ -172,6 +174,7 @@ def mfxDetectors(beamCodes=[[162, 120],[]]):
     dets.append(bmmonDetector('MFX-DG1-BMMON','ipm_dg1'))
     dets.append(bmmonDetector('MFX-DG2-BMMON','ipm_dg2'))
     dets.append(damageDetector())
+    dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(encoderDetector('XRT-USB-ENCODER-01','xrt_enc'))
         dets.append(encoderDetector('MFX-USB-ENCODER-01','enc'))
@@ -191,6 +194,7 @@ def cxiDetectors(beamCodes=[[162, 120],[]]):
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
     dets.append(ttDetector(baseName='CXI:TIMETOOL:'))
+    dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(impDetector('Sc1Imp'))
     except:
@@ -225,6 +229,7 @@ def mecDetectors(beamCodes=[[162, 120],[-182]]):
     dets.append(ttDetector(baseName='MEC:TIMETOOL:'))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(xtcavDetector('xtcav','xtcav'))
     dets.append(damageDetector())
     setParameter(dets, dets, detName='damage') 
     dets.append(epicsDetector(PVlist=['belens_z',
@@ -312,6 +317,13 @@ def getUserData(det):
                 det_dict[key.replace('_write_','')] = np.array(det.evt.__dict__[key])
     except:
         pass
+    newDict = {}
+    for key in det_dict:
+        if key.find('ragged')>=0:
+            newDict['ragged_%s'%(key.replace('ragged_',''))] = det_dict[key]
+        else:
+            newDict['%s'%(key)] = det_dict[key]
+    det_dict = newDict
     #print 'det_dict ',det_dict.keys()
     return det_dict
 
