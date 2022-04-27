@@ -12,7 +12,7 @@ class droplet2Func(DetObjectFunc):
     '''
     return_img: whether or not to return the img with how many photons at each coordinate
     threshold: # (noise sigma for) threshold
-    mask: pass a mask in here, is None: use mask stored in DetObject
+    mask: pass a mask in here (array-form), is None: use mask stored in DetObject
     aduspphot: 
     offset: 
     
@@ -24,10 +24,7 @@ class droplet2Func(DetObjectFunc):
     '''
     def __init__(self, **kwargs):
         self.return_img = kwargs.get('return_img',False)
-        if self.return_img is False:
-            self._name = kwargs.get('name', 'ragged_droplet')
-        else:
-            self._name = kwargs.get('name', 'droplet')
+        self._name =  kwargs.get('name','droplet')
         super(droplet2Func, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold', None)
         self.mask = kwargs.get('mask', None)
@@ -67,12 +64,12 @@ class droplet2Func(DetObjectFunc):
         p = getProb_img(photonlist, self.mask, 12)
         
         # output dictionary
-        d = {}
-        d['prob'] = np.squeeze(p)
+        ret_dict = {'prob': np.squeeze(p)}
         
-        if self.return_img is False:  
-            d['photon_i'] = photonlist[:,2]
-            d['photon_j'] = photonlist[:,1]
-        else:
-            d['img'] = phot_img
-        return d
+        self.dat = np.ma.masked_array(phot_img, mask=(~(self.mask.astype(bool))).astype(np.uint8))
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+
+        return ret_dict
