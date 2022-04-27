@@ -316,7 +316,8 @@ class DetObjectClass(object):
             
             if self.evt.dat is None:
                 return
-            dat_to_be_summed = self.evt.dat
+            #need to copy here so that threshold does not get applied to functions furtherr downstream
+            dat_to_be_summed = self.evt.dat.copy()
             if thres>-1e9:
                 dat_to_be_summed[self.evt.dat<thres]=0.
 
@@ -701,13 +702,13 @@ class JungfrauObject(TiledCameraObject):
         mbits=0 #do not apply mask (would set pixels to zero)
         #mbits=1 #set bad pixels to 0
         if self.common_mode==0:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,0,100), mbits=mbits)
+            self.evt.dat = self.det.calib(evt, cmpars=(7,0,10), mbits=mbits)
         elif self.common_mode%100==71:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,1,100,0), mbits=mbits) #correction in rows
+            self.evt.dat = self.det.calib(evt, cmpars=(7,1,10,10), mbits=mbits) #correction in rows
         elif self.common_mode%100==72:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,2,100,0), mbits=mbits) #correction in columns
+            self.evt.dat = self.det.calib(evt, cmpars=(7,2,10,10), mbits=mbits) #correction in columns
         elif self.common_mode%100==7:
-            self.evt.dat = self.det.calib(evt, cmpars=(7,3,100,0), mbits=mbits) #correction in rows&columns
+            self.evt.dat = self.det.calib(evt, cmpars=(7,3,10,10), mbits=mbits) #correction in rows&columns
         #override gain if desired
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [7,71,72,0]:
             self.evt.dat*=self.local_gain   #apply own gain
