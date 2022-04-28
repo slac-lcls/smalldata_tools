@@ -1381,7 +1381,7 @@ class SmallDataAna(object):
     def getScanName(self):
         scanNames=[]
         for key in self.Keys('scan'):
-            if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0 and key.find('UserDataCfg')<0:
+            if key.find('var')<0 and key.find('none')<0 and key.find('damage')<0 and key.find('UserDataCfg')<0 and key.find('epics')<0:
                 scanNames.append(key.replace('/scan/','').replace('scan/',''))
         #during the early times of bluesky scans with pseudo positioners, 
         #sometimes extra data was saved in the control data
