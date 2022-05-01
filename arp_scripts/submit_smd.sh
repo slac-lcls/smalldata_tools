@@ -62,6 +62,7 @@ do
 			;;
 		-c|--cores)
 			CORES="$2"
+                        POSITIONAL+=("$1 $2")
 			shift
 			shift
 			;;
@@ -72,6 +73,7 @@ do
 			;;
         --interactive)
             INTERACTIVE=1
+            POSITIONAL+=("$1")
 			shift
 			;;
         *)
