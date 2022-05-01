@@ -11,6 +11,7 @@ import logging
 import re
 import requests
 from requests.auth import HTTPBasicAuth
+import tables
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -53,6 +54,7 @@ parser.add_argument("--nevents", help="number of events/bin", default=-1)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true')
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 parser.add_argument('--config', help='Name of the config file module to use (without .py extension)', default=None, type=str)
+parser.add_argument("--optimize_cores", help="split processing over more cores than bins", action='store_true')
 args = parser.parse_args()
     
 exp = args.experiment
@@ -102,6 +104,8 @@ if rank==0:
             import cube_config_xcs as config
         elif hutch=='MFX':
             import cube_config_mfx as config
+        elif hutch=='CXI':
+            import cube_config_cxi as config
     else:
         print(f'Importing custom config {args.config}')
         config = importlib.import_module(args.config)
@@ -109,7 +113,6 @@ if rank==0:
 
     dirname=''
 #     dirname='/cds/data/psdm/xpp/xpplv9818/scratch/ffb/hdf5/smalldata'
-#     dirname = '/cds/data/drpsrcf/xpp/xpplw8919/scratch/hdf5/smalldata'
     if args.indirectory:
         dirname = args.indirectory
         if dirname.find('/')<=0:
@@ -121,7 +124,7 @@ if rank==0:
         print('create ana module from anaps')
         ana = anaps.sda
     else:
-        print('we will now try to open the littleData file directly')
+        print('we will now try to open the smallData file directly')
         ana = SmallDataAna(exp,run, dirname, fname)
         if 'fh5' not in ana.__dict__.keys():
             ana = None
@@ -132,6 +135,7 @@ if rank==0:
     ana.printRunInfo()
 
     for filt in config.filters:
+        if rank==0: print('Filter: ',filt)
         ana.addCut(*filt)
 
     varList = config.varList
@@ -146,6 +150,10 @@ if rank==0:
     binSteps=[]
     binName=''
     
+    if isinstance(scanName, list):
+       scanName = scanName[0]
+       scanValues = scanValues[0]
+
     if scanName!='':
         if scanName.find('delay')<0:
             scanSteps = np.unique(scanValues)
@@ -155,7 +163,8 @@ if rank==0:
             cubeName = scanName
             if 'lxt' in scanName:
                 bins = config.binBoundaries(run)
-                if bins is not None:
+                #only use special binning if we use the timetool correction!
+                if bins is not None and config.use_tt:
                     binSteps = bins
                 print('bin data using ',scanName,' and bins: ',binSteps)
                 binName='delay'
@@ -177,7 +186,7 @@ if rank==0:
         binName = [key for key in ana.Keys() if re.search("ipm.*/sum",key)][0]
         # binName='ipm2/sum'
         binVar=ana.getVar(binName)
-        binSteps=np.percentile(binVar,[0,25,50,75,100])
+        binSteps=np.nanpercentile(binVar,[0,25,50,75,100])
 
     print('Bin name: {}, bins: {}'.format(binName, binSteps))
 
@@ -192,7 +201,8 @@ if rank==0:
             cubeName = cubeName_base
         ana.addCube(cubeName,binName,binSteps,filterName)
         ana.addToCube(cubeName,varList)
-    
+            
+    nBins = binSteps.shape[0]
     try:
         addBinVars = config.get_addBinVars(run)
     except Exception as e:
@@ -202,7 +212,18 @@ if rank==0:
     if addBinVars is not None and isinstance(addBinVars, dict):
         for cubeName, cube in ana.cubes.items():
             cube.add_BinVar(addBinVars)
+        nBins *= len(addBinVars[1])
             
+    #figure out how many bins & cores we have to maybe add a fake variable.
+    nCores = size
+    nSplit = int(nCores/nBins)
+    #ok, we have more cores than bins. add a random variable to the data & add bins for that to the cube.
+    if nSplit > 1 and args.optimize_cores:
+        my_randomvar = np.random.random(ana.getVar('fiducials').shape[0])
+        ana.addVar('random_remove',my_randomvar)
+        randomBins = np.linspace(0,1.,nSplit+1)
+        for cubeName, cube in ana.cubes.items():
+            cube.add_BinVar({'random_remove': randomBins.tolist()})
 
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
@@ -228,7 +249,48 @@ if rank==0:
                 dirname=args.outdirectory)
             cube_infos.append([cubeName, bins, nEntries])
     comm.bcast('Go home!', root=0)
-        
+            
+    if nSplit > 1 and args.optimize_cores and rank==0:
+        cubedirectory= args.outdirectory
+        cubeFNames = []
+        for cubeName in ana.cubes:
+            cubeFName = 'Cube_%s_Run%04d_%s.h5'%(args.experiment, int(run), cubeName )
+            if config.laser:
+                cubeFNames.append(cubeFName.replace('.h5','_on.h5'))
+                cubeFNames.append(cubeFName.replace('.h5','_off.h5'))
+            else:
+                cubeFNames.append(cubeFName)
+        print('.....remove random_remove....')
+        for cubeFName in cubeFNames:
+            dat = tables.open_file('%s/%s'%(cubedirectory, cubeFName ),'r+')
+            bins_remove = getattr(dat.root,'bins_random_remove', None)
+            if bins_remove is None:
+                print('Did not find the axis to be removed, quit.')
+                continue
+            nBins_remove = bins_remove.shape[0]
+            print('Remove extra dimension: ', nSplit, nBins_remove)
+            dat.remove_node('/bins_random_remove')
+            #get all keys (not directories) & find binning variable random_remove
+            h5_variables = [k for k in dir(dat.root) if k[0]!='_']
+            #get data            
+            for var in h5_variables:
+                try:
+                    org_data = getattr(dat.root,var).read()
+                    if len(org_data.shape)<=1:
+                        #print('Dim not available')
+                        continue
+                    if org_data.shape[1]!=nBins_remove:
+                        #print('Did not find the right variable to sum over ', org_data.shape, nBins_remove)
+                        continue
+                    #sum to remove dim
+                    new_data = org_data.sum(axis=1)
+                    #remove dataset
+                    dat.remove_node('/%s'%var)
+                    #add dataset
+                    dat.create_array('/',var, obj=new_data)
+                except:
+                    pass
+
     if config.save_tiff is True:
         tiffdir='/cds/data/drpsrcf/mec/meclu9418/scratch/run%s'%args.run
         cubeFName = 'Cube_%s_Run%04d_%s'%(args.experiment, int(run), cubeName )
