@@ -72,6 +72,15 @@ do
 			shift
 			shift
 			;;
+                --interactive)
+            INTERACTIVE=1
+			shift
+			;;
+		-c|--cores)
+			CORES="$2"
+			shift
+			shift
+			;;
         *)
             POSITIONAL+=("$1")
 			shift
@@ -105,5 +114,9 @@ ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
     python -u $ABS_PATH/$PYTHONEXE $@
 else
-    mpirun python -u $ABS_PATH/$PYTHONEXE $@
+    if [ -v INTERACTIVE ]; then
+        mpirun -np $CORES python -u $ABS_PATH/$PYTHONEXE $@
+    else
+        mpirun python -u $ABS_PATH/$PYTHONEXE $@
+    fi
 fi

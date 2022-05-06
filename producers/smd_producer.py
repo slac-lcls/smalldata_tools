@@ -146,7 +146,7 @@ def define_dets(run):
                 det.addFunc(svdFit(**svd[detname]))
 
             det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_img')
+            #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
 
@@ -253,11 +253,6 @@ def get_sd_file(write_dir, exp, hutch):
             write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
         else:
             write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
-    if args.default:
-        if useFFB:
-            write_dir = write_dir.replace('hdf5','hdf5_def')
-        else:
-            write_dir = write_dir.replace('hdf5','scratch')
     h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
     if not os.path.isdir(write_dir):
         logger.debug('{0} does not exist, creating directory'.format(write_dir))
@@ -327,12 +322,11 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object, don't understand all conditions yet
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
-#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
+ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
-        ds_name += ':dir=/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
+        ds_name += ':live:dir=/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
 # try this: live & all streams (once I fixed the recording issue)
 #ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
 try:
@@ -439,7 +433,7 @@ if args.full:
 
 userDataCfg={}
 for det in default_dets:
-    if det.name=='tt' and ttCalib is not []:
+    if det.name=='tt' and len(ttCalib)>0:
         det.setPars(ttCalib)
         logger.info(f'Using user-defined tt parameters: {ttCalib}')
     userDataCfg[det.name] = det.params_as_dict()
@@ -510,11 +504,17 @@ for evt_num, evt in enumerate(ds.events()):
 
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
-    if (int(os.environ.get('RUN_NUM', '-1')) > 0) and ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
-        if ds.size == 1:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
-        elif ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+    if ( (evt_num<100 and evt_num%10==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
+        if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+            if ds.size == 1:
+                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
+            elif ds.rank == ds.size-1:
+                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+        else:
+            if ds.size == 1:
+                print('Current Event:', evt_num+1)
+            elif ds.rank == ds.size-1:
+                print('Current Event / rank :', evt_num+1)
 
 sumDict={'Sums': {}}
 for det in dets:
@@ -537,7 +537,7 @@ small_data.save()
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     if ds.size > 1:
         if ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)}])
+            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)},{"key": "<b>Duration</b>", "value": "%f min"%(prod_time)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
@@ -550,6 +550,7 @@ if args.postRuntable and ds.rank==0:
     runtable_data = {"Prod%s_end"%locStr:end_prod_time,
                      "Prod%s_start"%locStr:begin_prod_time,
                      "Prod%s_jobstart"%locStr:begin_job_time,
+                     "Prod%s_duration_mins"%locStr:prod_time,
                      "Prod%s_ncores"%locStr:ds.size}
     if args.default:
         runtable_data["SmallData%s"%locStr]="default"
