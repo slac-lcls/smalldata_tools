@@ -322,8 +322,8 @@ class sparsifyFunc(DetObjectFunc):
                 for iTile,photonTile in enumerate(photonsImg):
                     sImage = sparse.coo_matrix(photonTile)
                     data = list(itertools.chain.from_iterable([data, sImage.data.tolist()]))
-                    row = list(itertools.chain.from_iterable([row, sImage.data.tolist()]))
-                    col = list(itertools.chain.from_iterable([col, sImage.data.tolist()]))
+                    row = list(itertools.chain.from_iterable([row, sImage.row.tolist()]))
+                    col = list(itertools.chain.from_iterable([col, sImage.col.tolist()]))
                     tile = list(itertools.chain.from_iterable([tile, (np.ones_like(sImage.data)*iTile).tolist()]))
                 data = np.array(data)
                 row = np.array(row)
