@@ -67,8 +67,6 @@ class ROIFunc(DetObjectFunc):
             except:
                 pass
         try:
-            # self._x = self.applyROI(det.x.squeeze())
-            # self._y = self.applyROI(det.y.squeeze())
             self._x = self.applyROI(det.x)
             self._y = self.applyROI(det.y)
         except:
@@ -324,8 +322,8 @@ class sparsifyFunc(DetObjectFunc):
                 for iTile,photonTile in enumerate(photonsImg):
                     sImage = sparse.coo_matrix(photonTile)
                     data = list(itertools.chain.from_iterable([data, sImage.data.tolist()]))
-                    row = list(itertools.chain.from_iterable([row, sImage.data.tolist()]))
-                    col = list(itertools.chain.from_iterable([col, sImage.data.tolist()]))
+                    row = list(itertools.chain.from_iterable([row, sImage.row.tolist()]))
+                    col = list(itertools.chain.from_iterable([col, sImage.col.tolist()]))
                     tile = list(itertools.chain.from_iterable([tile, (np.ones_like(sImage.data)*iTile).tolist()]))
                 data = np.array(data)
                 row = np.array(row)
@@ -352,6 +350,11 @@ class sparsifyFunc(DetObjectFunc):
                     if self._saveint:
                         if not self._saveintadu and key == 'data': continue
                         ret_dict[key] = ret_dict[key].astype(int)
+        else:
+            ret_dict={'ragged_data':data}
+            ret_dict['ragged_row']=row
+            ret_dict['ragged_col']=col
+            ret_dict['ragged_tile']=tile
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
@@ -540,7 +543,12 @@ class imageFunc(DetObjectFunc):
                 if data.dtype==np.uint16:
                     data = data.filled(fill_value=0)
                 else:
-                    data = data.filled(fill_value=np.nan)
+                    #data from droplet2Func already has fill_value defined.
+                    try:
+                        data = data.filled(data, fill_value=np.nan)
+                    except:
+                        data = data.filled(data)
+
             if isinstance(data, np.matrix):
                 data = np.asarray(data)
             self.dat = data

@@ -94,19 +94,7 @@ class dropletFunc(DetObjectFunc):
 
     def process(self, data):
         ret_dict=self.dropletize(data)
-        newDict = {}
-        for key in ret_dict:
-            #print 'key in return val: write_%s'%(key)
-            #try:
-            #  print 'has shape: ',return_vals[key].shape, return_vals[key].dtype
-            #except:
-            #  pass
-            if key.find('ragged')>=0:
-                newDict['ragged_%s'%(key.replace('ragged_',''))] = ret_dict[key]
-            else:
-                newDict['%s'%(key)] = ret_dict[key]
 
-        ret_dict = newDict
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
             for kk in subfuncResults[k]:

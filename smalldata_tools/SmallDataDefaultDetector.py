@@ -663,7 +663,7 @@ class xtcavDetector(defaultDetector):
         self.name = name
         self.detname = detname
         self.nb=1
-        self.size=5000
+        self.size=1024
         try:
             from xtcav2.LasingOnCharacterization import LasingOnCharacterization
             self._XTCAVRetrieval = LasingOnCharacterization()
@@ -671,7 +671,7 @@ class xtcavDetector(defaultDetector):
             return None
     def data(self,evt):
         #check if detectors are in event
-        dl={}
+        dl={'success':0}
         xtcav_success=True
         arSize=0
         agreement=-2
@@ -679,22 +679,31 @@ class xtcavDetector(defaultDetector):
         powerAr=np.array([np.nan] * self.size)
         try:
             self._XTCAVRetrieval.processEvent(evt)
+            dl['success']=1
             t, power = self._XTCAVRetrieval.xRayPower()
+            dl['success']=2
             if t is not None:
-                arSize=t[0].shape[0]
-                if arSize>=1 and arSize<=self.size:
-                    timeAr = np.append(t[0],np.array([np.nan] * (self.size-arSize)))
-                    powerAr = np.append(power[0],np.array([np.nan] * (self.size-arSize)))
-                else:
-                    print('Xtcav array is too small in run, please check configuration',env.run())
-                    timeAr = t[:self.size]
-                    powerAr = power[:self.size]
+                imethod=0
+                for this_t, this_power in zip(t, power):
+                    arSize=this_t.shape[0]
+                    if arSize>=1 and arSize<=self.size:
+                        timeAr = np.append(this_t,np.array([np.nan] * (self.size-arSize)))
+                        powerAr = np.append(this_power,np.array([np.nan] * (self.size-arSize)))
+                    else:
+                        print('Xtcav array is too small in run, please check configuration',env.run())
+                        timeAr = this_t[:self.size]
+                        powerAr = this_power[:self.size]
+                    #we may have to create this outside for 
+                    #  data with much damage, 
+                    #  assuming we only have 1 method
+                    dl['arSize_%d'%imethod]=arSize
+                    dl['time_%d'%imethod]=timeAr
+                    dl['power_%d'%imethod]=powerAr
+                    imethod+=1
+                dl['success']=3
         except:
-            xtcav_success=False
+            pass
 
-        dl['arSize']=arSize
-        dl['time']=timeAr
-        dl['power']=powerAr
         return dl
 
 class gmdDetector(defaultDetector):
