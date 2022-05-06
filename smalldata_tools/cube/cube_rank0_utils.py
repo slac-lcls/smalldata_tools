@@ -126,9 +126,10 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
                 detname = det['source']
                 if 'thresADU' in det:
                     threshold = det['thresADU']
+                maxHis = getattr(det, 'maxHis', None)
             else:
                 detname = det
-            counts, bin_centers, bin_edges = anaps.pixelHistogram(detname=detname, numEvts=100, nSkip=0, common_mode=None, nBins=150)
+            counts, bin_centers, bin_edges = anaps.pixelHistogram(detname=detname, numEvts=100, nSkip=0, common_mode=None, nBins=150, maxHis=maxHis)
         #     fig = hv.Histogram((bin_edges, counts))
         #     fig.opts(title='jungfrau1M', fill_color='#000080', logy=True)
             fig = figure(title=detname, x_axis_label='Intensity (ADU)', y_axis_label='Count', 
@@ -147,7 +148,7 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
         tabs.append(dets_tab)
     
     # save to stats dir
-    reports_dir = Path(f'/cds/data/psdm/{exp[:3]}/{exp}/stats/summary/Cube_{int(run):03d}')
+    reports_dir = Path(f'/cds/data/psdm/{exp[:3]}/{exp}/stats/summary/Cube/Cube_{int(run):03d}')
     if not reports_dir.exists():
         reports_dir.mkdir()
     report_file = reports_dir / 'report.html'
