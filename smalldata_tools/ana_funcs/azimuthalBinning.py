@@ -335,7 +335,7 @@ class azimuthalBinning(DetObjectFunc):
         if self.thresADU is not None:
             data[data<self.thresADU]=0.
         if self.thresADUhigh is not None:
-            data[data>self.thresADU]=0.
+            data[data>self.thresADUhigh]=0.
         if self.thresRms is not None:
             data[data>self.thresRms*self.rms]=0.
         if self.square:

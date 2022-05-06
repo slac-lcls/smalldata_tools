@@ -364,7 +364,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                        numEvts=100, 
                        nBins=180, 
                        useFilter=None, 
-                       nSkip=0,minIpm=-1., 
+                       nSkip=0,maxHis=None,
                        common_mode=None, 
                        std=False,
                        printFid=False,
@@ -427,12 +427,12 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         bmax = 2*np.abs(np.percentile(data, 90))
         bmax = 50*np.std(data[np.logical_and(data>bmin, data<bmax)])
         bmin = -2*np.abs(np.percentile(data, 0.1))
+        if maxHis is not None: bmax = np.max(maxHis, bmax)
         bin_centers = np.linspace(bmin,bmax,nBins)
         hist, bin_edges = np.histogram(data, bins=bin_centers)
         
         for tm in times[10:]:
             #print('numEvts ',numEvts)
-            #this loop here is used for the minIpm option when no smallData file is available.
             if numEvts<=0:
                 break
             try:
