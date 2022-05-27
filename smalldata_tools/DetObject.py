@@ -2,6 +2,7 @@ import os
 import copy
 import numpy as np
 import tables
+
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
 from smalldata_tools.read_uxi import getDarks
@@ -16,6 +17,7 @@ from read_uxi import read_uxi, get_uxi_timestamps, getDarks
 #for common mode.
 #from read_uxi import getUnbonded, getZeroPeakFit 
 
+import Detector as DetTypes
 import psana
 #from collections import Counter
     
@@ -121,6 +123,7 @@ def DetObject(srcName, env, run, **kwargs):
         else:
             return None
     det.alias = srcName
+
     detector_classes = {
         1: CsPad2MObject,
         2: CsPadObject,
@@ -148,7 +151,14 @@ def DetObject(srcName, env, run, **kwargs):
        98: OceanOpticsObject,
        99: ImpObject,
     }
-    cls = detector_classes[det.dettype]
+
+    detector_lookup={DetTypes.GenericWFDetector.GenericWFDetector: GenericWFObject}
+
+    if hasattr(det,'dettype'):
+        cls = detector_classes[det.dettype]
+    else:
+        cls = detector_lookup[type(det)]
+
     return cls(det, env, run, **kwargs)
     ##should throw an exception here.
     #return None
@@ -351,24 +361,21 @@ class WaveformObject(DetObjectClass):
         self.rms = None
         self.mask = None
         self.wfx = None
-        #if self.det.dettype == 16: #acqiris
-        #  cfg = env.configStore().get(psana.Acqiris.ConfigV1, self._src)
-        #  self.interval = [cfg.horiz().sampInterval()]
-        #  self.delayTime = [cfg.horiz().delayTime()]
-        #  self.nSamples =  [cfg.horiz().nbrSamples()]
-        #  self.fullScale =[]
-        #  self.offset = []
-
-        #  for c in cfg.vert():
-        #    self.fullScale.append(c.fullScale())
-        #    self.offset.append(c.offset())
         self.gain = None
     def getData(self, evt):
         super(WaveformObject, self).getData(evt)
-        self.evt.dat = self.det.waveform(evt)
         if self.wfx is None:
             self.wfx = self.det.wftime(evt)
-        
+
+class GenericWFObject(WaveformObject): 
+    def __init__(self, det,env,run,**kwargs):
+        super(GenericWFObject, self).__init__(det,env,run, **kwargs)
+    def getData(self, evt):
+        super(GenericWFObject, self).getData(evt)
+        self.evt.dat = self.det.raw(evt)
+        if isinstance(self.evt.dat, list):
+            self.evt.dat = np.array(self.evt.dat)
+
 class AcqirisObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
@@ -385,20 +392,11 @@ class AcqirisObject(WaveformObject):
             self.offset.append(c.offset())
     def getData(self, evt):
         super(AcqirisObject, self).getData(evt)
-        #for now, this code lives in waveform. Might need to change if we have other 1d detector w/ different interface
-        #self.evt.dat = self.det.waveform(evt)
-        #if self.wfx is None:
-        #    self.wfx = self.det.wftime(evt)
+        self.evt.dat = self.det.waveform(evt)
 
 class OceanOpticsObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
-        #super().__init__(det,env,run, **kwargs)
         super(OceanOpticsObject, self).__init__(det,env,run, **kwargs)
-
-        #cfg = env.configStore().get(psana.Acqiris.ConfigV1, self._src)
-        #self.interval = [cfg.horiz().sampInterval()]
-        #self.delayTime = [cfg.horiz().delayTime()]
-        #self.nSamples =  [cfg.horiz().nbrSamples()]
 
     def getData(self, evt):
         super(OceanOpticsObject, self).getData(evt)
@@ -408,11 +406,11 @@ class OceanOpticsObject(WaveformObject):
 
 class ImpObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
-        #super().__init__(det,env,run, **kwargs)
         super(ImpObject, self).__init__(det,env,run, **kwargs)
 
     def getData(self, evt):
         super(ImpObject, self).getData(evt)
+        self.evt.dat = self.det.waveform(evt)
         
 class CameraObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
