@@ -451,6 +451,8 @@ class ttRawDetector(defaultDetector):
         self.runningRef=None
         self.refitData=False
         self.useProjection=False
+        #self.beamOn=[]
+        #self.laserOn=[]
         self.beamOff=[]
         self.laserOff=[]
         self.sb_convergence=1.
@@ -468,10 +470,12 @@ class ttRawDetector(defaultDetector):
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
                 self.detname = cfgKey.alias()
                 defaultDetector.__init__(self, self.detname, 'ttRaw')
+                self.ttCfg = 'TimeToolV2'
             elif cfgKey.type() == psana.TimeTool.ConfigV3:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV3, cfgKey.src())
                 self.detname = cfgKey.alias()
                 defaultDetector.__init__(self, self.detname, 'ttRaw')
+                self.ttCfg = 'TimeToolV3'
         if ttCfg is not None:
             self.ttProj=ttCfg.write_projections()
             self.ttROI_signal = [[ttCfg.sig_roi_lo().row(),ttCfg.sig_roi_hi().row()],\
@@ -494,38 +498,20 @@ class ttRawDetector(defaultDetector):
                 self.beamOff.append(el.event_code())
             for el in ttCfg.laser_logic():
                 self.laserOff.append(el.event_code())
+
         else:
             defaultDetector.__init__(self, self.detname, 'ttRaw')
             
     def inRun(self):
         if self.detname=='':
             return False
+        return defaultDetector.inRun(self)
 
     def setPars(self, ttPars):
-        if 'ttProj' in ttPars.keys():
-            self.ttProj=ttPars['ttProj']
-        if 'ttROI_signal' in ttPars.keys():
-            self.ttROI_signal=ttPars['ttROI_signal']
-        if 'ttROI_reference' in ttPars.keys():
-            self.ttROI_reference=ttPars['ttROI_reference']
-        if 'ttROI_sideband' in ttPars.keys():
-            self.ttROI_sideband=ttPars['ttROI_sideband']
-        if 'weights' in ttPars.keys():
-            self.weights=ttPars['weights']
-        if 'runningRef' in ttPars.keys():
-            self.runningRef=ttPars['runningRef']
-        if 'refitData' in ttPars.keys():
-            self.refitData=ttPars['refitData']
-        if 'useProjection' in ttPars.keys():
-            self.useProjection=ttPars['useProjection']
-        if 'sb_convergence' in ttPars.keys():
-            self.sb_convergence=ttPars['sb_convergence']
-        if 'ref_convergence' in ttPars.keys():
-            self.ref_convergence=ttPars['ref_convergence']
-        if 'subtract_sideband' in ttPars.keys():
-            self.subtract_sideband=ttPars['subtract_sideband']
-        if 'ttCalib' in ttPars.keys():
-            self.ttCalib=ttPars['ttCalib']
+        parsList = ['ttProj','ttROI_signal', 'ttROI_sideband','ttROI_reference','weights','runningRef','refitData','useProjection','sb_convergence','ref_convergence','subtract_sideband','ttCalib','beamOff', 'laserOff', 'kind']
+        for k in ttPars.keys():
+            if k in parsList:
+                setattr(self,k,ttPars[k])
 
     def data(self, evt):
         retDict = self.getTraces(evt)
@@ -547,16 +533,27 @@ class ttRawDetector(defaultDetector):
             ttData['tt_sideband']=np.zeros(abs(self.ttROI_sideband[1][1]-self.ttROI_sideband[1][0]))
         if self.ttROI_reference is not None:
             ttData['tt_reference']=np.zeros(abs(self.ttROI_reference[1][1]-self.ttROI_reference[1][0]))
+        #return zeros & no projection for dropped laser shots.
         for lOff in self.laserOff:
             if lOff in evtCodes:
                 if self._debug:
                     print('ttRaw: laser off event!')
                 return ttData
             
+        if getattr(self, 'ttCfg', None) == 'TimeToolV2':
+            ttDat = evt.get(psana.TimeTool.DataV2, psana.Source(self.detname))
+        elif getattr(self, 'ttCfg', None) == 'TimeToolV3':
+            ttDat = evt.get(psana.TimeTool.DataV3, psana.Source(self.detname))
         try:
-            ttData['tt_signal_pj']=ttDet.projected_signal().astype(dtype='uint32').astype(float)
-            ttData['tt_sideband_pj']=ttDet.projected_sideband().astype(dtype='uint32').astype(float)
-            ttData['tt_reference_pj']=ttDet.projected_reference().astype(dtype='uint32').astype(float)
+            ttData['tt_signal_pj']=ttDat.projected_signal().astype(dtype='uint32').astype(float)
+            ttData['tt_sideband_pj']=ttDat.projected_sideband().astype(dtype='uint32').astype(float)
+            ttData['tt_reference_pj']=ttDat.projected_reference().astype(dtype='uint32').astype(float)
+            if len(ttData['tt_sideband_pj'])==0:
+                ttData['tt_sideband_pj'] = np.empty(ttData['tt_signal_pj'].shape)
+                ttData['tt_sideband_pj'][:] = np.nan
+            if len(ttData['tt_reference_pj'])==0:
+                ttData['tt_reference_pj'] = np.empty(ttData['tt_signal_pj'].shape)
+                ttData['tt_reference_pj'][:] = np.nan
         except:
             pass
         ttImg = ttDet.raw(evt)
@@ -564,11 +561,21 @@ class ttRawDetector(defaultDetector):
             ttData['tt_signal']=ttImg[self.ttROI_signal[0][0]:self.ttROI_signal[0][1],self.ttROI_signal[1][0]:self.ttROI_signal[1][1]].mean(axis=0)          
         if self.ttROI_sideband is not None:
             ttData['tt_sideband']=ttImg[self.ttROI_sideband[0][0]:self.ttROI_sideband[0][1],self.ttROI_sideband[1][0]:self.ttROI_sideband[1][1]].mean(axis=0)
+
+        #check that this works - not sure how ttCfg information is translated online as logic is present.
+        boff_req = [ -bOff for  bOff in self.beamOff if bOff < 0]
         if self.ttROI_reference is not None:
             beamOff=False
             for bOff in self.beamOff:
-                if bOff in evtCodes:
+                if bOff > 0 and bOff in evtCodes:
                     beamOff=True
+            #if this seems like an on-shot & re quired an event code, reset logic and look again
+            if beamOff==False and len(boff_req)>0:
+                beamOff=True
+                for bOff in boff_req:
+                    if bOff in evtCodes:
+                        beamOff=False
+                
             if beamOff:
                 ttRef = ttImg[self.ttROI_reference[0][0]:self.ttROI_reference[0][1],self.ttROI_reference[1][0]:self.ttROI_reference[1][1]].mean(axis=0)
                 if self.runningRef is None:
@@ -576,6 +583,8 @@ class ttRawDetector(defaultDetector):
                 else:
                     self.runningRef=ttRef*self.ref_convergence + self.runningRef*(1.-self.ref_convergence)
                 #print('update self.runningRef')
+            #always save, only update when xray off.
+            if self.runningRef is not None:
                 ttData['tt_reference']=self.runningRef        
         return ttData
 
@@ -586,21 +595,21 @@ class ttRawDetector(defaultDetector):
                 return None
 
         if self.useProjection:
-            ttRef=ttData['tt_reference_pj']
-            ttSignal=ttData['tt_signal_pj']
+            ttRef=ttData['tt_reference_pj'].copy()
+            ttSignal=ttData['tt_signal_pj'].copy()
             if self.subtract_sideband>0:
                 ttSignal-=ttData['tt_sideband_pj']
                 ttRef-=ttData['tt_sideband_pj']
         else:
             ttRef=ttData['tt_reference'].copy()
-            ttSignal=ttData['tt_signal']
+            ttSignal=ttData['tt_signal'].copy()
             if self.subtract_sideband>0:
                 ttSignal-=ttData['tt_sideband']
                 ttRef-=ttData['tt_sideband']
 
         if ttData['tt_reference'].sum()==0:
             nanArray = np.ones(ttData['tt_reference'].shape[0])
-            nanArray=nanArray*np.nan
+            nanArray[:]=np.nan
             return nanArray
 
         return ttSignal/ttRef
@@ -619,7 +628,7 @@ class ttRawDetector(defaultDetector):
             return retDict
         
         f0 = np.convolve(np.array(self.weights).ravel(),data,'same')
-        f = f0[lf/2:len(f0)-lf/2-1]
+        f = f0[int(lf/2):len(f0)-int(lf/2)-1]
         retDict['f']=f
         if (self.kind=="stepDown"):
             mpr = f.argmin()
@@ -663,7 +672,7 @@ class xtcavDetector(defaultDetector):
         self.name = name
         self.detname = detname
         self.nb=1
-        self.size=1024
+        self.size=1000
         try:
             from xtcav2.LasingOnCharacterization import LasingOnCharacterization
             self._XTCAVRetrieval = LasingOnCharacterization()
@@ -693,16 +702,13 @@ class xtcavDetector(defaultDetector):
                         print('Xtcav array is too small in run, please check configuration',env.run())
                         timeAr = this_t[:self.size]
                         powerAr = this_power[:self.size]
-                    #we may have to create this outside for 
-                    #  data with much damage, 
-                    #  assuming we only have 1 method
                     dl['arSize_%d'%imethod]=arSize
                     dl['time_%d'%imethod]=timeAr
                     dl['power_%d'%imethod]=powerAr
                     imethod+=1
                 dl['success']=3
         except:
-            pass
+            dl['success']=0
 
         return dl
 
