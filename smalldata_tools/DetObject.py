@@ -663,12 +663,12 @@ class IcarusObject(CameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(IcarusObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [0,98,99,-1] #none, unb-calc, unb-applied, raw
+        self._common_mode_list = [0,80,81,98,99,-1] #none, unb-calc, unb-applied, raw
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
-            print('Common mode %d is not an option for a CsPad detector, please choose from: '%self.common_mode, self._common_mode_list)
+            print('Common mode %d is not an option for an Icarus detector, please choose from: '%self.common_mode, self._common_mode_list)
         if self.x is None and self.ped is not None:
             self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -678,16 +678,46 @@ class IcarusObject(CameraObject):
         if self.mask is None and self.ped is not None:
             self.mask = np.ones(self.ped.shape)
             self.cmask = np.ones(self.ped.shape)
+        #common mode stuff
+        self.cm_maskedROI =  kwargs.get('cm_maskedROI', None)
+        if self.cm_maskedROI is not None and isinstance(self.cm_maskedROI, list):
+            self.cm_maskedROI = np.array(self.cm_maskedROI).flatten()
+        self.cm_photonThres =  kwargs.get('cm_photonThres', 30)
+        self.cm_maskNeighbors =  kwargs.get('cm_maskNeighbors', 0)
+        self.cm_maxCorr =  kwargs.get('cm_maxCorr', self.cm_photonThres)
+        self.cm_minFrac =  kwargs.get('cm_minFrac', 0.05)
+        self.cm_mask_unb = np.zeros([1024,512])
+        self.cm_mask_unb[:,255:257]=1
+        self.cm_mask_unb=self.cm_mask_unb.astype(bool)
+
     def getData(self, evt):
         super(IcarusObject, self).getData(evt)
-        if self.common_mode >= 98 and self.common_mode < 100: #this here is some icarus stuff.
-            #print 'getdata icarus...', self.common_mode
-            self.evt.dat = self.det.raw_data(evt)-self.ped
-            #print 'getdata icarus...', self.evt.dat.shape
-            mask_unb = np.zeros([1024,512]); mask_unb[:,255:257]=1; mask_unb=mask_unb.astype(bool)
+        if self.common_mode >= 80 and self.common_mode < 100: #this here is some icarus stuff.
+            self.evt.dat = self.det.calib(evt)
+
+            if self.cm_maskedROI is not None:
+                cm_mask_mean = [ np.nanmean(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                cm_mask_med = [ np.nanmedian(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                cm_mask_std = [ np.nanstd(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                self.evt.__dict__['env_cm_masked_med'] = np.array(cm_mask_med)
+                self.evt.__dict__['env_cm_masked_mean'] = np.array(cm_mask_mean)
+                self.evt.__dict__['env_cm_masked_std'] = np.array(cm_mask_std)
+                dataFrame = np.array([df-corr for df, corr in zip(self.evt.dat,cm_mask_med)])
+
+            #only subtract the masked ROI
+            if self.common_mode==80:
+                self.evt.dat=dataFrame
+                return
+
+            if self.common_mode==81:
+                corrImg, cmDict = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
+                for k, value in iteritems(cmDict):
+                    self.evt.__dict__['env_%s'%k] = value
+                self.evt.dat = corrImg
+
             cmVals=[]
             for tile in self.evt.dat:
-                cmVals.append(np.nanmedian(tile[mask_unb>0]))
+                cmVals.append(np.nanmedian(tile[self.cm_mask_unb>0]))
                 if self.common_mode==99:
                     tile-=cmVals[-1] #apply the common mode.
             self.evt.__dict__['write_cmUnb'] = cmVals

@@ -461,7 +461,7 @@ def cm_uxi(dataFrame, cm_photonThres, cm_maxCorr, cm_minFrac, cm_maskNeighbors):
     cm_RowMedsMax=[]
     cm_newData=[]
     for frame in maskedImg: 
-        rs = frame.reshape(frame.shape[0]*2, frame.shape[1]/2, order='F')
+        rs = np.reshape(frame,(frame.shape[0]*2, int(frame.shape[1]/2)), order='F')
         rsmed = np.ma.median(rs, axis=1)
         #rsmean = np.ma.mean(rs, axis=1)
         cm_RowMeds.append(rsmed.data.tolist())
@@ -469,11 +469,11 @@ def cm_uxi(dataFrame, cm_photonThres, cm_maxCorr, cm_minFrac, cm_maskNeighbors):
         cm_nPixel.append(rscount.tolist())
         rsmed[abs(rsmed)>cm_maxCorr]=0   #do not correct more than maxCorr value
         cm_RowMedsMax.append(rsmed.data.tolist())
-        #print 'B',((1.-cm_minFrac)*frame.shape[1]), rscount[10:]
-        #print 'c', (rscount>((1.-cm_minFrac)*frame.shape[1])).sum()
-        #print 'd', rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]
+        #print('B',((1.-cm_minFrac)*frame.shape[1]), rscount[10:])
+        #print('c', (rscount>((1.-cm_minFrac)*frame.shape[1])).sum())
+        #print('d', rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])])
         rsmed[rscount>((1.-cm_minFrac)*frame.shape[1])]=0 #do not correct if too few pixels contribute
-        #print 'rsmed3 ',(rsmed.data==0).sum()
+        #print('rsmed3 ',(rsmed.data==0).sum())
         cm_RowMedsApplied.append(rsmed.data.tolist())
         imgCorr=(rs.data-rsmed[:,None]).reshape(maskedImg[0].shape[0],maskedImg[0].shape[1],order='F')
         cm_newData.append(imgCorr)
