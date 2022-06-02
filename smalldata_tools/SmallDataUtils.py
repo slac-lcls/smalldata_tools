@@ -89,7 +89,7 @@ def sxrDetectors(beamCodes=[[162],[91]]):
     dets.append(GMDDetector())
     return dets
 
-def xppDetectors(beamCodes=[[162,120],[91]]):
+def xppDetectors(beamCodes=[[-137],[91]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp', 'las_drift_correction']))
@@ -130,7 +130,7 @@ def xppDetectors(beamCodes=[[162,120],[91]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def xcsDetectors(beamCodes=[[162, 120],[89]]):
+def xcsDetectors(beamCodes=[[-137],[89]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -164,7 +164,7 @@ def xcsDetectors(beamCodes=[[162, 120],[89]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def mfxDetectors(beamCodes=[[162, 120],[]]):
+def mfxDetectors(beamCodes=[[-137],[]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -186,9 +186,9 @@ def mfxDetectors(beamCodes=[[162, 120],[]]):
                                       'BeamMonitor_target','Dg1Ipm_target']))
     return dets
 
-def cxiDetectors(beamCodes=[[162, 120],[]]):
+def cxiDetectors(beamCodes=[[-137],[184]]):
     dets=[]
-    dets.append(lightStatus(codes=beamCodes, evrName='evr1'))
+    dets.append(lightStatus(codes=beamCodes, evrName='evr0'))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
@@ -214,7 +214,7 @@ def cxiDetectors(beamCodes=[[162, 120],[]]):
         pass
     return dets
 
-def mecDetectors(beamCodes=[[162, 120],[-182]]):
+def mecDetectors(beamCodes=[[-137],[-182]]):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
