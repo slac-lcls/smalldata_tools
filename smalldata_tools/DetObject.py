@@ -430,6 +430,7 @@ class CameraObject(DetObjectClass):
         self.ped = self.det.pedestals(run)
         self.gain_mask = self.det.gain_mask(run)
         self.gain = self.det.gain(run)
+        
         self.common_mode_pars=self.det.common_mode(run)
         self.local_gain = None
         self._getImgShape() #sets self.imgShape

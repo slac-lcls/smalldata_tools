@@ -49,7 +49,7 @@ else:
     args_cube = f''
     
     # summaries
-    executable_summaries = str(ANA_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
+    executable_summaries = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
     queue_summaries = args.queue.replace('h','l')
 
     

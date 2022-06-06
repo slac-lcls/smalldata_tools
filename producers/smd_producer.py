@@ -10,21 +10,21 @@ start_job = time.time()
 import argparse
 import socket
 import os
-import logging 
+import logging
 import requests
 import sys
 from glob import glob
 from PIL import Image
 from requests.auth import HTTPBasicAuth
 
-########################################################## 
+##########################################################
 ##
-## User Input start --> 
+## User Input start -->
 ##
-########################################################## 
+##########################################################
 ##########################################################
 # functions for run dependant parameters
-# 
+#
 # See smalldata_producer_template.py for more analysis functions
 ##########################################################
 
