@@ -2,6 +2,7 @@ import os
 import copy
 import numpy as np
 import tables
+
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
 from smalldata_tools.read_uxi import getDarks
@@ -16,6 +17,7 @@ from read_uxi import read_uxi, get_uxi_timestamps, getDarks
 #for common mode.
 #from read_uxi import getUnbonded, getZeroPeakFit 
 
+import Detector as DetTypes
 import psana
 #from collections import Counter
     
@@ -121,6 +123,7 @@ def DetObject(srcName, env, run, **kwargs):
         else:
             return None
     det.alias = srcName
+
     detector_classes = {
         1: CsPad2MObject,
         2: CsPadObject,
@@ -148,7 +151,14 @@ def DetObject(srcName, env, run, **kwargs):
        98: OceanOpticsObject,
        99: ImpObject,
     }
-    cls = detector_classes[det.dettype]
+
+    detector_lookup={DetTypes.GenericWFDetector.GenericWFDetector: GenericWFObject}
+
+    if hasattr(det,'dettype'):
+        cls = detector_classes[det.dettype]
+    else:
+        cls = detector_lookup[type(det)]
+
     return cls(det, env, run, **kwargs)
     ##should throw an exception here.
     #return None
@@ -351,24 +361,21 @@ class WaveformObject(DetObjectClass):
         self.rms = None
         self.mask = None
         self.wfx = None
-        #if self.det.dettype == 16: #acqiris
-        #  cfg = env.configStore().get(psana.Acqiris.ConfigV1, self._src)
-        #  self.interval = [cfg.horiz().sampInterval()]
-        #  self.delayTime = [cfg.horiz().delayTime()]
-        #  self.nSamples =  [cfg.horiz().nbrSamples()]
-        #  self.fullScale =[]
-        #  self.offset = []
-
-        #  for c in cfg.vert():
-        #    self.fullScale.append(c.fullScale())
-        #    self.offset.append(c.offset())
         self.gain = None
     def getData(self, evt):
         super(WaveformObject, self).getData(evt)
-        self.evt.dat = self.det.waveform(evt)
         if self.wfx is None:
             self.wfx = self.det.wftime(evt)
-        
+
+class GenericWFObject(WaveformObject): 
+    def __init__(self, det,env,run,**kwargs):
+        super(GenericWFObject, self).__init__(det,env,run, **kwargs)
+    def getData(self, evt):
+        super(GenericWFObject, self).getData(evt)
+        self.evt.dat = self.det.raw(evt)
+        if isinstance(self.evt.dat, list):
+            self.evt.dat = np.array(self.evt.dat)
+
 class AcqirisObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
@@ -385,20 +392,11 @@ class AcqirisObject(WaveformObject):
             self.offset.append(c.offset())
     def getData(self, evt):
         super(AcqirisObject, self).getData(evt)
-        #for now, this code lives in waveform. Might need to change if we have other 1d detector w/ different interface
-        #self.evt.dat = self.det.waveform(evt)
-        #if self.wfx is None:
-        #    self.wfx = self.det.wftime(evt)
+        self.evt.dat = self.det.waveform(evt)
 
 class OceanOpticsObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
-        #super().__init__(det,env,run, **kwargs)
         super(OceanOpticsObject, self).__init__(det,env,run, **kwargs)
-
-        #cfg = env.configStore().get(psana.Acqiris.ConfigV1, self._src)
-        #self.interval = [cfg.horiz().sampInterval()]
-        #self.delayTime = [cfg.horiz().delayTime()]
-        #self.nSamples =  [cfg.horiz().nbrSamples()]
 
     def getData(self, evt):
         super(OceanOpticsObject, self).getData(evt)
@@ -408,11 +406,11 @@ class OceanOpticsObject(WaveformObject):
 
 class ImpObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
-        #super().__init__(det,env,run, **kwargs)
         super(ImpObject, self).__init__(det,env,run, **kwargs)
 
     def getData(self, evt):
         super(ImpObject, self).getData(evt)
+        self.evt.dat = self.det.waveform(evt)
         
 class CameraObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
@@ -666,12 +664,12 @@ class IcarusObject(CameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(IcarusObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [0,98,99,-1] #none, unb-calc, unb-applied, raw
+        self._common_mode_list = [0,80,81,98,99,-1] #none, unb-calc, unb-applied, raw
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
-            print('Common mode %d is not an option for a CsPad detector, please choose from: '%self.common_mode, self._common_mode_list)
+            print('Common mode %d is not an option for an Icarus detector, please choose from: '%self.common_mode, self._common_mode_list)
         if self.x is None and self.ped is not None:
             self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[-1]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -681,16 +679,46 @@ class IcarusObject(CameraObject):
         if self.mask is None and self.ped is not None:
             self.mask = np.ones(self.ped.shape)
             self.cmask = np.ones(self.ped.shape)
+        #common mode stuff
+        self.cm_maskedROI =  kwargs.get('cm_maskedROI', None)
+        if self.cm_maskedROI is not None and isinstance(self.cm_maskedROI, list):
+            self.cm_maskedROI = np.array(self.cm_maskedROI).flatten()
+        self.cm_photonThres =  kwargs.get('cm_photonThres', 30)
+        self.cm_maskNeighbors =  kwargs.get('cm_maskNeighbors', 0)
+        self.cm_maxCorr =  kwargs.get('cm_maxCorr', self.cm_photonThres)
+        self.cm_minFrac =  kwargs.get('cm_minFrac', 0.05)
+        self.cm_mask_unb = np.zeros([1024,512])
+        self.cm_mask_unb[:,255:257]=1
+        self.cm_mask_unb=self.cm_mask_unb.astype(bool)
+
     def getData(self, evt):
         super(IcarusObject, self).getData(evt)
-        if self.common_mode >= 98 and self.common_mode < 100: #this here is some icarus stuff.
-            #print 'getdata icarus...', self.common_mode
-            self.evt.dat = self.det.raw_data(evt)-self.ped
-            #print 'getdata icarus...', self.evt.dat.shape
-            mask_unb = np.zeros([1024,512]); mask_unb[:,255:257]=1; mask_unb=mask_unb.astype(bool)
+        if self.common_mode >= 80 and self.common_mode < 100: #this here is some icarus stuff.
+            self.evt.dat = self.det.calib(evt)
+
+            if self.cm_maskedROI is not None:
+                cm_mask_mean = [ np.nanmean(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                cm_mask_med = [ np.nanmedian(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                cm_mask_std = [ np.nanstd(frame[self.cm_maskedROI[0]:self.cm_maskedROI[1],self.cm_maskedROI[2]:self.cm_maskedROI[3]]) for frame in self.evt.dat ]
+                self.evt.__dict__['env_cm_masked_med'] = np.array(cm_mask_med)
+                self.evt.__dict__['env_cm_masked_mean'] = np.array(cm_mask_mean)
+                self.evt.__dict__['env_cm_masked_std'] = np.array(cm_mask_std)
+                dataFrame = np.array([df-corr for df, corr in zip(self.evt.dat,cm_mask_med)])
+
+            #only subtract the masked ROI
+            if self.common_mode==80:
+                self.evt.dat=dataFrame
+                return
+
+            if self.common_mode==81:
+                corrImg, cmDict = cm_uxi(dataFrame, self.cm_photonThres, self.cm_maxCorr, self.cm_minFrac, self.cm_maskNeighbors)
+                for k, value in iteritems(cmDict):
+                    self.evt.__dict__['env_%s'%k] = value
+                self.evt.dat = corrImg
+
             cmVals=[]
             for tile in self.evt.dat:
-                cmVals.append(np.nanmedian(tile[mask_unb>0]))
+                cmVals.append(np.nanmedian(tile[self.cm_mask_unb>0]))
                 if self.common_mode==99:
                     tile-=cmVals[-1] #apply the common mode.
             self.evt.__dict__['write_cmUnb'] = cmVals
