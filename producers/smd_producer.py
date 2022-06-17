@@ -94,7 +94,12 @@ def define_dets(run):
     try:
         drop = getDropletParams(run)
     except Exception as e:
-        print(f'Can\'t instantiate Droplet2 args: {e}')
+        print(f'Can\'t instantiate Droplet args: {e}')
+        drop = []
+    try:
+        drop = getDroplet2PhotonsParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate Droplet2Photons args: {e}')
         drop = []
     try:
         auto = getAutocorrParams(run)
@@ -191,7 +196,7 @@ from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectio
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
-from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
+from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit

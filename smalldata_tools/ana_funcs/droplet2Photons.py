@@ -25,7 +25,7 @@ class droplet2Photons(DetObjectFunc):
     def __init__(self, **kwargs):
         self.return_img = kwargs.get('return_img',False)
         self._name =  kwargs.get('name','droplet')
-        super(droplet2Func, self).__init__(**kwargs)
+        super(droplet2Photons, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold', None)
         self.mask = kwargs.get('mask', None)
         self.aduspphot = kwargs.get('aduspphot', 0)

@@ -313,9 +313,10 @@ class sparsifyFunc(DetObjectFunc):
                 print('cannot make a make a sparse, rectangular array of', data)
                 return
             ret_dict = data
-
+        
         #sparsify image
         if  isinstance(data, np.ndarray):
+            print('test')
             photonsImg = data.copy()
             if len(photonsImg.shape)>2: #tiled detector!
                 data=[]
@@ -338,10 +339,11 @@ class sparsifyFunc(DetObjectFunc):
                 row = sImage.row
                 col = sImage.col
                 tile = np.zeros_like(data)
-            ret_dict={'data':data}
-            ret_dict['row']=row
-            ret_dict['col']=col
-            ret_dict['tile']=tile
+            ret_dict = {'data':data}
+            ret_dict['row'] = row
+            ret_dict['col'] = col
+            ret_dict['tile'] = tile
+            
             
         #now fix shape of data in dict.
         if self.nData is not None:
@@ -354,10 +356,10 @@ class sparsifyFunc(DetObjectFunc):
                         if not self._saveintadu and key == 'data': continue
                         ret_dict[key] = ret_dict[key].astype(int)
         else:
-            ret_dict={'ragged_data':data}
-            ret_dict['ragged_row']=row
-            ret_dict['ragged_col']=col
-            ret_dict['ragged_tile']=tile
+            data_dict = ret_dict
+            ret_dict = {}
+            for key, d in data_dict.items():
+                ret_dict[f'ragged_{key}'] = d
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
