@@ -97,10 +97,10 @@ def define_dets(run):
         print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
     try:
-        drop = getDroplet2PhotonsParams(run)
+        drop2phot = getDroplet2PhotonsParams(run)
     except Exception as e:
         print(f'Can\'t instantiate Droplet2Photons args: {e}')
-        drop = []
+        drop2phot = []
     try:
         auto = getAutocorrParams(run)
     except Exception as e:
@@ -140,9 +140,22 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
-            # Droplet algo 2
+            # Droplet algo
             if detname in drop:
-                det.addFunc(droplet2Func(**drop[detname]))
+                if nData in drop:
+                    nData = drop.pop('nData')
+                else:
+                    nData = None
+                det.addFunc(dropletFunc(**drop[detname]))
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+            # Droplet to photons
+            if detname in drop2phot:
+                if nData in drop2phot:
+                    nData = drop2phot.pop('nData')
+                else:
+                    nData = None
+                det.addFunc(droplet2Photons(**drop2phot[detname]))
+                func.addFunc(roi.sparsifyFunc(nData=nData))
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
