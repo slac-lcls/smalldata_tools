@@ -298,6 +298,9 @@ class sparsifyFunc(DetObjectFunc):
         self._needProps = kwargs.get('needProps',False)
         self._saveint = kwargs.get('saveInt',True)
         self._saveintadu = kwargs.get('saveIntADU',False)
+        
+        if type(self.nData) is float:
+            self.nData = int(self.nData)
 
     def process(self, data):
         #apply mask - set to zero, so pixels will fall out in sparify step.
@@ -341,7 +344,7 @@ class sparsifyFunc(DetObjectFunc):
             ret_dict['tile']=tile
             
         #now fix shape of data in dict.
-        if self.nData > 0:
+        if self.nData is not None:
             for key in ret_dict.keys():
                 if ret_dict[key].shape[0] >= self.nData:
                     ret_dict[key]=ret_dict[key][:self.nData]

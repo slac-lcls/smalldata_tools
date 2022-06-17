@@ -37,6 +37,7 @@ class dropletFunc(DetObjectFunc):
         self._flagMasked = None
         self._needProps = None
         self._nMaxPixels = 15
+        
 
     def setFromDet(self, det):
         super(dropletFunc, self).setFromDet(det)
@@ -148,7 +149,7 @@ class dropletFunc(DetObjectFunc):
             if self._saveDrops is None: self._saveDrops = False
             if self._flagMasked is None: self._flagMasked = False
             if self._needProps is None: self._needProps = False
-
+        
         if not self._saveDrops:
             return ret_dict
 
