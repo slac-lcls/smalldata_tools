@@ -316,7 +316,6 @@ class sparsifyFunc(DetObjectFunc):
         
         #sparsify image
         if  isinstance(data, np.ndarray):
-            print('test')
             photonsImg = data.copy()
             if len(photonsImg.shape)>2: #tiled detector!
                 data=[]

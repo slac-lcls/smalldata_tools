@@ -34,7 +34,7 @@ class droplet2Photons(DetObjectFunc):
         # self.Np = kwargs.get('Np', None)
         
     def setFromDet(self, det):
-        super(droplet2Func, self).setFromDet(det)
+        super(droplet2Photons, self).setFromDet(det)
         if self.mask is None:
             self.mask = det.mask
         else:
