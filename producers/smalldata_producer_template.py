@@ -214,7 +214,7 @@ def define_dets(run):
         print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
     try:
-        drop = getDroplet2PhotonsParams(run)
+        drop2phot = getDroplet2PhotonsParams(run)
     except Exception as e:
         print(f'Can\'t instantiate Droplet2Photons args: {e}')
         drop2phot = []
@@ -263,16 +263,18 @@ def define_dets(run):
                     nData = drop.pop('nData')
                 else:
                     nData = None
-                det.addFunc(dropletFunc(**drop[detname]))
+                func = dropletFunc(**drop[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Droplet to photons
             if detname in drop2phot:
                 if nData in drop2phot:
                     nData = drop2phot.pop('nData')
                 else:
                     nData = None
-                det.addFunc(droplet2Photons(**drop2phot[detname]))
+                func = droplet2Photons(**drop2phot[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
@@ -284,5 +286,3 @@ def define_dets(run):
             #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
-
-

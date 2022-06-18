@@ -146,16 +146,18 @@ def define_dets(run):
                     nData = drop.pop('nData')
                 else:
                     nData = None
-                det.addFunc(dropletFunc(**drop[detname]))
+                func = dropletFunc(**drop[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Droplet to photons
             if detname in drop2phot:
                 if nData in drop2phot:
                     nData = drop2phot.pop('nData')
                 else:
                     nData = None
-                det.addFunc(droplet2Photons(**drop2phot[detname]))
+                func = droplet2Photons(**drop2phot[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
