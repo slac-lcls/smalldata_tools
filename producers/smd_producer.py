@@ -94,8 +94,13 @@ def define_dets(run):
     try:
         drop = getDropletParams(run)
     except Exception as e:
-        print(f'Can\'t instantiate Droplet2 args: {e}')
+        print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
+    try:
+        drop2phot = getDroplet2PhotonsParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate Droplet2Photons args: {e}')
+        drop2phot = []
     try:
         auto = getAutocorrParams(run)
     except Exception as e:
@@ -135,9 +140,24 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
-            # Droplet algo 2
+            # Droplet algo
             if detname in drop:
-                det.addFunc(droplet2Func(**drop[detname]))
+                if nData in drop:
+                    nData = drop.pop('nData')
+                else:
+                    nData = None
+                func = dropletFunc(**drop[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
+            # Droplet to photons
+            if detname in drop2phot:
+                if nData in drop2phot:
+                    nData = drop2phot.pop('nData')
+                else:
+                    nData = None
+                func = droplet2Photons(**drop2phot[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
@@ -191,7 +211,7 @@ from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectio
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
-from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
+from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit

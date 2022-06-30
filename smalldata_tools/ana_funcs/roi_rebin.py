@@ -298,6 +298,9 @@ class sparsifyFunc(DetObjectFunc):
         self._needProps = kwargs.get('needProps',False)
         self._saveint = kwargs.get('saveInt',True)
         self._saveintadu = kwargs.get('saveIntADU',False)
+        
+        if type(self.nData) is float:
+            self.nData = int(self.nData)
 
     def process(self, data):
         #apply mask - set to zero, so pixels will fall out in sparify step.
@@ -310,7 +313,7 @@ class sparsifyFunc(DetObjectFunc):
                 print('cannot make a make a sparse, rectangular array of', data)
                 return
             ret_dict = data
-
+        
         #sparsify image
         if  isinstance(data, np.ndarray):
             photonsImg = data.copy()
@@ -335,13 +338,14 @@ class sparsifyFunc(DetObjectFunc):
                 row = sImage.row
                 col = sImage.col
                 tile = np.zeros_like(data)
-            ret_dict={'data':data}
-            ret_dict['row']=row
-            ret_dict['col']=col
-            ret_dict['tile']=tile
+            ret_dict = {'data':data}
+            ret_dict['row'] = row
+            ret_dict['col'] = col
+            ret_dict['tile'] = tile
+            
             
         #now fix shape of data in dict.
-        if self.nData > 0:
+        if self.nData is not None:
             for key in ret_dict.keys():
                 if ret_dict[key].shape[0] >= self.nData:
                     ret_dict[key]=ret_dict[key][:self.nData]
@@ -351,10 +355,10 @@ class sparsifyFunc(DetObjectFunc):
                         if not self._saveintadu and key == 'data': continue
                         ret_dict[key] = ret_dict[key].astype(int)
         else:
-            ret_dict={'ragged_data':data}
-            ret_dict['ragged_row']=row
-            ret_dict['ragged_col']=col
-            ret_dict['ragged_tile']=tile
+            data_dict = ret_dict
+            ret_dict = {}
+            for key, d in data_dict.items():
+                ret_dict[f'ragged_{key}'] = d
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:

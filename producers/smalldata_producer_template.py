@@ -90,25 +90,43 @@ def getPhotonParams(run):
         ret_dict['jungfrau1M'] = photon_dict
     return ret_dict
 
-# Droplet algo 1
-# TO DO
 
-# Droplet algo 2 (greedy guess)
+# Droplet algorithm
 def getDropletParams(run):
     """ Parameters for droplet algorithm
-    See droplet2Func.py for more info
+    See droplet.py for more info
     """
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
     if run>0:
-        droplet_dict = {}
-        droplet_dict['return_img'] = True
-        droplet_dict['threshold'] = 15
-        droplet_dict['mask'] = None
-        droplet_dict['aduspphot'] = 162
-        droplet_dict['offset'] = 81
-        ret_dict['epix_alc'] = droplet_dict
+        droplet_dict = {
+            'theshold': 5,
+            'thresholdLow':5,
+            'thresADU':60,
+            'useRms':True,
+            'nData': 1e5 # int or None: sparsify arg
+        }
+        ret_dict['epix_1'] = droplet_dict
+    return ret_dict
+
+
+# Droplet to photon algorithm (greedy guess)
+def getDroplet2PhotonsParams(run):
+    """ Parameters for droplet to photons algorithm
+    See droplet2Photons.py for more info
+    """
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        d2p_dict = {}
+        d2p_dict['threshold'] = 15
+        d2p_dict['mask'] = None
+        d2p_dict['aduspphot'] = 162
+        d2p_dict['offset'] = 81
+        d2p_dict['nData'] = 1e5 # int or None: sparsify arg
+        ret_dict['epix_alc'] = d2p_dict
     return ret_dict
 
 
@@ -169,7 +187,7 @@ def define_dets(run):
     detnames = ['jungfrau1M'] # add detector here
     dets = []
     
-# Load DetObjectFunc parameters (if defined)
+    # Load DetObjectFunc parameters (if defined)
     try:
         ROIs = getROIs(run)
     except Exception as e:
@@ -193,8 +211,13 @@ def define_dets(run):
     try:
         drop = getDropletParams(run)
     except Exception as e:
-        print(f'Can\'t instantiate Droplet2 args: {e}')
+        print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
+    try:
+        drop2phot = getDroplet2PhotonsParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate Droplet2Photons args: {e}')
+        drop2phot = []
     try:
         auto = getAutocorrParams(run)
     except Exception as e:
@@ -211,11 +234,11 @@ def define_dets(run):
         havedet = checkDet(ds.env(), detname)
         # Common mode
         if havedet:
-            if detname=='jungfrau1M':
-                #common_mode=71 #also try 71
+            if detname=='': 
+                # change here to specify common mode for detname if desired. Else default is used
                 common_mode=0
             else:
-                common_mode=None # default common mode
+                common_mode=None
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
             
             # Analysis functions
@@ -234,23 +257,32 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
-            # Droplet algo 2
+            # Droplet algo
             if detname in drop:
-                det.addFunc(droplet2Func(**drop[detname]))
+                if nData in drop:
+                    nData = drop.pop('nData')
+                else:
+                    nData = None
+                func = dropletFunc(**drop[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
+            # Droplet to photons
+            if detname in drop2phot:
+                if nData in drop2phot:
+                    nData = drop2phot.pop('nData')
+                else:
+                    nData = None
+                func = droplet2Photons(**drop2phot[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
+            # Autocorrelation
+            if detname in auto:
+                det.addFunc(Autocorrelation(**auto[detname]))
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
-            # image
-            if detname in image:
-                det.addFunc(image_from_dat())
-            # autocorrelation
-            if detname in auto:
-                det.addFunc(Autocorrelation(**auto[detname]))
 
             det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_img')
-            det.storeSum(sumAlgo='square_img')
+            #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
-
-

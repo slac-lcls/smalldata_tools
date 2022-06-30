@@ -8,7 +8,7 @@ import scipy.ndimage.filters as filters
 from scipy import sparse
 from smalldata_tools.DetObject import DetObjectFunc
 
-class droplet2Func(DetObjectFunc):
+class droplet2Photons(DetObjectFunc):
     '''
     return_img: whether or not to return the img with how many photons at each coordinate
     threshold: # (noise sigma for) threshold
@@ -25,7 +25,7 @@ class droplet2Func(DetObjectFunc):
     def __init__(self, **kwargs):
         self.return_img = kwargs.get('return_img',False)
         self._name =  kwargs.get('name','droplet')
-        super(droplet2Func, self).__init__(**kwargs)
+        super(droplet2Photons, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold', None)
         self.mask = kwargs.get('mask', None)
         self.aduspphot = kwargs.get('aduspphot', 0)
@@ -34,7 +34,7 @@ class droplet2Func(DetObjectFunc):
         # self.Np = kwargs.get('Np', None)
         
     def setFromDet(self, det):
-        super(droplet2Func, self).setFromDet(det)
+        super(droplet2Photons, self).setFromDet(det)
         if self.mask is None:
             self.mask = det.mask
         else:
