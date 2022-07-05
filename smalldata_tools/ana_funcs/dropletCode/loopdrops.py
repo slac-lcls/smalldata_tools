@@ -3,48 +3,50 @@
 from smalldata_tools.ana_funcs.dropletCode.greedyguess import greedyguess
 from smalldata_tools.ana_funcs.dropletCode.fitdrop import *
 import numpy as np
+from numba import jit
+from numba.typed import List as NTL
 
-
+@jit(nopython=True, cache=True)
 def loopdrops(onephots,twos,pixtwos,aduspphot,photpts):
     pos=np.append(np.array([0]),np.cumsum(twos[:,4].astype(np.int32)))
     nph = np.digitize(twos[:,3],photpts)-1
     photonlist = np.zeros((np.sum(nph),3))
     ppos = np.append(np.array([0]),np.cumsum(nph))
     aduerr = 20.0
-    chisqs = np.zeros(twos.shape[0])
-#     print "\n number of droplets = ", twos.shape[0]
+    #chisqs = np.zeros(twos.shape[0])
+    #  print "\n number of droplets = ", twos.shape[0]
     #loop over all the droplets and find photon position
-    drops=range(twos.shape[0])
-    for count,drop in enumerate(drops):
+    for drop in range(twos.shape[0]):
         i = pixtwos[pos[drop]:pos[drop+1],0]
         j = pixtwos[pos[drop]:pos[drop+1],1]
         adus = pixtwos[pos[drop]:pos[drop+1],2].copy()
         int0 = twos[drop,3]
         #nophots=np.int32((int0+aduspphot-offset)/aduspphot)
-        nophots = np.digitize(int0, photpts)-1		
+        #nophots = np.digitize(int0, photpts)-1		
+        nophots = nph[drop]
         npix = len(i)
         #trivial case: single pixel
-        if(len(i))==1:
+        if(npix)==1:
             photonlist[ppos[drop]:ppos[drop+1],0] = twos[drop,0]
             photonlist[ppos[drop]:ppos[drop+1],1] = i
             photonlist[ppos[drop]:ppos[drop+1],2] = j
             continue
         # make a sub-image of only the droplet
-        #(i,j) in full image, (ii,jj) in sub-image
-        # could probaly use: 
-        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html
+        img = np.zeros((np.max(i)-np.min(i)+3,np.max(j)-np.min(j)+3))
+        zip_obj_old = zip(i+1,j+1,adus)
+        zip_obj = NTL()
+        [zip_obj.append(x) for x in zip_obj_old]
+
         mi = np.min(i)
         mj = np.min(j)
-        ii = 1+i-mi
-        jj = 1+j-mj
-        n,m = (np.max(i)-np.min(i)+1,np.max(j)-np.min(j)+1)
-        img = np.zeros((n+2,m+2))
-        img[ii,jj] = adus
+        for ti,tj,tadu in zip_obj:
+            img[ti-mi,tj-mj]=tadu
+
         posi,posj = greedyguess(img,nophots,aduspphot)
         fposi = posi
         fposj = posj
-        chisq = np.sum(((img-placephots(posi,posj,img.shape,aduspphot))/aduerr)**2)
-        chisqs[drop] = chisq
+        #chisq = np.sum(((img-placephots(posi,posj,img.shape,aduspphot))/aduerr)**2)
+        #chisqs[drop] = chisq
         photonlist[ppos[drop]:ppos[drop+1],0] = twos[drop,0]
         photonlist[ppos[drop]:ppos[drop+1],1] = fposi-1+mi
         photonlist[ppos[drop]:ppos[drop+1],2] = fposj-1+mj
