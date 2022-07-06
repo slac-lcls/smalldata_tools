@@ -61,7 +61,7 @@ job_defs.append( {
     'executable': executable,
     'trigger': trigger,
     'location': location,
-    'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait'
+    'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait --postRuntable'
     } )
 
 # cube job
