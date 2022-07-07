@@ -206,6 +206,7 @@ from smalldata_tools.SmallDataUtils import defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
+from smalldata_tools.SmallDataDefaultDetector import xtcavDetector
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
@@ -252,8 +253,9 @@ parser.add_argument('--full', help='store all data (please think before usig thi
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
-parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=True)
+parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
+parser.add_argument("--xtcav", help="add xtcav processing", action='store_true', default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -368,7 +370,9 @@ if ds.rank is 0:
 ##
 ########################################################## 
 default_dets = defaultDetectors(hutch.lower())
-
+if args.xtcav and not args.norecorder:
+    #default_dets.append(xtcavDetector('xtcav','xtcav',method='COM'))
+    default_dets.append(xtcavDetector('xtcav','xtcav'))
 
 #
 # add stuff here to save all EPICS PVs.
@@ -451,20 +455,6 @@ if args.full:
         except:
             pass
 
-userDataCfg={}
-for det in default_dets:
-    if det.name=='tt' and len(ttCalib)>0:
-        det.setPars(ttCalib)
-        logger.info(f'Using user-defined tt parameters: {ttCalib}')
-    userDataCfg[det.name] = det.params_as_dict()
-for det in dets:
-    try:
-        userDataCfg[det._name] = det.params_as_dict()
-    except:
-        userDataCfg[det.name] = det.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-small_data.save(Config)
-
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
@@ -535,6 +525,20 @@ for evt_num, evt in enumerate(ds.events()):
                 print('Current Event:', evt_num+1)
             elif ds.rank == ds.size-1:
                 print('Current Event / rank :', evt_num+1)
+
+userDataCfg={}
+for det in default_dets:
+    if det.name=='tt' and len(ttCalib)>0:
+        det.setPars(ttCalib)
+        logger.info(f'Using user-defined tt parameters: {ttCalib}')
+    userDataCfg[det.name] = det.params_as_dict()
+for det in dets:
+    try:
+        userDataCfg[det._name] = det.params_as_dict()
+    except:
+        userDataCfg[det.name] = det.params_as_dict()
+Config={'UserDataCfg':userDataCfg}
+small_data.save(Config)
 
 sumDict={'Sums': {}}
 for det in dets:
