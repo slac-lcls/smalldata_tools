@@ -9,7 +9,7 @@ from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
-from smalldata_tools.ana_funcs.droplet2Func import droplet2Func
+from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 
@@ -267,12 +267,14 @@ class BinWorker(object):
                 logger.info('No data in bin {}.'.format(bin_idx))
                 summed_data[det._name] = np.nan
                 continue
+            
             # make full image for each det if requested
             if hasattr(det, 'x') and thisDetDict['image']==1:
                 summed_data[det._name] = det.det.image(self.run, summed_data[det._name])
+            
             # process the additional functions
             for func in [det.__dict__[k] for k in det.__dict__ if isinstance(det.__dict__[k], DetObjectFunc)]:
-                if isinstance(func, (ROIFunc, photonFunc, dropletFunc, droplet2Func)):
+                if isinstance(func, (ROIFunc, photonFunc, dropletFunc, droplet2Photons)):
                     continue
                 proc_data[det._name] = func.process(summed_data[det._name])
                 logger.debug(f'Processed data keys: {proc_data[det._name].keys()}')
