@@ -207,7 +207,8 @@ from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnv
 from smalldata_tools.SmallDataUtils import defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import lcls2_epicsDetector, genlcls2Detector
 from smalldata_tools.DetObject_lcls2 import DetObject_lcls2
-from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc, imageFunc
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
+from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdBaselineCorrectFunc
 from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc, hsdROIFunc
