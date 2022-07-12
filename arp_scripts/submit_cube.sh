@@ -77,7 +77,6 @@ source /reg/g/psdm/etc/psconda.sh -py3
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
 #run all imports on batch node before calling mpirun on that node.
-#$ABS_PATH/preimport.py
 if [ -v NEVENTS ] && [ $NEVENTS -lt 10 ]; then
     python -u $ABS_PATH/letsCube.py $@
 else

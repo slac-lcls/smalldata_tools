@@ -110,7 +110,6 @@ fi
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
 #run all imports on batch node before calling mpirun on that node.
-#$ABS_PATH/preimport.py # do we still need that?
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
     python -u $ABS_PATH/$PYTHONEXE $@
 else

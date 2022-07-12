@@ -43,10 +43,11 @@ from smalldata_tools.utilities_plotting import hv_image_ctl
 from smalldata_tools.utilities_plotting import hv_3dimage
 from smalldata_tools.utilities_FitCenter import FindFitCenter
 from smalldata_tools.utilities_FitCenter import fitCircle
-from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, sparsifyFunc
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
 
 import smalldata_tools.cube.cube_mpi_fun as mpi_fun
 
