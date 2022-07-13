@@ -10,52 +10,40 @@ start_job = time.time()
 import argparse
 import socket
 import os
-import logging 
+import logging
 import requests
 import sys
 from glob import glob
 from PIL import Image
 from requests.auth import HTTPBasicAuth
 
-########################################################## 
+##########################################################
 ##
-## User Input start --> 
+## User Input start -->
 ##
-########################################################## 
+##########################################################
 ##########################################################
 # functions for run dependant parameters
-# 
+#
 # See smalldata_producer_template.py for more analysis functions
 ##########################################################
 
-def getDropletParams(run):
-    """ Parameters for droplet algorithm
-    See droplet2Func.py for more info
+# 1) REGIONS OF INTEREST
+def getROIs(run):
+    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
+    See roi_rebin.py for more info
     """
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
     if run>0:
-        droplet_dict = {}
-        droplet_dict['return_img'] = False
-        droplet_dict['threshold'] = 15
-        droplet_dict['aduspphot'] = 162
-        droplet_dict['offset'] = 81       
-        droplet_dict['cputime'] = True
-	#droplet_dict['droplet_mask'] =  np.load('/reg/d/psdm/xpp/xppx47419/results/yanwen/code/mask/droplet_post_exp_ROI.npy')
-        #droplet_dict['mask'] =  np.load('/reg/d/psdm/xpp/xppx47419/results/yanwen/code/mask/analysis_post_exp_ROI.npy')
-        
-        droplet_dict1 = droplet_dict.copy()
-
-        droplet_dict1['droplet_mask'] =  np.load('/reg/d/psdm/xpp/xppx49520/results/haoyuan/' +
-                                                'check_data/haoyuan_mask_epix1.npy')
-        droplet_dict1['mask'] =  np.load('/reg/d/psdm/xpp/xppx49520/results/haoyuan/' +
-                                                'check_data/haoyuan_epix1_roi.npy')
-        
-        # Add by Haoyuan
-        ret_dict['epix_alc1'] = droplet_dict1.copy()
-        
+        roi_dict = {}
+        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
+        roi_dict['writeArea'] = True
+        roi_dict['thresADU'] = None
+        ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
+
 
 ##########################################################
 # run independent parameters 
@@ -79,7 +67,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['epix_alc1']
+    detnames = ['jungfrau1M'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -106,8 +94,13 @@ def define_dets(run):
     try:
         drop = getDropletParams(run)
     except Exception as e:
-        print(f'Can\'t instantiate Droplet2 args: {e}')
+        print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
+    try:
+        drop2phot = getDroplet2PhotonsParams(run)
+    except Exception as e:
+        print(f'Can\'t instantiate Droplet2Photons args: {e}')
+        drop2phot = []
     try:
         auto = getAutocorrParams(run)
     except Exception as e:
@@ -134,12 +127,11 @@ def define_dets(run):
             # Analysis functions
             # ROIs:
             if detname in ROIs:
-                if detname.find('epix')<0 or args.epixROI:
-                    for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                        det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                            ROI=ROI,
-                                            writeArea=ROIs[detname]['writeArea'],
-                                            thresADU=ROIs[detname]['thresADU']))
+                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
+                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
+                                        ROI=ROI,
+                                        writeArea=ROIs[detname]['writeArea'],
+                                        thresADU=ROIs[detname]['thresADU']))
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
@@ -148,9 +140,24 @@ def define_dets(run):
             # Photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
-            # Droplet algo 2
-            if detname in drop and args.droplets:
-                det.addFunc(droplet2Photons(**drop[detname]))
+            # Droplet algo
+            if detname in drop:
+                if nData in drop:
+                    nData = drop.pop('nData')
+                else:
+                    nData = None
+                func = dropletFunc(**drop[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
+            # Droplet to photons
+            if detname in drop2phot:
+                if nData in drop2phot:
+                    nData = drop2phot.pop('nData')
+                else:
+                    nData = None
+                func = droplet2Photons(**drop2phot[detname])
+                func.addFunc(roi.sparsifyFunc(nData=nData))
+                det.addFunc(func)
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
@@ -199,6 +206,7 @@ from smalldata_tools.SmallDataUtils import defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
+from smalldata_tools.SmallDataDefaultDetector import xtcavDetector
 from smalldata_tools.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
@@ -248,8 +256,7 @@ parser.add_argument('--image', help='save everything as image (use with care)', 
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
-parser.add_argument("--droplets", help="add droplets", action='store_true', default=False)
-parser.add_argument("--epixROI", help="add epixROIs", action='store_true', default=False)
+parser.add_argument("--xtcav", help="add xtcav processing", action='store_true', default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -364,7 +371,9 @@ if ds.rank is 0:
 ##
 ########################################################## 
 default_dets = defaultDetectors(hutch.lower())
-
+if args.xtcav and not args.norecorder:
+    #default_dets.append(xtcavDetector('xtcav','xtcav',method='COM'))
+    default_dets.append(xtcavDetector('xtcav','xtcav'))
 
 #
 # add stuff here to save all EPICS PVs.
@@ -447,6 +456,8 @@ if args.full:
         except:
             pass
 
+
+# save detector config data
 userDataCfg={}
 for det in default_dets:
     if det.name=='tt' and len(ttCalib)>0:
@@ -460,6 +471,8 @@ for det in dets:
         userDataCfg[det.name] = det.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 small_data.save(Config)
+
+
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
@@ -480,11 +493,8 @@ for evt_num, evt in enumerate(ds.events()):
         try:
             #this should be a plain dict. Really.
             det.getData(evt)
-            print('det - got data ',det._name)
             det.processFuncs()
-            print('det - processed ',det._name)
             userDict[det._name]=getUserData(det)
-            print('det - got user dict ',det._name)
             try:
                 envData=getUserEnvData(det)
                 if len(envData.keys())>0:
@@ -492,7 +502,7 @@ for evt_num, evt in enumerate(ds.events()):
             except:
                 pass
             det.processSums()
-            print(userDict[det._name])
+#             print(userDict[det._name])
         except:
             # handle when sum is bad for all shots on a rank (rare, but happens)
             for key in det._storeSum.keys():
@@ -523,11 +533,18 @@ for evt_num, evt in enumerate(ds.events()):
 
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
-    if (int(os.environ.get('RUN_NUM', '-1')) > 0) and ((evt_num<100&evt_num%10==0) or (evt_num<1000&evt_num%100==0) or (evt_num%1000==0)):
-        if ds.size == 1:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
-        elif ds.rank == 0:
-            requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+    if ( (evt_num<100 and evt_num%10==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
+        if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+            if ds.size == 1:
+                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
+            elif ds.rank == 0:
+                requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event / rank </b>", "value": evt_num+1}])
+        else:
+            if ds.size == 1:
+                print('Current Event:', evt_num+1)
+            elif ds.rank == 0:
+                print('Current Event / rank :', evt_num+1)
+
 
 sumDict={'Sums': {}}
 for det in dets:
