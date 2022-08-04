@@ -11,7 +11,7 @@ except:
     pass
 from matplotlib import gridspec
 from matplotlib import path
-import itertools
+from itertools import count as icount
 import os
 import socket
 import holoviews as hv
@@ -528,8 +528,8 @@ class BaseSmallDataAna_psana(object):
             return -1
         greens=['#666600','#669900','#66cc00','#66cc99','#6699cc','#6633ff']
         print('center ',combRes['xCen'],combRes['yCen'])
-        for ir,thisRingInfo,rFit in itertools.izip(itertools.count(),ringInfo,combRes['R']):
-            #plot ransac selected data in green <-- consider different greens for first circles.
+        for ir,thisRingInfo,rFit in zip(icount(),ringInfo,combRes['R']):
+           #plot ransac selected data in green <-- consider different greens for first circles.
             plt.plot(arSparse.col[thisRingInfo['pointsInCircle']],
                      arSparse.row[thisRingInfo['pointsInCircle']],
                      marker='.',
