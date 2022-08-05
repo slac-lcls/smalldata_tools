@@ -172,6 +172,7 @@ class DetObjectClass(object):
         self.run=run
         self._storeSum = {}
         self.applyMask = kwargs.get('applyMask', 0)
+        self.maskCentral = kwargs.get('maskCentral', True)
 
         self.dataAccessTime=0.
 
@@ -225,11 +226,11 @@ class DetObjectClass(object):
     def _getMasks(self):               
         try:
             self.statusMask = self.det.mask(self.run, status=True)
-            self.mask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True)
+            self.mask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=self.maskCentral)
 
             if rank==0 and self.mask is not None:
                 print('masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum()))
-            self.cmask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
+            self.cmask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=self.maskCentral,calib=True)
             if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
                 print('found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum()))
         except:
@@ -443,6 +444,12 @@ class CameraObject(DetObjectClass):
         except:
             self.x = None
             self.y = None
+        self.areas = None
+        if not self.maskCentral:
+            try:
+                self.areas = self.det.areas(run)
+            except:
+                pass
 
     def getData(self, evt):
         super(CameraObject, self).getData(evt)
@@ -1279,6 +1286,10 @@ class Epix10k2MObject(TiledCameraObject):
         #override gain if desired -- this looks like CsPad.
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
             self.evt.dat*=self.local_gain   #apply own gain
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
         #store environmental row 
         try:
