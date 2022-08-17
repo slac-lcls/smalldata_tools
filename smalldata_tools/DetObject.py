@@ -172,6 +172,7 @@ class DetObjectClass(object):
         self.run=run
         self._storeSum = {}
         self.applyMask = kwargs.get('applyMask', 0)
+        self.maskCentral = kwargs.get('maskCentral', True)
 
         self.dataAccessTime=0.
 
@@ -225,11 +226,11 @@ class DetObjectClass(object):
     def _getMasks(self):               
         try:
             self.statusMask = self.det.mask(self.run, status=True)
-            self.mask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True)
+            self.mask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=self.maskCentral)
 
             if rank==0 and self.mask is not None:
                 print('masking %d pixel (status & edge,..) of %d'%(np.ones_like(self.mask).sum()-self.mask.sum(), np.ones_like(self.mask).sum()))
-            self.cmask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=True,calib=True)
+            self.cmask = self.det.mask(self.run, unbond=True, unbondnbrs=True, status=True,  edges=True, central=self.maskCentral,calib=True)
             if self.cmask is not None and self.cmask.sum()!=self.mask.sum() and rank==0:
                 print('found user mask, masking %d pixel'%(np.ones_like(self.mask).sum()-self.cmask.sum()))
         except:
@@ -657,6 +658,14 @@ class TiledCameraObject(CameraObject):
             self.ix=self.x #need to change this so ix & iy are integers!
             self.iy=self.y
         self._needsGeo=True #FIX ME: not sure it should be here.            
+
+        self.areas = None
+        if not self.maskCentral:
+            try:
+                self.areas = self.det.areas(run)
+            except:
+                pass
+
     def getData(self, evt):
         super(TiledCameraObject, self).getData(evt)
 
@@ -757,9 +766,14 @@ class JungfrauObject(TiledCameraObject):
             self.evt.dat = self.det.calib(evt, cmpars=(7,2,10,10), mbits=mbits) #correction in columns
         elif self.common_mode%100==7:
             self.evt.dat = self.det.calib(evt, cmpars=(7,3,10,10), mbits=mbits) #correction in rows&columns
+
         #override gain if desired
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [7,71,72,0]:
             self.evt.dat*=self.local_gain   #apply own gain
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
 class CsPadObject(TiledCameraObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -808,6 +822,10 @@ class CsPadObject(TiledCameraObject):
         #override gain if desired
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
             self.evt.dat*=self.local_gain   #apply own gain
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
 class CsPad2MObject(CsPadObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -895,6 +913,10 @@ class EpixObject(TiledCameraObject):
             self.evt.dat*=self.local_gain   #apply own gain
         elif self.local_gain is None and self.gain is not None and self.gain.shape == self.evt.dat.shape and self.common_mode in [45,46,47]:
             self.evt.dat*=self.gain   #apply gain after own common mode correction
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
         #store environmental row 
         try:
@@ -1013,6 +1035,10 @@ class Epix10kObject(TiledCameraObject):
         #override gain if desired -- this looks like CsPad.
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
             self.evt.dat*=self.local_gain   #apply own gain
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
         #store environmental row 
         try:
@@ -1279,6 +1305,10 @@ class Epix10k2MObject(TiledCameraObject):
         #override gain if desired -- this looks like CsPad.
         if self.local_gain is not None and self.local_gain.shape == self.evt.dat.shape and self.common_mode in [1,5,55,10]:
             self.evt.dat*=self.local_gain   #apply own gain
+
+        #correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat/=self.areas
 
         #store environmental row 
         try:

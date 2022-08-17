@@ -254,6 +254,7 @@ parser.add_argument('--full', help='store all data (please think before usig thi
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
+parser.add_argument('--centerpix', help='do not mask center pixels for epix10k detectors.', action='store_true', default=False)
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
 parser.add_argument("--xtcav", help="add xtcav processing", action='store_true', default=False)
@@ -442,7 +443,7 @@ if args.full:
             default_dets.append(adcDetector(alias))
             continue
         try:
-            thisDet = DetObject(alias, ds.env(), int(run), name=alias)
+            thisDet = DetObject(alias, ds.env(), int(run), name=alias, maskCentral=(not args.centerpix))
             hasGeom=False
             for keyword in ['cs','Cs','epix','Epix','jungfrau','Jungfrau']:
                 if alias.find(keyword)>=0 and args.image: hasGeom=True
@@ -518,7 +519,16 @@ for evt_num, evt in enumerate(ds.events()):
             for skey in userDict[key]:
                 if skey.find('area')>=0 or skey.find('img')>=0:
                    if len(userDict[key][skey].shape)==2:
-                       im = Image.fromarray(userDict[key][skey])
+                       image = userDict[key][skey]
+                       try:
+                           mask_key = [ key for key in userDataCfg[key].keys() if key.find('mask_img')>=0 ]
+                           if len(mask_key)>0:
+                               maskImg = userDataCfg[key][mask_key[0]]
+                               imageMasked = np.ma.array(image, mask=maskImg)
+                               image = imageMasked.filled(fill_value=0)
+                       except:
+                           pass
+                       im = Image.fromarray(image)
                        tiff_file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
                        im.save(tiff_file)
 
