@@ -950,7 +950,9 @@ class Epix10kObject(TiledCameraObject):
         self.pixelsize=[100e-6]
         self.isGainswitching=True
 
-        epixCfg = env.configStore().get(psana.Epix.Config10kaV1, det.source)               
+        epixCfg = env.configStore().get(psana.Epix.Config10kaV1, det.source)              
+        if epixCfg is None:
+            epixCfg = env.configStore().get(psana.Epix.Config10kaV2, det.source)    
         self.trbit = []
         self.pixelGain=[]
         self.nomGain=[1.,3.,100.,100.,3.,100.] #H,M,L,(HL auto), (ML auto - 2 values)

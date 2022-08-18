@@ -45,13 +45,13 @@ class dropletFunc(DetObjectFunc):
             setattr(self, '_mask', det.mask.astype(np.uint8))
         setattr(self, '_rms', det.rms)
         setattr(self, '_needsGeo', det._needsGeo)
-        if not self.useRms:
-            self._compData = np.ones_like(self._mask)
-        else:
-            if (len(self._rms.shape) > len(self._mask.shape)):
-                self._compData = self._rms[0]
+        self._compData = np.ones_like(self._mask).astype(float)
+        if self.useRms:
+            if (len(self._rms.shape) > len(det.mask.shape)):
+                self._compData *= self._rms[0]/det.gain[0]
             else:
-                self._compData = self._rms
+                self._compData *= self._rms/det.gain
+
         #self._grid = np.meshgrid(range(max(self._compData.shape)),range(max(self._compData.shape)))
         if len(det.ped.shape)>2:
             self.footprint = np.array([ [[0,0,0],[0,0,0],[0,0,0]], [[0,1,0],[1,1,1],[0,1,0]],  [[0,0,0],[0,0,0],[0,0,0]] ])
