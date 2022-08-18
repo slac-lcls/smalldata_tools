@@ -100,7 +100,7 @@ class DetObjectFunc(object):
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         subFuncResults={}
         if 'dat' not in self.__dict__.keys() and len(subFuncs)>0:
-            print('cannot process subfunctions for %s as data is not being passed'%self.name)
+            print('cannot process subfunctions for %s as data is not being passed'%self._name)
             return
         for tfunc in subFuncs:
             subFuncResults[tfunc._name] = tfunc.process(self.dat)
