@@ -208,11 +208,11 @@ class CameraObject_lcls2(DetObjectClass_lcls2):
         self._gainSwitching = False
         try:
             self.x, self.y, self.z = det.raw._pixel_coords(do_tilt=True, cframe=0)
+            self.x = self.x.squeeze()
+            self.y = self.y.squeeze()
+            self.z = self.z.squeeze()
         except:
             self.x, self.y, self.z = None, None, None
-        self.x = self.x.squeeze()
-        self.y = self.y.squeeze()
-        self.z = self.z.squeeze()
 
     def getData(self, evt):
         super(CameraObject_lcls2, self).getData(evt)
