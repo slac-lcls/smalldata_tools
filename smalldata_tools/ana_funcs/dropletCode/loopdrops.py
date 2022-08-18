@@ -7,22 +7,19 @@ from numba import jit
 from numba.typed import List as NTL
 
 @jit(nopython=True, cache=True)
-def loopdrops(onephots,twos,pixtwos,aduspphot,photpts):
+def loopdrops(twos,pixtwos,pixtwoadus,aduspphot,photpts):
     pos=np.append(np.array([0]),np.cumsum(twos[:,4].astype(np.int32)))
     nph = np.digitize(twos[:,3],photpts)-1
     photonlist = np.zeros((np.sum(nph),3))
     ppos = np.append(np.array([0]),np.cumsum(nph))
-    aduerr = 20.0
-    #chisqs = np.zeros(twos.shape[0])
-    #  print "\n number of droplets = ", twos.shape[0]
+
+    tiled = pixtwos.shape[1]>2
     #loop over all the droplets and find photon position
     for drop in range(twos.shape[0]):
-        i = pixtwos[pos[drop]:pos[drop+1],0]
-        j = pixtwos[pos[drop]:pos[drop+1],1]
-        adus = pixtwos[pos[drop]:pos[drop+1],2].copy()
+        i = pixtwos[pos[drop]:pos[drop+1],pixtwos.shape[1]-2]
+        j = pixtwos[pos[drop]:pos[drop+1],pixtwos.shape[1]-1]
+        adus = pixtwoadus[pos[drop]:pos[drop+1]].copy()
         int0 = twos[drop,3]
-        #nophots=np.int32((int0+aduspphot-offset)/aduspphot)
-        #nophots = np.digitize(int0, photpts)-1		
         nophots = nph[drop]
         npix = len(i)
         #trivial case: single pixel
@@ -45,10 +42,9 @@ def loopdrops(onephots,twos,pixtwos,aduspphot,photpts):
         posi,posj = greedyguess(img,nophots,aduspphot)
         fposi = posi
         fposj = posj
-        #chisq = np.sum(((img-placephots(posi,posj,img.shape,aduspphot))/aduerr)**2)
-        #chisqs[drop] = chisq
+
         photonlist[ppos[drop]:ppos[drop+1],0] = twos[drop,0]
         photonlist[ppos[drop]:ppos[drop+1],1] = fposi-1+mi
         photonlist[ppos[drop]:ppos[drop+1],2] = fposj-1+mj
-        # photonlist = np.append(onephots[:,[0,2,1]], photonlist, axis=0)
+
     return (photonlist)
