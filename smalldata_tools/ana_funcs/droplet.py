@@ -141,6 +141,7 @@ class dropletFunc(DetObjectFunc):
         drop_ind_thres = np.delete(drop_ind,vThres)
 
         ret_dict['nDroplets'] = len(drop_ind_thres)
+        #now figure out if we have subfunctions that need more than the droplet number.
         if self._flagMasked is None and self._needProps is None and self._saveDrops is None:
             for sfunc in [getattr(self, k) for k in  self.__dict__ if isinstance(self.__dict__[k], DetObjectFunc)]:
                 self._saveDrops = True
@@ -225,6 +226,9 @@ class dropletFunc(DetObjectFunc):
             maskDrop = maskMax+maskMin
             dat_dict['masked']=maskDrop
 
+        dat_dict['_mask']=self._mask
+        dat_dict['_imgDrop']=imgDrop
+        dat_dict['_image']=img
         self.dat = dat_dict                                             
 
         return ret_dict
