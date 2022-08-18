@@ -7,7 +7,7 @@ except:
     pass
 import scipy.ndimage.filters as filters
 import itertools
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 def fcn(buffer):
     if len(buffer[buffer<buffer[2]])>0:

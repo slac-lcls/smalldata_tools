@@ -398,11 +398,11 @@ default_dets = defaultDetectors(hutch.lower(), thisrun)
 #
 if args.full or args.epicsAll:
     epicsPV = [k[0] for k in thisrun.epicsinfo]
-    try:
-        logger.info('epicsStore names for epicsAll', epicsPV)
-    except:
-        pass
     if len(epicsPV)>0:
+        try:
+            logger.info('epicsStore names for epicsAll', epicsPV)
+        except:
+            pass
         logger.info('adding all epicsPVs....')
         default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
 elif len(epicsPV)>0:

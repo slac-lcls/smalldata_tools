@@ -4,7 +4,7 @@ import scipy.ndimage.measurements as measurements
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 class dropletFunc(DetObjectFunc):
     """ 

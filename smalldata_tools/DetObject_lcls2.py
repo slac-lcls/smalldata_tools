@@ -2,8 +2,8 @@ import os
 import copy
 import numpy as np
 from psana.pscalib.calib.MDBWebUtils import calib_constants
-from smalldata_tools.DetObject import event
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.DetObjectFunc import event
 from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -14,6 +14,7 @@ except NameError:
 
 import psana
 #from collections import Counter
+
 
 def DetObject_lcls2(srcName, run, **kwargs):
     print('Getting the detector for: ',srcName)
