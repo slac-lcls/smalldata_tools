@@ -323,7 +323,7 @@ def getUserData(det):
             newDict['ragged_%s'%(key.replace('ragged_',''))] = det_dict[key]
         elif key.find('var')>=0:
             fname = key.split('_')[-1]
-            dname = key.replace('_%s'%fname,'').replace('_var','')
+            dname = key.replace(f'_{fname}','').replace('_var','')
             if 'var_%s'%dname in newDict:
                 newDict[f'var_{dname}'][fname] = det_dict[key]
             else:
