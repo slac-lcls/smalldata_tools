@@ -6,7 +6,7 @@ from scipy import sparse
 
 import time
 from smalldata_tools.utilities import rebin, getBins
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 
 #

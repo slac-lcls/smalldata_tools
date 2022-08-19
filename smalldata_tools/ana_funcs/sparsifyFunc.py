@@ -5,7 +5,7 @@ import numpy.ma as ma
 import itertools
 
 import time
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 #
 # for now, this works in "raw" coordinates.
