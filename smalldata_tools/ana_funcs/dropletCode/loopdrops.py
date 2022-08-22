@@ -1,13 +1,20 @@
 #finding photon positions without/with fit, code from Mark Sutton
 #fitting is generally fast with intensity level 1e-3
 from smalldata_tools.ana_funcs.dropletCode.greedyguess import greedyguess
-from smalldata_tools.ana_funcs.dropletCode.fitdrop import *
+#from smalldata_tools.ana_funcs.dropletCode.fitdrop import *
 import numpy as np
 from numba import jit
 from numba.typed import List as NTL
 
 @jit(nopython=True, cache=True)
 def loopdrops(twos,pixtwos,pixtwoadus,aduspphot,photpts):
+    """
+    place single photons into a multiphoton droplets
+    arguments: arrays of multiphoton droplets, array of pixels assigned to photons,
+        array of pixel ADU assigned to photons, expected energy/photon, photon energy boundaries
+    
+    creates the images of multiphoton droplets & uses greedyguess to place photons
+    """
     pos=np.append(np.array([0]),np.cumsum(twos[:,4].astype(np.int32)))
     nph = np.digitize(twos[:,3],photpts)-1
     photonlist = np.zeros((np.sum(nph),3))
