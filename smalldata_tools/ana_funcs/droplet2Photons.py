@@ -220,7 +220,7 @@ class droplet2Photons(DetObjectFunc):
         imgDrop = data['_imgDrop']
         drop_ind = np.arange(1,np.nanmax(imgDrop)+1)
 
-        if self.one_photon_info:
+        if self.one_photon_limits:
             ones_dict = self.onephoton(image, imgDrop)
         else:
             ones_dict =  self.onephoton(img, imgDrop, detail=False)
