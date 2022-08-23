@@ -17,7 +17,7 @@ class droplet2Photons(DetObjectFunc):
     """
     Uses loopdrops to find the photons in the droplets (don't forget to append the ones)
     
-    Counts the number of photons at each (rounded) coordinate
+    Counts the number of photons at each (rounded) coordinate.
     """
     
     def __init__(self, **kwargs):
@@ -26,15 +26,17 @@ class droplet2Photons(DetObjectFunc):
         ----------
         aduspphot: float
             Expected single photon energy
-        offset: float
-            Offset to convert number of photons into energy boundaries (defaults to 0.5*aduspphot)
+        offset: float (default = 0.5*aduspphot)
+            Offset to convert number of photons into energy boundaries.
         photpts: float
             energy boundaries for given number of photons (defaults to offset + N*aduspphot)
         one_photon_limits: list
             Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
-        mask: 
-            Pass a mask in here (array-form), is None: use mask stored in DetObject.
-        cputime: bool
+        mask: np.ndarray
+            Pass a mask in here (array-form). If None: use mask stored in DetObject.
+        one_photon_info: bool (default = False)
+            Only returns info for one-photon droplets
+        cputime: bool (default = False)
             Store CPU tiime of different steps in hdf5
         """
         self._name =  kwargs.get('name','droplet2phot')
@@ -46,6 +48,8 @@ class droplet2Photons(DetObjectFunc):
         
         # self.Np = kwargs.get('Np', None)
         self.cputime = kwargs.get('cputime', False)
+        self.one_photon_info = kwargs.get('one_photon_info', False)
+        
         self._footprintnbr = np.array([[0,1,0],[1,0,1],[0,1,0]])
         self.one_photon_limits = kwargs.get('one_photon_limits', None)
         
@@ -56,24 +60,32 @@ class droplet2Photons(DetObjectFunc):
     
     
     @jit(nopython=True, cache=True)
-    def piximg(self, i,j,adu, pad=True):
+    def piximg(self, i, j, adu, pad=True):
         """
-        make a sub-image of only the droplet
-        takes coordinates & values, equivalent to sparse matrix w/ optionial edge pixels
+        Make a sub-image of only the droplet.
+        Takes coordinates & values, equivalent to sparse matrix w/ optionial edge pixels.
+        Parameters
+        ----------
+        i,j: int
+            Coordinates of the pixel in the droplet
+        adu: float
+            Per pixel ADU
+        pad: bool (default = True)
+            Pad droplet with 3 zeros on each side.
         """
         if pad:
-            img = np.zeros((np.max(i)-np.min(i)+3,np.max(j)-np.min(j)+3))
-            zip_obj_old = zip(i+1,j+1,adus)
+            img = np.zeros((np.max(i)-np.min(i)+3, np.max(j)-np.min(j)+3))
+            zip_obj_old = zip(i+1, j+1, adus)
         else:
-            img = np.zeros((np.max(i)-np.min(i)+1,np.max(j)-np.min(j)+1))
-            zip_obj_old = zip(i,j,adus)
+            img = np.zeros((np.max(i)-np.min(i)+1, np.max(j)-np.min(j)+1))
+            zip_obj_old = zip(i, j, adus)
         zip_obj = NTL()
         [zip_obj.append(x) for x in zip_obj_old]
 
         mi = np.min(i)
         mj = np.min(j)
-        for ti,tj,tadu in zip_obj:
-            img[ti-mi,tj-mj]=tadu
+        for ti, tj, tadu in zip_obj:
+            img[ti-mi, tj-mj] = tadu
         return
 
             
@@ -89,15 +101,15 @@ class droplet2Photons(DetObjectFunc):
         twoPixAdu=[]
         twobnrPixAdu=[]
         for drop in range(len(npix_drop)):
-            i = pixones[ppos[drop]:ppos[drop+1],0]
-            j = pixones[ppos[drop]:ppos[drop+1],1]
+            i = pixones[ppos[drop]:ppos[drop+1], 0]
+            j = pixones[ppos[drop]:ppos[drop+1], 1]
             adus = pixonesadu[ppos[drop]:ppos[drop+1]]
             maxPixAdu.append(np.nanmax(adus))
             ##they need to be neighbors, this is not required here....
             #twoPixAdu.append((np.sort(adus)[-1*(min(2, len(adus))):]).sum())
             piximg1=sparse.coo_matrix( (adus, (i, j)) ).todense()
             #find maximum, find maximum of footprint_nbradd neighbor, maximum.
-            nbrpix=filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
+            nbrpix = filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1]+nbrpix)
         return maxPixAdu, twonbrPixAdu
 
@@ -117,12 +129,15 @@ class droplet2Photons(DetObjectFunc):
         """
         drop_ind = np.arange(1,np.nanmax(imgDrop)+1)
         adu_drop_all = measurements.sum(image, imgDrop, drop_ind)
-        vThres = np.where((adu_drop_all>=self.one_photon_limits[0])&(adu_drop_all<self.one_photon_limits[1]))[0]
+        vThres = np.where(
+            (adu_drop_all>=self.one_photon_limits[0])
+            &(adu_drop_all<self.one_photon_limits[1])
+        )[0]
         adu_drop = np.array(measurements.sum(image, imgDrop, drop_ind[vThres])) #only to check!
         pos_drop = np.array(measurements.center_of_mass(image, imgDrop, drop_ind[vThres])) 
         npix_drop = np.array(measurements.sum(image.astype(bool).astype(int),imgDrop, drop_ind[vThres])).astype(int)
         ones_pos = np.zeros((len(npix_drop),3))
-        if len(image.shape)==2:
+        if len(image.shape) == 2:
             ones_pos[:,1] = pos_drop[:,0]
             ones_pos[:,2] = pos_drop[:,1]
         else:
@@ -135,11 +150,13 @@ class droplet2Photons(DetObjectFunc):
         ones_dict['npix'] = npix_drop
         ones_dict['n1'] = len(adu_drop)
 
-        if not detail: return ones_dict
+        if not detail: 
+            return ones_dict
+        
         imgDrop1 = imgDrop.copy()
         vThres_1_veto = np.where((adu_drop>=self.one_photon_limits[0])|(adu_drop<self.one_photon_limits[1]))[0]
         vetoed = np.in1d(imgDrop.ravel(), (vThres_1_veto+1)).reshape(imgDrop.shape)
-        imgDrop1[vetoed]=0
+        imgDrop1[vetoed] = 0
         drop_ind_thres1 = np.delete(drop_ind,vThres_1_veto)
 
         pp = np.where(imgDrop1>0)
@@ -149,9 +166,10 @@ class droplet2Photons(DetObjectFunc):
         pixonesadu = np.zeros(npixtot)
         for i in range(len(image.shape)):
             pixones[:,i] = pp[i][ss]
-        pixonesadu = image[pp[0][ss],pp[1][ss],pp[2][ss]] # dim dependant!!!
-        ppos1 = np.append(np.array([0]),np.cumsum(npix_drop_1))
-        maxPixAdu,twoPixAdu = self.onephoton_max(pixones, npix_drop_1, ppos1)
+        # TODO: error below, fix if one_photon_info is needed
+        pixonesadu = image[pp[0][ss], pp[1][ss], pp[2][ss]] # dim dependant!!!
+        ppos1 = np.append(np.array([0]), np.cumsum(npix_drop_1))
+        maxPixAdu, twoPixAdu = self.onephoton_max(pixones, npix_drop_1, ppos1)
         ones_dict['maxpixadu'] = maxPixAdu
         ones_dict['twopixadu'] = twoPixAdu
         return ones_dict
@@ -171,7 +189,7 @@ class droplet2Photons(DetObjectFunc):
         #veto below threshold
         vThres = np.where((adu_drop<self.one_photon_limits[1])|(adu_drop>self.photpts[-1]))[0]
         vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
-        imgDrop[vetoed]=0
+        imgDrop[vetoed] = 0
         drop_ind_thres = np.delete(drop_ind,vThres)
 
         npix_drop = (measurements.sum(image.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int) #need 
@@ -197,7 +215,7 @@ class droplet2Photons(DetObjectFunc):
         pixtwosadu = np.zeros(npixtot)
         for i in range(len(image.shape)):
             pixtwos[:,i] = pp[i][ss]
-        if len(image.shape)==3:
+        if len(image.shape) == 3:
             pixtwosadu = image[pp[0][ss],pp[1][ss],pp[2][ss]]
         else:
             pixtwosadu = image[pp[0][ss],pp[1][ss]]
@@ -220,8 +238,7 @@ class droplet2Photons(DetObjectFunc):
         imgDrop = data['_imgDrop']
         drop_ind = np.arange(1,np.nanmax(imgDrop)+1)
 
-        # if self.one_photon_limits:
-        if False:
+        if self.one_photon_info:
             ones_dict = self.onephoton(img, imgDrop)
         else:
             ones_dict =  self.onephoton(img, imgDrop, detail=False)
@@ -242,7 +259,7 @@ class droplet2Photons(DetObjectFunc):
 
         #photon_list is array of [tiles, x, y]
         #photon_list = loopdrops(twos,pixtwos,aduspphot,photpts)
-        photonlist = loopdrops(twos,multpixs,multpixadus,self.aduspphot,self.photpts)
+        photonlist = loopdrops(twos, multpixs, multpixadus, self.aduspphot, self.photpts)
 
         ###
         # get the ones
