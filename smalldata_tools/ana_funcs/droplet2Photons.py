@@ -3,7 +3,7 @@ import numpy as np
 from smalldata_tools.ana_funcs.dropletCode.convert_img import convert_img
 from smalldata_tools.ana_funcs.dropletCode.loopdrops import *
 from smalldata_tools.ana_funcs.dropletCode.getProb import *
-import scipy.ndimage.measurements as measurements
+import scipy.ndimage as ndi
 #use that??
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
@@ -30,9 +30,9 @@ class droplet2Photons(DetObjectFunc):
             Offset to convert number of photons into energy boundaries.
         photpts: float
             energy boundaries for given number of photons (defaults to offset + N*aduspphot)
-        one_photon_limits: list
-            Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
-        mask: np.ndarray
+        one_photon_limits: list (defaults = [offset, offset+N*aduspphot])
+            Energy range for a single photon
+        mask: np.ndarray (default = None)
             Pass a mask in here (array-form). If None: use mask stored in DetObject.
         one_photon_info: bool (default = False)
             Only returns info for one-photon droplets. DOES NOT WORK FOR NOW.
@@ -107,19 +107,31 @@ class droplet2Photons(DetObjectFunc):
             maxPixAdu.append(np.nanmax(adus))
             ##they need to be neighbors, this is not required here....
             #twoPixAdu.append((np.sort(adus)[-1*(min(2, len(adus))):]).sum())
-            piximg1=sparse.coo_matrix( (adus, (i, j)) ).todense()
+            piximg1 = sparse.coo_matrix( (adus, (i, j)) ).todense()
             #find maximum, find maximum of footprint_nbradd neighbor, maximum.
             nbrpix = filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1]+nbrpix)
         return maxPixAdu, twonbrPixAdu
 
 
-    def onephoton(self, image, imgDrop, detail=True):
+    def onephoton(self, image, imgDrop, detail=False):
         """
-        image: image
-        imgDrop: droplet image (result of label)
-        detail: return energy of (two) highest pixels
-        returns dict with keys:
+        Analysis of the single photon droplets, i.e. droplets whose total ADU matches the single
+        photon ADU.
+        
+        
+        Parameters
+        ----------
+        image: 
+            image
+        imgDrop: 
+            droplet image (result of label)
+        detail: bool (default = False)
+            return energy of (two) highest pixels        
+        
+        Returns
+        -------
+        ones_dict: dict
             adu: array of energy per droplet
             pos: array of positions (3d: [tile or zeros], 1st&2nd coord of image)
             npix: array of number of pixels in droplet
@@ -128,15 +140,21 @@ class droplet2Photons(DetObjectFunc):
             [twopixadu]: two highest pixel ADU
         """
         drop_ind = np.arange(1, np.nanmax(imgDrop)+1)
-        adu_drop_all = measurements.sum(image, imgDrop, drop_ind)
+        adu_drop_all = ndi.sum_labels(image, labels=imgDrop, index=drop_ind)
+        
+        # find all droplets whose intensity is in the single photon range
         vThres = np.where(
             (adu_drop_all>=self.one_photon_limits[0])
             & (adu_drop_all<self.one_photon_limits[1])
         )[0]
         
-        adu_drop = np.array(measurements.sum(image, imgDrop, drop_ind[vThres])) #only to check!
-        pos_drop = np.array(measurements.center_of_mass(image, imgDrop, drop_ind[vThres])) 
-        npix_drop = np.array(measurements.sum(image.astype(bool).astype(int),imgDrop, drop_ind[vThres])).astype(int)
+        adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind[vThres]) #only to check!
+        pos_drop = np.asarray( ndi.center_of_mass(image, imgDrop, drop_ind[vThres]) )
+        npix_drop = ndi.sum_labels(
+            image.astype(bool).astype(int),
+            labels=imgDrop,
+            index=drop_ind[vThres]
+        ).astype(int)
         ones_pos = np.zeros((len(npix_drop),3))
         
         if len(image.shape) == 2:
@@ -181,30 +199,40 @@ class droplet2Photons(DetObjectFunc):
 
     def multi_photon(self, image, imgDrop, drop_ind):
         """
-        image: image
-        imgDrop: droplet image (result of label)
-        drop_ind: list of droplet indices
-        returns:
-            twos: droplet coordinates (5d: [tile or zeros], 1st&2nd coord of image, energy, npixel)
-            pixtwos: pixel coordinates
-            pixtwoadus: adus for pixels in droplets
+        Parameters
+        ----------
+        image:
+            image
+        imgDrop:
+            droplet image (result of label)
+        drop_ind:
+            list of droplet indices
+        
+        Returns
+        -------
+            twos:
+                Droplet coordinates (5d: [tile or zeros], 1st&2nd coord of image, energy, npixel)
+            pixtwos:
+                Pixel coordinates
+            pixtwoadus:
+                Adus for pixels in droplets
         """
-        adu_drop = measurements.sum(image, imgDrop, drop_ind)
+        adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind)
+        imgDrop_multi = imgDrop.copy()
         
         #veto below threshold
         vThres = np.where(
-            (adu_drop<self.one_photon_limits[1])
-            | (adu_drop>self.photpts[-1])
+            (adu_drop<self.one_photon_limits[1]) | (adu_drop>self.photpts[-1])
         )[0]
-        vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
+        vetoed = np.in1d( imgDrop.ravel(), (vThres+1) ).reshape(imgDrop.shape)
         imgDrop[vetoed] = 0
-        drop_ind_thres = np.delete(drop_ind,vThres)
+        drop_ind_thres = np.delete(drop_ind, vThres)
 
-        npix_drop = (measurements.sum(image.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int) #need 
-        adu_drop = np.array(measurements.sum(image,imgDrop, drop_ind_thres))
-        pos_drop = np.array(measurements.center_of_mass(image,imgDrop, drop_ind_thres))
+        npix_drop = (ndi.sum_labels(image.astype(bool).astype(int), labels=imgDrop, index=drop_ind_thres)).astype(int) #need 
+        adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind_thres)
+        pos_drop = np.asarray(ndi.center_of_mass(image, imgDrop, drop_ind_thres))
 
-        twos = np.zeros((len(npix_drop),5))
+        twos = np.zeros( (len(npix_drop), 5) )
         twos[:,3] = adu_drop
         twos[:,4] = npix_drop
         if len(image.shape)==2:
@@ -219,14 +247,14 @@ class droplet2Photons(DetObjectFunc):
         ss = np.argsort(imgDrop[pp])
         npixtot = len(pp[0])
 
-        pixtwos = np.zeros((npixtot,len(image.shape)),dtype=np.int16)
+        pixtwos = np.zeros( (npixtot, len(image.shape)), dtype=np.int16 )
         pixtwosadu = np.zeros(npixtot)
         for i in range(len(image.shape)):
             pixtwos[:,i] = pp[i][ss]
         if len(image.shape) == 3:
-            pixtwosadu = image[pp[0][ss],pp[1][ss],pp[2][ss]]
+            pixtwosadu = image[pp[0][ss], pp[1][ss], pp[2][ss]]
         else:
-            pixtwosadu = image[pp[0][ss],pp[1][ss]]
+            pixtwosadu = image[pp[0][ss], pp[1][ss]]
 
         #this not being returned. I assume the idea is to return this instead of the multiple 
         #    arguments in a future iteration
@@ -245,16 +273,19 @@ class droplet2Photons(DetObjectFunc):
         time0 = time.time()
         img = data['_image']
         imgDrop = data['_imgDrop']
-        drop_ind = np.arange(1,np.nanmax(imgDrop)+1)
+        drop_ind = np.arange(1, np.nanmax(imgDrop)+1)
 
         if self.one_photon_info:
-            ones_dict = self.onephoton(img, imgDrop)
+            ones_dict = self.onephoton(img, imgDrop, detail=True)
         else:
             ones_dict =  self.onephoton(img, imgDrop, detail=False)
 
         #alternative and likely better version for twos:
         #confirms its the same
-        w = np.where((data['data']>self.photpts[2])&(data['data']<=self.photpts[-1]))[0]
+        # find all droplets whose intensity is in the single photon range
+        w = np.where(
+            (data['data']>self.photpts[2]) & (data['data']<=self.photpts[-1])
+        )[0]
         n = len(w)
         ntwos = np.zeros((n,5))
         if 'tile' in data:

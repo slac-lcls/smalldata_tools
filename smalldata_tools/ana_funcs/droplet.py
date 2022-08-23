@@ -1,6 +1,6 @@
 import numpy as np
 import time
-import scipy.ndimage.measurements as measurements
+import scipy.ndimage as ndi
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
@@ -23,12 +23,12 @@ class dropletFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
         super(dropletFunc, self).__init__(**kwargs)
-        self.threshold = kwargs.get('threshold',10.)
+        self.threshold = kwargs.get('threshold', 10.)
         self.thresholdLow = kwargs.get('thresholdLow', 3.)
-        self.thresADU = kwargs.get('thresADU',10.)
+        self.thresADU = kwargs.get('thresADU', 10.)
         self.useRms = kwargs.get('useRms', True)
-        self.relabel = kwargs.get('relabel',True)
-        self._mask = kwargs.get('mask',None)
+        self.relabel = kwargs.get('relabel', True)
+        self._mask = kwargs.get('mask', None)
         # new way to store this info
         self._debug = False
         self.footprint = np.array([
@@ -147,7 +147,7 @@ class dropletFunc(DetObjectFunc):
         time_start = time.time()
         img = self.prepareImg(data)
         # Is faster than measure.label(img, connectivity=1)
-        img_drop = measurements.label(img, structure=self.footprint)
+        img_drop = ndi.label(img, structure=self.footprint)
         time_label = time.time()
         # get all neighbors
 
@@ -160,14 +160,14 @@ class dropletFunc(DetObjectFunc):
 
             if self.relabel:
                 imgDrop[img==0]=0
-                img_drop_relabel = measurements.label(imgDrop, structure=self.footprint)
+                img_drop_relabel = ndi.label(imgDrop, structure=self.footprint)
                 imgDrop = img_drop_relabel[0]
         else:
             imgDrop = img_drop[0]
 
         drop_ind = np.arange(1, img_drop[1]+1)
         ret_dict = {'nDroplets_all': len(drop_ind)} # number of droplets before ADU cut.
-        adu_drop = measurements.sum(img, imgDrop, drop_ind)
+        adu_drop = ndi.sum_labels(img, labels=imgDrop, index=drop_ind)
         tfilled = time.time()
 
         # clean list with lower threshold. Only that one!
@@ -201,17 +201,18 @@ class dropletFunc(DetObjectFunc):
             # imgNpix = img.copy(); imgNpix[img>0]=1
             # drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
             # drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
-            drop_adu = np.array(measurements.sum(img, imgDrop, drop_ind_thres))
-            pos_drop = np.array(measurements.center_of_mass(
+            drop_adu = np.array(ndi.sum_labels(img, labels=imgDrop, index=drop_ind_thres))
+            pos_drop = np.array(ndi.center_of_mass(
                 img,
                 imgDrop,
                 drop_ind_thres)
                 )
-            npix_drop = (measurements.sum(
-                                          img.astype(bool).astype(int),
-                                          imgDrop,
-                                          drop_ind_thres
-                                          )).astype(int)
+            npix_drop = (ndi.sum_labels(
+                img.astype(bool).astype(int),
+                labels=imgDrop,
+                index=drop_ind_thres
+            )).astype(int)
+            
             dat_dict = {'data': drop_adu}  # adu_drop}
             dat_dict['npix'] = npix_drop
             if drop_adu.shape[0] == 0:
@@ -229,7 +230,7 @@ class dropletFunc(DetObjectFunc):
             self.regions = measure.regionprops(imgDrop,
                                                intensity_image=img,
                                                cache=True)
-            dropSlices = measurements.find_objects(imgDrop)
+            dropSlices = ndi.find_objects(imgDrop)
             for droplet, ds in zip(self.regions, dropSlices):
                 pos_drop.append(droplet['weighted_centroid'])
                 moments.append(droplet['weighted_moments_central'])
@@ -246,6 +247,7 @@ class dropletFunc(DetObjectFunc):
                         pixelArray,
                         np.zeros(self._nMaxPixels-pixelArray.shape[0])
                         ))
+
             dat_dict = {'data': np.array(adu_drop)}
             dat_dict['npix'] = np.array(npix_drop)
             dat_dict['bbox'] = np.array(bbox)
@@ -256,7 +258,7 @@ class dropletFunc(DetObjectFunc):
 
         if self._flagMasked:
             maxImg = filters.maximum_filter(imgDrop, footprint=self.footprint)
-            maskMax = measurements.sum(self._mask, maxImg, drop_ind)
+            maskMax = ndi.sum_labels(self._mask, labels=maxImg, index=drop_ind)
             imgDropMin = imgDrop.copy()
             imgDropMin[imgDrop == 0] = (imgDrop.max() + 1)
             minImg = filters.minimum_filter(
@@ -264,7 +266,7 @@ class dropletFunc(DetObjectFunc):
                 footprint=self.footprint
                 )
             minImg[minImg == (imgDrop.max()+1)] = 0
-            maskMin = measurements.sum(self._mask, maxImg, drop_ind)
+            maskMin = ndi.sum(self._mask, label=maxImg, index=drop_ind)
             maskDrop = maskMax+maskMin
             dat_dict['masked'] = maskDrop
 
