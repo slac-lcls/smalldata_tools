@@ -1,8 +1,10 @@
 import numpy as np
+#use that??
 from smalldata_tools.ana_funcs.dropletCode.convert_img import convert_img
 from smalldata_tools.ana_funcs.dropletCode.loopdrops import *
 from smalldata_tools.ana_funcs.dropletCode.getProb import *
 import scipy.ndimage.measurements as measurements
+#use that??
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
@@ -28,8 +30,6 @@ class droplet2Photons(DetObjectFunc):
             Offset to convert number of photons into energy boundaries (defaults to 0.5*aduspphot)
         photpts: float
             energy boundaries for given number of photons (defaults to offset + N*aduspphot)
-        one_photon_info: list
-            Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
         one_photon_limits: list
             Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
         mask: 
@@ -43,7 +43,6 @@ class droplet2Photons(DetObjectFunc):
         self.aduspphot = kwargs.get('aduspphot', 0)
         self.offset = kwargs.get('offset', self.aduspphot*0.5)
         self.photpts = np.arange(1000000)*self.aduspphot-self.aduspphot+self.offset
-        self.one_photon_info = kwargs.get('one_photon_info', False)
         
         # self.Np = kwargs.get('Np', None)
         self.cputime = kwargs.get('cputime', False)
@@ -101,8 +100,8 @@ class droplet2Photons(DetObjectFunc):
             nbrpix=filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1]+nbrpix)
         return maxPixAdu, twonbrPixAdu
-        
-                
+
+
     def onephoton(self, image, imgDrop, detail=True):
         """
         image: image
