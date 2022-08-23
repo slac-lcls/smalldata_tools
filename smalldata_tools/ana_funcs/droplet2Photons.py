@@ -1,8 +1,10 @@
 import numpy as np
+#use that??
 from smalldata_tools.ana_funcs.dropletCode.convert_img import convert_img
 from smalldata_tools.ana_funcs.dropletCode.loopdrops import *
 from smalldata_tools.ana_funcs.dropletCode.getProb import *
 import scipy.ndimage.measurements as measurements
+#use that??
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
@@ -16,7 +18,7 @@ class droplet2Photons(DetObjectFunc):
     aduspphot: expected photon energy
     offset: offset to convert number of photons into energy boundaries (defaults to 0.5*aduspphot)
     photpts: energy boundaries for given number of photons (defaults to offset + N*aduspphot)
-    one_photon_info: energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
+    one_photon_info: only return info for one-photon droplets
     cputime: store CPU tiime of different steps in hdf5
     one_photon_limits: energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
     mask: pass a mask in here (array-form), is None: use mask stored in DetObject
@@ -82,7 +84,7 @@ class droplet2Photons(DetObjectFunc):
             #find maximum, find maximum of footprint_nbradd neighbor, maximum.
             nbrpix=filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1]+nbrpix)
-            return maxPixAdu, twonbrPixAdu
+        return maxPixAdu, twonbrPixAdu
                 
     def onephoton(self, image, imgDrop, detail=True):
         """
