@@ -2,8 +2,8 @@ import os
 import copy
 import numpy as np
 from psana.pscalib.calib.MDBWebUtils import calib_constants
-from smalldata_tools.DetObject import event
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.DetObjectFunc import event
 from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -14,6 +14,7 @@ except NameError:
 
 import psana
 #from collections import Counter
+
 
 def DetObject_lcls2(srcName, run, **kwargs):
     print('Getting the detector for: ',srcName)
@@ -207,11 +208,11 @@ class CameraObject_lcls2(DetObjectClass_lcls2):
         self._gainSwitching = False
         try:
             self.x, self.y, self.z = det.raw._pixel_coords(do_tilt=True, cframe=0)
+            self.x = self.x.squeeze()
+            self.y = self.y.squeeze()
+            self.z = self.z.squeeze()
         except:
             self.x, self.y, self.z = None, None, None
-        self.x = self.x.squeeze()
-        self.y = self.y.squeeze()
-        self.z = self.z.squeeze()
 
     def getData(self, evt):
         super(CameraObject_lcls2, self).getData(evt)

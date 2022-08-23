@@ -4,7 +4,7 @@ try:
 except ModuleNotFoundError:
     print("pyFAI not available on LCLS-II env")
 
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 from smalldata_tools.utilities import image_from_dxy
 
 class azav_pyfai(DetObjectFunc):

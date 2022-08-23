@@ -9,9 +9,9 @@ import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
 import time
-from smalldata_tools.DetObject import DetObjectFunc
 from numba import jit
 from numba.typed import List as NTL
+from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 class droplet2Photons(DetObjectFunc):
     """
