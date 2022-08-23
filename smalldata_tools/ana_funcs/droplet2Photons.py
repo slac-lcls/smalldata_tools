@@ -13,33 +13,49 @@ from numba.typed import List as NTL
 
 class droplet2Photons(DetObjectFunc):
     """
-    aduspphot: expected photon energy
-    offset: offset to convert number of photons into energy boundaries (defaults to 0.5*aduspphot)
-    photpts: energy boundaries for given number of photons (defaults to offset + N*aduspphot)
-    one_photon_info: energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
-    cputime: store CPU tiime of different steps in hdf5
-    one_photon_limits: energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
-    mask: pass a mask in here (array-form), is None: use mask stored in DetObject
+    Uses loopdrops to find the photons in the droplets (don't forget to append the ones)
     
-    uses loopdrops to find the photons in the droplets (don't forget to append the ones)
-    
-    counts the number of photons at each (rounded) coordinate
+    Counts the number of photons at each (rounded) coordinate
     """
+    
     def __init__(self, **kwargs):
+        """
+        Parameters
+        ----------
+        aduspphot: float
+            Expected single photon energy
+        offset: float
+            Offset to convert number of photons into energy boundaries (defaults to 0.5*aduspphot)
+        photpts: float
+            energy boundaries for given number of photons (defaults to offset + N*aduspphot)
+        one_photon_info: list
+            Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
+        one_photon_limits: list
+            Energy range for a single photon ((defaults to [offset, offset+N*aduspphot])
+        mask: 
+            Pass a mask in here (array-form), is None: use mask stored in DetObject.
+        cputime: bool
+            Store CPU tiime of different steps in hdf5
+        """
         self._name =  kwargs.get('name','droplet2phot')
         super(droplet2Photons, self).__init__(**kwargs)
+        
         self.aduspphot = kwargs.get('aduspphot', 0)
         self.offset = kwargs.get('offset', self.aduspphot*0.5)
         self.photpts = np.arange(1000000)*self.aduspphot-self.aduspphot+self.offset
         self.one_photon_info = kwargs.get('one_photon_info', False)
+        
         # self.Np = kwargs.get('Np', None)
         self.cputime = kwargs.get('cputime', False)
         self._footprintnbr = np.array([[0,1,0],[1,0,1],[0,1,0]])
         self.one_photon_limits = kwargs.get('one_photon_limits', None)
+        
         # not sure if this should not just be photpts[:2]?
         if self.one_photon_limits is None:
             self.one_photon_limits = [self.offset, self.offset+self.aduspphot]
-
+        return
+    
+    
     @jit(nopython=True, cache=True)
     def piximg(self, i,j,adu, pad=True):
         """
@@ -59,7 +75,9 @@ class droplet2Photons(DetObjectFunc):
         mj = np.min(j)
         for ti,tj,tadu in zip_obj:
             img[ti-mi,tj-mj]=tadu
+        return
 
+            
 #    @jit(nopython=True, cache=True)
     def onephoton_max(self, pixones, npix_drop, ppos):
         """
@@ -82,7 +100,8 @@ class droplet2Photons(DetObjectFunc):
             #find maximum, find maximum of footprint_nbradd neighbor, maximum.
             nbrpix=filters.maximum_filter(piximg1, mode='constant', footprint=self._footprintnbr).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1]+nbrpix)
-            return maxPixAdu, twonbrPixAdu
+        return maxPixAdu, twonbrPixAdu
+        
                 
     def onephoton(self, image, imgDrop, detail=True):
         """
@@ -191,6 +210,7 @@ class droplet2Photons(DetObjectFunc):
 
         return twos, pixtwos, pixtwosadu
 
+    
     def process(self, data):
         #this will be a dictionary.
         if (not isinstance(data, dict)) or (data.get('_imgDrop',None) is None): 
