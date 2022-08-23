@@ -35,7 +35,7 @@ class droplet2Photons(DetObjectFunc):
         mask: np.ndarray
             Pass a mask in here (array-form). If None: use mask stored in DetObject.
         one_photon_info: bool (default = False)
-            Only returns info for one-photon droplets
+            Only returns info for one-photon droplets. DOES NOT WORK FOR NOW.
         cputime: bool (default = False)
             Store CPU tiime of different steps in hdf5
         """
@@ -127,16 +127,18 @@ class droplet2Photons(DetObjectFunc):
             [maxpixadu]: highest pixel ADU
             [twopixadu]: two highest pixel ADU
         """
-        drop_ind = np.arange(1,np.nanmax(imgDrop)+1)
+        drop_ind = np.arange(1, np.nanmax(imgDrop)+1)
         adu_drop_all = measurements.sum(image, imgDrop, drop_ind)
         vThres = np.where(
             (adu_drop_all>=self.one_photon_limits[0])
-            &(adu_drop_all<self.one_photon_limits[1])
+            & (adu_drop_all<self.one_photon_limits[1])
         )[0]
+        
         adu_drop = np.array(measurements.sum(image, imgDrop, drop_ind[vThres])) #only to check!
         pos_drop = np.array(measurements.center_of_mass(image, imgDrop, drop_ind[vThres])) 
         npix_drop = np.array(measurements.sum(image.astype(bool).astype(int),imgDrop, drop_ind[vThres])).astype(int)
         ones_pos = np.zeros((len(npix_drop),3))
+        
         if len(image.shape) == 2:
             ones_pos[:,1] = pos_drop[:,0]
             ones_pos[:,2] = pos_drop[:,1]
@@ -157,7 +159,7 @@ class droplet2Photons(DetObjectFunc):
         vThres_1_veto = np.where((adu_drop>=self.one_photon_limits[0])|(adu_drop<self.one_photon_limits[1]))[0]
         vetoed = np.in1d(imgDrop.ravel(), (vThres_1_veto+1)).reshape(imgDrop.shape)
         imgDrop1[vetoed] = 0
-        drop_ind_thres1 = np.delete(drop_ind,vThres_1_veto)
+        drop_ind_thres1 = np.delete(drop_ind, vThres_1_veto)
 
         pp = np.where(imgDrop1>0)
         ss = np.argsort(imgDrop1[pp])
@@ -166,8 +168,10 @@ class droplet2Photons(DetObjectFunc):
         pixonesadu = np.zeros(npixtot)
         for i in range(len(image.shape)):
             pixones[:,i] = pp[i][ss]
+        
         # TODO: error below, fix if one_photon_info is needed
         pixonesadu = image[pp[0][ss], pp[1][ss], pp[2][ss]] # dim dependant!!!
+        # pixonesadu = image[pp[0][ss], pp[1][ss]] # dim dependant!!! # Seems to fix for 2d detectors...
         ppos1 = np.append(np.array([0]), np.cumsum(npix_drop_1))
         maxPixAdu, twoPixAdu = self.onephoton_max(pixones, npix_drop_1, ppos1)
         ones_dict['maxpixadu'] = maxPixAdu
@@ -175,7 +179,7 @@ class droplet2Photons(DetObjectFunc):
         return ones_dict
 
 
-    def multphoton(self, image, imgDrop, drop_ind):
+    def multi_photon(self, image, imgDrop, drop_ind):
         """
         image: image
         imgDrop: droplet image (result of label)
@@ -186,8 +190,12 @@ class droplet2Photons(DetObjectFunc):
             pixtwoadus: adus for pixels in droplets
         """
         adu_drop = measurements.sum(image, imgDrop, drop_ind)
+        
         #veto below threshold
-        vThres = np.where((adu_drop<self.one_photon_limits[1])|(adu_drop>self.photpts[-1]))[0]
+        vThres = np.where(
+            (adu_drop<self.one_photon_limits[1])
+            | (adu_drop>self.photpts[-1])
+        )[0]
         vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
         imgDrop[vetoed] = 0
         drop_ind_thres = np.delete(drop_ind,vThres)
@@ -233,6 +241,7 @@ class droplet2Photons(DetObjectFunc):
         if (not isinstance(data, dict)) or (data.get('_imgDrop',None) is None): 
             print('droplet2photons expects a dictionary with imgDrop and image keys!')
             return
+        
         time0 = time.time()
         img = data['_image']
         imgDrop = data['_imgDrop']
@@ -250,12 +259,13 @@ class droplet2Photons(DetObjectFunc):
         ntwos = np.zeros((n,5))
         if 'tile' in data:
             ntwos[:,0] = data['tile'][w]
+        
         ntwos[:,1] = data['row'][w]
         ntwos[:,2] = data['col'][w]
         ntwos[:,3] = data['data'][w]
         ntwos[:,4] = data['npix'][w]
 
-        twos, multpixs, multpixadus = self.multphoton(img, imgDrop, drop_ind)
+        twos, multpixs, multpixadus = self.multi_photon(img, imgDrop, drop_ind)
 
         #photon_list is array of [tiles, x, y]
         #photon_list = loopdrops(twos,pixtwos,aduspphot,photpts)
