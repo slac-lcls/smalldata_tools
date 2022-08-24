@@ -16,7 +16,7 @@ from smalldata_tools.DetObjectFunc import DetObjectFunc
 #TEST ME WITH MASKED ARRAY  - WAS ALSO WRITTEN FOR MASKED ARRAYS
 class sparsifyFunc(DetObjectFunc):
     """
-    Function to sparisify a passed array (2 or 3-d input)
+    Function to sparsify a passed array (2 or 3-d input)
     nData: if passed, make output array rectangular (for storing in event based smlData)
     if a dictionary w/ data, row, col is passed, only make rectangular
     """
@@ -95,6 +95,59 @@ class sparsifyFunc(DetObjectFunc):
             for key, d in data_dict.items():
                 ret_dict[f'var_{key}'] = d
 
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
+
+        return ret_dict
+
+
+
+class unsparsifyFunc(DetObjectFunc):
+    """
+    Function to create a 'dense'/raw data shaped array out of the sparsified dict
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','dense')
+        super(unsparsifyFunc, self).__init__(**kwargs)
+
+    def setFromDet(self, det):
+        super(unsparsifyFunc, self).setFromDet(det)
+        self._shape = det.mask.shape
+
+    def process(self, data):
+        #make sure we have dict w/ data
+        if not isinstance(data, dict):
+            if not (isinstance(data, np.ma.masked_array) or
+                    isinstance(data, np.ndarray)):
+                logger.warning('Try to unsparsify data that is neither a dict nor alraedy an array: {}'.format(data.dtype))
+            return
+
+        if 'data' not in data or 'row' not in data or 'col' not in data:
+            print('cannot make a make a sparse, rectangular array of', data)
+            return
+
+        #now unsparsify the data
+        if len(self._shape) == 2:
+            dropdata = sparse.coo_matrix((data['data'],
+                                      ((data['row']).astype(int),\
+                                       (data['col']).astype(int))),\
+                                     shape=self._shape).toarray()
+        elif len(self._shape) > 2:
+            dropdata=[]
+            tileshp = [self._shape[1], self._shape[2]]
+            for itile in range(self._shape[0]):
+                ontile = (data['tile']==itile)
+                dropdata.append( sparse.coo_matrix((data['data'][ontile],
+                                     ((data['row'][ontile]).astype(int),\
+                                     (data['col'][ontile]).astype(int))),\
+                                               shape=[self._shape[1],\
+                                                      self._shape[2]]).toarray())
+            dropdata = np.array(dropdata)
+
+        self.dat = dropdata
+        ret_dict={}
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
             for kk in subfuncResults[k]:
