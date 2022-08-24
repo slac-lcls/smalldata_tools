@@ -77,7 +77,6 @@ class dropletFunc(DetObjectFunc):
         """
         super().addFunc(func)
         self._saveDrops = True
-        self._flagMasked = getattr(func, '_flagMasked', self._flagMasked)
         self._needProps = getattr(func, '_needProps', self._needProps)
         return
 
@@ -267,7 +266,7 @@ class dropletFunc(DetObjectFunc):
                 )
             minImg[minImg == (imgDrop.max()+1)] = 0
             maskMin = ndi.sum(self._mask, label=maxImg, index=drop_ind)
-            maskDrop = maskMax+maskMin
+            maskDrop = maskMax + maskMin
             dat_dict['masked'] = maskDrop
 
         dat_dict['_mask'] = self._mask
