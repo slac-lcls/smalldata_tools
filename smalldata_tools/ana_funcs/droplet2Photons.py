@@ -134,7 +134,7 @@ class droplet2Photons(DetObjectFunc):
             [twopixadu]: two highest pixel ADU
         """
         adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind) #only to check!
-        pos_drop = np.asarray( ndi.center_of_mass(image, imgDrop, drop_ind) )
+        pos_drop = np.asarray( ndi.center_of_mass(image, labels=imgDrop, index=drop_ind) )
         npix_drop = ndi.sum_labels(
             image.astype(bool).astype(int),
             labels=imgDrop,
@@ -205,15 +205,9 @@ class droplet2Photons(DetObjectFunc):
             pixtwoadus:
                 Adus for pixels in droplets
         """
-        adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind)
-        
-        #veto below threshold
-        vThres = np.where(
-            (adu_drop<self.photpts[2]) | (adu_drop>self.photpts[-1])
-        )[0]
-        vetoed = np.in1d( imgDrop.ravel(), (vThres+1) ).reshape(imgDrop.shape)
+        vetoed = ~np.in1d( imgDrop.ravel(), drop_ind ).reshape(imgDrop.shape)
         imgDrop[vetoed] = 0 # remove the single photon droplet
-        drop_ind_thres = np.delete(drop_ind, vThres)
+        drop_ind_thres = drop_ind
 
         npix_drop = (ndi.sum_labels(image.astype(bool).astype(int), labels=imgDrop, index=drop_ind_thres)).astype(int) #need 
         adu_drop = ndi.sum_labels(image, labels=imgDrop, index=drop_ind_thres)
@@ -294,7 +288,7 @@ class droplet2Photons(DetObjectFunc):
 #         ntwos[:,3] = data['data'][w]
 #         ntwos[:,4] = data['npix'][w]
 
-        twos, multpixs, multpixadus = self.multi_photon(img, imgDrop, drop_ind)
+        twos, multpixs, multpixadus = self.multi_photon(img, imgDrop.copy(), drop_ind_multi)
 
         # photon_list is array of [tiles, x, y]
         photonlist = loopdrops(twos, multpixs, multpixadus, self.aduspphot, self.photpts)

@@ -4,15 +4,15 @@ import numpy as np
 from numba import jit
 
 @jit(nopython=True, cache=True)
-def greedyguess(img,nophots,aduspphot):
+def greedyguess(img, nophots, aduspphot):
     """
     place single photons into a multiphoton droplet.
     arguments: [droplet] image, # of photons in droplet, expected photon energy
     
     divides image/photon_energy, place photons where pixel>=1
-    combine two pixels, startining with highest energy ones until all photons are assigned
-    this differentiates this algorithm from the photon also where the two pixels need to be 
-        above a threshold     
+    combine two pixels, starting with highest energy ones until all photons are assigned.
+    This differentiates this algorithm from the photon also where the two pixels need to be 
+    above a threshold.
     """
     pxs=np.zeros(nophots)
     pys=pxs.copy()
