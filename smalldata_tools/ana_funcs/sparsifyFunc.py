@@ -5,6 +5,7 @@ import numpy.ma as ma
 import itertools
 
 import time
+from smalldata_tools.utilities import unsparsify
 from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 #
@@ -129,24 +130,7 @@ class unsparsifyFunc(DetObjectFunc):
             return
 
         #now unsparsify the data
-        if len(self._shape) == 2:
-            dropdata = sparse.coo_matrix((data['data'],
-                                      ((data['row']).astype(int),\
-                                       (data['col']).astype(int))),\
-                                     shape=self._shape).toarray()
-        elif len(self._shape) > 2:
-            dropdata=[]
-            tileshp = [self._shape[1], self._shape[2]]
-            for itile in range(self._shape[0]):
-                ontile = (data['tile']==itile)
-                dropdata.append( sparse.coo_matrix((data['data'][ontile],
-                                     ((data['row'][ontile]).astype(int),\
-                                     (data['col'][ontile]).astype(int))),\
-                                               shape=[self._shape[1],\
-                                                      self._shape[2]]).toarray())
-            dropdata = np.array(dropdata)
-
-        self.dat = dropdata
+        self.dat = unsparsify(data, self._shape)
         ret_dict={}
         subfuncResults = self.processFuncs()
         for k in subfuncResults:

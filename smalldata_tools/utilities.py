@@ -872,6 +872,30 @@ def image_from_dxy(d,x,y, **kwargs):
     img = np.asarray(sparse.coo_matrix((d.flatten(), (ix.flatten(), iy.flatten())), shape=outShape).todense())
     return img
 
+def unsparsify(data, shape):
+    if not isinstance(data, dict):
+        print('unsparsify takes a dict!')
+        return
+    if 'data' not in data or 'row' not in data or 'col' not in data:
+        print('unsparsify takes a dict with data, row & col keys! ', data.keys())
+        return
+    if len(shape) == 2:
+        dropdata = sparse.coo_matrix((data['data'],
+                                      ((data['row']).astype(int),\
+                                       (data['col']).astype(int))),\
+                                     shape=self._shape).toarray()
+        return dropdata
+    if len(shape) > 2:
+        dropdata=[]
+        tileshp = [shape[1], shape[2]]
+        for itile in range(shape[0]):
+            ontile = (data['tile']==itile)
+            dropdata.append( sparse.coo_matrix((data['data'][ontile],
+                                 ((data['row'][ontile]).astype(int),\
+                                 (data['col'][ontile]).astype(int))),\
+                                           shape=tileshp).toarray())
+        dropdata = np.array(dropdata)
+        return dropdata
 
 def KdeCuts(values, bandwidth='scott', percentile=[0.1,99.9], nBins=1000):
     kde = gaussian_kde(values, bw_method=bandwidth)
