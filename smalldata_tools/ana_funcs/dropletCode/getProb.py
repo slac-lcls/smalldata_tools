@@ -37,13 +37,14 @@ def getContrast(ps, nroi,low, high, Mmax):
     return M0, delta_M
 
 
-def getProb(ones, photonlist, i0s, roi, Np = 12):
+def getProb(photonlist, i0s, roi, Np = 12):
     nx,ny = roi.shape
     flag = np.zeros_like(i0s,dtype = "int")
     p = np.zeros((i0s.size,Np))
-    #note the x and y in python and in c 
-    photon_arr = np.append(ones[:,[0,2,1]],photonlist,axis = 0)
-    sequence = np.argsort(photon_arr[:,0])
+    #note the x and y in python and in c - photonlist has both & is correctly shaped
+    #photon_arr = np.append(ones[:,[0,2,1]],photonlist,axis = 0)
+    photon_arr = photonlist
+    sequence = np.argsort(photon_arr[:,0]) # this would not sort in tiles?
     photon_arr_sorted = photon_arr[sequence,:]
     #aa is the number of frames with droplets in it
     aa,bb = np.unique(photon_arr_sorted[:,0],return_counts = True)
@@ -61,8 +62,10 @@ def getProb(ones, photonlist, i0s, roi, Np = 12):
     return p/float(roi.sum())
 
 def getProb_img(photonlist, mask, Np=12):
-    nx,ny = mask.shape
     p = np.zeros((1,Np))
+    if mask is None:
+        return p
+    nx,ny = mask.shape
     #note the x and y in python and in c 
 #     fr = np.append(ones[:,[0,2,1]],photonlist,axis = 0)
 #     ave0,xedges, yedges = np.histogram2d(fr[:,1]+0.5,fr[:,2]+0.5,bins = [np.arange(nx+1),np.arange(ny+1)])
