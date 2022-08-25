@@ -272,22 +272,6 @@ class droplet2Photons(DetObjectFunc):
         else:
             ones_dict =  self.onephoton(img, imgDrop, drop_ind_single, detail=False)
 
-        # alternative and likely better version for twos:
-        # confirms its the same
-        # find all droplets whose intensity is in the single photon range
-#         w = np.where(
-#             (data['data']>=self.photpts[2]) & (data['data']<=self.photpts[-1])
-#         )[0]
-#         n = len(w)
-#         ntwos = np.zeros((n,5))
-#         if 'tile' in data:
-#             ntwos[:,0] = data['tile'][w]
-        
-#         ntwos[:,1] = data['row'][w]
-#         ntwos[:,2] = data['col'][w]
-#         ntwos[:,3] = data['data'][w]
-#         ntwos[:,4] = data['npix'][w]
-
         twos, multpixs, multpixadus = self.multi_photon(img, imgDrop.copy(), drop_ind_multi)
 
         # photon_list is array of [tiles, x, y]

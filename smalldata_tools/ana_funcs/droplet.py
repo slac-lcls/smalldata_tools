@@ -8,17 +8,28 @@ from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 class dropletFunc(DetObjectFunc):
     """ 
-    threshold : # (noise sigma for) threshold (def: 10.0)
-    thresholdLow : # (noise sigma for) lower threshold (def: 3.0): this is to make the spectrum sharper, but not find peaks out of pixels with
-                   low significance
-    mask (def:None): pass a mask in here, is None: use mask stored in DetObject
-    name (def:'droplet'): name used in hdf5 for data
-    thresADU (def: 10): ADU threshold for droplets to be further processed
-    useRms (def True): if True, threshold and thresholdLow are # of rms of data, otherwise ADU are used.
-    relabel (def True): after initial droplet finding and allowing pixels above the lower threshold, relabel the image (so that droplets merge)
+    Parameters
+    ----------
+    threshold : float (default = 10.0)
+         Treshold in sigma or ADU, depending on the value of the useRms parameters
+    thresholdLow : float (default = 3.0)
+        Lower threshold: this is to make the spectrum sharper, but not find peaks out 
+        of pixels with low significance.
+    mask: np.ndarray (default = None)
+        Pass a mask in here, is None: use mask stored in DetObject
+    name: str (default: 'droplet') 
+        Name used in hdf5 for data field
+    thresADU: float (default = 10)
+        ADU threshold for droplets to be further processed
+    useRms (def True): 
+        If True, threshold and thresholdLow are # of rms of data, otherwise ADU are used.
+    relabel (def True): 
+        After initial droplet finding and allowing pixels above the lower threshold, relabel 
+        the image (so that droplets merge)
 
-    by default, only total number of droplets is returned by process(data)
-           Many more information about the droplets ca be saved there.
+    By default, only total number of droplets is returned by process(data)
+    
+    Many more information about the droplets ca be saved there.
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
@@ -148,8 +159,8 @@ class dropletFunc(DetObjectFunc):
         # Is faster than measure.label(img, connectivity=1)
         img_drop = ndi.label(img, structure=self.footprint)
         time_label = time.time()
+        
         # get all neighbors
-
         if (self.threshold != self.thresholdLow):
             if (len(img_drop[0].shape) == 2):
                 imgDrop = self.neighborImg(img_drop[0])
