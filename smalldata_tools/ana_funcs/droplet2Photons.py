@@ -266,16 +266,21 @@ class droplet2Photons(DetObjectFunc):
         drop_ind_multi = drop_ind[
             (adu_drop>=self.photpts[2]) & (adu_drop<self.photpts[-1])
         ]
-
-        if self.one_photon_info:
-            ones_dict = self.onephoton(img, imgDrop, drop_ind_single, detail=True)
+        if drop_ind_single.size > 0:
+            if self.one_photon_info:
+                ones_dict = self.onephoton(img, imgDrop, drop_ind_single, detail=True)
+            else:
+                ones_dict =  self.onephoton(img, imgDrop, drop_ind_single, detail=False)
         else:
-            ones_dict =  self.onephoton(img, imgDrop, drop_ind_single, detail=False)
+            ones_dict['pos'] = []
 
-        twos, multpixs, multpixadus = self.multi_photon(img, imgDrop.copy(), drop_ind_multi)
+        if drop_ind_multi.size > 0:
+            twos, multpixs, multpixadus = self.multi_photon(img, imgDrop.copy(), drop_ind_multi)
 
-        # photon_list is array of [tiles, x, y]
-        photonlist = loopdrops(twos, multpixs, multpixadus, self.aduspphot, self.photpts)
+            # photon_list is array of [tiles, x, y]
+            photonlist = loopdrops(twos, multpixs, multpixadus, self.aduspphot, self.photpts)
+        else:
+            photonlist = []
         timed = time.time()
         
         if len(ones_dict['pos'])>0:
@@ -287,8 +292,9 @@ class droplet2Photons(DetObjectFunc):
         ret_dict = {'prob': np.squeeze(p)}
             
         photon_dict={'tile': photonlist[:,0]}
-        photon_dict['col'] = photonlist[:,1]
-        photon_dict['row'] = photonlist[:,2]
+        # Reverse columns and rows because of legacy C-code array order.
+        photon_dict['col'] = photonlist[:,2]
+        photon_dict['row'] = photonlist[:,1]
         photon_dict['data'] = np.ones(photonlist[:,0].shape[0])
 
         if self.cputime: ret_dict['cputime'] = np.array([time.time()-time0, timed-time0, timep-timed, time.time()-timep]) 
