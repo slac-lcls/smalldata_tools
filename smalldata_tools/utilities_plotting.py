@@ -1108,12 +1108,23 @@ def hv_image(data2plot, **kwargs):
     width = kwargs.pop("width",600)
     height = kwargs.pop("height",int(width*0.8))
     cmap = kwargs.pop("cmap",'nipy_spectral')
-    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
     imgLow = kwargs.pop("imgLow",None)
     imgHigh = kwargs.pop("imgHigh",None)
 
     kdims = kwargs.pop("kdims", None)
     bounds = kwargs.pop("bounds", None)
+
+    #dimCol = hv.Dimension('cmap', values=['viridis','fire','seismic','gray','rainbow','jet','nipy_spectral'])
+    clipping = kwargs.pop("clipping", None)
+    if clipping is None:
+        if cmap == 'gray': clipping = {'min': 'blue', 'max': 'magenta', 'NaN': 'green'}
+        elif cmap == 'fire': clipping = {'min': 'blue', 'max': 'magenta', 'NaN': 'gray'}
+        elif cmap == 'seismic': clipping = {'min': 'green', 'max': 'magenta', 'NaN': 'gray'}
+        elif cmap == 'viridis': clipping = {'min': 'blue', 'max': 'magenta', 'NaN': 'gray'}
+        elif cmap == 'jet': clipping = {'min': 'black', 'max': 'magenta', 'NaN': 'gray'}
+        elif cmap == 'nipy_spectral': clipping = {'min': 'black', 'max': 'magenta', 'NaN': 'gray'}
+        elif cmap == 'rainbow': clipping = {'min': 'black', 'max': 'magenta', 'NaN': 'white'}
+        else: clipping = {'min': 'black', 'max': 'magenta', 'NaN': 'white'}
 
     if not isinstance(data2plot, np.ndarray):
         try:
@@ -1162,7 +1173,7 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh,  **kwargs):
     plotLog = kwargs.pop("plotLog",False)
     width = kwargs.pop("width",600)
     height = kwargs.pop("height",int(width*0.8))
-    clipping = kwargs.pop("clipping", {'min': 'red', 'max': 'green', 'NaN': 'gray'})
+    clipping = kwargs.pop("clipping", {'min': 'black', 'max': 'magenta', 'NaN': 'gray'})
     kdims = kwargs.pop("kdims", None)
     bounds = kwargs.pop("bounds", None)
 
