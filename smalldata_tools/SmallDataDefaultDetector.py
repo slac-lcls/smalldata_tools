@@ -672,7 +672,7 @@ class xtcavDetector(defaultDetector):
         self.name = name
         self.detname = detname
         self.nb=1
-        self.size=1000
+        self.size=1024
         try:
             from xtcav2.LasingOnCharacterization import LasingOnCharacterization
             self._XTCAVRetrieval = LasingOnCharacterization()
@@ -689,26 +689,45 @@ class xtcavDetector(defaultDetector):
         try:
             self._XTCAVRetrieval.processEvent(evt)
             dl['success']=1
-            t, power = self._XTCAVRetrieval.xRayPower()
-            dl['success']=2
-            if t is not None:
-                imethod=0
-                for this_t, this_power in zip(t, power):
-                    arSize=this_t.shape[0]
-                    if arSize>=1 and arSize<=self.size:
-                        timeAr = np.append(this_t,np.array([np.nan] * (self.size-arSize)))
-                        powerAr = np.append(this_power,np.array([np.nan] * (self.size-arSize)))
-                    else:
-                        print('Xtcav array is too small in run, please check configuration',env.run())
-                        timeAr = this_t[:self.size]
-                        powerAr = this_power[:self.size]
-                    dl['arSize_%d'%imethod]=arSize
-                    dl['time_%d'%imethod]=timeAr
-                    dl['power_%d'%imethod]=powerAr
-                    imethod+=1
-                dl['success']=3
+            if self.method=='COM' or self.method=='RMS':
+                t, power = self._XTCAVRetrieval.xRayPower(self.method)
+                dl['success']=2
+                if t is not None:
+                    imethod=0
+                    for this_t, this_power in zip(t, power):
+                        arSize=this_t.shape[0]
+                        if arSize>=1 and arSize<=self.size:
+                            timeAr = np.append(this_t,np.array([np.nan] * (self.size-arSize)))
+                            powerAr = np.append(this_power,np.array([np.nan] * (self.size-arSize)))
+                        else:
+                            print('Xtcav array is too small in run, please check configuration',env.run())
+                            timeAr = this_t[:self.size]
+                            powerAr = this_power[:self.size]
+                        #we may have to create this outside for 
+                        #  data with much damage, 
+                        #  assuming we only have 1 method
+                        dl['arSize_%d'%imethod]=arSize
+                        dl['time_%d'%imethod]=timeAr
+                        dl['power_%d'%imethod]=powerAr
+                        imethod+=1
+                    dl['success']=3
+            else:
+                full_results = self._XTCAVRetrieval.fullResults()
+                keylist=['grounpnum','num_bunches','bunchdelay','nolasingECOM','lasingECOM']
+                for key in dir(full_results):
+                    #if tkey[0]!='_' and isinstance(getattr(full_results, tkey), np.ndarray):
+                    if key[0]!='_' and isinstance(getattr(full_results, key), np.ndarray):
+                        dl[key] = getattr(full_results, key).squeeze()
+                time_vals=dl.pop('t',None)
+                if time_vals is not None:
+                    #somehow, MPI complains about this, but not any of the other arrays...
+                    #dl['time']=time_vals
+                    if self.t[0]==0:  
+                        self.t=time_vals
+                    elif self.t!=time_vals:
+                        print('xtcav time array changed in run!')
         except:
-            dl['success']=0
+            pass
 
         return dl
 
