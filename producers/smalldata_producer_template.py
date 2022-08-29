@@ -158,7 +158,7 @@ def getSvdParams(run):
     return ret_dict
 
 
-# 5) autocorrelation
+# 5) AUTOCORRELATION
 def getAutocorrParams(run):
     if isinstance(run,str):
         run=int(run)
@@ -262,14 +262,17 @@ def define_dets(run):
                                         ROI=ROI,
                                         writeArea=ROIs[detname]['writeArea'],
                                         thresADU=ROIs[detname]['thresADU']))
+            
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
             if detname in az_pyfai:
                 det.addFunc(azav_pyfai(**az_pyfai[detname]))
-            # Photon count
+            
+            # psana photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
+            
             # Droplet algo
             if detname in drop:
                 if nData in drop[detame]:
@@ -279,6 +282,7 @@ def define_dets(run):
                 func = dropletFunc(**drop[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
                 det.addFunc(func)
+            
             # Droplet to photons
             if detname in drop2phot:
                 if 'nData' in drop2phot[detname]:
@@ -297,9 +301,11 @@ def define_dets(run):
                 drop2phot.addFunc(sparsify)
                 dropfunc.addFunc(drop2phot)
                 det.addFunc(dropfunc)
+            
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
+            
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
