@@ -133,8 +133,7 @@ def getDroplet2Photons(run):
         # droplet2Photons args
         d2p_dict['d2p'] = {
             'aduspphot': 162,
-            'mask': np.load('/reg/d/psdm/xpp/xppx49520/results/haoyuan/' +
-                             'check_data/haoyuan_epix1_roi.npy'),
+            # 'mask': np.load('path_to_mask.npy'),
             'cputime': True
         }
         d2p_dict['nData'] = 3e4
