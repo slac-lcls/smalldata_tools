@@ -274,7 +274,7 @@ def define_dets(run):
             
             # Droplet algo
             if detname in drop:
-                if nData in drop[detame]:
+                if nData in drop[detname]:
                     nData = drop[detname].pop('nData')
                 else:
                     nData = None
