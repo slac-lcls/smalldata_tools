@@ -20,7 +20,7 @@ class dropletFunc(DetObjectFunc):
     name: str (default: 'droplet') 
         Name used in hdf5 for data field
     thresADU: float (default = 10)
-        ADU threshold for droplets to be further processed
+        Threshold for droplets' total ADU to be further processed
     useRms (def True): 
         If True, threshold and thresholdLow are # of rms of data, otherwise ADU are used.
     relabel (def True): 
