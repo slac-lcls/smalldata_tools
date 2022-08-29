@@ -125,7 +125,7 @@ def getDroplet2Photons(run):
         d2p_dict = {}
         # droplet args
         d2p_dict['droplet'] = {
-            'theshold': 10,
+            'threshold': 10,
             'thresholdLow':3,
             'thresADU':10,
             'useRms':True
