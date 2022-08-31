@@ -15,7 +15,10 @@ from smalldata_tools.DetObjectFunc import DetObjectFunc
 
 class droplet2Photons(DetObjectFunc):
     """
-    Uses loopdrops to find the photons in the droplets (don't forget to append the ones)
+    Uses a greedy-guess algorithm to find photon in dropletized data. Must be 
+    used after running the droplet function.
+    Generally the ouput is passed to sparsify to save the photon coordinates
+    to the smalldata h5 file.
     
     Counts the number of photons at each (rounded) coordinate.
     """

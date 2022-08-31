@@ -112,21 +112,33 @@ def getDropletParams(run):
 
 
 # Droplet to photon algorithm (greedy guess)
-def getDroplet2PhotonsParams(run):
-    """ Parameters for droplet to photons algorithm
-    See droplet2Photons.py for more info
+def getDroplet2Photons(run):
+    """ Set parameter for droplet2photon analysis. The analysis uses two functions, each with their
+    own dictionary of argument:
+        1. droplet: see droplet.py for args documentation
+        2. photonize droplets: see droplet2Photons.py for args documentation
     """
     if isinstance(run,str):
         run=int(run)
     ret_dict = {}
     if run>0:
         d2p_dict = {}
-        d2p_dict['threshold'] = 15
-        d2p_dict['mask'] = None
-        d2p_dict['aduspphot'] = 162
-        d2p_dict['offset'] = 81
-        d2p_dict['nData'] = 1e5 # int or None: sparsify arg
-        ret_dict['epix_alc'] = d2p_dict
+        # droplet args
+        d2p_dict['droplet'] = {
+            'threshold': 10,
+            'thresholdLow':3,
+            'thresADU':10,
+            'useRms':True
+        }
+        # droplet2Photons args
+        d2p_dict['d2p'] = {
+            'aduspphot': 162,
+            # 'mask': np.load('path_to_mask.npy'),
+            'cputime': True
+        }
+        d2p_dict['nData'] = 3e4
+
+        ret_dict['epix_alc1'] = d2p_dict
     return ret_dict
 
 
@@ -145,7 +157,7 @@ def getSvdParams(run):
     return ret_dict
 
 
-# 5) autocorrelation
+# 5) AUTOCORRELATION
 def getAutocorrParams(run):
     if isinstance(run,str):
         run=int(run)
@@ -184,7 +196,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M'] # add detector here
+    detnames = ['jungfrau1M', 'epix_alc1'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -214,7 +226,7 @@ def define_dets(run):
         print(f'Can\'t instantiate Droplet args: {e}')
         drop = []
     try:
-        drop2phot = getDroplet2PhotonsParams(run)
+        drop2phot = getDroplet2Photons(run)
     except Exception as e:
         print(f'Can\'t instantiate Droplet2Photons args: {e}')
         drop2phot = []
@@ -249,35 +261,50 @@ def define_dets(run):
                                         ROI=ROI,
                                         writeArea=ROIs[detname]['writeArea'],
                                         thresADU=ROIs[detname]['thresADU']))
+            
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
             if detname in az_pyfai:
                 det.addFunc(azav_pyfai(**az_pyfai[detname]))
-            # Photon count
+            
+            # psana photon count
             if detname in phot:
                 det.addFunc(photonFunc(**phot[detname]))
+            
             # Droplet algo
             if detname in drop:
-                if nData in drop:
-                    nData = drop.pop('nData')
+                if nData in drop[detname]:
+                    nData = drop[detname].pop('nData')
                 else:
                     nData = None
                 func = dropletFunc(**drop[detname])
                 func.addFunc(roi.sparsifyFunc(nData=nData))
                 det.addFunc(func)
+            
             # Droplet to photons
             if detname in drop2phot:
-                if nData in drop2phot:
-                    nData = drop2phot.pop('nData')
+                if 'nData' in drop2phot[detname]:
+                    nData = drop2phot[detname].pop('nData')
                 else:
                     nData = None
-                func = droplet2Photons(**drop2phot[detname])
-                func.addFunc(roi.sparsifyFunc(nData=nData))
-                det.addFunc(func)
+                # getp droplet dict
+                droplet_dict = drop2phot[detname]['droplet']
+                #get droplet2Photon dict
+                d2p_dict = drop2phot[detname]['d2p']
+                dropfunc = dropletFunc(**droplet_dict)
+                drop2phot = droplet2Photons(**d2p_dict)
+                # add sparsify to put photon coord to file
+                sparsify = sparsifyFunc(nData=nData)
+                # assemble function stack: droplet -> photon -> sparsify
+                drop2phot.addFunc(sparsify)
+                dropfunc.addFunc(drop2phot)
+                det.addFunc(dropfunc)
+            
             # Autocorrelation
             if detname in auto:
                 det.addFunc(Autocorrelation(**auto[detname]))
+            
             # SVD waveform analysis
             if detname in svd:
                 det.addFunc(svdFit(**svd[detname]))
