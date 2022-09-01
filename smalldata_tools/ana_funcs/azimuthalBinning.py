@@ -97,8 +97,8 @@ class azimuthalBinning(DetObjectFunc):
         if func is None:
             self._setup()
             return
-        if func._x is not None: self.x = func._x.flatten()/1e3
-        if func._y is not None: self.y = func._y.flatten()/1e3
+        if getattr(func,'_x', None) is not None: self.x = func._x.flatten()/1e3
+        if getattr(func,'_y', None) is not None: self.y = func._y.flatten()/1e3
         maskattr='_mask'
         if not hasattr(func, maskattr):
             maskattr='mask'
