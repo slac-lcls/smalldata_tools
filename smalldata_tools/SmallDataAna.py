@@ -206,7 +206,7 @@ class Selection(object):
         self.removeCut(varName)
         self.cuts.append([varName, varmin, varmax])
         self._filter=None
-
+    
     def removeCut(self, varName):
         """
         remove a variable from the selection
@@ -1130,7 +1130,6 @@ class SmallDataAna(object):
                 #print('DEBUG check if someone just moved lxt  ot lxt_ttc')
                 print(epics_delay.std())
                 if epics_delay.std()!=0:
-                    addLxt = False #as epics_delay is already lxt.
                     nomDelay = epics_delay*1e12
 
         if addEnc and not self.hasKey('enc/lasDelay'):
@@ -1140,10 +1139,13 @@ class SmallDataAna(object):
                 nomDelay=nomDelay.copy()+self.getVar('enc/lasDelay')
 
         if addLxt and scanVar!='lxt':
-            if self.hasKey('epics/lxt_ttc'):
+            try:
                 nomDelay=nomDelay.copy()+self.getVar('epics/lxt_ttc')*1e12
-            elif self.hasKey('epics/lxt'):
-                nomDelay=nomDelay.copy()+self.getVar('epics/lxt')*1e12
+            except:
+                try:
+                    nomDelay=nomDelay.copy()+self.getVar('epics/lxt')*1e12
+                except:
+                    pass
 
         if use_ttCorr:
             #print('DEBUG adding ttcorr,nomdelay mean,std: ',ttCorr.mean(),nomDelay.mean(),ttCorr.std(),nomDelay.std())
