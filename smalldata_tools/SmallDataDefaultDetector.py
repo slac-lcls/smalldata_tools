@@ -471,6 +471,11 @@ class ttRawDetector(defaultDetector):
                 self.detname = cfgKey.alias()
                 defaultDetector.__init__(self, self.detname, 'ttRaw')
                 self.ttCfg = 'TimeToolV2'
+            elif cfgKey.type() == psana.TimeTool.ConfigV1:
+                ttCfg = env.configStore().get(psana.TimeTool.ConfigV1, cfgKey.src())
+                self.detname = cfgKey.alias()
+                defaultDetector.__init__(self, self.detname, 'ttRaw')
+                self.ttCfg = 'TimeToolV1'
             elif cfgKey.type() == psana.TimeTool.ConfigV3:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV3, cfgKey.src())
                 self.detname = cfgKey.alias()
@@ -542,20 +547,34 @@ class ttRawDetector(defaultDetector):
             
         if getattr(self, 'ttCfg', None) == 'TimeToolV2':
             ttDat = evt.get(psana.TimeTool.DataV2, psana.Source(self.detname))
+        elif getattr(self, 'ttCfg', None) == 'TimeToolV1':
+            ttDat = evt.get(psana.TimeTool.DataV1, psana.Source(self.detname))
         elif getattr(self, 'ttCfg', None) == 'TimeToolV3':
             ttDat = evt.get(psana.TimeTool.DataV3, psana.Source(self.detname))
+
         try:
-            ttData['tt_signal_pj']=ttDat.projected_signal().astype(dtype='uint32').astype(float)
-            ttData['tt_sideband_pj']=ttDat.projected_sideband().astype(dtype='uint32').astype(float)
-            ttData['tt_reference_pj']=ttDat.projected_reference().astype(dtype='uint32').astype(float)
-            if len(ttData['tt_sideband_pj'])==0:
+            ttDat_signal_pj = ttDat.projected_signal().astype(dtype='uint32').astype(float)
+        except:
+            ttDat_signal_pj = []
+        if len(ttDat_signal_pj > 0):
+            ttData['tt_signal_pj']=ttDat_signal_pj
+            try:
+                ttData['tt_sideband_pj']=ttDat.projected_sideband().astype(dtype='uint32').astype(float)
+                if len(ttData['tt_sideband_pj'])==0:
+                   ttData['tt_sideband_pj'] = np.empty(ttData['tt_signal_pj'].shape)
+                   ttData['tt_sideband_pj'][:] = np.nan
+            except:
                 ttData['tt_sideband_pj'] = np.empty(ttData['tt_signal_pj'].shape)
                 ttData['tt_sideband_pj'][:] = np.nan
-            if len(ttData['tt_reference_pj'])==0:
+            try:
+                ttData['tt_reference_pj']=ttDat.projected_reference().astype(dtype='uint32').astype(float)
+                if len(ttData['tt_reference_pj'])==0:
+                    ttData['tt_reference_pj'] = np.empty(ttData['tt_signal_pj'].shape) 
+                    ttData['tt_reference_pj'][:] = np.nan
+            except:
                 ttData['tt_reference_pj'] = np.empty(ttData['tt_signal_pj'].shape)
                 ttData['tt_reference_pj'][:] = np.nan
-        except:
-            pass
+
         ttImg = ttDet.raw(evt)
         if self.ttROI_signal is not None:
             ttData['tt_signal']=ttImg[self.ttROI_signal[0][0]:self.ttROI_signal[0][1],self.ttROI_signal[1][0]:self.ttROI_signal[1][1]].mean(axis=0)          
