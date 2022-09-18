@@ -883,7 +883,7 @@ def unsparsify(data, shape):
         dropdata = sparse.coo_matrix((data['data'],
                                       ((data['row']).astype(int),\
                                        (data['col']).astype(int))),\
-                                     shape=self._shape).toarray()
+                                     shape=shape).toarray()
         return dropdata
     if len(shape) > 2:
         dropdata=[]
