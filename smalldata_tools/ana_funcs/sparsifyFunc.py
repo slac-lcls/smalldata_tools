@@ -76,24 +76,25 @@ class sparsifyFunc(DetObjectFunc):
             
             
         #now fix shape of data in dict.
+        data_dict = ret_dict
+        ret_dict = {}
         if self.nData == 0:
-            data_dict = ret_dict
-            ret_dict = {}
             for key, d in data_dict.items():
+                if key[0]=='_': continue
                 ret_dict[f'ragged_{key}'] = d
         elif self.nData is not None:                
-            for key in ret_dict.keys():
-                if ret_dict[key].shape[0] >= self.nData:
-                    ret_dict[key]=ret_dict[key][:self.nData]
+            for key in data_dict.keys():
+                if key[0]=='_': continue
+                if data_dict[key].shape[0] >= self.nData:
+                    ret_dict[key]=data_dict[key][:self.nData]
                 else:
-                    ret_dict[key]=(np.append(ret_dict[key], np.zeros(self.nData-len(ret_dict[key]))))
+                    ret_dict[key]=(np.append(data_dict[key], np.zeros(self.nData-len(data_dict[key]))))
                     if self._saveint:
                         if not self._saveintadu and key == 'data': continue
                         ret_dict[key] = ret_dict[key].astype(int)
         else:
-            data_dict = ret_dict
-            ret_dict = {}
             for key, d in data_dict.items():
+                if key[0]=='_': continue
                 ret_dict[f'var_{key}'] = d
 
         subfuncResults = self.processFuncs()
