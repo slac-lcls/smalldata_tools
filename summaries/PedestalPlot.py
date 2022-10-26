@@ -411,7 +411,7 @@ def getPixelStatus(det_name, run):
 def countBadPixels(det_name, run):
     status = getPixelStatus(det_name, run)
     status_sum = status.sum(axis=0)
-    return (status_sum>0).sum()
+    return int((status_sum>0).sum())
 
 def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
                  detImgMaxSize=400):
