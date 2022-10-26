@@ -45,6 +45,19 @@ expname = args.experiment
 run = int(args.run)
 
 
+def postRunTable(runtable_data):
+    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
+    print('URL:',ws_url)
+    user=args.experiment[:3]+'opr'
+    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+        answer = reader.readline()
+    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
+                      auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+    #we might need to use this for non=current expetiments. Currently does not work in ARP
+    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
+    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
+    print(r)
+
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Ped=1e6
     max95Ped=-1e6
@@ -389,6 +402,15 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     
     return tabs
 
+def getPixelStatus(det_name, run):
+    det = psana.Detector(det_name)
+    return det.status(run)
+
+def countBadPixels(det_name, run):
+    status = getPixelStatus(det_name, run)
+    status_sum = status.sum(axis=0)
+    return (status_sum>0).sum()
+
 def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
                  detImgMaxSize=400):
     isLCLS2=False
@@ -412,6 +434,7 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
         run=thisrun
 
     tabs = None
+    runTableData = {}
     for det_name, alias in zip(det_names, aliases):
         #print(det_name, alias)
         if alias == '':
@@ -420,6 +443,7 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
         else:
             tabs = allPlots(alias, run, make_ped_imgs=make_ped_imgs, 
                             make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
+        runTableData[f'{det_name}_n_bad_pixels'] = countBadPixels(det_name, run)
       
     if save_elog:
         elogDir = '/reg/d/psdm/%s/%s/stats/summary/Pedestals/Pedestals_Run%03d'%(expname[0:3],expname,runnum)
@@ -429,6 +453,8 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
             os.makedirs(elogDir)
         print('Made Directory to save data:', elogDir)
         tabs.save(('%s/report.html'%elogDir))
+
+        postRunTable(runTableData)
         
     return tabs
 
