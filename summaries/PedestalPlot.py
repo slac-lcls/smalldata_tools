@@ -9,6 +9,7 @@ import os
 import argparse
 import sys
 import logging
+import requests
 import socket
 try:
     basestring
