@@ -10,6 +10,7 @@ import argparse
 import sys
 import logging
 import requests
+from requests.auth import HTTPBasicAuth
 import socket
 try:
     basestring
