@@ -62,7 +62,7 @@ do
 			;;
 		-c|--cores)
 			CORES="$2"
-                        POSITIONAL+=("$1 $2")
+            POSITIONAL+=("$1 $2")
 			shift
 			shift
 			;;

@@ -109,7 +109,7 @@ def xppDetectors(beamCodes=[[-137],[91]]):
         dets.append(adcDetector('adc','adc'))
     except:
         print('did not find slow Adc detector')
-    dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
+    dets.append(ttDetector(baseName='XPP:TT:01:'))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
     dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))

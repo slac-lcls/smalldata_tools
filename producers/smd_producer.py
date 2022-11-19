@@ -462,7 +462,7 @@ if args.full:
             thisDet.addFunc(fullROI)
             dets.append(thisDet)
         except:
-            pass
+           pass
 
 
 # save detector config data

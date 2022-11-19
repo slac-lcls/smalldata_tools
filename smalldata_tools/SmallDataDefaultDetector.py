@@ -837,11 +837,11 @@ class genlcls2Detector(defaultDetector):
         dl={}
         raw =getattr( self.det, 'raw')
         if raw is not None:
-           fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
-           for field in fields:
-               if getattr(raw, field)(evt) is None: continue
-               dl[field]=getattr(raw, field)(evt)
-               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+            fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+            for field in fields:
+                if getattr(raw, field)(evt) is None: continue
+                dl[field]=getattr(raw, field)(evt)
+                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
 
 class ttlcls2Detector(defaultDetector):
