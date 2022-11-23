@@ -378,6 +378,9 @@ if ds.rank is 0:
 ## Setting up the default detectors
 ##
 ########################################################## 
+
+start_setup_dets = time.time()
+
 default_dets = defaultDetectors(hutch.lower())
 if args.xtcav and not args.norecorder:
     #default_dets.append(xtcavDetector('xtcav','xtcav',method='COM'))
@@ -480,12 +483,14 @@ for det in dets:
 Config={'UserDataCfg':userDataCfg}
 small_data.save(Config)
 
-
+end_setup_dets = time.time()
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
+
+start_evt_loop = time.time()
 
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
@@ -562,6 +567,7 @@ for evt_num, evt in enumerate(ds.events()):
             elif ds.rank == 0:
                 print('Current Event / rank :', evt_num+1)
 
+end_evt_loop = time.time()
 
 sumDict={'Sums': {}}
 for det in dets:
@@ -571,6 +577,18 @@ for det in dets:
 if len(sumDict['Sums'].keys())>0:
 #     print(sumDict)
     small_data.save(sumDict)
+
+# Print duration summary
+dets_time_start = (start_setup_dets-start_job)/60
+dets_time_end = (end_setup_dets-start_job)/60
+evt_time_start = (start_evt_loop-start_job)/60
+evt_time_end = (end_evt_loop-start_job)/60
+print(f"##### Timing benchmarks core {ds.rank}: ##### """)
+print(f'Setup dets: \n\tStart: {dets_time_start:.2f} min\n\tEnd: {dets_time_end:.2f} min')
+print(f'\tDuration:{dets_time_end-dets_time_start:.2f}')
+print(f'Event loop: \n\tStart: {evt_time_start:.2f} min\n\tEnd: {evt_time_end:.2f} min')
+print(f'\tDuration:{evt_time_end-evt_time_start:.2f}')
+print('\n')
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 end_job = time.time()
