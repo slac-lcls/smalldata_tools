@@ -62,7 +62,7 @@ do
 			;;
 		-c|--cores)
 			CORES="$2"
-                        POSITIONAL+=("$1 $2")
+            POSITIONAL+=("$1 $2")
 			shift
 			shift
 			;;
@@ -76,6 +76,11 @@ do
             POSITIONAL+=("$1")
 			shift
 			;;
+        --output)
+            OUTPUT="$2"
+            shift
+            shift
+            ;;
         *)
             POSITIONAL+=("$1")
 			shift
@@ -109,6 +114,10 @@ fi
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 if [ -v INTERACTIVE ]; then
     $MYDIR/submit_small_data.sh $@
+    exit 0
+fi
+if [ -v OUTPUT ]; then
+    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --output $OUTPUT $MYDIR/submit_small_data.sh $@
     exit 0
 fi
 
