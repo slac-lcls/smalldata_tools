@@ -80,6 +80,34 @@ def DetObject(srcName, env, run, **kwargs):
     #return None
 
 class DetObjectClass(object):
+    # These constants are essentially the inverse of the detector_classes dict above.
+    # Where are these really defined?  PSCalib!  In src/GlobalUtils.py.
+    CsPad2M = 1           # CSPAD
+    CsPad = 2             # CSPAD2X2
+    Pulnix = 5
+    Opal = 6              # OPAL1000
+    Opal2k = 7
+    Opal4k = 8
+    Opal8k = 9
+    Orca = 10
+    Epix = 13
+    AndOr = 15
+    Acqiris = 16
+    Rayonix = 19
+    Fli = 23
+    Jungfrau = 26
+    Zyla = 27
+    ControlsCamera = 28
+    Epix10k = 29
+    Icarus = 30
+    Epix10k2M = 32
+    Epix10k2M_quad = 33
+    Camera = 34           # STREAK?
+    iStar = 36
+    Alvium = 37
+    OceanOptics = 98      # ?
+    Imp = 99              # ?
+    
     def __init__(self,det,env,run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
         self._src=det.source
@@ -114,11 +142,11 @@ class DetObjectClass(object):
         if self.ped is not None:
             self.imgShape = self.ped.shape
             try:
-                self.imgShape = self.det.image(self.run, self.ped)
+                self.imgShape = self.det.image(self.run, self.ped).shape
             except:
                 if len(self.ped.shape)>2:
                     try:
-                        self.imgShape = self.det.image(ped[0], self.run)
+                        self.imgShape = self.det.image(ped[0], self.run).shape
                     except:         
                         print('multi dim pedestal & image function does do nothing: multi gain detector.....')
                         self.imgShape=self.ped.shape[1:]
@@ -396,11 +424,11 @@ class OpalObject(CameraObject):
             if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
                 #if srcName=='xtcav':
                 #  self.ped = np.zeros([1024,1024])
-                if det.dettype == 6:
+                if det.dettype == DetObjectClass.Opal:
                     self.ped = np.zeros([1024,1024])
                 else:
                     self.ped = None
-        if det.dettype == 6:
+        if det.dettype == DetObjectClass.Opal:
             self.imgShape = self.ped.shape
             if self.x is None:
                 self._get_coords_from_ped()
@@ -1070,7 +1098,7 @@ class Epix10k2MObject(TiledCameraObject):
         self.ped = self.ped.squeeze()
         if self.rms is None or self.rms.shape!=self.ped.shape:
             self.rms=np.ones_like(self.ped)
-        self.imgShape=self.det.image(run, self.ped[0])
+        self.imgShape=self.det.image(run, self.ped[0]).shape
         self._gainSwitching = True                
 
         ##stuff for ghost correction
@@ -1297,11 +1325,11 @@ class RayonixObject(CameraObject):
           self.pixelsize=[170e-3/3840*binning] #needs to change for bigger rayonix.
         try:
           self.ped = np.zeros([rcfg.width(), rcfg.height()])
-          self.imgShape = [rcfg.width(), rcfg.height()]
+          self.imgShape = (rcfg.width(), rcfg.height())
         except: 
           npix = int(170e-3/self.pixelsize[0])
           self.ped = np.zeros([npix, npix])
-          self.imgShape = [npix, npix]
+          self.imgShape = (npix, npix)
         if self.x is None:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
