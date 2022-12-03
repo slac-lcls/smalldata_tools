@@ -341,6 +341,7 @@ class ttDetector(defaultDetector):
             for det in psana.DetNames('epics'):
                 if 'FLTPOSFWHM' in det[0]:
                     baseName = det[0].split('FLTPOSFWHM')[0] # guess tt detector prefix
+                    break
         self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
         self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
         self.pvs=[]
