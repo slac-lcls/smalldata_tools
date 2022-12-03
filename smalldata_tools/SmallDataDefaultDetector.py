@@ -330,16 +330,17 @@ class feeBldDetector(defaultDetector):
         return dl
 
 class ttDetector(defaultDetector):
-    def __init__(self, name='tt'):
+    def __init__(self, name='tt', baseName=None):
         """
         Throughout LCLS history, different tt prefix have been used. This class aims at 
         get the right timetool automatically.
         """
         self.name = name
         self.detname='epics'
-        for det in psana.DetNames('epics'):
-            if 'FLTPOSFWHM' in det[0]:
-                baseName = det[0].split('FLTPOSFWHM')[0] # guess tt detector prefix
+        if baseName is None:
+            for det in psana.DetNames('epics'):
+                if 'FLTPOSFWHM' in det[0]:
+                    baseName = det[0].split('FLTPOSFWHM')[0] # guess tt detector prefix
         self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
         self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
         self.pvs=[]
