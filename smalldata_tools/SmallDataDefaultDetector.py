@@ -836,12 +836,14 @@ class genlcls2Detector(defaultDetector):
     def data(self, evt):
         dl={}
         raw =getattr( self.det, 'raw')
+        vetolist = ['TypeId', 'Version', 'config']
         if raw is not None:
-            fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
-            for field in fields:
-                if getattr(raw, field)(evt) is None: continue
-                dl[field]=getattr(raw, field)(evt)
-                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+           fields = [ field for field in dir(raw) if (field[0]!='_' and field not in vetolist) ]
+           #print(self.name, fields)
+           for field in fields:
+               if getattr(raw, field)(evt) is None: continue
+               dl[field]=getattr(raw, field)(evt)
+               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
 
 class ttlcls2Detector(defaultDetector):
@@ -886,7 +888,7 @@ class fimfexDetector(defaultDetector):
     def data(self, evt):
         dl={}
         fex=getattr( self.det, 'fex')
-        veto_fields = []#'TypeId', 'Version', 'calib', 'image', 'raw' ]
+        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:
