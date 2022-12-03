@@ -85,7 +85,7 @@ def sxrDetectors(beamCodes=[[162],[91]]):
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(epicsDetector(PVlist=['GATT:FEE1:310:P_DES','GATT:FEE1:310:R_ACT','GMD_ACQ_RAW']))
-    dets.append(ttDetector(baseName='TTSPEC:'))
+    dets.append(ttDetector())
     dets.append(GMDDetector())
     return dets
 
@@ -109,7 +109,7 @@ def xppDetectors(beamCodes=[[-137],[91]]):
         dets.append(adcDetector('adc','adc'))
     except:
         print('did not find slow Adc detector')
-    dets.append(ttDetector(baseName='XPP:TIMETOOL:'))
+    dets.append(ttDetector())
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
     dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))
@@ -150,7 +150,7 @@ def xcsDetectors(beamCodes=[[-137],[89]]):
     dets.append(bmmonDetector('HFX-DG2-BMMON','ipm2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
-    dets.append(ttDetector(baseName='XCS:TIMETOOL:'))
+    dets.append(ttDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(xtcavDetector('xtcav','xtcav'))
     try:
@@ -170,7 +170,7 @@ def mfxDetectors(beamCodes=[[-137],[]]):
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(aiDetector('MFX-AIN-01','ai')) 
-    dets.append(ttDetector(baseName='MFX:TIMETOOL:'))
+    dets.append(ttDetector())
     dets.append(bmmonDetector('MFX-DG1-BMMON','ipm_dg1'))
     dets.append(bmmonDetector('MFX-DG2-BMMON','ipm_dg2'))
     dets.append(damageDetector())
@@ -193,7 +193,7 @@ def cxiDetectors(beamCodes=[[-137],[184]]):
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
-    dets.append(ttDetector(baseName='CXI:TIMETOOL:'))
+    dets.append(ttDetector())
     dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(impDetector('Sc1Imp'))
@@ -226,7 +226,7 @@ def mecDetectors(beamCodes=[[-137],[-182]]):
     dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-02','xt2_ipm2'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-03','xt2_ipm3'))
-    dets.append(ttDetector(baseName='MEC:TIMETOOL:'))
+    dets.append(ttDetector())
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(xtcavDetector('xtcav','xtcav'))
