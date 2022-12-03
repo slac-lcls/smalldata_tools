@@ -583,12 +583,12 @@ dets_time_start = (start_setup_dets-start_job)/60
 dets_time_end = (end_setup_dets-start_job)/60
 evt_time_start = (start_evt_loop-start_job)/60
 evt_time_end = (end_evt_loop-start_job)/60
-print(f"##### Timing benchmarks core {ds.rank}: ##### """)
-print(f'Setup dets: \n\tStart: {dets_time_start:.2f} min\n\tEnd: {dets_time_end:.2f} min')
-print(f'\tDuration:{dets_time_end-dets_time_start:.2f}')
-print(f'Event loop: \n\tStart: {evt_time_start:.2f} min\n\tEnd: {evt_time_end:.2f} min')
-print(f'\tDuration:{evt_time_end-evt_time_start:.2f}')
-print('\n')
+logger.debug(f"##### Timing benchmarks core {ds.rank}: ##### """)
+logger.debugprint(f'Setup dets: \n\tStart: {dets_time_start:.2f} min\n\tEnd: {dets_time_end:.2f} min')
+logger.debug(f'\tDuration:{dets_time_end-dets_time_start:.2f}')
+logger.debug(f'Event loop: \n\tStart: {evt_time_start:.2f} min\n\tEnd: {evt_time_end:.2f} min')
+logger.debug(f'\tDuration:{evt_time_end-evt_time_start:.2f}')
+logger.debug('\n')
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 end_job = time.time()
