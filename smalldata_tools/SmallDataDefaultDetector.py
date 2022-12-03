@@ -330,17 +330,30 @@ class feeBldDetector(defaultDetector):
         return dl
 
 class ttDetector(defaultDetector):
-    def __init__(self, name='tt', baseName='TTSPEC:'):
+    def __init__(self, name='tt', baseName=None):
+        """
+        Throughout LCLS history, different tt prefix have been used. This class aims at 
+        get the right timetool automatically.
+        """
         self.name = name
         self.detname='epics'
-        self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
-        self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
-        self.pvs=[]
-        for pv in self.PVlist:
-            try:
-                self.pvs.append(psana.Detector(pv))
-            except:
-                print('could not find timetool EPICS PV %s in data'%pv)
+        if baseName is None:
+            for det in psana.DetNames('epics'):
+                if 'FLTPOSFWHM' in det[0]:
+                    baseName = det[0].split('FLTPOSFWHM')[0] # guess tt detector prefix
+                    break
+        if baseName is None:
+            print('Timetool detector not found in data.')
+            self.pvs = []
+        else:
+            self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
+            self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
+            self.pvs = []
+            for pv in self.PVlist:
+                try:
+                    self.pvs.append(psana.Detector(pv))
+                except:
+                    print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
     
     def inRun(self):
@@ -836,8 +849,10 @@ class genlcls2Detector(defaultDetector):
     def data(self, evt):
         dl={}
         raw =getattr( self.det, 'raw')
+        vetolist = ['TypeId', 'Version', 'config']
         if raw is not None:
-           fields = [ field for field in dir(raw) if (field[0]!='_' and field!='TypeId' and field!='Version') ]
+           fields = [ field for field in dir(raw) if (field[0]!='_' and field not in vetolist) ]
+           #print(self.name, fields)
            for field in fields:
                if getattr(raw, field)(evt) is None: continue
                dl[field]=getattr(raw, field)(evt)
@@ -886,7 +901,7 @@ class fimfexDetector(defaultDetector):
     def data(self, evt):
         dl={}
         fex=getattr( self.det, 'fex')
-        veto_fields = []#'TypeId', 'Version', 'calib', 'image', 'raw' ]
+        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:

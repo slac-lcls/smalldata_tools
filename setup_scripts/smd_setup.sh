@@ -130,7 +130,9 @@ if [ $FFB -eq 1 ]; then
 fi
 
 
-# Create h5 directories
+# Create h5 and plot directories
+mkdir $PSANA_BASE/stats/summary/Cube
+
 if [ $FFB -eq 1 ]; then
     mkdir -p $FFB_BASE/hdf5/smalldata
     mkdir -p $FFB_BASE/hdf5/smalldata/cube

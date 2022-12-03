@@ -14,8 +14,11 @@ class azav_pyfai(DetObjectFunc):
     name: str
         Function name
     
-    mask: array, optional
+    userMask: array, optional
         User defined mask. 1 for valid pixels.
+
+    thres: int, float, optional
+        Pixel intensity threshold.
     
     return2d: bool, optional
         Return a 2d (q,phi). Default: False
@@ -42,10 +45,11 @@ class azav_pyfai(DetObjectFunc):
     """
     
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','azav')
+        self._name = kwargs.get('name','pyfai')
         super(azav_pyfai, self).__init__(**kwargs)
         
         self.mask = kwargs.pop('userMask',None)
+        self.thresold = kwargs.pop('thres',None)
         self.return2d = kwargs.pop('return2d','False')
         
         # azimuthal integrator argument
@@ -118,6 +122,8 @@ class azav_pyfai(DetObjectFunc):
         return
         
     def process(self, data):
+        if self.threshold is not None:
+            data[data<threshold] = 0
         if data.ndim==3:
             data = image_from_dxy(data, self.ix, self.iy)
         out = self._process(data)
