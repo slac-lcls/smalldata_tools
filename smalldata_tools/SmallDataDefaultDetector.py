@@ -345,14 +345,15 @@ class ttDetector(defaultDetector):
         if baseName is None:
             print('Timetool detector not found in data.')
             self.pvs = []
-        self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
-        self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
-        self.pvs = []
-        for pv in self.PVlist:
-            try:
-                self.pvs.append(psana.Detector(pv))
-            except:
-                print('could not find timetool EPICS PV %s in data'%pv)
+        else:
+            self.ttNames = ['FLTPOS','FLTPOS_PS','AMPL','FLTPOSFWHM','REFAMPL','AMPLNXT']
+            self.PVlist = [ baseName+pvname for pvname in self.ttNames ]
+            self.pvs = []
+            for pv in self.PVlist:
+                try:
+                    self.pvs.append(psana.Detector(pv))
+                except:
+                    print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
     
     def inRun(self):
