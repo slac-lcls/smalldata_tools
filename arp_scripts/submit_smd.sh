@@ -108,7 +108,7 @@ fi
 #need to export this so that it can be used in the follow-up script even in SLURMx
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 if [ -v INTERACTIVE ]; then
-    $MYDIR/submit_small_data.sh $@
+    $MYDIR/submit_small_data.sh -c $CORES $@
     exit 0
 fi
 
