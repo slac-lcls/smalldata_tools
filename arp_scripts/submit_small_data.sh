@@ -114,7 +114,7 @@ if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
     python -u $ABS_PATH/$PYTHONEXE $@
 else
     if [ -v INTERACTIVE ]; then
-        mpirun python -u $ABS_PATH/$PYTHONEXE $@
+        mpirun -np $CORES python -u $ABS_PATH/$PYTHONEXE $@
     else
         mpirun python -u $ABS_PATH/$PYTHONEXE $@
     fi
