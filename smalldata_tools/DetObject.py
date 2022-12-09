@@ -119,6 +119,7 @@ class DetObjectClass(object):
         self.maskCentral = kwargs.get('maskCentral', True)
 
         self.dataAccessTime=0.
+        self.rawShape = None
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
@@ -152,6 +153,15 @@ class DetObjectClass(object):
                         self.imgShape=self.ped.shape[1:]
         else:
             self.imgShape = None
+
+    #
+    # In what follows, we should call this to set the raw shape whenever we set self.evt.dat.
+    # It would be nice to do this once at the beginning of time, but probably better not to
+    # search for an event with data.
+    #
+    def _getRawShape(self):
+        if self.rawShape is None and self.evt is not None and self.evt.dat is not None:
+            self.rawShape = self.evt.dat.shape
 
     def _get_coords_from_ped(self):
         self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0]*1e6, self.pixelsize[0]*1e6)
@@ -307,6 +317,7 @@ class WaveformObject(DetObjectClass):
         self.mask = None
         self.wfx = None
         self.gain = None
+
     def getData(self, evt):
         super(WaveformObject, self).getData(evt)
         if self.wfx is None:
@@ -315,11 +326,13 @@ class WaveformObject(DetObjectClass):
 class GenericWFObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
         super(GenericWFObject, self).__init__(det,env,run, **kwargs)
+
     def getData(self, evt):
         super(GenericWFObject, self).getData(evt)
         self.evt.dat = self.det.raw(evt)
         if isinstance(self.evt.dat, list):
             self.evt.dat = np.array(self.evt.dat)
+        self._getRawShape()
 
 class AcqirisObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -335,9 +348,11 @@ class AcqirisObject(WaveformObject):
         for c in cfg.vert():
             self.fullScale.append(c.fullScale())
             self.offset.append(c.offset())
+
     def getData(self, evt):
         super(AcqirisObject, self).getData(evt)
         self.evt.dat = self.det.waveform(evt)
+        self._getRawShape()
 
 class OceanOpticsObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -348,6 +363,7 @@ class OceanOpticsObject(WaveformObject):
         self.evt.dat = self.det.intensity(evt)
         if self.wfx is None:
             self.wfx = self.det.wavelength(evt)
+        self._getRawShape()
 
 class ImpObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -356,6 +372,7 @@ class ImpObject(WaveformObject):
     def getData(self, evt):
         super(ImpObject, self).getData(evt)
         self.evt.dat = self.det.waveform(evt)
+        self._getRawShape()
         
 class CameraObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
@@ -405,11 +422,10 @@ class CameraObject(DetObjectClass):
                         self.evt.dat*=self.gain   
         elif self.common_mode%100==30:
             self.evt.dat = self.det.calib(evt)
-
         #override gain if desired
         if self.local_gain is not None and self.common_mode in [0,30] and self._gainSwitching is False and self.local_gain.shape == self.evt.dat.shape:
             self.evt.dat*=self.local_gain   #apply own gain
-        
+        self._getRawShape()
 
 class OpalObject(CameraObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -677,6 +693,7 @@ class IcarusObject(CameraObject):
             self.evt.__dict__['write_cmUnb'] = cmVals
             self._applyMask()
             #gain is ignored here for now
+            self._getRawShape()
 
 class JungfrauObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
@@ -698,6 +715,7 @@ class JungfrauObject(TiledCameraObject):
             pass
         self._gainSwitching = True
         #self._common_mode_list.append()
+
     def getData(self, evt):
         super(JungfrauObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
@@ -718,6 +736,7 @@ class JungfrauObject(TiledCameraObject):
         #correct for area of pixels.
         if self.areas is not None:
             self.evt.dat/=self.areas
+        self._getRawShape()
 
 class CsPadObject(TiledCameraObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -740,6 +759,7 @@ class CsPadObject(TiledCameraObject):
           self.gain_mask*=6.85
           self.gain_mask[self.gain_mask==0]=1.
           self.gain*=self.gain_mask
+
     def getData(self, evt):
         super(CsPadObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
@@ -770,6 +790,7 @@ class CsPadObject(TiledCameraObject):
         #correct for area of pixels.
         if self.areas is not None:
             self.evt.dat/=self.areas
+        self._getRawShape()
 
 class CsPad2MObject(CsPadObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -787,6 +808,7 @@ class CsPad2MObject(CsPadObject):
                  self.imgShape = self.det.image(run, self.ped).shape
             except:
                  self.imgShape = self.ped.shape
+
     def getData(self, evt):
         super(CsPad2MObject, self).getData(evt)
 
@@ -877,6 +899,7 @@ class EpixObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalV']  = envRow[8]*0.001
         except:
             pass
+        self._getRawShape()
 
 #
 # as a
@@ -1037,6 +1060,7 @@ class Epix10kObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalTemp']  =  np.array(digtemp) 
         except:
             pass
+        self._getRawShape()
 
 class Epix10k2MObject(TiledCameraObject): 
     def __init__(self, det, env, run, **kwargs):
@@ -1307,6 +1331,7 @@ class Epix10k2MObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalTemp']  =  np.array(digtemp) 
         except:
             pass
+        self._getRawShape()
 
 #needs to be retrofitted to work with both rayonix cameras.
 class RayonixObject(CameraObject): 
@@ -1460,7 +1485,7 @@ class UxiObject(DetObjectClass):
         #self.evt.__dict__['env_cm_RowMed'] = cmValues
         #self.evt.__dict__['env_cm_RowMed_used'] = cmValues_used
         #self.evt.dat = corrImg
-
+        self._getRawShape()
         return
 
 ##---------------------------------------------------------------------
