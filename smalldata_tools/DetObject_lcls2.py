@@ -31,7 +31,7 @@ def DetObject_lcls2(srcName, run, **kwargs):
         'wave8':  Wave8Object,
         'pv':   PVObject_lcls2
     }
-    print('dettype: ', det._dettype)
+    #print('dettype: ', det._dettype)
     cls = detector_classes[det._dettype]
     return cls(det, run, **kwargs)
     ##should throw an exception here.
@@ -402,7 +402,8 @@ class Wave8Object(WaveformObject_lcls2):
 
     def getData(self, evt):
         super(Wave8Object, self).getData(evt)
-        self.evt.dat = [ getattr(self.det.raw, name)(evt) for name in self._chan_names]
+        vetolist=['config']
+        self.evt.dat = [ getattr(self.det.raw, name)(evt) for name in self._chan_names if name not in vetolist]
         try:
             self.evt.dat = np.array(self.evt.dat)
         except:
