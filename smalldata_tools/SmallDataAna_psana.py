@@ -34,7 +34,7 @@ except NameError:
 import smalldata_tools.SmallDataAna as sda
 
 from smalldata_tools.BaseSmallDataAna_psana import BaseSmallDataAna_psana
-from smalldata_tools.DetObject import DetObject
+from smalldata_tools.DetObject import DetObject, DetObjectClass
 from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
@@ -654,17 +654,17 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         if dirname == 'calib':
             #detname, img, avImage = self.getAvImage(detname=None)
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
-            if det.dettype==2:
+            if det.dettype==DetObjectClass.CsPad:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype==1:
+            elif det.dettype==DetObjectClass.CsPad2M:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==13:
+            elif det.dettype==DetObjectClass.Epix:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype==19:
+            elif det.dettype==DetObjectClass.Rayonix:
                 dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==29:
+            elif det.dettype==DetObjectClass.Epix10k:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==32:
+            elif det.dettype==DetObjectClass.Epix10k2M:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
 
         if not os.path.exists(dirname+'pedestals'):
@@ -767,11 +767,11 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         else:
             plt.subplot(gs[1]).imshow(image_mask,clim=[plotMin,plotMax])
 
-        if  det.dettype == 2:
+        if  det.dettype == DetObjectClass.CsPad:
             mask=mask.reshape(2,185*388).transpose(1,0)
-        elif det.dettype == 1:
+        elif det.dettype == DetObjectClass.CsPad2M:
             mask=mask.reshape(32*185,388)
-        elif det.dettype == 13:
+        elif det.dettype == DetObjectClass.Epix:
             mask=mask.reshape(704,768)
 
         #2x2 save as 71780 lines, 2 entries
@@ -779,15 +779,15 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             mask = (~(mask.astype(bool))).astype(int)
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
-            if det.dettype==2:
+            if det.dettype==DetObjectClass.CsPad:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)
-            elif det.dettype==2:
+            elif det.dettype==DetObjectClass.CsPad2M:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==13:
+            elif det.dettype==DetObjectClass.Epix:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==29:
+            elif det.dettype==DetObjectClass.Epix10k:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==32:
+            elif det.dettype==DetObjectClass.Epix10k2M:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
@@ -814,7 +814,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         np.seterr(divide='ignore', invalid='ignore')
         hstPed=[]
         hstRms=[]
-        if det.dettype==26 or det.dettype==30:
+        if det.dettype==DetObjectClass.Jungfrau or det.dettype==DetObjectClass.Icarus:
             for ped,frms in zip(pedestals, rms):
                 hstPed.append(np.histogram(ped.flatten(), np.arange(0, pedestals.max()*1.05)))
                 hstRms.append(np.histogram(frms.flatten(), np.arange(0, rms.max()*1.05,0.05)))
@@ -823,13 +823,13 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
             hstRms.append(np.histogram(rms.flatten(), np.arange(0, rms.max()*1.05,0.05)))
 
         if needsGeo:
-            if det.dettype==26:
+            if det.dettype==DetObjectClass.Jungfrau:
                 pedImg = det.image(self.run,pedestals[0])
                 rmsImg = det.image(self.run,rms[0])
                 if pedImg is None and pedestals.shape[1]==1:
                     pedImg = pedestals[0].squeeze()
                     rmsImg = rms[0].squeeze()
-            elif det.dettype==30:
+            elif det.dettype==DetObjectClass.Icarus:
                 pedImg = pedestals[0]; rmsImg = rms[0]
                 for iFrame, pedf, rmsf in zip(itertools.count(), pedestals, rms):
                     if iFrame>0:
@@ -869,7 +869,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         for i in range(len(hstPed)):
             plt.subplot(gsPed[1]).plot(hstPed[i][1][:-1],np.log(hstPed[i][0]),'o')
             plt.subplot(gsPed[3]).plot(hstRms[i][1][:-1],np.log(hstRms[i][0]),'o')
-        if det.dettype==26:
+        if det.dettype==DetObjectClass.Jungfrau:
             im0 = plt.subplot(gsPed[0]).imshow(pedImg,clim=[np.nanpercentile(pedestals[0],1),np.nanpercentile(pedestals[0],99)])
             cbar0 = plt.colorbar(im0)
             im2 = plt.subplot(gsPed[2]).imshow(rmsImg,clim=[np.nanpercentile(rms[0],1),np.nanpercentile(rms[0],99)])
@@ -1264,7 +1264,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                         addToHdf5(grp, 'ix', det.ix)
                         addToHdf5(grp, 'iy', det.iy)
                 else:
-                    if det.det.dettype==26:
+                    if det.det.dettype==DetObjectClass.Jungfrau:
                         addToHdf5(grp, 'ped', det.det.image(self.run,det.ped[0]))
                         addToHdf5(grp, 'rms', det.det.image(self.run,det.rms[0]))
                         addToHdf5(grp, 'gain', det.det.image(self.run,det.gain[0]))
