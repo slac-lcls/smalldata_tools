@@ -1111,7 +1111,7 @@ class BaseSmallDataAna_psana(object):
         if extMask is None:
             prompt = "Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n"
         else:
-            prompt = "Does the ext. mask have 0 values for masked pixels [y/n] (n: non-zero pixels are rejected)?\n"
+            prompt = "Does the ext. mask have 0 for masked pixels [y/n] (n: non-zero pixels are rejected)?\n"
         if raw_input(prompt) in ["y","Y"]:
             totmask = (totmask.astype(bool)).astype(int)
         else:
