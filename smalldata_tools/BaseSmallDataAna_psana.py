@@ -1108,7 +1108,7 @@ class BaseSmallDataAna_psana(object):
         for thismask in mask[1:]:
             totmask = np.logical_or(totmask,thismask)
 
-        if extMask is not None:
+        if extMask is None:
             prompt = "Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n"
         else:
             prompt = "Does the ext. mask have 0 values for masked pixels [y/n] (n: non-zero pixels are rejected)?\n"
