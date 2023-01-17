@@ -767,7 +767,7 @@ class BaseSmallDataAna_psana(object):
         return
     
             
-    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
+    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1, extMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
 
         plotMax = np.nanpercentile(img, limits[1])
@@ -814,7 +814,7 @@ class BaseSmallDataAna_psana(object):
         
         mask=[]
         mask_r_nda=None
-        select=True
+        select=extMask is None  # Short-circuit the loop if given an external mask.
         while select:
             fig=plt.figure(figsize=(12,10))
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
@@ -1090,13 +1090,29 @@ class BaseSmallDataAna_psana(object):
                 select = False
 
         #end of mask creating loop
+
+        if extMask is not None:
+            if extMask.shape != self.__dict__[detname].rawShape:
+                print("extMask is the wrong shape: %s actual, %s desired." % (
+                      extMask.shape, self.__dict__[detname].rawShape))
+                return None
+            if extMask.dtype != np.dtype('int64'):
+                print("extMask is the wrong type: %s actual, %s desired." % (
+                      extMask.shape, np.dtype('int64')))
+                return None
+            mask = [extMask]
+
         if len(mask)==0:
             return
         totmask = mask[0]
         for thismask in mask[1:]:
             totmask = np.logical_or(totmask,thismask)
 
-        if raw_input("Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n") in ["y","Y"]:
+        if extMask is None:
+            prompt = "Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n"
+        else:
+            prompt = "Does the ext. mask have 0 for masked pixels [y/n] (n: non-zero pixels are rejected)?\n"
+        if raw_input(prompt) in ["y","Y"]:
             totmask = (totmask.astype(bool)).astype(int)
         else:
             totmask = (~(totmask.astype(bool))).astype(int)
