@@ -1084,7 +1084,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
 
 
     def compareCommonMode(self, detname='None',common_modes=[], numEvts=100, thresADU=0., thresRms=0., plotWith=None):
-        if detname is 'None':
+        if detname == 'None':
             detname = self.addDetInfo(detname=detname)
             if detname == 'None':
                 print('need detector name as input! ')

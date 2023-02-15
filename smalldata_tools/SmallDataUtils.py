@@ -262,7 +262,6 @@ def diaDetectors():
 def detDetectors():
     return []
 
-
 def detData(detList, evt):
     #mpiDataSource Issue? cpo, tjlane
     #if one of the keys here contains an empty dict (say: no user PV that are in the data)
@@ -275,6 +274,18 @@ def detData(detList, evt):
         except:
             #print('could not get data in this event for detector ',det.name)
             pass
+    return data
+
+def detOnceData(detList, ds):
+    evt = ds.events().__next__()
+    data = detData(detList, evt)
+    # Future expansion: if we've missed something, find it in the archiver?
+    # Look at the timestamp of evt.
+    return data
+
+def lcls2_detOnceData(detList, ds, data):
+    # Future expansion: if we've missed something, find it in the archiver?
+    # ts = ds.events().__next__()._seconds + 631152000
     return data
 
 def setParameter(detList, Params, detName='tt'):

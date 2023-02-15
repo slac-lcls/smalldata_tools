@@ -159,6 +159,7 @@ def define_dets(run):
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = []
+epicsOncePV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
 ttCalib=[]
@@ -204,7 +205,7 @@ if rank==0: print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData, lcls2_detOnceData
 from smalldata_tools.SmallDataDefaultDetector import lcls2_epicsDetector, genlcls2Detector
 from smalldata_tools.DetObject_lcls2 import DetObject_lcls2
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
@@ -385,7 +386,7 @@ small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
 print('smalldata file has been created on rank %d'%rank)
 
 # Not sure why, but here
-if rank is 0:
+if rank == 0:
     logger.info('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 ########################################################## 
 ##
@@ -407,6 +408,12 @@ if args.full or args.epicsAll:
         default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
 elif len(epicsPV)>0:
     default_dets.append(lcls2_epicsDetector(PVlist=epicsPV, name='epicsUser', run=thisrun))
+
+if len(epicsOncePV)>0:
+    EODet = lcls2_epicsDetector(PVlist=epicsOncePV, name='epicsOnce', run=thisrun)
+else:
+    EODet = None
+EODetData = {'epicsOnce': {}}
 
 default_det_aliases = [det.name for det in default_dets]
 #default_det_aliases = [det.name for det in default_dets if det.name.find('fim')<0]
@@ -456,10 +463,13 @@ event_iter = thisrun.events()
 evt_num=-1 #set this to default until I have a useable rank for printing updates...
 if rank==0: print('And now the event loop....')
 for evt_num, evt in enumerate(event_iter):
-
     det_data = detData(default_dets, evt)
     if det_data is not None:
         small_data.event(evt, det_data)
+
+    # If we don't have the epics once data, try to get it!
+    if EODet is not None and EODetData['epicsOnce'] == {}: 
+        EODetData = detData([EODet], evt)
 
     #detector data using DetObject 
     userDict = {}
@@ -522,7 +532,12 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
+if EODet is not None:
+    userDataCfg[EODet.name] = EODet.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
+if EODet is not None:
+    EODetData = lcls2_detOnceData([EODet], ds, EODetData)
+    Config.update(EODetData)
 #if rank==0: print(Config)
 if small_data.summary:
     small_data.save_summary(Config) # this only works w/ 1 rank!

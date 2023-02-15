@@ -51,6 +51,7 @@ def getROIs(run):
 #aliases for experiment specific PVs go here
 #epicsPV = ['slit_s1_hw'] 
 epicsPV = []
+epicsOncePV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
 ttCalib=[]
@@ -209,7 +210,7 @@ print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
@@ -370,7 +371,7 @@ except Exception as e:
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
-if ds.rank is 0:
+if ds.rank == 0:
 	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
@@ -397,6 +398,11 @@ if args.full or args.epicsAll:
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 elif len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+if len(epicsOncePV)>0:
+    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
+else:
+    EODet = None
 
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
@@ -477,10 +483,14 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
+if EODet is not None:
+    userDataCfg[EODet.name] = EODet.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 small_data.save(Config)
 
-
+if EODet is not None:
+    det_data = detOnceData([EODet], ds)
+    small_data.save(det_data)
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))

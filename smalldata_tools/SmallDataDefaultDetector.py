@@ -982,6 +982,7 @@ class lcls2_epicsDetector(defaultDetector):
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
         PVlist = getattr(self,'PVlist')
         parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
+        return parList
 
 class scanDetector(defaultDetector):
     def __init__(self, name='scan',run=None):
