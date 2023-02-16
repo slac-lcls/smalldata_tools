@@ -156,8 +156,9 @@ def define_dets(run):
 ##########################################################
 # run independent parameters 
 ##########################################################
-#aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
+# These lists are either PV names, aliases, or tuples with both.
+# epicsPV = ['slit_s1_hw'] 
+# epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias')]
 epicsPV = []
 epicsOncePV = []
 #fix timetool calibration if necessary
@@ -347,7 +348,7 @@ else:
         print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
         sys.exit()
 
-print('deifne output')
+print('define output')
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 print(h5_f_name)

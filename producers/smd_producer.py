@@ -49,7 +49,9 @@ def getROIs(run):
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
+# These lists are either PV names, aliases, or tuples with both.
+# epicsPV = ['slit_s1_hw', "XPP:GON:MMS:01.RBV"] 
+# epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v']
 epicsPV = []
 epicsOncePV = []
 #fix timetool calibration if necessary

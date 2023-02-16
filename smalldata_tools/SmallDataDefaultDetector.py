@@ -206,13 +206,22 @@ class epicsDetector(defaultDetector):
         enames = psana.DetNames('epics')
         aliases = [k[1] for k in enames if k[1]!='']
         pvnames = [k[0] for k in enames if k[1]!='']
-        for pv in PVlist:
+        for p in PVlist:
             try:
+                if type(p) == tuple:
+                    pv = p[0]
+                    al = p[1]
+                else:
+                    al = p
+                    if al in aliases:
+                        pv = pvnames[aliases.index(al)]
+                    else:
+                        pv = p
                 self.pvs.append(psana.Detector(pv))
-                self.PVlist.append(pv)
-                self.PVlist_PV.append(pvnames[aliases.index(pv)])
+                self.PVlist.append(al)
+                self.PVlist_PV.append(pv)
             except:
-                print('could not find EPICS PV %s in data'%pv)
+                print('could not find EPICS PV %s in data'%p)
 
     def inRun(self):
         if len(self.pvs)>0:
@@ -952,12 +961,18 @@ class lcls2_epicsDetector(defaultDetector):
         self.detname='epics'
         self.PVlist = []
         self.pvs = []
-        for pv in PVlist:
+        for p in PVlist:
             try:
+                if type(p) == tuple:
+                    pv = p[0]
+                    al = p[1]
+                else:
+                    pv = p
+                    al = p
                 self.pvs.append(run.Detector(pv))
-                self.PVlist.append(pv)
+                self.PVlist.append(al)
             except:
-                print('could not find LCLS2 EPICS PV %s in data'%pv)
+                print('could not find LCLS2 EPICS PV %s in data'%p)
 
     def inRun(self):
         if len(self.pvs)>0:
