@@ -202,6 +202,8 @@ class epicsDetector(defaultDetector):
         self.detname='epics'
         self.PVlist = []
         self.PVlist_PV = []
+        self.missing = []
+        self.missingPV = []
         self.pvs = []
         enames = psana.DetNames('epics')
         aliases = [k[1] for k in enames if k[1]!='']
@@ -209,19 +211,31 @@ class epicsDetector(defaultDetector):
         for p in PVlist:
             try:
                 if type(p) == tuple:
+                    # User-specified pv and alias.
                     pv = p[0]
                     al = p[1]
-                else:
+                elif p in aliases:
+                    # It's an alias.
                     al = p
-                    if al in aliases:
-                        pv = pvnames[aliases.index(al)]
-                    else:
-                        pv = p
+                    pv = pvnames[aliases.index(al)]
+                elif p in pvnames:
+                    # It's a PV.
+                    pv = p
+                    al = aliases[pvnames.index(pv)]
+                else:
+                    # Probably a PV.  Save it as its own alias.
+                    al = p
+                    pv = p
                 self.pvs.append(psana.Detector(pv))
-                self.PVlist.append(al)
-                self.PVlist_PV.append(pv)
+                self.addPV(al, pv)
             except:
-                print('could not find EPICS PV %s in data'%p)
+                print('could not find EPICS PV %s in data' % pv)
+                self.missing.append(al)
+                self.missingPV.append(pv)
+
+    def addPV(self, al, pv):
+        self.PVlist.append(al)
+        self.PVlist_PV.append(pv)
 
     def inRun(self):
         if len(self.pvs)>0:
@@ -960,19 +974,54 @@ class lcls2_epicsDetector(defaultDetector):
         self.name = name
         self.detname='epics'
         self.PVlist = []
+        self.missing = []
+        self.missingPV = []
         self.pvs = []
+        # run.epicsinfo is an alias or (alias, pvname) --> pvname dict.
+        # Let's rearrange this somewhat to make it more useful.
+        self.al2pv = {}
+        self.pv2al = {}
+        for (k, pv) in run.epicsinfo:
+            if type(k) == tuple:
+                al = k[0]
+            else:
+                al = k
+            self.al2pv[al] = pv
+            self.pv2al[pv] = al
         for p in PVlist:
             try:
                 if type(p) == tuple:
+                    # User specified PV and alias.
                     pv = p[0]
                     al = p[1]
+                    self.pv2al[pv] = al
+                    self.al2pv[al] = pv
+                elif p in self.al2pv.keys():
+                    # Known Alias
+                    al = p
+                    pv = self.al2pv[al]
+                elif p in self.pv2al.keys():
+                    # Known PV
+                    pv = p
+                    al = self.pv2al[pv]
                 else:
+                    # We don't know.  Assume it's a PV we'll find later.
                     pv = p
                     al = p
+                    self.pv2al[pv] = al
+                    self.al2pv[al] = pv
                 self.pvs.append(run.Detector(pv))
-                self.PVlist.append(al)
+                self.addPV(al, pv)
             except:
-                print('could not find LCLS2 EPICS PV %s in data'%p)
+                print('could not find LCLS2 EPICS PV %s in data' % pv)
+                self.missing.append(al)
+                self.missingPV.append(pv)
+        # Add these now so they don't interfere in the above loop.
+        for (al, pv) in run.epicsinfo:
+            self.al2pv[pv] = pv
+
+    def addPV(self, al, pv):
+        self.PVlist.append(al)
 
     def inRun(self):
         if len(self.pvs)>0:
@@ -997,6 +1046,7 @@ class lcls2_epicsDetector(defaultDetector):
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
         PVlist = getattr(self,'PVlist')
         parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
+        parList.update({'PVname_%d'%ipv: self.al2pv[pv] for ipv,pv in enumerate(PVlist) if pv is not None})
         return parList
 
 class scanDetector(defaultDetector):

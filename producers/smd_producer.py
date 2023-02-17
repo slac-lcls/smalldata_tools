@@ -50,8 +50,9 @@ def getROIs(run):
 ##########################################################
 #aliases for experiment specific PVs go here
 # These lists are either PV names, aliases, or tuples with both.
-# epicsPV = ['slit_s1_hw', "XPP:GON:MMS:01.RBV"] 
-# epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v']
+#epicsPV = ['gon_h'] 
+#epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v', "XPP:GON:MMS:03.RBV",
+#               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
 epicsPV = []
 epicsOncePV = []
 #fix timetool calibration if necessary
@@ -485,10 +486,9 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
-if EODet is not None:
-    userDataCfg[EODet.name] = EODet.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-small_data.save(Config)
+if EODet is None:
+    Config={'UserDataCfg':userDataCfg}
+    small_data.save(Config)
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
@@ -498,7 +498,10 @@ if args.tiff:
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
     if evt_num == 0 and EODet is not None:
-        det_data = detOnceData([EODet], evt)
+        det_data = detOnceData(EODet, evt)
+        userDataCfg[EODet.name] = EODet.params_as_dict()
+        Config={'UserDataCfg':userDataCfg}
+        small_data.save(Config)
         small_data.save(det_data)
 
     if evt_num > max_iter:

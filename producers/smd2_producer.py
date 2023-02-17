@@ -157,8 +157,9 @@ def define_dets(run):
 # run independent parameters 
 ##########################################################
 # These lists are either PV names, aliases, or tuples with both.
-# epicsPV = ['slit_s1_hw'] 
-# epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias')]
+#epicsPV = ['las_fs14_controller_time'] 
+#epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'), 
+#               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
 epicsPV = []
 epicsOncePV = []
 #fix timetool calibration if necessary
@@ -472,7 +473,7 @@ for evt_num, evt in enumerate(event_iter):
     # If we don't have the epics once data, try to get it!
     if EODet is not None and EODetData['epicsOnce'] == {}: 
         EODetData = detData([EODet], evt)
-        EODetTS   = evt._seconds
+        EODetTS   = evt._seconds + 631152000 # Convert to linux time.
 
     #detector data using DetObject 
     userDict = {}
@@ -536,11 +537,12 @@ for det in dets:
     except:
         userDataCfg[det.name] = det.params_as_dict()
 if EODet is not None:
+    EODetData = lcls2_detOnceData(EODet, EODetData, EODetTS)
     userDataCfg[EODet.name] = EODet.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-if EODet is not None:
-    EODetData = lcls2_detOnceData([EODet], EODetData, EODetTS)
+    Config={'UserDataCfg':userDataCfg}
     Config.update(EODetData)
+else:
+    Config={'UserDataCfg':userDataCfg}
 #if rank==0: print(Config)
 if small_data.summary:
     small_data.save_summary(Config) # this only works w/ 1 rank!
