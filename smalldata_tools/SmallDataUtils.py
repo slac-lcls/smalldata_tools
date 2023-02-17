@@ -276,16 +276,14 @@ def detData(detList, evt):
             pass
     return data
 
-def detOnceData(detList, ds):
-    evt = ds.events().__next__()
+def detOnceData(detList, evt):
     data = detData(detList, evt)
     # Future expansion: if we've missed something, find it in the archiver?
     # Look at the timestamp of evt.
     return data
 
-def lcls2_detOnceData(detList, ds, data):
+def lcls2_detOnceData(detList, data, ts):
     # Future expansion: if we've missed something, find it in the archiver?
-    # ts = ds.events().__next__()._seconds + 631152000
     return data
 
 def setParameter(detList, Params, detName='tt'):

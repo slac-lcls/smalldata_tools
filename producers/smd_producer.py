@@ -490,10 +490,6 @@ if EODet is not None:
 Config={'UserDataCfg':userDataCfg}
 small_data.save(Config)
 
-if EODet is not None:
-    det_data = detOnceData([EODet], ds)
-    small_data.save(det_data)
-
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
@@ -501,6 +497,10 @@ if args.tiff:
 
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
+    if evt_num == 0 and EODet is not None:
+        det_data = detOnceData([EODet], evt)
+        small_data.save(det_data)
+
     if evt_num > max_iter:
         break
 

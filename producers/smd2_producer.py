@@ -415,6 +415,7 @@ if len(epicsOncePV)>0:
 else:
     EODet = None
 EODetData = {'epicsOnce': {}}
+EODetTS   = None
 
 default_det_aliases = [det.name for det in default_dets]
 #default_det_aliases = [det.name for det in default_dets if det.name.find('fim')<0]
@@ -471,6 +472,7 @@ for evt_num, evt in enumerate(event_iter):
     # If we don't have the epics once data, try to get it!
     if EODet is not None and EODetData['epicsOnce'] == {}: 
         EODetData = detData([EODet], evt)
+        EODetTS   = evt._seconds
 
     #detector data using DetObject 
     userDict = {}
@@ -537,7 +539,7 @@ if EODet is not None:
     userDataCfg[EODet.name] = EODet.params_as_dict()
 Config={'UserDataCfg':userDataCfg}
 if EODet is not None:
-    EODetData = lcls2_detOnceData([EODet], ds, EODetData)
+    EODetData = lcls2_detOnceData([EODet], EODetData, EODetTS)
     Config.update(EODetData)
 #if rank==0: print(Config)
 if small_data.summary:
