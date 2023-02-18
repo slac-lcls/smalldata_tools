@@ -49,8 +49,12 @@ def getROIs(run):
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
+# These lists are either PV names, aliases, or tuples with both.
+#epicsPV = ['gon_h'] 
+#epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v', "XPP:GON:MMS:03.RBV",
+#               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
 epicsPV = []
+epicsOncePV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
 ttCalib=[]
@@ -209,7 +213,7 @@ print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
@@ -370,7 +374,7 @@ except Exception as e:
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
-if ds.rank is 0:
+if ds.rank == 0:
 	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
@@ -397,6 +401,11 @@ if args.full or args.epicsAll:
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 elif len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+if len(epicsOncePV)>0:
+    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
+else:
+    EODet = None
 
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
@@ -477,10 +486,9 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-small_data.save(Config)
-
-
+if EODet is None:
+    Config={'UserDataCfg':userDataCfg}
+    small_data.save(Config)
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
@@ -489,6 +497,13 @@ if args.tiff:
 
 max_iter = args.nevents / ds.size
 for evt_num, evt in enumerate(ds.events()):
+    if evt_num == 0 and EODet is not None:
+        det_data = detOnceData(EODet, evt)
+        userDataCfg[EODet.name] = EODet.params_as_dict()
+        Config={'UserDataCfg':userDataCfg}
+        small_data.save(Config)
+        small_data.save(det_data)
+
     if evt_num > max_iter:
         break
 

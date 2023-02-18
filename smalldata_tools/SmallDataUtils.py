@@ -262,7 +262,6 @@ def diaDetectors():
 def detDetectors():
     return []
 
-
 def detData(detList, evt):
     #mpiDataSource Issue? cpo, tjlane
     #if one of the keys here contains an empty dict (say: no user PV that are in the data)
@@ -275,6 +274,39 @@ def detData(detList, evt):
         except:
             #print('could not get data in this event for detector ',det.name)
             pass
+    return data
+
+def detOnceData(det, evt):
+    data = detData([det], evt)
+    # Future expansion: if we've missed something, find it in the archiver?
+    # Look at the timestamp of evt and convert to linux epoch.
+    """
+    for (i, pv) in enumerate(det.missingPV):
+        if pv == 'FOO:BAR:BAZ':
+            al = det.missing[i]
+            det.addPV(al, pv)
+            data['epicsOnce'][al] = 22.7
+        if pv == 'X:Y:Z':
+            al = det.missing[i]
+            det.addPV(al, pv)
+            data['epicsOnce'][al] = 19.3
+    """
+    return data
+
+def lcls2_detOnceData(det, data, ts):
+    # Future expansion: if we've missed something, find it in the archiver?
+    # ts is our timestamp.
+    """
+    for (i, pv) in enumerate(det.missingPV):
+        if pv == 'FOO:BAR:BAZ':
+            al = det.missing[i]
+            det.addPV(al, pv)
+            data['epicsOnce'][al] = 22.7
+        if pv == 'X:Y:Z':
+            al = det.missing[i]
+            det.addPV(al, pv)
+            data['epicsOnce'][al] = 19.3
+    """
     return data
 
 def setParameter(detList, Params, detName='tt'):
