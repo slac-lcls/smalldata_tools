@@ -75,8 +75,8 @@ do
             POSITIONAL+=("$1")
 			shift
 			;;
-        --output)
-            OUTPUT="$2"
+        --logfile)
+            LOGFILE="$2"
             shift
             shift
             ;;
@@ -115,8 +115,8 @@ if [ -v INTERACTIVE ]; then
     $MYDIR/submit_small_data.sh -c $CORES $@
     exit 0
 fi
-if [ -v OUTPUT ]; then
-    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --output $OUTPUT $MYDIR/submit_small_data.sh $@
+if [ -v LOGFILE ]; then
+    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --output $LOGFILE $MYDIR/submit_small_data.sh $@
     exit 0
 fi
 
