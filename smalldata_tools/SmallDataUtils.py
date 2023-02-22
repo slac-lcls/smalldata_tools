@@ -2,6 +2,8 @@
 import numpy as np
 #import psana
 from smalldata_tools.SmallDataDefaultDetector import *
+from smalldata_tools.epicsarchive import EpicsArchive
+from datetime import datetime
 
 def defaultDetectors(hutch, run=None):
     if hutch.lower()=='amo':
@@ -276,37 +278,48 @@ def detData(detList, evt):
             pass
     return data
 
-def detOnceData(det, evt):
-    data = detData([det], evt)
-    # Future expansion: if we've missed something, find it in the archiver?
-    # Look at the timestamp of evt and convert to linux epoch.
-    """
+def addArchiverData(det, data, ts):
+    try:
+        arch = EpicsArchive()
+    except Exception:
+        print('Failed to create the EPICS archiver')
+        return data
     for (i, pv) in enumerate(det.missingPV):
-        if pv == 'FOO:BAR:BAZ':
-            al = det.missing[i]
-            det.addPV(al, pv)
-            data['epicsOnce'][al] = 22.7
-        if pv == 'X:Y:Z':
-            al = det.missing[i]
-            det.addPV(al, pv)
-            data['epicsOnce'][al] = 19.3
-    """
+        try:
+            (t, v) = arch.get_points(pv, start=ts, end=ts+30, two_lists=True, raw=True)
+        except Exception:
+            continue # Not in the archiver!
+        #
+        # OK, t[0] < ts, but t[1] > ts, *if* it exists.
+        # So, let's take t[1] if it exists, and t[0] if it's "recent-ish".
+        #
+        if len(t) >= 2:
+            t = t[1]
+            v = v[1]
+        elif len(t) == 1 and abs(t[0]-ts) < 30:
+            t = t[0]
+            v = v[0]
+        else:
+            continue
+        al = det.missing[i]
+        det.addPV(al, pv)
+        data['epicsOnce'][al] = v
     return data
 
-def lcls2_detOnceData(det, data, ts):
-    # Future expansion: if we've missed something, find it in the archiver?
-    # ts is our timestamp.
-    """
-    for (i, pv) in enumerate(det.missingPV):
-        if pv == 'FOO:BAR:BAZ':
-            al = det.missing[i]
-            det.addPV(al, pv)
-            data['epicsOnce'][al] = 22.7
-        if pv == 'X:Y:Z':
-            al = det.missing[i]
-            det.addPV(al, pv)
-            data['epicsOnce'][al] = 19.3
-    """
+def detOnceData(det, evt, noarch):
+    data = detData([det], evt)
+    if not noarch:
+        # If we've missed something, look for it in the archiver.
+        # Look at the timestamp of evt and convert to linux epoch.
+        ts = evt.get(psana.EventId).time()[0]
+        data = addArchiverData(det, data, ts)
+    return data
+
+def lcls2_detOnceData(det, data, ts, noarch):
+    if not noarch:
+        # If we've missed something, look for it in the archiver.
+        # ts is our timestamp.
+        data = addArchiverData(det, data, ts)
     return data
 
 def setParameter(detList, Params, detName='tt'):
