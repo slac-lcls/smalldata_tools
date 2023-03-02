@@ -55,7 +55,6 @@ def getROIs(run):
 #               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
 #epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
-epicsOncePV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
 ttCalib=[]
@@ -214,7 +213,7 @@ print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
+from smalldata_tools.SmallDataUtils import defaultDetectors, detData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
@@ -248,7 +247,7 @@ HUTCHES = [
 ]
 
 FFB_BASE = '/cds/data/drpsrcf'
-PSDM_BASE = '/reg/d/psdm'
+PSDM_BASE = os.environ.get('SIT_PSDM_DATA', '/reg/d/psdm')
 SD_EXT = '/hdf5/smalldata'
 
 # Define Args
@@ -376,7 +375,7 @@ except Exception as e:
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
-if ds.rank == 0:
+if ds.rank is 0:
 	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
@@ -403,11 +402,6 @@ if args.full or args.epicsAll:
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 elif len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-
-if len(epicsOncePV)>0:
-    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
-else:
-    EODet = None
 
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
@@ -488,16 +482,17 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
-if EODet is None:
-    Config={'UserDataCfg':userDataCfg}
-    small_data.save(Config)
+Config={'UserDataCfg':userDataCfg}
+small_data.save(Config)
+
+
 
 if args.tiff:
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
-max_iter = args.nevents / ds.size
+ds.break_after(args.nevents)
 for evt_num, evt in enumerate(ds.events()):
     if evt_num == 0 and EODet is not None:
         det_data = detOnceData(EODet, evt, args.noarch)
