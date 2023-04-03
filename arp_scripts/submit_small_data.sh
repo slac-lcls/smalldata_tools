@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Took this from Silke's script, nice implementation
 usage()
 {
 cat << EOF
@@ -115,6 +114,10 @@ else
 fi
 
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
+
+echo ---- print environment ----
+env | sort
+echo --- printed environment ---
 
 #run all imports on batch node before calling mpirun on that node.
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
