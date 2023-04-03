@@ -49,7 +49,11 @@ def getROIs(run):
 # run independent parameters 
 ##########################################################
 #aliases for experiment specific PVs go here
-#epicsPV = ['slit_s1_hw'] 
+# These lists are either PV names, aliases, or tuples with both.
+#epicsPV = ['gon_h'] 
+#epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v', "XPP:GON:MMS:03.RBV",
+#               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
+#epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
@@ -265,6 +269,7 @@ parser.add_argument('--centerpix', help='do not mask center pixels for epix10k d
 parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
 parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
 parser.add_argument("--xtcav", help="add xtcav processing", action='store_true', default=False)
+parser.add_argument("--noarch", help="dont use archiver data", action='store_true', default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -489,6 +494,19 @@ if args.tiff:
 
 ds.break_after(args.nevents)
 for evt_num, evt in enumerate(ds.events()):
+    if evt_num == 0 and EODet is not None:
+        det_data = detOnceData(EODet, evt, args.noarch)
+        if det_data['epicsOnce'] != {}:
+            userDataCfg[EODet.name] = EODet.params_as_dict()
+            Config={'UserDataCfg':userDataCfg}
+            small_data.save(Config)
+            small_data.save(det_data)
+        else:
+            Config={'UserDataCfg':userDataCfg}
+            small_data.save(Config)
+
+    if evt_num > max_iter:
+        break
 
     det_data = detData(default_dets, evt)
     small_data.event(det_data)

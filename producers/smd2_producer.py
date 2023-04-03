@@ -160,6 +160,7 @@ def define_dets(run):
 #epicsPV = ['las_fs14_controller_time'] 
 #epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'), 
 #               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
+#epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
 epicsOncePV = []
 #fix timetool calibration if necessary
@@ -263,6 +264,7 @@ parser.add_argument("--wait", help="wait for a file to appear", action='store_tr
 parser.add_argument("--rawFim", help="save raw Fim data", action='store_true', default=False)
 parser.add_argument("--nohsd", help="dont save HSD data", action='store_true', default=False)
 parser.add_argument("--nosum", help="dont save sums", action='store_true', default=False)
+parser.add_argument("--noarch", help="dont use archiver data", action='store_true', default=False)
 args = parser.parse_args()
 
 logger.debug('Args to be used for small data run: {0}'.format(args))
@@ -537,10 +539,13 @@ for det in dets:
     except:
         userDataCfg[det.name] = det.params_as_dict()
 if EODet is not None:
-    EODetData = lcls2_detOnceData(EODet, EODetData, EODetTS)
-    userDataCfg[EODet.name] = EODet.params_as_dict()
-    Config={'UserDataCfg':userDataCfg}
-    Config.update(EODetData)
+    EODetData = lcls2_detOnceData(EODet, EODetData, EODetTS, args.noarch)
+    if EODetData['epicsOnce'] != {}:
+        userDataCfg[EODet.name] = EODet.params_as_dict()
+        Config={'UserDataCfg':userDataCfg}
+        Config.update(EODetData)
+    else:
+        Config={'UserDataCfg':userDataCfg}
 else:
     Config={'UserDataCfg':userDataCfg}
 #if rank==0: print(Config)

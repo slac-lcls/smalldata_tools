@@ -254,6 +254,18 @@ class epicsDetector(defaultDetector):
                 pass
         return dl
 
+    def params_as_dict(self):
+        d = super().params_as_dict()
+        try:
+            del d['missing']
+        except Exception:
+            pass
+        try:
+            del d['missingPV']
+        except Exception:
+            pass
+        return d
+
 class encoderDetector(defaultDetector):
     def __init__(self, detname, name=None):
         if name is None:
