@@ -85,6 +85,11 @@ do
             POSITIONAL+=("$1")
 			shift
 			;;
+        --logfile)
+            LOGFILE="$2"
+            shift
+            shift
+            ;;
         *)
             POSITIONAL+=("$1")
 			shift
@@ -127,6 +132,10 @@ fi
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 if [ -v INTERACTIVE ]; then
     $MYDIR/submit_small_data.sh -c $CORES $@
+    exit 0
+fi
+if [ -v LOGFILE ]; then
+    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --output $LOGFILE $MYDIR/submit_small_data.sh $@
     exit 0
 fi
 
