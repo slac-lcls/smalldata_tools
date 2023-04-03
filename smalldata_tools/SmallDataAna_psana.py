@@ -10,13 +10,11 @@ except:
     print('could not import pyplot')
     pass
 from matplotlib import gridspec
-from matplotlib import path
 import itertools
 import os
 import socket
 import holoviews as hv
 import bokeh.plotting as bp
-from matplotlib import gridspec
 import psana
 import logging
 import time
@@ -39,12 +37,9 @@ from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar
-from smalldata_tools.utilities_plotting import plotImageBokeh
 from smalldata_tools.utilities_plotting import hv_image
 from smalldata_tools.utilities_plotting import hv_image_ctl
 from smalldata_tools.utilities_plotting import hv_3dimage
-from smalldata_tools.utilities_FitCenter import FindFitCenter
-from smalldata_tools.utilities_FitCenter import fitCircle
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
