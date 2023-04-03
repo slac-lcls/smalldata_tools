@@ -32,7 +32,7 @@ except NameError:
 
 import smalldata_tools.SmallDataAna as sda
 
-from smalldata_tools.DetObject import DetObject
+from smalldata_tools.DetObject import DetObject, DetObjectClass
 from smalldata_tools.SmallDataUtils import getUserData
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
@@ -294,7 +294,7 @@ class BaseSmallDataAna_psana(object):
         if len(img.shape)>2:
             image = self.__dict__[detname].det.image(self.run, img)
             if image is None:
-                if self.__dict__[detname].det.dettype != 30:
+                if self.__dict__[detname].det.dettype != DetObjectClass.Icarus:
                     image = img.squeeze()
                 else:
                     imgNew = img[0]
@@ -415,7 +415,7 @@ class BaseSmallDataAna_psana(object):
         gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
 
         needsGeo=False
-        if self.__dict__[detname].det.dettype==26:
+        if self.__dict__[detname].det.dettype==DetObjectClass.Jungfrau:
             if self.__dict__[detname].ped[0].shape != self.__dict__[detname].imgShape:
                 needsGeo=True
         elif self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
@@ -668,7 +668,7 @@ class BaseSmallDataAna_psana(object):
         extent=[x.min(), x.max(), y.min(), y.max()]
 
         if needsGeo:
-            if self.__dict__[detname].det.dettype==30:
+            if self.__dict__[detname].det.dettype==DetObjectClass.Icarus:
                 if singleTile<0:
                     print('we need to select a tile for the icarus')
                     return
@@ -767,7 +767,7 @@ class BaseSmallDataAna_psana(object):
         return
     
             
-    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1):
+    def MakeMask(self, detname=None, limits=[5,99.5], singleTile=-1, extMask=None):
         detname, img, avImage = self.getAvImage(detname=None)
 
         plotMax = np.nanpercentile(img, limits[1])
@@ -778,7 +778,7 @@ class BaseSmallDataAna_psana(object):
         if self.__dict__[detname].ped.shape != self.__dict__[detname].imgShape:
             needsGeo=True
 
-        if self.__dict__[detname].det.dettype==30:
+        if self.__dict__[detname].det.dettype==DetObjectClass.Icarus:
             needsGeo=False
             if singleTile<0 or singleTile>= img.shape[0]:
                 image = img.sum(axis=0)
@@ -804,7 +804,7 @@ class BaseSmallDataAna_psana(object):
         iy = self.__dict__[detname+'_iy']
         extent=[x.min(), x.max(), y.min(), y.max()]
         #print('DEBUG: extent(x,y min,max)',extent)
-        if self.__dict__[detname].det.dettype==30:
+        if self.__dict__[detname].det.dettype==DetObjectClass.Icarus:
             if singleTile<0 or singleTile>= img.shape[0]:
                 x=x[0]
                 y=y[0]
@@ -814,7 +814,7 @@ class BaseSmallDataAna_psana(object):
         
         mask=[]
         mask_r_nda=None
-        select=True
+        select=extMask is None  # Short-circuit the loop if given an external mask.
         while select:
             fig=plt.figure(figsize=(12,10))
             gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
@@ -846,7 +846,7 @@ class BaseSmallDataAna_psana(object):
                 else:
                     mask_r_nda = mask_roi
                     plt.subplot(gs[1]).imshow(mask_r_nda)
-                    if self.__dict__[detname].det.dettype==30:
+                    if self.__dict__[detname].det.dettype==DetObjectClass.Icarus:
                         maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
                         mask_r_nda = np.array(maskTuple)
                 print('mask from rectangle (shape):',mask_r_nda.shape)
@@ -866,7 +866,7 @@ class BaseSmallDataAna_psana(object):
             elif shape=='c':
                 fig=plt.figure(figsize=(12,10))
                 gs=gridspec.GridSpec(1,2,width_ratios=[2,1])
-                if det.dettype==30:
+                if det.dettype==DetObjectClass.Icarus:
                     plt.subplot(gs[0]).imshow(image,
                                               clim=[plotMin,plotMax],
                                               interpolation='None',
@@ -879,7 +879,7 @@ class BaseSmallDataAna_psana(object):
                 if raw_input("Select center by mouse?\n") in ["y","Y"]:
                     c=ginput(1)
                     cx=c[0][0];cy=c[0][1]
-                    print('Corrdinates of selected center: ',cx,' ',cy)
+                    print('Coordinates of selected center: ',cx,' ',cy)
                 else:
                     ctot = raw_input("center (x y)?\n")
                     c = ctot.split(' ');cx=float(c[0]);cy=float(c[1]);
@@ -918,17 +918,17 @@ class BaseSmallDataAna_psana(object):
                                               clim=[plotMin,plotMax],
                                               interpolation='None',
                                               extent=(x.min(),x.max(),y.min(),y.max()))
-                elif det.dettype==13:
+                elif det.dettype==DetObjectClass.Epix:
                     plt.subplot(gs[0]).imshow(np.rot90(image),
                                               clim=[plotMin,plotMax],
                                               interpolation='None',
                                               extent=(x.min(),x.max(),y.min(),y.max()))
-                elif det.dettype==19:
+                elif det.dettype==DetObjectClass.Rayonix:
                     plt.subplot(gs[0]).imshow(image,
                                               clim=[plotMin,plotMax],
                                               interpolation='None',
                                               extent=(x.min(),x.max(),y.min(),y.max()))
-                elif det.dettype==30:
+                elif det.dettype==DetObjectClass.Icarus:
                     plt.subplot(gs[0]).imshow(np.rot90(image),
                                               clim=[plotMin,plotMax],
                                               interpolation='None',
@@ -948,7 +948,7 @@ class BaseSmallDataAna_psana(object):
                     plt.subplot(gs[1]).imshow(det.image(self.run,mask_r_nda))
                 else:
                     plt.subplot(gs[1]).imshow(mask_r_nda)
-                if self.__dict__[detname].det.dettype==30:
+                if self.__dict__[detname].det.dettype==DetObjectClass.Icarus:
                     maskTuple=[mask_r_nda for itile in range(self.__dict__[detname].ped.shape[0])]
                     mask_r_nda = np.array(maskTuple)
                 print('mask from polygon (shape):',mask_r_nda.shape)
@@ -957,12 +957,14 @@ class BaseSmallDataAna_psana(object):
                 gsPed=gridspec.GridSpec(1,2,width_ratios=[1,1])
                 if shape=='d':
                     pedResult = det.pedestals(self.run)
-                    if det.dettype in [26,29,32,33]:
+                    if det.dettype in [DetObjectClass.Jungfrau, DetObjectClass.Epix10k,
+                                       DetObjectClass.Epix10k2M, DetObjectClass.Epix10k2M_quad]:
                         pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05))
                 else:
                     pedResult = det.rms(self.run)
-                    if det.dettype in [26,29,32,33]:
+                    if det.dettype in [DetObjectClass.Jungfrau, DetObjectClass.Epix10k,
+                                       DetObjectClass.Epix10k2M, DetObjectClass.Epix10k2M_quad]:
                         pedResult = pedResult[0]
                     hstPed = np.histogram(pedResult.flatten(), np.arange(0, pedResult.max()*1.05,0.05))
                 if needsGeo:
@@ -1060,7 +1062,7 @@ class BaseSmallDataAna_psana(object):
                 if needsGeo:
                     plt.imshow(det.image(self.run,image_mask),clim=[plotMin,plotMax])
                 else:
-                    if (self.__dict__[detname].det.dettype==30):
+                    if (self.__dict__[detname].det.dettype==DetObjectClass.Icarus):
                         if singleTile<0 or singleTile>= img.shape[0]:
                             image = image_mask.sum(axis=0)
                         else:
@@ -1088,24 +1090,40 @@ class BaseSmallDataAna_psana(object):
                 select = False
 
         #end of mask creating loop
+
+        if extMask is not None:
+            if extMask.shape != self.__dict__[detname].rawShape:
+                print("extMask is the wrong shape: %s actual, %s desired." % (
+                      extMask.shape, self.__dict__[detname].rawShape))
+                return None
+            if extMask.dtype != np.dtype('int64'):
+                print("extMask is the wrong type: %s actual, %s desired." % (
+                      extMask.shape, np.dtype('int64')))
+                return None
+            mask = [extMask]
+
         if len(mask)==0:
             return
         totmask = mask[0]
         for thismask in mask[1:]:
             totmask = np.logical_or(totmask,thismask)
 
-        if raw_input("Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n") in ["y","Y"]:
+        if extMask is None:
+            prompt = "Invert [y/n]? (n/no inversion: masked pixels will get rejected)?\n"
+        else:
+            prompt = "Does the ext. mask have 0 for masked pixels [y/n] (n: non-zero pixels are rejected)?\n"
+        if raw_input(prompt) in ["y","Y"]:
             totmask = (totmask.astype(bool)).astype(int)
         else:
             totmask = (~(totmask.astype(bool))).astype(int)
 
         self.__dict__['_mask_'+avImage]=totmask
 
-        if  det.dettype == 2:
+        if  det.dettype == DetObjectClass.CsPad:
             mask=totmask.reshape(2,185*388).transpose(1,0)
-        elif det.dettype == 1:
+        elif det.dettype == DetObjectClass.CsPad2M:
             mask=totmask.reshape(32*185,388)
-        elif det.dettype == 13:
+        elif det.dettype == DetObjectClass.Epix:
             mask=totmask.reshape(704,768)
         else:
             mask=totmask
@@ -1113,15 +1131,15 @@ class BaseSmallDataAna_psana(object):
         #cspad save as 5920 lines, 388 entries
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
-            if det.dettype==2:
+            if det.dettype==DetObjectClass.CsPad:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype==1:
+            elif det.dettype==DetObjectClass.CsPad2M:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==13:
+            elif det.dettype==DetObjectClass.Epix:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
-            elif det.dettype==19:
+            elif det.dettype==DetObjectClass.Rayonix:
                 dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
-            elif det.dettype==32:
+            elif det.dettype==DetObjectClass.Epix10k2M:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
@@ -1505,11 +1523,11 @@ class BaseSmallDataAna_psana(object):
         else:
             plt.subplot(gs[1]).imshow(image_mask,clim=[plotMin,plotMax])
 
-        if  det.dettype == 2:
+        if  det.dettype == DetObjectClass.CsPad:
             mask=mask.reshape(2,185*388).transpose(1,0)
-        elif det.dettype == 1:
+        elif det.dettype == DetObjectClass.CsPad2M:
             mask=mask.reshape(32*185,388)
-        elif det.dettype == 13:
+        elif det.dettype == DetObjectClass.Epix:
             mask=mask.reshape(704,768)
 
         #2x2 save as 71780 lines, 2 entries
@@ -1517,15 +1535,15 @@ class BaseSmallDataAna_psana(object):
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             mask = (~(mask.astype(bool))).astype(int)
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
-            if det.dettype==2:
+            if det.dettype==DetObjectClass.CsPad:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)
-            elif det.dettype==2:
+            elif det.dettype==DetObjectClass.CsPad2M:
                 dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==13:
+            elif det.dettype==DetObjectClass.Epix:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==29:
+            elif det.dettype==DetObjectClass.Epix10k:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
-            elif det.dettype==32:
+            elif det.dettype==DetObjectClass.Epix10k2M:
                 dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
             if not os.path.exists(dirname):
                 os.makedirs(dirname)

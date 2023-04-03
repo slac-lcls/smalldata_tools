@@ -1,11 +1,9 @@
 import numpy as np
-#use that??
-from smalldata_tools.ana_funcs.dropletCode.convert_img import convert_img
-from smalldata_tools.ana_funcs.dropletCode.loopdrops import *
-from smalldata_tools.ana_funcs.dropletCode.getProb import *
+from smalldata_tools.ana_funcs.dropletCode.loopdrops import loopdrops
+from smalldata_tools.ana_funcs.dropletCode.getProb import getProb_img
 import scipy.ndimage as ndi
 #use that??
-import skimage.measure as measure
+# import skimage.measure as measure
 import scipy.ndimage.filters as filters
 from scipy import sparse
 import time

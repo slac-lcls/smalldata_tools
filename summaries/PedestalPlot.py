@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
-parser.add_argument('--postElog', help='post plot to elog', action='store_true', default=True)
-parser.add_argument('--pedImgs', help='make images of pedestals', action='store_true', default=True)
+parser.add_argument('--postElog', help='post plot to elog', action='store_true', default=False)
+parser.add_argument('--pedImgs', help='make images of pedestals', action='store_true', default=False)
 parser.add_argument('--pedDiffImgs', help='make images of first 10 subtracted images ', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 args = parser.parse_args()
@@ -46,19 +46,108 @@ make_ped_data_imgs = args.pedImgs
 expname = args.experiment
 run = int(args.run)
 
+####
+# detector info to be used for status#s to elog
+####
+gainSwitching=['jungfrau','epix10k']
+statusDict={}
+#https://confluence.slac.stanford.edu/display/PSDMInternal/Pixel+status+in+data
+statusDict['pnccd']={'rms_high':0x1,
+            'adu_high_frac':0x2,
+            'adu_low_frac':0x4,
+            'rms_low':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20,
+            'adu_max_high':0x40,
+            'adu_min_low':0x80}
 
+#https://confluence.slac.stanford.edu/display/PSDM/Jungfrau+bad+gain+mode+switch+status#Jungfraubadgainmodeswitchstatus-pixelstatusstatistics
+statusDict['jungfrau']={'rms_high':0x1,
+            'rms_low':0x2,
+            'adu_high_frac':0x4,
+            'adu_low_frac':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20,
+            'bad_switch':0x40}
+
+#from logfile for epix10k2M using ana-4.0.48
+statusDict['epix10k']={'rms_high':0x1,
+            'rms_low':0x2,
+            'adu_high_frac':0x4,
+            'adu_low_frac':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20}
+
+#epix100 for epix100 using ana-4.0.48 for xpptut15. run 260
+statusDict['epix100']={'rms_high':0x1,
+            'rms_low':0x2,
+            'adu_high_frac':0x4,
+            'adu_low_frac':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20}
+
+#cspad from cs140 using ana-4.0.48 for xpptut15. run 201
+statusDict['cspad']={'rms_high':0x1,
+            'rms_low':0x2,
+            'adu_high_frac':0x4,
+            'adu_low_frac':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20}
+
+# (other detectors)
+statusDict['camera']={'rms_high':0x1,
+            'rms_low':0x2,
+            'adu_high_frac':0x4,
+            'adu_low_frac':0x8,
+            'adu_av_high':0x10,
+            'adu_av_low':0x20}
+
+
+####
+# helper functions
+####
 def postRunTable(runtable_data):
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
     user=args.experiment[:3]+'opr'
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+    elogPostFile='/cds/home/opr/%s/forElogPost.txt'%user
+    hostname=socket.gethostname()
+    if hostname.find('sdf')>=0:
+        elogPostFile='/sdf/group/lcls/ds/tools/forElogPost.txt'
+    with open(elogPostFile,'r') as reader:
         answer = reader.readline()
-    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
+        r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
                       auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     #we might need to use this for non=current expetiments. Currently does not work in ARP
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     print(r)
+
+def statusStats(det_name, printme=False):
+    det = psana.Detector(det_name)
+    statusmask = det.mask(run,status=True)
+    status = det.status(run)
+    status_type = 'camera' #see if different detector types here are different?
+    if det.is_epix10ka_any(): status_type = 'epix10k'
+    elif det.is_jungfrau(): status_type = 'jungfrau'
+    elif det.is_epix100a(): status_type = 'epix100'
+    elif det.is_cspad() or det.is_cspad2x2(): status_type = 'cspad'
+
+    status_unp = np.array([ (np.unpackbits(tstatus.flatten().astype(np.uint8), bitorder='little')).\
+                       reshape([int(tstatus.flatten().shape[0]),8]) for tstatus in status ])
+
+    statusStatDict={}
+    for istatus,statusk in enumerate(statusDict[status_type]):
+        if status_type in gainSwitching:
+            statusStatDict[statusk]=int((status_unp.sum(axis=0)[:,istatus]>0).sum())
+        else:
+            statusStatDict[statusk]=int((status_unp[:,istatus]>0).sum())
+    statusStatDict['total_masked']=int(statusmask.flatten().shape[0]-statusmask.sum())
+ 
+    if printme:
+        for k,v in statusStatDict.items():
+            print(k,v)
+    return statusStatDict
 
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Ped=1e6
@@ -404,15 +493,6 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     
     return tabs
 
-def getPixelStatus(det_name, run):
-    det = psana.Detector(det_name)
-    return det.status(run)
-
-def countBadPixels(det_name, run):
-    status = getPixelStatus(det_name, run)
-    status_sum = status.sum(axis=0)
-    return int((status_sum>0).sum())
-
 def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
                  detImgMaxSize=400):
     isLCLS2=False
@@ -439,14 +519,18 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
     runTableData = {}
     for det_name, alias in zip(det_names, aliases):
         #print(det_name, alias)
+        this_det_name = alias
         if alias == '':
-            tabs = allPlots(det_name, run, make_ped_imgs=make_ped_imgs, 
-                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
-        else:
-            tabs = allPlots(alias, run, make_ped_imgs=make_ped_imgs, 
-                            make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
-        runTableData[f'{det_name}_n_bad_pixels'] = countBadPixels(det_name, run)
-      
+            this_det_name = det_name
+        tabs = allPlots(this_det_name, run, make_ped_imgs=make_ped_imgs, 
+                        make_ped_data_imgs=make_ped_data_imgs, tabs=tabs, 
+                        detImgMaxSize=detImgMaxSize, isLCLS2=isLCLS2)
+        statusDict = statusStats(this_det_name)
+        for k,v in statusDict.items():
+            runTableData[f'Pixel Status/{this_det_name}_n_{k}'] = v
+        print('runTableData:')
+        print(runTableData)
+
     if save_elog:
         elogDir = '/reg/d/psdm/%s/%s/stats/summary/Pedestals/Pedestals_Run%03d'%(expname[0:3],expname,runnum)
 

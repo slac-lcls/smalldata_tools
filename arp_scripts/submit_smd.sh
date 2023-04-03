@@ -70,6 +70,16 @@ do
 			shift
 			shift
 			;;
+        --account)
+            ACCOUNT="$2"
+			shift
+			shift
+			;;
+        --reservation)
+            RESERVATION="$2"
+			shift
+			shift
+			;;
         --interactive)
             INTERACTIVE=1
             POSITIONAL+=("$1")
@@ -88,12 +98,19 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+DEFQUEUE='psanaq'
+if [[ $HOSTNAME == *drp* ]]; then
+    DEFQUEUE='anaq'
+elif [[ $HOSTNAME == *sdf* ]]; then
+    DEFQUEUE='milano'
+fi
 #Define cores if we don't have them
 #Set to 1 by default
 CORES=${CORES:=1}
-QUEUE=${QUEUE:='psanaq'}
-#QUEUE=${QUEUE:='ffbh3q'}
-#QUEUE=${QUEUE:='psfehq'}
+QUEUE=${QUEUE:=$DEFQUEUE}
+ACCOUNT=${ACCOUNT:='lcls'}
+RESERVATION=${RESERVATION:=''}
+#QUEUE=${QUEUE:='anaq'}
 # select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
@@ -101,6 +118,8 @@ elif [[ $QUEUE == *psfeh* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=16}
 elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
+elif [[ $QUEUE == *milano* ]]; then
+    TASKS_PER_NODE=${TASKS_PER_NODE:=128}
 else
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
@@ -120,4 +139,12 @@ if [ -v LOGFILE ]; then
     exit 0
 fi
 
-sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
+if [[ $QUEUE == *milano* ]]; then
+    if [[ $ACCOUNT == 'lcls' ]]; then
+	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable $MYDIR/submit_small_data.sh $@
+    else
+	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT $MYDIR/submit_small_data.sh $@
+    fi
+else
+    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive $MYDIR/submit_small_data.sh $@
+fi

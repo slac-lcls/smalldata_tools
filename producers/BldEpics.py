@@ -9,6 +9,8 @@ import os
 import argparse
 import sys
 import logging
+import socket
+
 try:
     basestring
 except NameError:
@@ -38,7 +40,12 @@ logger.debug('Args to be used for Bld&EPICS extraction: {0}'.format(args))
 expname = args.experiment
 run = int(args.run)
 
-dat = tables.open_file('/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
+hostname = socket.gethostname()
+
+if hostname.find('drp') >= 0:
+    dat = tables.open_file('/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
+else:
+    dat = tables.open_file('/cds/data/psdm/%s/%s/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
 
 tiffdir = '/cds/data/psdm/%s/%s/scratch/run%d'%(expname[:3],expname,run)
 

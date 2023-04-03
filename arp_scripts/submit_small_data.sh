@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Took this from Silke's script, nice implementation
 usage()
 {
 cat << EOF
@@ -96,18 +95,29 @@ umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
+SIT_ENV_DIR="/cds/group/psdm"
+S3DF="sdf"
+
+if [[ $HOSTNAME == *sdf* ]]; then
+    SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+fi
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
-    source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
+    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
     PYTHONEXE=smd2_producer.py
     export PS_SRV_NODES 1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
-    source /reg/g/psdm/etc/psconda.sh -py3
+    #echo "Setting up the enviroment: "$SIT_ENV_DIR/sw/ds/ana/conda1/manage/bin/psconda.sh
+    source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     PYTHONEXE=smd_producer.py
 fi
 
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
+
+echo ---- print environment ----
+env | sort
+echo --- printed environment ---
 
 #run all imports on batch node before calling mpirun on that node.
 if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then

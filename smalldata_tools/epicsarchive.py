@@ -95,7 +95,7 @@ class EpicsArchive(object):
         If do_print=False, returns the list of matches.
         """
         url = mgmt_url + "getAllPVs"
-        url += pv_arg.format(urllib.quote(glob, safe=""))
+        url += pv_arg.format(urllib.parse.quote(glob, safe=""))
         pvs = url_query(url)
         if do_print:
             success = list_print(pvs)
@@ -172,7 +172,7 @@ class EpicsArchive(object):
         chunk: boolean for whether or not you want data to be chunked.
         """
         url = retrieval_url
-        url += pv_arg.format(urllib.quote(PV, safe=""))
+        url += pv_arg.format(urllib.parse.quote(PV, safe=""))
         url += url_arg.format("from", date_format(*start))
         url += url_arg.format("to", date_format(*end))
         if not chunk:
@@ -218,11 +218,11 @@ def to_datetime(arg, unit):
     """
     if isinstance(arg, datetime.datetime):
         return arg
-    if isinstance(arg, (int, float, long)):
+    if isinstance(arg, (int, float)):
         if (arg < 10000):
             return datetime_ago(arg, unit)
         else: #big - must be time in secs since epoch.
-            return datetime.datetime.fromtimestamp(arg.astype(int))
+            return datetime.datetime.fromtimestamp(int(arg))
     if isinstance(arg, (list, tuple)):
         arg = list(arg)
         while len(arg) < 3:
@@ -248,7 +248,7 @@ def datetime_to_array(dt):
 def date_format(year=2015, month=1, day=1, hr=0, min=0, s=0, ms=0):
     """Convert date/time parameters to date format string for archiver"""
     d = date_spec_format.format(year, month, day, hr, min, s, ms)
-    return urllib.quote(d, safe="")
+    return urllib.parse.quote(d, safe="")
 
 def valid_date_arrays(start, end):
     """

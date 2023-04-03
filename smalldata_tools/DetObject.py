@@ -80,6 +80,34 @@ def DetObject(srcName, env, run, **kwargs):
     #return None
 
 class DetObjectClass(object):
+    # These constants are essentially the inverse of the detector_classes dict above.
+    # Where are these really defined?  PSCalib!  In src/GlobalUtils.py.
+    CsPad2M = 1           # CSPAD
+    CsPad = 2             # CSPAD2X2
+    Pulnix = 5
+    Opal = 6              # OPAL1000
+    Opal2k = 7
+    Opal4k = 8
+    Opal8k = 9
+    Orca = 10
+    Epix = 13
+    AndOr = 15
+    Acqiris = 16
+    Rayonix = 19
+    Fli = 23
+    Jungfrau = 26
+    Zyla = 27
+    ControlsCamera = 28
+    Epix10k = 29
+    Icarus = 30
+    Epix10k2M = 32
+    Epix10k2M_quad = 33
+    Camera = 34           # STREAK?
+    iStar = 36
+    Alvium = 37
+    OceanOptics = 98      # ?
+    Imp = 99              # ?
+    
     def __init__(self,det,env,run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
         self._src=det.source
@@ -91,6 +119,7 @@ class DetObjectClass(object):
         self.maskCentral = kwargs.get('maskCentral', True)
 
         self.dataAccessTime=0.
+        self.rawShape = None
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
@@ -114,16 +143,25 @@ class DetObjectClass(object):
         if self.ped is not None:
             self.imgShape = self.ped.shape
             try:
-                self.imgShape = self.det.image(self.run, self.ped)
+                self.imgShape = self.det.image(self.run, self.ped).shape
             except:
                 if len(self.ped.shape)>2:
                     try:
-                        self.imgShape = self.det.image(ped[0], self.run)
+                        self.imgShape = self.det.image(ped[0], self.run).shape
                     except:         
                         print('multi dim pedestal & image function does do nothing: multi gain detector.....')
                         self.imgShape=self.ped.shape[1:]
         else:
             self.imgShape = None
+
+    #
+    # In what follows, we should call this to set the raw shape whenever we set self.evt.dat.
+    # It would be nice to do this once at the beginning of time, but probably better not to
+    # search for an event with data.
+    #
+    def _getRawShape(self):
+        if self.rawShape is None and self.evt is not None and self.evt.dat is not None:
+            self.rawShape = self.evt.dat.shape
 
     def _get_coords_from_ped(self):
         self.x = np.arange(0,self.ped.shape[-2]*self.pixelsize[0]*1e6, self.pixelsize[0]*1e6)
@@ -279,6 +317,7 @@ class WaveformObject(DetObjectClass):
         self.mask = None
         self.wfx = None
         self.gain = None
+
     def getData(self, evt):
         super(WaveformObject, self).getData(evt)
         if self.wfx is None:
@@ -287,11 +326,13 @@ class WaveformObject(DetObjectClass):
 class GenericWFObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
         super(GenericWFObject, self).__init__(det,env,run, **kwargs)
+
     def getData(self, evt):
         super(GenericWFObject, self).getData(evt)
         self.evt.dat = self.det.raw(evt)
         if isinstance(self.evt.dat, list):
             self.evt.dat = np.array(self.evt.dat)
+        self._getRawShape()
 
 class AcqirisObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -307,9 +348,11 @@ class AcqirisObject(WaveformObject):
         for c in cfg.vert():
             self.fullScale.append(c.fullScale())
             self.offset.append(c.offset())
+
     def getData(self, evt):
         super(AcqirisObject, self).getData(evt)
         self.evt.dat = self.det.waveform(evt)
+        self._getRawShape()
 
 class OceanOpticsObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -320,6 +363,7 @@ class OceanOpticsObject(WaveformObject):
         self.evt.dat = self.det.intensity(evt)
         if self.wfx is None:
             self.wfx = self.det.wavelength(evt)
+        self._getRawShape()
 
 class ImpObject(WaveformObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -328,6 +372,7 @@ class ImpObject(WaveformObject):
     def getData(self, evt):
         super(ImpObject, self).getData(evt)
         self.evt.dat = self.det.waveform(evt)
+        self._getRawShape()
         
 class CameraObject(DetObjectClass): 
     def __init__(self, det,env,run,**kwargs):
@@ -377,11 +422,10 @@ class CameraObject(DetObjectClass):
                         self.evt.dat*=self.gain   
         elif self.common_mode%100==30:
             self.evt.dat = self.det.calib(evt)
-
         #override gain if desired
         if self.local_gain is not None and self.common_mode in [0,30] and self._gainSwitching is False and self.local_gain.shape == self.evt.dat.shape:
             self.evt.dat*=self.local_gain   #apply own gain
-        
+        self._getRawShape()
 
 class OpalObject(CameraObject): 
     def __init__(self, det,env,run,**kwargs):
@@ -396,11 +440,11 @@ class OpalObject(CameraObject):
             if self.ped is None or self.ped.shape==(0,0): #this is the case for e.g. the xtcav recorder but can also return with the DAQ. Assume Opal1k for now.
                 #if srcName=='xtcav':
                 #  self.ped = np.zeros([1024,1024])
-                if det.dettype == 6:
+                if det.dettype == DetObjectClass.Opal:
                     self.ped = np.zeros([1024,1024])
                 else:
                     self.ped = None
-        if det.dettype == 6:
+        if det.dettype == DetObjectClass.Opal:
             self.imgShape = self.ped.shape
             if self.x is None:
                 self._get_coords_from_ped()
@@ -649,6 +693,7 @@ class IcarusObject(CameraObject):
             self.evt.__dict__['write_cmUnb'] = cmVals
             self._applyMask()
             #gain is ignored here for now
+            self._getRawShape()
 
 class JungfrauObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
@@ -670,6 +715,7 @@ class JungfrauObject(TiledCameraObject):
             pass
         self._gainSwitching = True
         #self._common_mode_list.append()
+
     def getData(self, evt):
         super(JungfrauObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
@@ -690,6 +736,7 @@ class JungfrauObject(TiledCameraObject):
         #correct for area of pixels.
         if self.areas is not None:
             self.evt.dat/=self.areas
+        self._getRawShape()
 
 class CsPadObject(TiledCameraObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -712,6 +759,7 @@ class CsPadObject(TiledCameraObject):
           self.gain_mask*=6.85
           self.gain_mask[self.gain_mask==0]=1.
           self.gain*=self.gain_mask
+
     def getData(self, evt):
         super(CsPadObject, self).getData(evt)
         mbits=0 #do not apply mask (would set pixels to zero)
@@ -742,6 +790,7 @@ class CsPadObject(TiledCameraObject):
         #correct for area of pixels.
         if self.areas is not None:
             self.evt.dat/=self.areas
+        self._getRawShape()
 
 class CsPad2MObject(CsPadObject):  
     def __init__(self, det,env,run,**kwargs):
@@ -759,6 +808,7 @@ class CsPad2MObject(CsPadObject):
                  self.imgShape = self.det.image(run, self.ped).shape
             except:
                  self.imgShape = self.ped.shape
+
     def getData(self, evt):
         super(CsPad2MObject, self).getData(evt)
 
@@ -849,6 +899,7 @@ class EpixObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalV']  = envRow[8]*0.001
         except:
             pass
+        self._getRawShape()
 
 #
 # as a
@@ -1009,6 +1060,7 @@ class Epix10kObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalTemp']  =  np.array(digtemp) 
         except:
             pass
+        self._getRawShape()
 
 class Epix10k2MObject(TiledCameraObject): 
     def __init__(self, det, env, run, **kwargs):
@@ -1070,7 +1122,7 @@ class Epix10k2MObject(TiledCameraObject):
         self.ped = self.ped.squeeze()
         if self.rms is None or self.rms.shape!=self.ped.shape:
             self.rms=np.ones_like(self.ped)
-        self.imgShape=self.det.image(run, self.ped[0])
+        self.imgShape=self.det.image(run, self.ped[0]).shape
         self._gainSwitching = True                
 
         ##stuff for ghost correction
@@ -1279,6 +1331,7 @@ class Epix10k2MObject(TiledCameraObject):
             self.evt.__dict__['env_DigitalTemp']  =  np.array(digtemp) 
         except:
             pass
+        self._getRawShape()
 
 #needs to be retrofitted to work with both rayonix cameras.
 class RayonixObject(CameraObject): 
@@ -1297,11 +1350,11 @@ class RayonixObject(CameraObject):
           self.pixelsize=[170e-3/3840*binning] #needs to change for bigger rayonix.
         try:
           self.ped = np.zeros([rcfg.width(), rcfg.height()])
-          self.imgShape = [rcfg.width(), rcfg.height()]
+          self.imgShape = (rcfg.width(), rcfg.height())
         except: 
           npix = int(170e-3/self.pixelsize[0])
           self.ped = np.zeros([npix, npix])
-          self.imgShape = [npix, npix]
+          self.imgShape = (npix, npix)
         if self.x is None:
             self.x = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
             self.y = np.arange(0,self.ped.shape[0]*self.pixelsize[0], self.pixelsize[0])*1e6
@@ -1432,7 +1485,7 @@ class UxiObject(DetObjectClass):
         #self.evt.__dict__['env_cm_RowMed'] = cmValues
         #self.evt.__dict__['env_cm_RowMed_used'] = cmValues_used
         #self.evt.dat = corrImg
-
+        self._getRawShape()
         return
 
 ##---------------------------------------------------------------------
