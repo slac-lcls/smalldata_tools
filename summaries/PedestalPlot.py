@@ -143,6 +143,10 @@ def statusStats(det_name, printme=False):
         else:
             statusStatDict[statusk]=int((status_unp[:,istatus]>0).sum())
     statusStatDict['total_masked']=int(statusmask.flatten().shape[0]-statusmask.sum())
+    if status_type in gainSwitching:
+        print(status.shape) 
+        for icycle in range(status.shape[0]):
+            statusStatDict['cycle%i'%icycle]=int((status[icycle]>0).sum())
  
     if printme:
         for k,v in statusStatDict.items():
