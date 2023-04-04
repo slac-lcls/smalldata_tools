@@ -18,7 +18,7 @@ $(basename "$0"):
 			Queue to use on SLURM
 		-i|--interactive
 			Run interactively
-		-p|--pedestal
+		-p|--pedestals
 			plot the pedestals instead
 		-b|--bld
 			output selected BLD data in a text file (MEC style)
