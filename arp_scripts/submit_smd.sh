@@ -203,6 +203,9 @@ fi
 
 LOGFILE='smd_'${EXP}'_Run'${RUN}'_%J.log'
 if [ -v LOGDIR ]; then
+    if [ ! -d "$LOGDIR" ]; then
+        mkdir -p "$LOGDIR"
+    fi
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
