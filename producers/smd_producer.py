@@ -54,6 +54,7 @@ def getROIs(run):
 #epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v', "XPP:GON:MMS:03.RBV",
 #               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
 #epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
+epicsOncePV = []
 epicsPV = []
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
@@ -213,7 +214,7 @@ print(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData
+from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
@@ -375,7 +376,7 @@ except Exception as e:
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 # Not sure why, but here
-if ds.rank is 0:
+if ds.rank == 0:
 	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
@@ -405,6 +406,12 @@ if args.full or args.epicsAll:
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 elif len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+
+if len(epicsOncePV)>0:
+    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce', run=thisrun)
+else:
+    EODet = None
+EODetData = {'epicsOnce': {}}
 
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
@@ -497,6 +504,7 @@ if args.tiff:
 
 ds.break_after(args.nevents)
 for evt_num, evt in enumerate(ds.events()):
+    start_evt_loop = time.time()
     if evt_num == 0 and EODet is not None:
         det_data = detOnceData(EODet, evt, args.noarch)
         if det_data['epicsOnce'] != {}:
@@ -507,9 +515,6 @@ for evt_num, evt in enumerate(ds.events()):
         else:
             Config={'UserDataCfg':userDataCfg}
             small_data.save(Config)
-
-    if evt_num > max_iter:
-        break
 
     det_data = detData(default_dets, evt)
     small_data.event(det_data)
