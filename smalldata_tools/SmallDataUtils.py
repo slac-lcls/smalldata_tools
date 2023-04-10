@@ -190,7 +190,8 @@ def mfxDetectors(beamCodes=[[-137],[]]):
 
 def cxiDetectors(beamCodes=[[-137],[184]]):
     dets=[]
-    dets.append(lightStatus(codes=beamCodes, evrName='evr0'))
+    #dets.append(lightStatus(codes=beamCodes, evrName='evr0'))
+    dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))

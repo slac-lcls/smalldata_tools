@@ -44,6 +44,10 @@ def getROIs(run):
         ret_dict['jungfrau1M'] = roi_dict
     return ret_dict
 
+def isDropped(def_data):
+    if def_data['lightStatus']['xray'] == 0: 
+        return True
+    return False
 
 ##########################################################
 # run independent parameters 
@@ -178,6 +182,8 @@ def define_dets(run):
                 det.addFunc(svdFit(**svd[detname]))
 
             det.storeSum(sumAlgo='calib')
+            det.storeSum(sumAlgo='calib_dropped')
+            det.storeSum(sumAlgo='calib_dropped_square')
             #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
@@ -262,7 +268,8 @@ parser.add_argument('--gather_interval', help='gather interval', type=int, defau
 parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)
-parser.add_argument('--full', help='store all data (please think before usig this)', action='store_true', default=False)
+parser.add_argument('--full', help='store all data (please think before using this)', action='store_true', default=False)
+parser.add_argument('--fullSum', help='store sums for all area detectors', action='store_true', default=False)
 parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
 parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
 parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
@@ -408,10 +415,9 @@ elif len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 
 if len(epicsOncePV)>0:
-    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce', run=thisrun)
+    EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
 else:
     EODet = None
-EODetData = {'epicsOnce': {}}
 
 default_dets.append(eorbitsDetector())
 default_det_aliases = [det.name for det in default_dets]
@@ -422,7 +428,7 @@ else:
     dets = []
 
 det_presence={}
-if args.full:
+if args.full or args.fullSum:
     aliases = []
     for dn in psana.DetNames():
         if dn[1]!='':
@@ -445,25 +451,29 @@ if args.full:
         if alias=='XPP-USB-ENCODER-02' and args.experiment.find('xpp')>=0:  continue
         if alias=='XCS-SB1-BMMON' and args.experiment.find('xcs')>=0:  continue
         if alias=='XCS-SB2-BMMON' and args.experiment.find('xcs')>=0:  continue
+        if alias=='CXI-DG2-BMMON' and args.experiment.find('cxi')>=0:  continue
+        if alias=='CXI-DG3-BMMON' and args.experiment.find('cxi')>=0:  continue
         if alias=='MEC-XT2-BMMON-02' and args.experiment.find('mec')>=0:  continue
         if alias=='MEC-XT2-BMMON-03' and args.experiment.find('mec')>=0:  continue
 
-        if alias.find('BMMON')>=0:
-            print('append a bmmon',alias)
-            default_dets.append(bmmonDetector(alias))
-            continue
-        elif alias.find('IPM')>=0 or alias.find('Ipm')>0:
-            default_dets.append(ipmDetector(alias, savePos=True))
-            continue
-        elif alias.find('DIO')>=0 or alias.find('Imb')>0:
-            default_dets.append(ipmDetector(alias, savePos=False))
-            continue
-        elif alias.find('USB')>=0:
-            default_dets.append(encoderDetector(alias))
-            continue
-        elif alias.find('adc')>=0:
-            default_dets.append(adcDetector(alias))
-            continue
+        if args.full:
+            if alias.find('BMMON')>=0:
+                print('append a bmmon',alias)
+                default_dets.append(bmmonDetector(alias))
+                continue
+            elif alias.find('IPM')>=0 or alias.find('Ipm')>0:
+                default_dets.append(ipmDetector(alias, savePos=True))
+                continue
+            elif alias.find('DIO')>=0 or alias.find('Imb')>0:
+                default_dets.append(ipmDetector(alias, savePos=False))
+                continue
+            elif alias.find('USB')>=0:
+                default_dets.append(encoderDetector(alias))
+                continue
+            elif alias.find('adc')>=0:
+                default_dets.append(adcDetector(alias))
+                continue
+
         try:
             thisDet = DetObject(alias, ds.env(), int(run), name=alias, maskCentral=(not args.centerpix))
             hasGeom=False
@@ -474,7 +484,12 @@ if args.full:
                 fullROI.addFunc(imageFunc(coords=['x','y']))
             else:    
                 fullROI = ROIFunc(writeArea=True)
-            thisDet.addFunc(fullROI)
+            if args.full:
+                thisDet.addFunc(fullROI)
+            if args.fullSum:
+                thisDet.storeSum(sumAlgo='calib_dropped')
+                thisDet.storeSum(sumAlgo='calib_dropped_square')
+
             dets.append(thisDet)
         except:
            pass
@@ -492,8 +507,11 @@ for det in dets:
         userDataCfg[det._name] = det.params_as_dict()
     except:
         userDataCfg[det.name] = det.params_as_dict()
-Config={'UserDataCfg':userDataCfg}
-small_data.save(Config)
+
+#is EOODet exists, save this later.
+if EODet is None:
+    Config={'UserDataCfg':userDataCfg}
+    small_data.save(Config)
 
 end_setup_dets = time.time()
 
@@ -503,11 +521,11 @@ if args.tiff:
         os.makedirs(dirname)
 
 ds.break_after(args.nevents)
+start_evt_loop = time.time()
 for evt_num, evt in enumerate(ds.events()):
-    start_evt_loop = time.time()
     if evt_num == 0 and EODet is not None:
         det_data = detOnceData(EODet, evt, args.noarch)
-        if det_data['epicsOnce'] != {}:
+        if det_data[EODet.name] != {}:
             userDataCfg[EODet.name] = EODet.params_as_dict()
             Config={'UserDataCfg':userDataCfg}
             small_data.save(Config)
@@ -516,8 +534,8 @@ for evt_num, evt in enumerate(ds.events()):
             Config={'UserDataCfg':userDataCfg}
             small_data.save(Config)
 
-    det_data = detData(default_dets, evt)
-    small_data.event(det_data)
+    def_data = detData(default_dets, evt)
+    small_data.event(def_data)
 
     #detector data using DetObject 
     userDict = {}
@@ -533,7 +551,7 @@ for evt_num, evt in enumerate(ds.events()):
                     userDict[det._name+'_env']=envData
             except:
                 pass
-            det.processSums()
+            det.processSums(dropped=isDropped(def_data))
 #             print(userDict[det._name])
         except:
             # handle when sum is bad for all shots on a rank (rare, but happens)
