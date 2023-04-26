@@ -14,11 +14,29 @@ args = parser.parse_args()
 
 exp = args.experiment
 hutch = exp[:3].lower()
-FFB_BASE = Path("/cds/data/drpsrcf/{}/{}/scratch".format(hutch, exp))
-PSANA_BASE = Path("/cds/data/psdm/{}/{}".format(hutch, exp))
+FFB_BASE = Path("/cds/data/drpsrcf/{hutch}/{exp}/scratch")
+PSANA_BASE = Path("/cds/data/psdm/{hutch}/{exp}")
+SDF_BASE = Path(f"/sdf/data/lcls/ds/{hutch}/{exp}")
 
 # job arguments
-if 'ffb' in args.queue:
+if 'milano' in args.queue:
+    location = 'SLAC'
+    cores = 128
+    account = f"lcls:{exp}"
+
+    # smd
+    executable = str(SDF_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
+    trigger = 'START_OF_RUN'
+    
+    # cube
+    executable_cube = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
+    run_param_name = 'SmallData'
+    args_cube = f''
+    
+    # summaries
+    executable_summaries = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
+
+elif 'ffb' in args.queue:
     location = 'SRCF_FFB'
     cores = 60
     # smd
