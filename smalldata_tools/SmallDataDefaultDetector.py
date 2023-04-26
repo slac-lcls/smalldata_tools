@@ -60,15 +60,20 @@ class lightStatus(defaultDetector):
             evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
             #print('in lightStatus', evrNames)
             if len(evrNames)<1:
-                return
-            nCodesMax = -1
-            for name in evrNames:
-                nCodes = psana.Detector(name)._fetch_configs()[0].neventcodes()
-                if nCodes > nCodesMax:
-                    nCodesMax = nCodes
-                    evrName = name
-            if nCodesMax < 0:
-                return
+                return                
+            evrNames.sort()
+            #snelson: as far as I can tell, this does not work as the EVRs seem to have the same cfg.
+            #nCodesMax = -1
+            #for name in evrNames:
+            #    nCodes = psana.Detector(name)._fetch_configs()[0].neventcodes()
+            #    if nCodes > nCodesMax:
+            #        nCodesMax = nCodes
+            #        evrName = name
+            #if nCodesMax < 0:
+            #    return
+            #snelson: at some point after 2020, Dan D. implemented that the first/lower EVR would be 
+            #    the main one carrying the event codes
+            evrName = evrNames[0]    
         defaultDetector.__init__(self, evrName, 'lightStatus')
         self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
         self.laserCodes_drop = [ c for c in codes[1] if c > 0]
@@ -253,6 +258,18 @@ class epicsDetector(defaultDetector):
                 #print('we have issues with %s in this event'%pvname)
                 pass
         return dl
+
+    def params_as_dict(self):
+        d = super().params_as_dict()
+        try:
+            del d['missing']
+        except Exception:
+            pass
+        try:
+            del d['missingPV']
+        except Exception:
+            pass
+        return d
 
 class encoderDetector(defaultDetector):
     def __init__(self, detname, name=None):

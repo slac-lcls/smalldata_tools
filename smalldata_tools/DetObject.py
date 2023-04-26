@@ -269,7 +269,7 @@ class DetObjectClass(object):
                 print('Could not run function %s on data of detector %s of shape'%(func._name, self._name), self.evt.dat.shape)
                 print('Error message: {}'.format(E))
 
-    def processSums(self):
+    def processSums(self, **kwargs):
         for key in self._storeSum.keys():
             asImg=False
             thres=-1.e9
@@ -298,6 +298,13 @@ class DetObjectClass(object):
                 except:
                     pass
 
+            #loop over kwargs & look for them in the key
+            for k,v in kwargs.items():
+                # the key indicates a given selection is to be respected
+                if key.find(k)>=0:
+                    # is the selection is not tryue, set array to zeros
+                    if not v: dat_to_be_summed = np.zeros_like(dat_to_be_summed)
+            
             if self._storeSum[key] is None:
                 self._storeSum[key] = dat_to_be_summed.copy()
             else:
