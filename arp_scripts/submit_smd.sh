@@ -209,19 +209,19 @@ if [ -v LOGDIR ]; then
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE"
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive -o $LOGFILE"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 if [[ $QUEUE == *milano* ]]; then
     if [[ $ACCOUNT == 'lcls' ]]; then
 	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
-	sbatch $SBATCH_ARGS --qos preemptable --wrap="$MPI_CMD"
+	sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
 	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
-	sbatch $SBATCH_ARGS --wrap="$MPI_CMD"
+	sbatch $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
 
     fi
-else # do we need the no-account setup?
-    sbatch --wrap "mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+else # for outside s3df
+    sbatch $SBATCH_ARGS --wrap "$MPI_CMD"
 fi
