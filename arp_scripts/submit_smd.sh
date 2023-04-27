@@ -147,9 +147,9 @@ fi
 #Set to 1 by default
 CORES=${CORES:=1}
 QUEUE=${QUEUE:=$DEFQUEUE}
-ACCOUNT=${ACCOUNT:='lcls'}
-RESERVATION=${RESERVATION:=''}
-#QUEUE=${QUEUE:='anaq'}
+ACCOUNT=${ACCOUNT:="lcls:$EXP"}
+RESERVATION=${RESERVATION:=''} # not implemented yet
+
 # select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
@@ -191,7 +191,7 @@ env | sort
 echo --- printed environment ---
 
 if [ -v INTERACTIVE ]; then
-    #run all imports on batch node before calling mpirun on that node.
+    # run in local terminal
     if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
         python -u $ABS_PATH/$PYTHONEXE $@
     else
@@ -209,14 +209,19 @@ if [ -v LOGDIR ]; then
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE"
+MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+
 if [[ $QUEUE == *milano* ]]; then
     if [[ $ACCOUNT == 'lcls' ]]; then
-	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+	sbatch $SBATCH_ARGS --qos preemptable --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
-	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+	sbatch $SBATCH_ARGS --wrap="$MPI_CMD"
 
     fi
-else
-    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive -o $LOGFILE --wrap "mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+else # do we need the no-account setup?
+    sbatch --wrap "mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 fi
