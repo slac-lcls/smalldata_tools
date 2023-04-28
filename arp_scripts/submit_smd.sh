@@ -89,8 +89,8 @@ do
         shift
         ;;
     -e|--experiment)
-        POSITIONAL+=("--experiment $2")
         EXP=$2
+        POSITIONAL+=("--experiment $2")
         shift
         shift
         ;;
@@ -128,6 +128,7 @@ umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
+RUN="${RUN_NUM:=$RUN}" # same as EXP
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
 SIT_ENV_DIR="/cds/group/psdm"
@@ -186,6 +187,10 @@ else
     PYTHONEXE=smd_producer.py
 fi
 
+# figure out the right base path for the data
+DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+export SIT_PSDM_DATA=$DATAPATH
+
 echo ---- print environment ----
 env | sort
 echo --- printed environment ---
@@ -211,6 +216,8 @@ fi
 
 SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive -o $LOGFILE"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+
+export SIT_PSDM_DATA=/sdf/data/lcls/drpsrcf/ffb
 
 if [[ $QUEUE == *milano* ]]; then
     if [[ $ACCOUNT == 'lcls' ]]; then

@@ -83,12 +83,9 @@ fi
 echo "... Done."
 
 # Create h5 and plot directories
-mkdir $SDF_BASE/stats/summary/Cube
-
-#if [ $FFB -eq 1 ]; then
-#    mkdir -p $FFB_BASE/hdf5/smalldata
-#    mkdir -p $FFB_BASE/hdf5/smalldata/cube
-#fi
+mkdir -p $SDF_BASE/hdf5/smalldata
+mkdir -p $SDF_BASE/hdf5/smalldata/cube
+mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
 if [ $QUEUE != "0" ]; then

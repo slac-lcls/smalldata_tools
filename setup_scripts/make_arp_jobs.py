@@ -20,7 +20,7 @@ SDF_BASE = Path(f"/sdf/data/lcls/ds/{hutch}/{exp}")
 
 # job arguments
 if 'milano' in args.queue:
-    location = 'SLAC'
+    location = 'S3DF'
     cores = 128
     account = f"lcls:{exp}"
 
@@ -35,6 +35,8 @@ if 'milano' in args.queue:
     
     # summaries
     executable_summaries = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
+    queue_summaries = args.queue
+    args_summaries = ''
 
 elif 'ffb' in args.queue:
     location = 'SRCF_FFB'
