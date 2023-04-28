@@ -25,7 +25,7 @@ if 'milano' in args.queue:
     account = f"lcls:{exp}"
 
     # smd
-    executable = str(SDF_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
+    executable = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
     trigger = 'START_OF_RUN'
     
     # cube

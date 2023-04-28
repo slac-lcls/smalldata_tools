@@ -404,8 +404,7 @@ if hostname.find('sdf')>=0:
     onS3DF = True
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
-        # do we need to do smth to wait for
-        # files?
+        # do we need to do smth to wait for files here?
 
 elif hostname.find('drp')>=0:
     nFiles=0
