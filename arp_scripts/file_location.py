@@ -5,11 +5,9 @@ import json
 import argparse
 import logging
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-exp = 'xppc00121'
-run = 120
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run', '-r', type=int, action='store', help="Run number")
