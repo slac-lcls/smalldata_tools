@@ -350,8 +350,6 @@ def get_xtc_files(base, hutch, run):
 
 def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
-    print(exp)
-    print(hutch)
     if write_dir is None:
         if useFFB and not onS3DF: # when on a drp node
             write_dir = FFB_BASE / hutch.lower() / exp / '/scratch' / SD_EXT
