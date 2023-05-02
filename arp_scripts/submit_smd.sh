@@ -115,6 +115,10 @@ do
         INTERACTIVE=1
         shift
         ;;
+    --s3df)
+        FORCE_S3DF=1
+        shift
+        ;;
     *)
         POSITIONAL+=("$1")
         shift
@@ -187,8 +191,12 @@ else
     PYTHONEXE=smd_producer.py
 fi
 
-# figure out the right base path for the data
-DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+# figure out the right base path for the data (or use S3DF in force case)
+if [ -v FORCE_S3DF ]; then
+    DATAPATH="/sdf/data/lcls/ds"
+else
+    DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+fi
 export SIT_PSDM_DATA=$DATAPATH
 
 echo ---- print environment ----
