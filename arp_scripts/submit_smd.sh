@@ -214,25 +214,25 @@ if [ -v INTERACTIVE ]; then
     exit 0
 fi
 
-LOGFILE='smd_'${EXP}'_Run'${RUN}'_%J.log'
-if [ -v LOGDIR ]; then
-    if [ ! -d "$LOGDIR" ]; then
-        mkdir -p "$LOGDIR"
-    fi
-    LOGFILE=$LOGDIR'/'$LOGFILE
-fi
+#LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
+#if [ -v LOGDIR ]; then
+#    if [ ! -d "$LOGDIR" ]; then
+#        mkdir -p "$LOGDIR"
+#    fi
+#    LOGFILE=$LOGDIR'/'$LOGFILE
+#fi
 
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive -o $LOGFILE"
+# The log name must be passed as the SBATCH env var for it to work in the elog
+#SBATCH --output=smd_${EXPERIMENT}_Run${RUN_NUM}_%J.log
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 
 if [[ $QUEUE == *milano* ]]; then
     if [[ $ACCOUNT == 'lcls' ]]; then
-	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 	sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
-	#sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 	sbatch $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
 
     fi
