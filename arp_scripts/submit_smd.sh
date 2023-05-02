@@ -130,13 +130,17 @@ set -- "${POSITIONAL[@]}"
 
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
-# Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 RUN="${RUN_NUM:=$RUN}" # same as EXP
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
 SIT_ENV_DIR="/cds/group/psdm"
 S3DF="sdf"
+
+# Export EXP and RUN for when running form the CLI
+# This should just re-write the existing variables when running from the elog
+export EXPERIMENT=$EXP
+export RUN_NUM=$RUN
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
@@ -175,6 +179,8 @@ fi
 if [[ $HOSTNAME == *sdf* ]]; then
     SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 fi
+
+# Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
     source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
@@ -199,9 +205,9 @@ else
 fi
 export SIT_PSDM_DATA=$DATAPATH
 
-echo ---- print environment ----
+echo ---- Print environment ----
 env | sort
-echo --- printed environment ---
+echo ---- Printed environment ----
 
 if [ -v INTERACTIVE ]; then
     # run in local terminal
@@ -222,7 +228,7 @@ fi
 #    LOGFILE=$LOGDIR'/'$LOGFILE
 #fi
 
-# The log name must be passed as the SBATCH env var for it to work in the elog
+# The log filename must be passed as the SBATCH env var for it to work in the elog
 #SBATCH --output=smd_${EXPERIMENT}_Run${RUN_NUM}_%J.log
 SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
