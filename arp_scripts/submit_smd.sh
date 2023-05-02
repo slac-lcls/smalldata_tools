@@ -188,7 +188,6 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
-    #echo "Setting up the enviroment: "$SIT_ENV_DIR/sw/ds/ana/conda1/manage/bin/psconda.sh
     if [[ $HOSTNAME == *sdf* ]]; then
         source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     else
