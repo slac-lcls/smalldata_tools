@@ -89,8 +89,8 @@ do
         shift
         ;;
     -e|--experiment)
-        POSITIONAL+=("--experiment $2")
         EXP=$2
+        POSITIONAL+=("--experiment $2")
         shift
         shift
         ;;
@@ -115,6 +115,10 @@ do
         INTERACTIVE=1
         shift
         ;;
+    --s3df)
+        FORCE_S3DF=1
+        shift
+        ;;
     *)
         POSITIONAL+=("$1")
         shift
@@ -126,12 +130,17 @@ set -- "${POSITIONAL[@]}"
 
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
-# Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
+RUN="${RUN_NUM:=$RUN}" # same as EXP
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
 SIT_ENV_DIR="/cds/group/psdm"
-S3DF="sdf"
+ARP_LOCATION="${ARP_LOCATION:=LOCAL}"
+
+# Export EXP and RUN for when running form the CLI
+# This should just re-write the existing variables when running from the elog
+export EXPERIMENT=$EXP
+export RUN_NUM=$RUN
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
@@ -140,16 +149,17 @@ ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 DEFQUEUE='psanaq'
 if [[ $HOSTNAME == *drp* ]]; then
     DEFQUEUE='anaq'
-elif [[ $HOSTNAME == *sdf* ]]; then
+elif [ -d "/sdf/data/lcls/" ]; then
     DEFQUEUE='milano'
 fi
+
 #Define cores if we don't have them
 #Set to 1 by default
 CORES=${CORES:=1}
 QUEUE=${QUEUE:=$DEFQUEUE}
-ACCOUNT=${ACCOUNT:='lcls'}
-RESERVATION=${RESERVATION:=''}
-#QUEUE=${QUEUE:='anaq'}
+ACCOUNT=${ACCOUNT:="lcls:$EXP"}
+RESERVATION=${RESERVATION:=''} # not implemented yet
+
 # select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
@@ -167,9 +177,14 @@ if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 
 fi
 
-if [[ $HOSTNAME == *sdf* ]]; then
+if [ -d "/sdf/data/lcls" ]; then
+    ON_S3DF=true
     SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+else
+    ON_S3DF=false
 fi
+
+# Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
     source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
@@ -177,8 +192,7 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
-    #echo "Setting up the enviroment: "$SIT_ENV_DIR/sw/ds/ana/conda1/manage/bin/psconda.sh
-    if [[ $HOSTNAME == *sdf* ]]; then
+    if $ON_S3DF; then
         source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     else
         source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh
@@ -186,12 +200,20 @@ else
     PYTHONEXE=smd_producer.py
 fi
 
-echo ---- print environment ----
+# figure out the right base path for the data (or use S3DF in force case)
+if [ -v FORCE_S3DF ]; then
+    DATAPATH="/sdf/data/lcls/ds"
+else
+    DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+fi
+export SIT_PSDM_DATA=$DATAPATH
+
+echo ---- Print environment ----
 env | sort
-echo --- printed environment ---
+echo ---- Printed environment ----
 
 if [ -v INTERACTIVE ]; then
-    #run all imports on batch node before calling mpirun on that node.
+    # run in local terminal
     if [ -v NEVENTS ] && [ $NEVENTS -lt 20 ]; then
         python -u $ABS_PATH/$PYTHONEXE $@
     else
@@ -201,7 +223,7 @@ if [ -v INTERACTIVE ]; then
     exit 0
 fi
 
-LOGFILE='smd_'${EXP}'_Run'${RUN}'_%J.log'
+LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
 if [ -v LOGDIR ]; then
     if [ ! -d "$LOGDIR" ]; then
         mkdir -p "$LOGDIR"
@@ -209,14 +231,19 @@ if [ -v LOGDIR ]; then
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
+MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+
+
 if [[ $QUEUE == *milano* ]]; then
     if [[ $ACCOUNT == 'lcls' ]]; then
-	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT --qos preemptable -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+	    sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
-	sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive --account $ACCOUNT -o $LOGFILE --wrap="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+        echo $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
+	    sbatch $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
 
     fi
-else
-    sbatch -p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive -o $LOGFILE --wrap "mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+else # for outside s3df
+    sbatch $SBATCH_ARGS --wrap "$MPI_CMD"
 fi

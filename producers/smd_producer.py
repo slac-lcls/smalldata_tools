@@ -16,6 +16,8 @@ import sys
 from glob import glob
 from PIL import Image
 from requests.auth import HTTPBasicAuth
+from pathlib import Path
+
 
 ##########################################################
 ##
@@ -216,7 +218,7 @@ sys.excepthook = global_except_hook
 fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
-print(fpathup)
+print(f'\n{fpathup}')
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
@@ -237,7 +239,7 @@ from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
-# logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -253,31 +255,86 @@ HUTCHES = [
 	'DIA'
 ]
 
-FFB_BASE = '/cds/data/drpsrcf'
-PSDM_BASE = os.environ.get('SIT_PSDM_DATA', '/reg/d/psdm')
-SD_EXT = '/hdf5/smalldata'
+S3DF_BASE = Path('/sdf/data/lcls/ds/')
+FFB_BASE = Path('/cds/data/drpsrcf/')
+PSANA_BASE = Path('/cds/data/psdm/')
+PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
+SD_EXT = Path('./hdf5/smalldata/')
+logger.debug(f"PSDM_BASE={PSDM_BASE}")
 
 # Define Args
 parser = argparse.ArgumentParser()
-parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
-parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
-parser.add_argument('--stn', help='hutch station', type=int, default=0)
-parser.add_argument('--nevents', help='number of events', type=int, default=1e9)
-parser.add_argument('--directory', help='directory for output files (def <exp>/hdf5/smalldata)')
-parser.add_argument('--gather_interval', help='gather interval', type=int, default=25)
-parser.add_argument('--norecorder', help='ignore recorder streams', action='store_true', default=False)
-parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
-parser.add_argument('--epicsAll', help='store all epics PVs', action='store_true', default=False)
-parser.add_argument('--full', help='store all data (please think before using this)', action='store_true', default=False)
-parser.add_argument('--fullSum', help='store sums for all area detectors', action='store_true', default=False)
-parser.add_argument('--default', help='store only minimal data', action='store_true', default=False)
-parser.add_argument('--image', help='save everything as image (use with care)', action='store_true', default=False)
-parser.add_argument('--tiff', help='save all images also as single tiff (use with even more care)', action='store_true', default=False)
-parser.add_argument('--centerpix', help='do not mask center pixels for epix10k detectors.', action='store_true', default=False)
-parser.add_argument("--postRuntable", help="postTrigger for seconday jobs", action='store_true', default=False)
-parser.add_argument("--wait", help="wait for a file to appear", action='store_true', default=False)
-parser.add_argument("--xtcav", help="add xtcav processing", action='store_true', default=False)
-parser.add_argument("--noarch", help="dont use archiver data", action='store_true', default=False)
+parser.add_argument('--run', 
+                    help='run', 
+                    type=str, 
+                    default=os.environ.get('RUN_NUM', ''))
+parser.add_argument('--experiment', 
+                    help='experiment name', 
+                    type=str, 
+                    default=os.environ.get('EXPERIMENT', ''))
+parser.add_argument('--stn', 
+                    help='hutch station', 
+                    type=int, 
+                    default=0)
+parser.add_argument('--nevents', 
+                    help='number of events', 
+                    type=int, 
+                    default=1e9)
+parser.add_argument('--directory',
+                    help='directory for output files (def <exp>/hdf5/smalldata)')
+parser.add_argument('--gather_interval', 
+                    help='gather interval', 
+                    type=int, 
+                    default=25)
+parser.add_argument('--norecorder', 
+                    help='ignore recorder streams', 
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--url',
+                    default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
+parser.add_argument('--epicsAll', 
+                    help='store all epics PVs', 
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--full', 
+                    help='store all data (please think before using this)',
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--fullSum', help='store sums for all area detectors', 
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--default', 
+                    help='store only minimal data', 
+                    action='store_true',
+                    default=False)
+parser.add_argument('--image', 
+                    help='save everything as image (use with care)',
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--tiff', 
+                    help='save all images as single tiff (use with extreme care)',
+                    action='store_true', 
+                    default=False)
+parser.add_argument('--centerpix', 
+                    help='do not mask center pixels for epix10k detectors.', 
+                    action='store_true',
+                    default=False)
+parser.add_argument("--postRuntable",
+                    help="postTrigger for seconday jobs", 
+                    action='store_true',
+                    default=False)
+parser.add_argument("--wait", 
+                    help="wait for a file to appear",
+                    action='store_true', 
+                    default=False)
+parser.add_argument("--xtcav",
+                    help="add xtcav processing",
+                    action='store_true', 
+                    default=False)
+parser.add_argument("--noarch", 
+                    help="dont use archiver data", 
+                    action='store_true',
+                    default=False)
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -286,24 +343,32 @@ logger.debug('Args to be used for small data run: {0}'.format(args))
 def get_xtc_files(base, hutch, run):
     """File all xtc files for given experiment and run"""
     run_format = ''.join(['r', run.zfill(4)])
-    data_dir = ''.join([base, '/', hutch.lower(), '/', exp, '/xtc'])
-    xtc_files = glob(''.join([data_dir, '/', '*', '-', run_format, '*']))
+    data_dir = Path(base) / hutch.lower() / exp / 'xtc'
+    xtc_files = list(data_dir.glob(f'*{run_format}*'))
+    logger.debug(f'xtc file list: {xtc_files}')
     return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
     if write_dir is None:
-        if useFFB:
-            write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
+        if useFFB and not onS3DF: # when on a drp node
+            write_dir = FFB_BASE / hutch.lower() / exp / '/scratch' / SD_EXT
+        elif onPSANA: # when on old psana system
+            write_dir = PSANA_BASE / hutch.lower() / exp, SD_EXT
+        elif onS3DF: # S3DF should now be the default
+            write_dir = S3DF_BASE / hutch.lower() / exp / SD_EXT
         else:
-            write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
-    h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
-    if not os.path.isdir(write_dir):
-        logger.debug('{0} does not exist, creating directory'.format(write_dir))
+            print('get_sd_file problem. Please fix.')
+    logger.debug(f'hdf5 directory: {write_dir}')
+
+    h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
+    if not write_dir.exists():
+        logger.info(f'{write_dir} does not exist, creating directory now.')
         try:
-            os.mkdir(write_dir)
-        except OSError as e:
-            logger.debug('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
+            write_dir.mkdir(parents=True)
+        except (PermissionError, FileNotFoundError) as e:
+            logger.info(f'Unable to make directory {write_dir} for output' \
+                        f'exiting on error: {e}')
             sys.exit()
     logger.debug('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
@@ -326,11 +391,20 @@ if hutch not in HUTCHES:
 	logger.debug('Could not find {0} in list of available hutches'.format(hutch))
 	sys.exit()	
 
+# Figure out where we are and where to look for data
 xtc_files = []
-# If experiment matches, check for files in ffb
-useFFB=False
-#with the new FFB, no need to check both on & offline as systems are independant.
-if hostname.find('drp')>=0:
+useFFB = False
+onS3DF = False
+onPSANA = False
+
+if hostname.find('sdf')>=0:
+    logger.debug('On S3DF')
+    onS3DF = True
+    if 'ffb' in PSDM_BASE.as_posix():
+        useFFB = True
+        # do we need to do smth to wait for files here?
+
+elif hostname.find('drp')>=0:
     nFiles=0
     logger.debug('On FFB')
     waitFilesStart=datetime.now()
@@ -340,12 +414,14 @@ if hostname.find('drp')>=0:
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
-                print('We have no xtc files for run %s in %s in the FFB system, we will quit')
+                print("We have no xtc files for run %s in %s in the FFB system,"\
+                      "Quitting now.")
                 sys.exit()
             else:
-                print('We have no xtc files for run %s in %s in the FFB system, we will wait for 10 second and check again.'%(run,exp))
+                print("We have no xtc files for run %s in %s in the FFB system," \
+                      "we will wait for 10 second and check again."%(run,exp))
                 time.sleep(10)
-    waitFilesEnd=datetime.now()
+    waitFilesEnd = datetime.now()
     print('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
     useFFB = True
 
@@ -358,6 +434,7 @@ else:
         sys.exit()
 
 # Get output file, check if we can write to it
+print(args.directory)
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 #if args.default:
 #    if useFFB:
@@ -370,9 +447,11 @@ ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
-        ds_name += ':live:dir=/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
-# try this: live & all streams (once I fixed the recording issue)
-#ds_name = ''.join(['exp=', exp, ':run=', run, ':smd:live'])
+        ds_name += ':live'
+        if not onS3DF:
+            ds_name += f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc'
+
+logger.debug(f'DataSource name: {ds_name}')
 try:
     ds = psana.MPIDataSource(ds_name)
 except Exception as e:
@@ -382,9 +461,6 @@ except Exception as e:
 # Generate smalldata object
 small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
-# Not sure why, but here
-if ds.rank == 0:
-	logger.debug('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
 
 ########################################################## 
 ##
@@ -508,14 +584,14 @@ for det in dets:
     except:
         userDataCfg[det.name] = det.params_as_dict()
 
-#is EOODet exists, save this later.
+# is EOODet exists, save this later.
 if EODet is None:
     Config={'UserDataCfg':userDataCfg}
     small_data.save(Config)
 
 end_setup_dets = time.time()
 
-if args.tiff:
+if args.tiff: # this needs to be done for S3DF
     dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
@@ -593,7 +669,7 @@ for evt_num, evt in enumerate(ds.events()):
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
     if ( (evt_num<100 and evt_num%10==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
-        if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+        if os.environ.get('ARP_JOB_ID', None) is not None:
             if ds.size == 1:
                 requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
             elif ds.rank == 0:
@@ -636,7 +712,7 @@ if ds.rank==0:
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
-if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+if os.environ.get('ARP_JOB_ID', None) is not None:
     if ds.size > 1:
         if ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)},{"key": "<b>Duration</b>", "value": "%f min"%(prod_time)}])
@@ -644,6 +720,9 @@ if (int(os.environ.get('RUN_NUM', '-1')) > 0):
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
+
+# This is no broken. How to access the file under /cds/...?
+# Should we put it under /sdf/ as well?
 if args.postRuntable and ds.rank==0:
     print('Posting to the run tables.')
     locStr=''
@@ -664,8 +743,12 @@ if args.postRuntable and ds.rank==0:
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     user=(args.experiment[:3]+'opr').replace('dia','mcc')
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-        answer = reader.readline()
+    if os.environ.get("ARP_LOCATION", None) == "S3DF":
+        with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader:
+            answer = reader.readline()
+    else:
+        with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+            answer = reader.readline()
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)
     if det_presence!={}:
