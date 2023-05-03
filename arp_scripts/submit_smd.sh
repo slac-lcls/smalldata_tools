@@ -135,7 +135,7 @@ RUN="${RUN_NUM:=$RUN}" # same as EXP
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
 SIT_ENV_DIR="/cds/group/psdm"
-S3DF="sdf"
+ARP_LOCATION="${ARP_LOCATION:=LOCAL}"
 
 # Export EXP and RUN for when running form the CLI
 # This should just re-write the existing variables when running from the elog
@@ -149,7 +149,7 @@ ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 DEFQUEUE='psanaq'
 if [[ $HOSTNAME == *drp* ]]; then
     DEFQUEUE='anaq'
-elif [[ $HOSTNAME == *sdf* ]]; then
+elif [ -d "/sdf/data/lcls/" ]; then
     DEFQUEUE='milano'
 fi
 #Define cores if we don't have them
@@ -176,8 +176,11 @@ if [ $TASKS_PER_NODE -gt $CORES ]; then
     TASKS_PER_NODE=$CORES 
 fi
 
-if [[ $HOSTNAME == *sdf* ]]; then
+if [ -d "/sdf/data/lcls" ]; then
+    ON_S3DF=true
     SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+else
+    ON_S3DF=false
 fi
 
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
@@ -188,7 +191,7 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
-    if [[ $HOSTNAME == *sdf* ]]; then
+    if $ON_S3DF; then
         source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     else
         source /cds/sw/ds/ana/conda1/manage/bin/psconda.sh
@@ -229,7 +232,8 @@ fi
 
 # The log filename must be passed as the SBATCH env var for it to work in the elog
 #SBATCH --output=smd_${EXPERIMENT}_Run${RUN_NUM}_%J.log
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive"
+#SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES --exclusive"
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 
@@ -238,6 +242,7 @@ if [[ $QUEUE == *milano* ]]; then
 	sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
+    echo $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
 	sbatch $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
 
     fi

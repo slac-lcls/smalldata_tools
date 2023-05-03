@@ -669,7 +669,7 @@ for evt_num, evt in enumerate(ds.events()):
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
     if ( (evt_num<100 and evt_num%10==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
-        if (int(os.environ.get('ARP_JOB_ID', '-1')) > 0):
+        if os.environ.get('ARP_JOB_ID', None) is not None:
             if ds.size == 1:
                 requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
             elif ds.rank == 0:
@@ -712,7 +712,7 @@ if ds.rank==0:
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
 small_data.save()
-if (int(os.environ.get('ARP_JOB_ID', '-1')) > 0):
+if os.environ.get('ARP_JOB_ID', None) is not None:
     if ds.size > 1:
         if ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)},{"key": "<b>Duration</b>", "value": "%f min"%(prod_time)}])
@@ -720,6 +720,9 @@ if (int(os.environ.get('ARP_JOB_ID', '-1')) > 0):
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
+
+# This is no broken. How to access the file under /cds/...?
+# Should we put it under /sdf/ as well?
 if args.postRuntable and ds.rank==0:
     print('Posting to the run tables.')
     locStr=''
@@ -740,8 +743,12 @@ if args.postRuntable and ds.rank==0:
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     user=(args.experiment[:3]+'opr').replace('dia','mcc')
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-        answer = reader.readline()
+    if os.environ.get("ARP_LOCATION", None) == "S3DF":
+        with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader:
+            answer = reader.readline()
+    else:
+        with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+            answer = reader.readline()
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)
     if det_presence!={}:
