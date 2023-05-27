@@ -2,24 +2,21 @@ import logging
 
 import sys
 import psana
-import pytest
+import pytest 
 
-from ..smalldata_tools import DetObject
+import smalldata_tools
+from conftest import datasource, detector
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-print('Loading detector: Rayonix660')
-exp = 'xpptut15'
-run = 660
-ds_str = f"exp={exp}:run={run}"
-ds = psana.MPIDataSource(ds_str)
-sys.path.append('/sdf/home/h/hzhang12/smalldata_tools/')
-import smalldata_tools 
-from smalldata_tools.DetObject import DetObjects
-det = DetObject('Rayonix', ds.env(), run)
+logger.info('Loading detector: Rayonix660')
 
-@pytest
-def test_detector_type():
-    print('Running detector type test')
-    assert(isinstance(det, DetObject.RayonixObject))
-    print('Pass the test')
+@pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 660}], indirect=True)
+@pytest.mark.parametrize('detector', [{'name': 'Rayonix660'}], indirect=True)
+def test_detector_type(datasource, detector):
+    logger.debug('Running detector type test')
+    det = detector
+    assert(isinstance(det, smalldata_tools.DetObject.RayonixObject))
+    logger.debug('Pass the test')
+    
