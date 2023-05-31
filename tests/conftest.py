@@ -9,15 +9,14 @@ def datasource(request):
     run = request.param.get('run')
     ds_str = f"exp={exp}:run={run}"
     ds = psana.MPIDataSource(ds_str)
-    yield ds
-
-    ds.close()
+    return (ds, run)
 
 @pytest.fixture(scope="module")
-def detector(request):
-    
+def detector(request, datasource):
+    ds, run = datasource
     detector_name = request.param.get('name')
-    detector = DetObject(detector_name)
-    yield detector
+    detector = DetObject(detector_name, ds.env(), run)
+    return detector
 
-    detector.cleanup()
+
+   
