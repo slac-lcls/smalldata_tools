@@ -18,5 +18,3 @@ def detector(request, datasource):
     detector_name = request.param.get('name')
     detector = DetObject(detector_name, ds.env(), run)
     yield detector
-
-   
