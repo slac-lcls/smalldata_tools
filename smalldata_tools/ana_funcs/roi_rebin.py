@@ -215,13 +215,7 @@ class projectionFunc(DetObjectFunc):
         self.singlePhoton =  kwargs.get('singlePhoton',False)
         self.mean =  kwargs.get('mean',False)
     def process(self,data):
-        #if isinstance(data, np.ma.masked_array):
-        #    array = data.data.copy().squeeze()
-        #else:
-        #    array = data.copy().squeeze()
-        if not isinstance(data, np.ma.masked_array):
-            array = data.copy().squeeze()[np.zeros_like(data.squeeze())]
-        array = data.copy().squeeze()
+        array = np.ma.array(data.copy().squeeze())
         if self.thresADU is not None:
             array.data[array.data<self.thresADU]=0
         if self.thresRms is not None and 'rms' in self.__dict__.keys() and self.rms is not None:
