@@ -38,14 +38,12 @@ def getProjections(request):
     See roi_rebin.py for more info
     """
     roi_dict = {}
+    roi_dict['name'] = 'test'
     roi_dict['axis'] = request.param.get('axis')
     roi_dict['mean'] = request.param.get('mean')
     roi_dict['thresADU'] = request.param.get('thresADU')
     roi_dict['thresRms'] = request.param.get('thresRms')
     roi_dict['singlePhoton'] = request.param.get('singlePhoton')
-    roi_dict['mean'] = request.param.get('mean')
-
     yield roi_dict
-
 
 

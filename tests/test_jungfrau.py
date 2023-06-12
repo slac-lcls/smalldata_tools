@@ -1,4 +1,5 @@
 import logging
+import os
 
 import sys
 import psana
@@ -28,18 +29,9 @@ def test_detector_type(datasource, detector):
     logger.debug('Pass the Detector_type test')
 
     
-# x1 = 0
-# x2 = 1
-# y1 = 100
-# y2 = 120
-# z1 = 50
-# z2 = 60
-# writeArea = True
-    
 @pytest.mark.parametrize('getROIs', [{'ROI': [[1,2], [157,487], [294,598]], 'writeArea': True, 'thresADU': None, }], indirect=True)
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
-#@pytest.mark.parametrize('getROIs', [{'ROIs': [ [[x1,x2], [y1,y2], [z1,z2]] ], 'writeArea': writeArea, 'thresADU': None, }], indirect=True)
 def test_ROI(getROIs, detector, datasource):
     logger.debug('Running test for ROI function')
     try:
@@ -60,29 +52,27 @@ def test_ROI(getROIs, detector, datasource):
     small_data = ds.small_data('./test_roi.h5', gather_interval=5) # file to save data to
     ds.break_after(5) # stop event loop after 5 events
     
-    dats = []
+    # dats = []
 
     for nevt,evt in enumerate(ds.events()): # usual psana event loop
         det.getData(evt) # get the detector data
         det.processFuncs() # process the attached functions
         userDict[det._name]=getUserData(det) # get the function results
-        dats.append(det.evt.dat)
+        # dats.append(det.evt.dat)
         small_data.event(userDict) # write data to h5
     
     # Test the function
     f = "test_roi.h5"
     h5explorer = tables.File(f).root
-    
-    print(list(h5explorer.jungfrau1M._v_children))
 
     for i in range(5):
         if writeArea:
-            assert(list(h5explorer.jungfrau1M._v_children)==['ROI_area', 'ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'], True)
+            assert(list(h5explorer.jungfrau1M._v_children)==['ROI_area', 'ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'])
         else:
-            assert(list(h5explorer.jungfrau1M._v_children)==['ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'], True)
+            assert(list(h5explorer.jungfrau1M._v_children)==['ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'])
         logger.debug('Correct output')
         
-        dat = dats[i]    
+        # dat = dats[i]    
         area = h5explorer.jungfrau1M.ROI_area[i]
         com = h5explorer.jungfrau1M.ROI_com[i]
         max = h5explorer.jungfrau1M.ROI_max[i]
@@ -90,52 +80,92 @@ def test_ROI(getROIs, detector, datasource):
         sum = h5explorer.jungfrau1M.ROI_sum[i]
         
         #checking for the type
-        assert(com.dtype == 'float32', True)
-        assert(max.dtype == 'float32', True)
-        assert(mean.dtype == 'float32', True)
-        assert(sum.dtype == 'float32', True)
+        assert(com.dtype == 'float64')
+        assert(max.dtype == 'float32')
+        assert(mean.dtype == 'float32')
+        assert(sum.dtype == 'float32')
         logger.debug('Correct type')
         
         #checking for the size/shape
-        assert(com.shape == (2,), True)
-        assert(max.size == 1, True)
-        assert(mean.size == 1, True)
-        assert(sum.size == 1, True)
+        assert(com.shape == (2,))
+        assert(max.size == 1)
+        assert(mean.size == 1)
+        assert(sum.size == 1)
         #assert(area == (330,304), True)
-        assert(area.shape == (y2-y1,z2-z1), True)
+        assert(area.shape == (y2-y1,z2-z1))
         logger.debug('Correct shape')
-        
-    logger.debug('Pass the ROI_function test')
-    
-    
-
-        
-        
-
-
-
-
-        
-        
-        
-        
-        
-        
-        
-        
-
-        # assert(area[0][0] == dat[1][157][294], True)
-        # assert(area[329][303] == dat[1][486][597], True)
+#         assert(area[0][0] == dat[1][157][294], True)
+#         assert(area[329][303] == dat[1][486][597], True)
 #         assert(area[0][0] == dat[x1][y1][z1], True)
 #         assert(area[0][z2-z1-1] == dat[x2-1][y1][z2-1], True)
 #         assert(area[y2-y1-1][0] == dat[x2-1][y2-1][z1], True)
 #         assert(area[y2-y1-1][z2-z1-1] == dat[x2-1][y2-1][z2-1], True)
 #         logger.debug('Correct boundary')
-
 #         assert(area.sum() == h5explorer.jungfrau1M.ROI_sum[4], True)
+        
+    logger.debug('Pass the ROI_function test')
     
+    tables.file._open_files.close_all()
     
+    os.remove('test_roi.h5')
+
+
+
+@pytest.mark.parametrize('getProjections', [{'axis': 2, 'mean': True, 'thresADU': 1e-6, 'thresRms': 1e-6, 'singlePhoton': False}], indirect=True)
+@pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
+@pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
+def test_Projection(getProjections, detector, datasource):
+    logger.debug('Running test for Projection function')
+    try:
+        func_kwargs = getProjections
+    except Exception as e:
+        print(f'Can\'t instantiate Projection args: {e}')
+        func_kwargs = []
+    axis = func_kwargs['axis']
+    proj = projectionFunc(**func_kwargs)
+    det = detector
+    ds, run = datasource
+    det.addFunc(proj)
     
+    userDict = {}
+    small_data = ds.small_data('./test_proj.h5', gather_interval=5) # file to save data to
+    ds.break_after(5) # stop event loop after 5 events
+
+    for nevt,evt in enumerate(ds.events()): # usual psana event loop
+        det.getData(evt) # get the detector data
+        det.processFuncs() # process the attached functions
+        userDict[det._name]=getUserData(det) # get the function results
+        small_data.event(userDict) # write data to h5
+    
+    # Test the function
+    f = "test_proj.h5"
+    h5explorer = tables.File(f).root
+    
+    #checking for the shape
+    if axis==0:
+        assert(h5explorer.jungfrau1M.test_data.shape == (5, 512, 1024))
+    elif axis==1:
+        assert(h5explorer.jungfrau1M.test_data.shape == (5, 2, 1024))
+    elif axis==2:
+        assert(h5explorer.jungfrau1M.test_data.shape == (5, 2, 512))
+    else:
+        assert(h5explorer.jungfrau1M.test_data.shape == (5, ))
+    logger.debug('Correct shape')
+    
+    #checking for the type
+    for i in range(5):        
+        assert(h5explorer.jungfrau1M.test_data[i].dtype == 'float32')
+    logger.debug('Correct type')
+    
+    logger.debug('Pass the Projection_function test')
+    
+    tables.file._open_files.close_all()
+    
+    os.remove('test_proj.h5')
+
+
+        
+
     
     
     

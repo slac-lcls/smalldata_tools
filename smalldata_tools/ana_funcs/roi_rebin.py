@@ -228,7 +228,7 @@ class projectionFunc(DetObjectFunc):
                 retDict={'data': np.nanmean(array)}
             else:
                 meanRes = np.nanmean(array,axis=self.axis)
-                if isinstance(data, np.ma.masked_array):
+                if isinstance(meanRes, np.ma.masked_array):
                     meanRes = meanRes.data
                 retDict={'data': meanRes}
         else:
@@ -236,7 +236,7 @@ class projectionFunc(DetObjectFunc):
                 retDict={'data': np.nansum(array)}
             else:
                 sumRes = np.nansum(array,axis=self.axis)
-                if isinstance(data, np.ma.masked_array):
+                if isinstance(sumRes, np.ma.masked_array):
                     sumRes = sumRes.data
                 retDict={'data': sumRes}
         return retDict
