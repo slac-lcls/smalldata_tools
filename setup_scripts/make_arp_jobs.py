@@ -21,7 +21,7 @@ SDF_BASE = Path(f"/sdf/data/lcls/ds/{hutch}/{exp}")
 # job arguments
 if 'milano' in args.queue:
     location = 'S3DF'
-    cores = 128
+    cores = 125
     account = f"lcls:{exp}"
 
     # smd
