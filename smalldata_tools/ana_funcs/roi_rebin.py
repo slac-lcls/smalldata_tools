@@ -214,6 +214,7 @@ class projectionFunc(DetObjectFunc):
         self.thresRms =  kwargs.get('thresRms',None)
         self.singlePhoton =  kwargs.get('singlePhoton',False)
         self.mean =  kwargs.get('mean',False)
+
     def process(self,data):
         array = np.ma.array(data.copy().squeeze())
         if self.thresADU is not None:

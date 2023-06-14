@@ -16,8 +16,8 @@ logger.info('Loading detector: Rayonix660')
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 660}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'Rayonix'}], indirect=True)
 def test_detector_type(datasource, detector):
-    logger.debug('Running detector type test')
+    logger.info('Running detector type test')
     det = detector
     assert(isinstance(det, smalldata_tools.DetObject.RayonixObject))
-    logger.debug('Pass the test')
+    logger.info('Pass the test')
     
