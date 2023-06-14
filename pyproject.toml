@@ -3,3 +3,6 @@
 testpaths = [
     "tests",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
