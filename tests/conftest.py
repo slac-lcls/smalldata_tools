@@ -38,7 +38,7 @@ def getProjections(request):
     See roi_rebin.py for more info
     """
     roi_dict = {}
-    roi_dict['name'] = 'test'
+    roi_dict['name'] = 'proj'
     roi_dict['axis'] = request.param.get('axis')
     roi_dict['mean'] = request.param.get('mean')
     roi_dict['thresADU'] = request.param.get('thresADU')
@@ -46,4 +46,12 @@ def getProjections(request):
     roi_dict['singlePhoton'] = request.param.get('singlePhoton')
     yield roi_dict
 
-
+@pytest.fixture(scope="function")  
+def getSpectrums(request):
+    """ Set parameter for Spectrum analysis.
+    See roi_rebin.py for more info
+    """
+    roi_dict = {}
+    roi_dict['bins'] = request.param.get('bins')
+    
+    yield roi_dict
