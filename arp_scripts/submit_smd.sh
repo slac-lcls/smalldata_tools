@@ -168,7 +168,7 @@ elif [[ $QUEUE == *psfeh* ]]; then
 elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
 elif [[ $QUEUE == *milano* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=128}
+    TASKS_PER_NODE=${TASKS_PER_NODE:=125}
 else
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
