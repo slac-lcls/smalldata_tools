@@ -9,7 +9,7 @@ import smalldata_tools
 from smalldata_tools.DetObject import DetObject
 from tests.conftest import datasource, detector, getROIs
 import tests.conftest
-from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, projectionFunc
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, projectionFunc, spectrumFunc
 from smalldata_tools.SmallDataUtils import getUserData
 
 import tables
@@ -33,7 +33,7 @@ def test_detector_type(datasource, detector):
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
 def test_ROI(getROIs, detector, datasource):
-    logger.info('Running test for ROI function')
+    logger.info('Running test for ROI function to check output format.')
     try:
         func_kwargs = getROIs
     except Exception as e:
@@ -70,7 +70,7 @@ def test_ROI(getROIs, detector, datasource):
             assert(list(h5explorer.jungfrau1M._v_children)==['ROI_area', 'ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'])
         else:
             assert(list(h5explorer.jungfrau1M._v_children)==['ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum'])
-        logger.info('Correct output')
+        logger.info('Correct name and number of outputs')
         
         # dat = dats[i]    
         area = h5explorer.jungfrau1M.ROI_area[i]
@@ -86,7 +86,7 @@ def test_ROI(getROIs, detector, datasource):
         assert(sum.dtype == 'float32')
         if writeArea:
             assert(area.dtype == 'float32')
-        logger.info('Correct type')
+        logger.info('Correct data type for ROI_area, ROI_com, ROI_max, ROI_mean, ROI_sum')
         
         #checking for the size/shape
         assert(com.shape == (2,))
@@ -96,16 +96,8 @@ def test_ROI(getROIs, detector, datasource):
         #assert(area == (330,304), True)
         if writeArea:
             assert(area.shape == (y2-y1,z2-z1))
-        logger.info('Correct shape')
-#         assert(area[0][0] == dat[1][157][294], True)
-#         assert(area[329][303] == dat[1][486][597], True)
-#         assert(area[0][0] == dat[x1][y1][z1], True)
-#         assert(area[0][z2-z1-1] == dat[x2-1][y1][z2-1], True)
-#         assert(area[y2-y1-1][0] == dat[x2-1][y2-1][z1], True)
-#         assert(area[y2-y1-1][z2-z1-1] == dat[x2-1][y2-1][z2-1], True)
-#         logger.info('Correct boundary')
-#         assert(area.sum() == h5explorer.jungfrau1M.ROI_sum[4], True)
-        
+        logger.info('Correct shape for ROI_area, ROI_com, ROI_max, ROI_mean, ROI_sum')
+
     logger.info('Pass the ROI_function test')
     
     tables.file._open_files.close_all()
@@ -118,7 +110,7 @@ def test_ROI(getROIs, detector, datasource):
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
 def test_Projection(getProjections, detector, datasource):
-    logger.info('Running test for Projection function')
+    logger.info('Running test for Projection function to check output format.')
     try:
         func_kwargs = getProjections
     except Exception as e:
@@ -145,24 +137,24 @@ def test_Projection(getProjections, detector, datasource):
     h5explorer = tables.File(f).root
     
     #checking for the output
-    assert(list(h5explorer.jungfrau1M._v_children)==['test_data'])
-    logger.info('Correct output')
+    assert(list(h5explorer.jungfrau1M._v_children)==['proj_data'])
+    logger.info('Correct name and number of outputs')
     
     #checking for the shape
     if axis==0:
-        assert(h5explorer.jungfrau1M.test_data.shape == (5, 512, 1024))
+        assert(h5explorer.jungfrau1M.proj_data.shape == (5, 512, 1024))
     elif axis==1:
-        assert(h5explorer.jungfrau1M.test_data.shape == (5, 2, 1024))
+        assert(h5explorer.jungfrau1M.proj_data.shape == (5, 2, 1024))
     elif axis==2:
-        assert(h5explorer.jungfrau1M.test_data.shape == (5, 2, 512))
+        assert(h5explorer.jungfrau1M.proj_data.shape == (5, 2, 512))
     else:
-        assert(h5explorer.jungfrau1M.test_data.shape == (5, ))
-    logger.info('Correct shape')
+        assert(h5explorer.jungfrau1M.proj_data.shape == (5, ))
+    logger.info('Correct data shape for proj_data')
     
     #checking for the type
     for i in range(5):        
-        assert(h5explorer.jungfrau1M.test_data[i].dtype == 'float32')
-    logger.info('Correct type')
+        assert(h5explorer.jungfrau1M.proj_data[i].dtype == 'float32')
+    logger.info('Correct data type for proj_data')
     
     logger.info('Pass the Projection_function test')
     
@@ -176,7 +168,7 @@ def test_Projection(getProjections, detector, datasource):
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
 def test_ROI_Projection(getROIs, getProjections, detector, datasource):
-    logger.info('Running test for ROI_Projection')
+    logger.info('Running test for ROI_Projection to check output format.')
     #roi function
     try:
         func_kwargs = getROIs
@@ -223,45 +215,43 @@ def test_ROI_Projection(getROIs, getProjections, detector, datasource):
     
     #checking for the output
     if writeArea:
-        assert(list(h5explorer.jungfrau1M._v_children)==['ROI_area', 'ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum', 'ROI_test_data'])
+        assert(list(h5explorer.jungfrau1M._v_children)==['ROI_area', 'ROI_com', 'ROI_max', 'ROI_mean', 'ROI_proj_data', 'ROI_sum'])
     else:
-        assert(list(h5explorer.jungfrau1M._v_children)==['ROI_com', 'ROI_max', 'ROI_mean', 'ROI_sum', 'ROI_test_data'])
-    logger.info('Correct output')
+        assert(list(h5explorer.jungfrau1M._v_children)==['ROI_com', 'ROI_max', 'ROI_mean', 'ROI_proj_data', 'ROI_sum'])
+    logger.info('correct name and number of outputs')
     
     #checking for the shape
     if axis==0:
-        assert(h5explorer.jungfrau1M.ROI_test_data.shape == (5, x2-x1))
+        assert(h5explorer.jungfrau1M.ROI_proj_data.shape == (5, x2-x1))
     elif axis==1:
-        assert(h5explorer.jungfrau1M.ROI_test_data.shape == (5, y2-y1))
+        assert(h5explorer.jungfrau1M.ROI_proj_data.shape == (5, y2-y1))
     elif axis==2:
-        assert(h5explorer.jungfrau1M.ROI_test_data.shape == (5, z2-z1))
+        assert(h5explorer.jungfrau1M.ROI_proj_data.shape == (5, z2-z1))
     else:
-        assert(h5explorer.jungfrau1M.ROI_test_data.shape == (5, ))
+        assert(h5explorer.jungfrau1M.ROI_proj_data.shape == (5, ))
     assert(h5explorer.jungfrau1M.ROI_com.shape == (5,2))
     if writeArea:
         assert(h5explorer.jungfrau1M.ROI_area.shape == (5,y2-y1,z2-z1))
     assert(h5explorer.jungfrau1M.ROI_max.shape == (5,))
     assert(h5explorer.jungfrau1M.ROI_mean.shape == (5,))
     assert(h5explorer.jungfrau1M.ROI_sum.shape == (5,))
-    logger.info('Correct shape')
+    logger.info('Correct data shape for ROI_area, ROI_com, ROI_max, ROI_mean, ROI_sum and ROI_proj_data')
     
     #checking for the type
     for i in range(5):        
-        assert(h5explorer.jungfrau1M.ROI_test_data[i].dtype == 'float32')
+        assert(h5explorer.jungfrau1M.ROI_proj_data[i].dtype == 'float32')
         assert(h5explorer.jungfrau1M.ROI_com[i].dtype == 'float64')
         assert(h5explorer.jungfrau1M.ROI_max[i].dtype == 'float32')
         assert(h5explorer.jungfrau1M.ROI_mean[i].dtype == 'float32')
         assert(h5explorer.jungfrau1M.ROI_sum[i].dtype == 'float32')
         if writeArea:
             assert(h5explorer.jungfrau1M.ROI_area[i].dtype == 'float32')
-    logger.info('Correct type')
+    logger.info('Correct data type for ROI_area, ROI_com, ROI_max, ROI_mean, ROI_sum and ROI_proj_data')
      
-    logger.info('Pass the Projection_function test')
+    logger.info('Pass the ROI_Projection_function test')
     
     tables.file._open_files.close_all()
     
     os.remove('test_roi_proj.h5')
-    
-    
     
     
