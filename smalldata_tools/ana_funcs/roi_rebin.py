@@ -214,14 +214,9 @@ class projectionFunc(DetObjectFunc):
         self.thresRms =  kwargs.get('thresRms',None)
         self.singlePhoton =  kwargs.get('singlePhoton',False)
         self.mean =  kwargs.get('mean',False)
+
     def process(self,data):
-        #if isinstance(data, np.ma.masked_array):
-        #    array = data.data.copy().squeeze()
-        #else:
-        #    array = data.copy().squeeze()
-        if not isinstance(data, np.ma.masked_array):
-            array = data.copy().squeeze()[np.zeros_like(data.squeeze())]
-        array = data.copy().squeeze()
+        array = np.ma.array(data.copy().squeeze())
         if self.thresADU is not None:
             array.data[array.data<self.thresADU]=0
         if self.thresRms is not None and 'rms' in self.__dict__.keys() and self.rms is not None:
@@ -234,7 +229,7 @@ class projectionFunc(DetObjectFunc):
                 retDict={'data': np.nanmean(array)}
             else:
                 meanRes = np.nanmean(array,axis=self.axis)
-                if isinstance(data, np.ma.masked_array):
+                if isinstance(meanRes, np.ma.masked_array):
                     meanRes = meanRes.data
                 retDict={'data': meanRes}
         else:
@@ -242,7 +237,7 @@ class projectionFunc(DetObjectFunc):
                 retDict={'data': np.nansum(array)}
             else:
                 sumRes = np.nansum(array,axis=self.axis)
-                if isinstance(data, np.ma.masked_array):
+                if isinstance(sumRes, np.ma.masked_array):
                     sumRes = sumRes.data
                 retDict={'data': sumRes}
         return retDict
