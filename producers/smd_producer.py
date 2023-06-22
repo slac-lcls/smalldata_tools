@@ -239,8 +239,8 @@ from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
-#logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -403,6 +403,7 @@ if hostname.find('sdf')>=0:
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
         # do we need to do smth to wait for files here?
+    xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
 
 elif hostname.find('drp')>=0:
     nFiles=0
@@ -410,7 +411,7 @@ elif hostname.find('drp')>=0:
     waitFilesStart=datetime.now()
     while nFiles==0:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-        print (xtc_files)
+        print(xtc_files)
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
@@ -434,7 +435,7 @@ else:
         sys.exit()
 
 # Get output file, check if we can write to it
-print(args.directory)
+print(f"directory: {args.directory}")
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 #if args.default:
 #    if useFFB:
@@ -448,7 +449,9 @@ if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
         ds_name += ':live'
-        if not onS3DF:
+        if onS3DF: 
+            ds_name += f':dir={PSDM_BASE}/{exp[0:3]}/{exp}/xtc'
+        else:
             ds_name += f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc'
 
 logger.debug(f'DataSource name: {ds_name}')
