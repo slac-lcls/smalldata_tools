@@ -361,6 +361,7 @@ def get_sd_file(write_dir, exp, hutch):
             print('get_sd_file problem. Please fix.')
     logger.debug(f'hdf5 directory: {write_dir}')
 
+    write_dir = Path(write_dir)
     h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
     if not write_dir.exists():
         logger.info(f'{write_dir} does not exist, creating directory now.')
