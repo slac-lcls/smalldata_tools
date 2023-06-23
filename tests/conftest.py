@@ -55,3 +55,19 @@ def getSpectrums(request):
     roi_dict['bins'] = request.param.get('bins')
     
     yield roi_dict
+    
+@pytest.fixture(scope="function")  
+def getAzavPyfais(request):
+    """ Set parameter for Spectrum analysis.
+    See roi_rebin.py for more info
+    """
+    roi_dict = {}
+    roi_dict['name'] = 'pyfai'
+    roi_dict['userMask'] = request.param.get('userMask')
+    roi_dict['return2d'] = request.param.get('return2d')
+    roi_dict['ai_kwargs'] = request.param.get('ai_kwargs')
+    roi_dict['pol_factor'] = request.param.get('pol_factor')
+    roi_dict['npts_radial'] = request.param.get('npts_radial')
+    roi_dict['npts_az'] = request.param.get('npts_az')
+    
+    yield roi_dict
