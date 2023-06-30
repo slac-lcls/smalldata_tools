@@ -46,3 +46,12 @@ def getProjections(request):
     roi_dict['singlePhoton'] = request.param.get('singlePhoton')
     yield roi_dict
 
+@pytest.fixture(scope="function")  
+def getSpectrums(request):
+    """ Set parameter for Spectrum analysis.
+    See roi_rebin.py for more info
+    """
+    roi_dict = {}
+    roi_dict['bins'] = request.param.get('bins')
+    
+    yield roi_dict
