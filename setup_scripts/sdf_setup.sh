@@ -61,7 +61,7 @@ then
 fi
 
 HUTCH=${EXP:0:3}
-FFB_BASE="/sdf/data/lcls/drpsrcf/$HUTCH/$EXP"
+FFB_BASE="/sdf/data/lcls/drpsrcf/ffb/$HUTCH/$EXP"
 SDF_BASE="/sdf/data/lcls/ds/$HUTCH/$EXP"
 
 # Exit if directories dont exist
