@@ -340,10 +340,10 @@ logger.debug('Args to be used for small data run: {0}'.format(args))
 
 ###### Helper Functions ##########
 
-def get_xtc_files(base, hutch, run):
+def get_xtc_files(base, exp, run):
     """File all xtc files for given experiment and run"""
     run_format = ''.join(['r', run.zfill(4)])
-    data_dir = Path(base) / hutch.lower() / exp / 'xtc'
+    data_dir = Path(base) / exp[:3] / exp / 'xtc'
     xtc_files = list(data_dir.glob(f'*{run_format}*'))
     logger.debug(f'xtc file list: {xtc_files}')
     return xtc_files
@@ -404,7 +404,7 @@ if hostname.find('sdf')>=0:
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
         # do we need to do smth to wait for files here?
-    xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
+    xtc_files = get_xtc_files(PSDM_BASE, exp, run)
 
 elif hostname.find('drp')>=0:
     nFiles=0
@@ -429,7 +429,7 @@ elif hostname.find('drp')>=0:
 
 # If not a current experiment or files in ffb, look in psdm
 else:
-    logger.debug('Not on FFB, use offline system')
+    logger.debug('Not on FFB or S3DF, use old offline system')
     xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
     if len(xtc_files)==0:
         print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
@@ -444,7 +444,7 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #    else:
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
-# Define data source name and generate data source object, don't understand all conditions yet
+# Define data source name and generate data source object
 ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
 if args.norecorder:
         ds_name += ':stream=0-79'
@@ -596,7 +596,10 @@ if EODet is None:
 end_setup_dets = time.time()
 
 if args.tiff: # this needs to be done for S3DF
-    dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
+    if onS3DF:
+        dirname = S3DF_BASE / f"{exp[:3]}/{exp}/scratch/run{int(run)}"
+    else:
+        dirname = PSANA_BASE / '%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
@@ -658,7 +661,8 @@ for evt_num, evt in enumerate(ds.events()):
                        except:
                            pass
                        im = Image.fromarray(image)
-                       tiff_file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
+                       #tiff_file = dirname / '/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
+                       tiff_file = dirname / f"Run_{int(run)}_evt_{evt_num+1}_{key}.tiff"
                        im.save(tiff_file)
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.
