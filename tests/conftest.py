@@ -55,7 +55,8 @@ def getSpectrums(request):
     roi_dict['bins'] = request.param.get('bins')
     
     yield roi_dict
-    
+
+   
 @pytest.fixture(scope="function")  
 def getAzavPyfais(request):
     """ Set parameter for Spectrum analysis.
@@ -71,3 +72,4 @@ def getAzavPyfais(request):
     roi_dict['npts_az'] = request.param.get('npts_az')
     
     yield roi_dict
+
