@@ -56,6 +56,7 @@ class photonFunc(DetObjectFunc):
         use PyAlgo method to find photons.
 
         """
+        ret_dict = {}
         tstart=time.time()
         fimage = self.prepImage(image)
         locMask = self._mask

@@ -216,6 +216,7 @@ class projectionFunc(DetObjectFunc):
         self.mean =  kwargs.get('mean',False)
 
     def process(self,data):
+        ret_dict = {}
         array = np.ma.array(data.copy().squeeze())
         if self.thresADU is not None:
             array.data[array.data<self.thresADU]=0
@@ -258,6 +259,7 @@ class spectrumFunc(DetObjectFunc):
         self.bins = getBins(self.bins)
 
     def process(self, data):
+        ret_dict = {}
         if isinstance(data, np.ma.masked_array):
             his=np.histogram(data.compressed(), self.bins)
         elif  isinstance(data, np.ndarray):

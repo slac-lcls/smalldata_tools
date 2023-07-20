@@ -71,3 +71,51 @@ def getAzavPyfais(request):
     roi_dict['npts_az'] = request.param.get('npts_az')
     
     yield roi_dict
+
+@pytest.fixture(scope="function")
+def getDroplets(request):
+    """ Parameters for droplet algorithm
+    See droplet.py for more info
+    """
+    roi_dict = {}
+    roi_dict['theshold'] = request.param.get('theshold')
+    roi_dict['thresholdLow'] = request.param.get('thresholdLow')
+    roi_dict['thresADU'] = request.param.get('thresADU')
+    roi_dict['useRms'] = request.param.get('useRms')
+    roi_dict['nData'] = request.param.get('nData')
+    
+    yield roi_dict
+
+@pytest.fixture(scope="function")
+def getPhotons(request):
+    """ Parameters for droplet algorithm
+    See photons.py for more info
+    """
+    roi_dict = {}
+    roi_dict['ADU_per_photon'] = request.param.get('ADU_per_photon')
+    roi_dict['thresADU'] = request.param.get('thresADU')
+    
+    yield roi_dict
+
+    
+@pytest.fixture(scope="function")
+def getD2P(request):
+    """ Parameters for droplet algorithm
+    See photons.py for more info
+    """
+    roi_dict = {}
+    roi_dict['aduspphot'] = request.param.get('aduspphot')
+    roi_dict['cputime'] = request.param.get('cputime')
+    
+    yield roi_dict
+    
+
+@pytest.fixture(scope="function")
+def getSparsify(request):
+    """ Parameters for droplet algorithm
+    See photons.py for more info
+    """
+    roi_dict = {}
+    roi_dict['nData'] = request.param.get('nData')
+    
+    yield roi_dict

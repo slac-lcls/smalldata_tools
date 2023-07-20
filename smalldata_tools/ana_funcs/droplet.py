@@ -134,6 +134,7 @@ class dropletFunc(DetObjectFunc):
 
 
     def process(self, data):
+        ret_dict = {}
         if self._saveDrops is None:
             self._saveDrops = False
         if self._flagMasked is None:
@@ -287,3 +288,4 @@ class dropletFunc(DetObjectFunc):
         self.dat = dat_dict
 
         return ret_dict
+
