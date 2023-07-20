@@ -254,6 +254,7 @@ def test_ROI_Projection(getROIs, getProjections, detector, datasource):
     
     os.remove('test_roi_proj.h5')
     
+
 @pytest.mark.parametrize('getSpectrums', [{'bins': [1,2,3,4,5,6,7,8]}], indirect=True)
 @pytest.mark.parametrize('datasource', [{'exp': 'xpptut15', 'run': 650}], indirect=True)
 @pytest.mark.parametrize('detector', [{'name': 'jungfrau1M'}], indirect=True)
@@ -381,5 +382,4 @@ def test_ROI_Spectrum(getROIs, getSpectrums, detector, datasource):
     tables.file._open_files.close_all()
     
     os.remove('test_roi_spec.h5')
-
     

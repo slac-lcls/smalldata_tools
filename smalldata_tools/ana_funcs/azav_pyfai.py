@@ -49,7 +49,7 @@ class azav_pyfai(DetObjectFunc):
         super(azav_pyfai, self).__init__(**kwargs)
         
         self.mask = kwargs.pop('userMask',None)
-        self.thresold = kwargs.pop('thres',None)
+        self.threshold = kwargs.pop('thres',None)
         self.return2d = kwargs.pop('return2d','False')
         
         # azimuthal integrator argument
