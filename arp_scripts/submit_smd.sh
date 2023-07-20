@@ -168,7 +168,6 @@ elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
 elif [[ $QUEUE == *milano* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=120}
-    #TASKS_PER_NODE=${TASKS_PER_NODE:=1}
 else
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
@@ -234,7 +233,7 @@ if [ -v LOGDIR ]; then
 fi
 
 #SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE"
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE" # test without exclusive for now
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 
@@ -243,6 +242,7 @@ if [[ $QUEUE == *milano* ]]; then
         SBATCH_ARGS="$SBATCH_ARGS --reservation $RESERVATION"
     fi
     if [[ $ACCOUNT == 'lcls' ]]; then
+        echo $SBATCH_ARGS --qos preemtable --account $ACCOUNT --wrap="$MPI_CMD"
 	    sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@

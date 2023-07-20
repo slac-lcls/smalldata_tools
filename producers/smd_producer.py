@@ -239,8 +239,8 @@ from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
-logging.basicConfig(level=logging.DEBUG)
-#logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -661,7 +661,6 @@ for evt_num, evt in enumerate(ds.events()):
                        except:
                            pass
                        im = Image.fromarray(image)
-                       #tiff_file = dirname / '/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
                        tiff_file = dirname / f"Run_{int(run)}_evt_{evt_num+1}_{key}.tiff"
                        im.save(tiff_file)
 
