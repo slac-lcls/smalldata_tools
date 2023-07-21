@@ -345,7 +345,7 @@ def get_xtc_files(base, exp, run):
     run_format = ''.join(['r', run.zfill(4)])
     data_dir = Path(base) / exp[:3] / exp / 'xtc'
     xtc_files = list(data_dir.glob(f'*{run_format}*'))
-    logger.debug(f'xtc file list: {xtc_files}')
+    logger.info(f'xtc file list: {xtc_files}')
     return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
@@ -371,7 +371,7 @@ def get_sd_file(write_dir, exp, hutch):
             logger.info(f'Unable to make directory {write_dir} for output' \
                         f'exiting on error: {e}')
             sys.exit()
-    logger.debug('Will write small data file to {0}'.format(h5_f_name))
+    logger.info('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
 
 ##### START SCRIPT ########
@@ -450,9 +450,7 @@ if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
         ds_name += ':live'
-        if onS3DF: 
-            ds_name += f':dir={PSDM_BASE}/{exp[0:3]}/{exp}/xtc'
-        else:
+        if not onS3DF:
             ds_name += f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc'
 
 logger.debug(f'DataSource name: {ds_name}')

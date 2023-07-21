@@ -23,30 +23,33 @@ def get_file_location(exp, run, location):
         logger.info("Data files found on s3df.")
         print("/sdf/data/lcls/ds/")
     else:
-        # test ffb location
-        r = requests.get(ws_url, params={"location": "SRCF_FFB"})
-        r.raise_for_status()
-        on_ffb = r.json()['value']['all_present']
-        if on_ffb:
-            logger.info('Data files found on ffb.')
-            print("/sdf/data/lcls/drpsrcf/ffb")
-        else:
-            logger.info("Elog is not aware of data neither on S3DF or FFB.")
-            logger.info("Try by ignoring stream 80.")
-            ignore_stream(r.json())
+        print('/sdf/data/lcls/drpsrcf/ffb')
+        # test ffb location (comment for now, we might not need that)
+        #r = requests.get(ws_url, params={"location": "SRCF_FFB"})
+        #r.raise_for_status()
+        #on_ffb = r.json()['value']['all_present']
+        #if on_ffb:
+        #    logger.info('Data files found on ffb.')
+        #    print("/sdf/data/lcls/drpsrcf/ffb")
+        #else:
+        #    logger.info("Elog is not aware of data neither on S3DF or FFB.")
+        #    logger.info("Try by ignoring stream 80.")
+        #    ignore_stream(r.json())
     return 0
 
 
 def ignore_stream(r, stream=80):
+    s80_present = True
+    count = 0 # count files that are present on the drp
     for file in r['value']['files']:
         p = file['path']
         is_present = file['is_present']
-        count = 0
         if not is_present:
             if not f"s{stream}" in p:
                 count+=1
             else:
                 s80_present = False
+    # if only the s80 is missing, go to ffb location
     if count==0 and s80_present is False:
         print("/sdf/data/lcls/drpsrcf/ffb")
                 
