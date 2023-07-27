@@ -405,6 +405,9 @@ if hostname.find('sdf')>=0:
         useFFB = True
         # do we need to do smth to wait for files here?
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+    if if len(xtc_files)==0:
+        print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
+        sys.exit()
 
 elif hostname.find('drp')>=0:
     nFiles=0
@@ -412,7 +415,6 @@ elif hostname.find('drp')>=0:
     waitFilesStart=datetime.now()
     while nFiles==0:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-        print(xtc_files)
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
@@ -445,7 +447,7 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
+ds_name = f'exp={exp}:run={run}:smd')
 if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:

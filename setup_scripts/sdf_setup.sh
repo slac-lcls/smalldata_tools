@@ -85,8 +85,9 @@ echo "... Done."
 # change smalldata_tool permissions for the ARP (temporary?)
 # ARP kubernetes pods do not have the ACL
 chmod -R o+r $SDF_BASE/results/smalldata_tools
-chmod o+x $SDF_BASE/results/smalldata_tools/arp_scripts/*
-chmod o+x $SDF_BASE/results/smalldata_tools/producers/*
+chmod o+x $SDF_BASE/results/smalldata_tools
+chmod -R o+x $SDF_BASE/results/smalldata_tools/arp_scripts
+chmod -R o+x $SDF_BASE/results/smalldata_tools/producers
 
 # Create h5 and plot directories
 mkdir -p $SDF_BASE/hdf5/smalldata
