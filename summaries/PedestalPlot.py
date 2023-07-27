@@ -10,6 +10,7 @@ import argparse
 import sys
 import logging
 import requests
+from pathlib import Path
 from requests.auth import HTTPBasicAuth
 import socket
 try:
@@ -45,6 +46,8 @@ make_ped_imgs = args.pedImgs
 make_ped_data_imgs = args.pedImgs
 expname = args.experiment
 run = int(args.run)
+
+SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA"))
 
 ####
 # detector info to be used for status#s to elog
@@ -536,7 +539,7 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
         print(runTableData)
 
     if save_elog:
-        elogDir = '/reg/d/psdm/%s/%s/stats/summary/Pedestals/Pedestals_Run%03d'%(expname[0:3],expname,runnum)
+        elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals_Run{runnum:03d}"
 
         import os
         if not os.path.isdir(elogDir):
