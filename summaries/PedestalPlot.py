@@ -506,9 +506,6 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
     if expname[:3] in ['tmo','rix','ued']: isLCLS2=True
     if not isLCLS2:
         ds_name = 'exp={}:run={}:smd'.format(expname,run)
-        hostname = socket.gethostname()
-        if hostname.find('drp')>=0:
-            ds_name += ':dir=/cds/data/drpsrcf/%s/%s/xtc'%(expname[0:3],expname)
         ds = psana.DataSource(ds_name)
 
         det_names = [dn[0] for dn in psana.DetNames() if dn[0].find('Jungfrau')>=0 or dn[0].find('Epix')>=0 or dn[0].find('Cspad')>=0 or dn[0].find('Uxi')>=0]
