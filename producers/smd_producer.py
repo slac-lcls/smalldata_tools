@@ -404,6 +404,9 @@ if hostname.find('sdf')>=0:
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
         # do we need to do smth to wait for files here?
+        # Let's just pause for a few seconds here, seems like sometimes we are too
+        # quick trying to make the datasource
+        time.sleep(10)
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if if len(xtc_files)==0:
         print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
@@ -438,7 +441,6 @@ else:
         sys.exit()
 
 # Get output file, check if we can write to it
-print(f"directory: {args.directory}")
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 #if args.default:
 #    if useFFB:
