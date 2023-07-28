@@ -340,12 +340,12 @@ logger.debug('Args to be used for small data run: {0}'.format(args))
 
 ###### Helper Functions ##########
 
-def get_xtc_files(base, hutch, run):
+def get_xtc_files(base, exp, run):
     """File all xtc files for given experiment and run"""
     run_format = ''.join(['r', run.zfill(4)])
-    data_dir = Path(base) / hutch.lower() / exp / 'xtc'
+    data_dir = Path(base) / exp[:3] / exp / 'xtc'
     xtc_files = list(data_dir.glob(f'*{run_format}*'))
-    logger.debug(f'xtc file list: {xtc_files}')
+    logger.info(f'xtc file list: {xtc_files}')
     return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
@@ -361,6 +361,7 @@ def get_sd_file(write_dir, exp, hutch):
             print('get_sd_file problem. Please fix.')
     logger.debug(f'hdf5 directory: {write_dir}')
 
+    write_dir = Path(write_dir)
     h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
     if not write_dir.exists():
         logger.info(f'{write_dir} does not exist, creating directory now.')
@@ -370,7 +371,7 @@ def get_sd_file(write_dir, exp, hutch):
             logger.info(f'Unable to make directory {write_dir} for output' \
                         f'exiting on error: {e}')
             sys.exit()
-    logger.debug('Will write small data file to {0}'.format(h5_f_name))
+    logger.info('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
 
 ##### START SCRIPT ########
@@ -403,6 +404,13 @@ if hostname.find('sdf')>=0:
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
         # do we need to do smth to wait for files here?
+        # Let's just pause for a few seconds here, seems like sometimes we are too
+        # quick trying to make the datasource
+        time.sleep(10)
+    xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+    if if len(xtc_files)==0:
+        print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
+        sys.exit()
 
 elif hostname.find('drp')>=0:
     nFiles=0
@@ -410,7 +418,6 @@ elif hostname.find('drp')>=0:
     waitFilesStart=datetime.now()
     while nFiles==0:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-        print (xtc_files)
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
@@ -427,14 +434,13 @@ elif hostname.find('drp')>=0:
 
 # If not a current experiment or files in ffb, look in psdm
 else:
-    logger.debug('Not on FFB, use offline system')
+    logger.debug('Not on FFB or S3DF, use old offline system')
     xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
     if len(xtc_files)==0:
         print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
         sys.exit()
 
 # Get output file, check if we can write to it
-print(args.directory)
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 #if args.default:
 #    if useFFB:
@@ -442,8 +448,8 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #    else:
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
-# Define data source name and generate data source object, don't understand all conditions yet
-ds_name = ''.join(['exp=', exp, ':run=', run, ':smd'])
+# Define data source name and generate data source object
+ds_name = f'exp={exp}:run={run}:smd')
 if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
@@ -592,7 +598,10 @@ if EODet is None:
 end_setup_dets = time.time()
 
 if args.tiff: # this needs to be done for S3DF
-    dirname = '/cds/data/psdm/%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
+    if onS3DF:
+        dirname = S3DF_BASE / f"{exp[:3]}/{exp}/scratch/run{int(run)}"
+    else:
+        dirname = PSANA_BASE / '%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
@@ -654,7 +663,7 @@ for evt_num, evt in enumerate(ds.events()):
                        except:
                            pass
                        im = Image.fromarray(image)
-                       tiff_file = dirname+'/Run_%d_evt_%d_%s.tiff'%(int(args.run), evt_num+1, key)
+                       tiff_file = dirname / f"Run_{int(run)}_evt_{evt_num+1}_{key}.tiff"
                        im.save(tiff_file)
 
     #here you can add any data you like: example is a product of the maximumof two area detectors.

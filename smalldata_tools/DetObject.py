@@ -302,7 +302,7 @@ class DetObjectClass(object):
             for k,v in kwargs.items():
                 # the key indicates a given selection is to be respected
                 if key.find(k)>=0:
-                    # is the selection is not tryue, set array to zeros
+                    # is the selection is not true, set array to zeros
                     if not v: dat_to_be_summed = np.zeros_like(dat_to_be_summed)
             
             if self._storeSum[key] is None:

@@ -61,7 +61,7 @@ then
 fi
 
 HUTCH=${EXP:0:3}
-FFB_BASE="/sdf/data/lcls/drpsrcf/$HUTCH/$EXP"
+FFB_BASE="/sdf/data/lcls/drpsrcf/ffb/$HUTCH/$EXP"
 SDF_BASE="/sdf/data/lcls/ds/$HUTCH/$EXP"
 
 # Exit if directories dont exist
@@ -81,6 +81,13 @@ else
     git clone https://github.com/slac-lcls/smalldata_tools.git $SDF_BASE/results/smalldata_tools
 fi
 echo "... Done."
+
+# change smalldata_tool permissions for the ARP (temporary?)
+# ARP kubernetes pods do not have the ACL
+chmod -R o+r $SDF_BASE/results/smalldata_tools
+chmod o+x $SDF_BASE/results/smalldata_tools
+chmod -R o+x $SDF_BASE/results/smalldata_tools/arp_scripts
+chmod -R o+x $SDF_BASE/results/smalldata_tools/producers
 
 # Create h5 and plot directories
 mkdir -p $SDF_BASE/hdf5/smalldata

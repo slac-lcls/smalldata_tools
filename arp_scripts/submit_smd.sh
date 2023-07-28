@@ -158,7 +158,6 @@ fi
 CORES=${CORES:=1}
 QUEUE=${QUEUE:=$DEFQUEUE}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
-RESERVATION=${RESERVATION:=''} # not implemented yet
 
 # select tasks per node to match the number of cores:
 if [[ $QUEUE == *psanaq* ]]; then
@@ -168,7 +167,7 @@ elif [[ $QUEUE == *psfeh* ]]; then
 elif [[ $QUEUE == *ffb* ]]; then
     TASKS_PER_NODE=${TASKS_PER_NODE:=60}
 elif [[ $QUEUE == *milano* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=125}
+    TASKS_PER_NODE=${TASKS_PER_NODE:=120}
 else
     TASKS_PER_NODE=${TASKS_PER_NODE:=12}
 fi
@@ -204,9 +203,11 @@ fi
 if [ -v FORCE_S3DF ]; then
     DATAPATH="/sdf/data/lcls/ds"
 else
-    DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+    DATAPATH=`python $MYDIR/file_location.py -e $EXP -r $RUN`
 fi
 export SIT_PSDM_DATA=$DATAPATH
+
+echo "SIT_PSDM_DATA: $SIT_PSDM_DATA"
 
 echo ---- Print environment ----
 env | sort
@@ -231,12 +232,17 @@ if [ -v LOGDIR ]; then
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
+#SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
+SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE" # test without exclusive for now
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 
 if [[ $QUEUE == *milano* ]]; then
+    if [ -v RESERVATION ]; then
+        SBATCH_ARGS="$SBATCH_ARGS --reservation $RESERVATION"
+    fi
     if [[ $ACCOUNT == 'lcls' ]]; then
+        echo $SBATCH_ARGS --qos preemtable --account $ACCOUNT --wrap="$MPI_CMD"
 	    sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
