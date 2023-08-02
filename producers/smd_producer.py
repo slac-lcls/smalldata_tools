@@ -408,7 +408,7 @@ if hostname.find('sdf')>=0:
         # quick trying to make the datasource
         time.sleep(10)
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
-    if if len(xtc_files)==0:
+    if len(xtc_files)==0:
         print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
         sys.exit()
 
@@ -449,7 +449,7 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 #        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object
-ds_name = f'exp={exp}:run={run}:smd')
+ds_name = f'exp={exp}:run={run}:smd'
 if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
