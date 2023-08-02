@@ -41,13 +41,16 @@ expname = args.experiment
 run = int(args.run)
 
 hostname = socket.gethostname()
+tiffdir = '/cds/data/psdm/%s/%s/scratch/run%d'%(expname[:3],expname,run)
 
 if hostname.find('drp') >= 0:
     dat = tables.open_file('/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
+elif hostname.find('sdf') >= 0:
+    dat = tables.open_file('/sdf/data/lcls/ds/%s/%s/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
+    tiffdir = '/sdf/data/lcls/ds/%s/%s/scratch/run%d'%(expname[:3],expname,run)
 else:
     dat = tables.open_file('/cds/data/psdm/%s/%s/hdf5/smalldata/%s_Run%04d.h5'%(expname[:3],expname,expname,run)).root
 
-tiffdir = '/cds/data/psdm/%s/%s/scratch/run%d'%(expname[:3],expname,run)
 
 def SafeFloat(self, string, precision=None):
     try:
