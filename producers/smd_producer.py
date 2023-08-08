@@ -403,10 +403,27 @@ if hostname.find('sdf')>=0:
     onS3DF = True
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
-        # do we need to do smth to wait for files here?
-        # Let's just pause for a few seconds here, seems like sometimes we are too
-        # quick trying to make the datasource
-        time.sleep(10)
+        # wait for files to appear
+        nFiles = 0
+        n_wait = 0
+        max_wait = 20 # 10s wait per cycle.
+        waitFilesStart=datetime.now()
+        while nFiles == 0:
+            if n_wait > max_wait:
+                print(f"Waited {str(n_wait*10)}s, still no files available." \
+                       "Giving up, please check dss nodes and data movers." \
+                       "Exiting now.")
+                sys.exit()
+            xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+            nFiles = len(xtc_files)
+            if nFiles == 0:
+                print(f"We have no xtc files for run {run} in {exp} in the FFB system," \
+                      "we will wait for 10 second and check again.")
+                n_wait+=1
+                time.sleep(10)
+        waitFilesEnd = datetime.now()
+        print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if len(xtc_files)==0:
         print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
