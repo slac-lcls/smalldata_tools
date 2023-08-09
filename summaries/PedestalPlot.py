@@ -536,7 +536,7 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
         print(runTableData)
 
     if save_elog:
-        elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals_Run{runnum:03d}"
+        elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
 
         import os
         if not os.path.isdir(elogDir):
