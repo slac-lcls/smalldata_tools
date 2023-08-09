@@ -49,7 +49,18 @@ do
 unset PYTHONPATH
 unset LD_LIBRARY_PATH
 	    
-source /reg/g/psdm/etc/psconda.sh -py3
+if [ -d "/sdf/data/lcls" ]; then
+    ON_S3DF=true
+    SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+else
+    ON_S3DF=false
+fi
+
+if $ON_S3DF; then
+    source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
+else
+    source /reg/g/psdm/etc/psconda.sh -py3
+fi
 
 LDAP='./producers'
 

@@ -240,6 +240,11 @@ class SmallDataAna(object):
         self.run=int(run)
         self.runLabel='Run%03d'%self.run
         self.plotWith=plotWith
+        self.onS3DF = False
+        hostname = socket.gethostname()
+        if hostname.find('sdf')>=0:
+            self.onS3DF = True
+
         if len(expname)>3:
             self.hutch=self.expname[:3]
             self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
@@ -247,6 +252,9 @@ class SmallDataAna(object):
                 hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
                     self.dirname = '/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                elif self.onS3DF:
+                    self.dirname = '/sdf/data/lcls/ds/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.plot_dirname='/sdf/data/lcls/ds/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
                 else:
                     self.dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.
@@ -266,7 +274,7 @@ class SmallDataAna(object):
             if not path.isfile(self.fname):
                 self.fname='%s/%s_Run%04d.h5'%(self.dirname,self.expname,self.run)
             print('Setting up dirs:')
-            if not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
+            if not self.onS3DF and not path.isdir('/reg/d/psdm/%s/%s/results/'%(self.hutch,self.expname)):
                 self.fname='%s/ldat_%s_Run%03d.h5'%(self.dirname,self.expname,self.run)
         else:
             self.fname='%s/%s'%(self.dirname,filename)
