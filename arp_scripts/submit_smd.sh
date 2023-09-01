@@ -7,30 +7,30 @@ $(basename "$0"):
 	Script to launch a smalldata_tools run analysis
 	
 	OPTIONS:
-		-h|--help
-			Definition of options
-		-e|--experiment
-			Experiment name (i.e. cxilr6716)
-		-r|--run
-			Run Number
-		-d|--directory
-			Full path to directory for output file
-		-n|--nevents
-			Number of events to analyze
-		-q|--queue
-			Queue to use on SLURM
-		-c|--cores
-			Number of cores to be utilized
+        -h|--help
+            Definition of options
+        -e|--experiment
+            Experiment name (i.e. cxilr6716)
+        -r|--run
+            Run Number
+        -d|--directory
+            Full path to directory for output file
+        -n|--nevents
+            Number of events to analyze
+        -q|--queue
+            Queue to use on SLURM
+        -c|--cores
+            Number of cores to be utilized
         --maxnodes
             Max number of nodes to use
-		-f|--full
-			If specified, translate everything (do not use)
-		-D|--default
-			If specified, translate only smalldata
+        -f|--full
+            If specified, translate everything (do not use)
+        -D|--default
+            If specified, translate only smalldata
         -i|--image
-			If specified, translate everything & save area detectors as images (do not use)
-		--norecorder
-			If specified, don't use recorder data
+            If specified, translate everything & save area detectors as images (do not use)
+        --norecorder
+            If specified, don't use recorder data
         --postTrigger
             Post that primary processing done to elog so secondary jobs can start
         --interactive
