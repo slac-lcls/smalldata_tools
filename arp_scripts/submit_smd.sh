@@ -21,22 +21,24 @@ $(basename "$0"):
 			Queue to use on SLURM
 		-c|--cores
 			Number of cores to be utilized
+        --maxnodes
+            Max number of nodes to use
 		-f|--full
-			If specified, translate everything
+			If specified, translate everything (do not use)
 		-D|--default
 			If specified, translate only smalldata
-                -i|--image
-			If specified, translate everything & save area detectors as images
+        -i|--image
+			If specified, translate everything & save area detectors as images (do not use)
 		--norecorder
 			If specified, don't use recorder data
-                --nparallel
-                        Number of processes per node
-                --postTrigger
-                        Post that primary processing done to elog to seconndary jobs can start
-                --interactive
-                        Run the process live w/o batch system
-                --logdir
-                        save log-files in specified directory
+        --postTrigger
+            Post that primary processing done to elog so secondary jobs can start
+        --interactive
+            Run the process live w/o batch system
+        --logdir
+            save log-files in specified directory
+        --s3df
+            Forces to load xtc files from the S3DF location
 EOF
 
 }
@@ -68,8 +70,8 @@ do
         shift
         shift
         ;;
-    --nparallel)
-        TASKS_PER_NODE="$2"
+    --maxnodes)
+        MAX_NODES="$2"
         shift
         shift
         ;;
@@ -145,42 +147,31 @@ export RUN_NUM=$RUN
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
-
+# Default queue and S3DF flag
 DEFQUEUE='psanaq'
 if [[ $HOSTNAME == *drp* ]]; then
     DEFQUEUE='anaq'
-elif [ -d "/sdf/data/lcls/" ]; then
-    DEFQUEUE='milano'
 fi
 
-#Define cores if we don't have them
-#Set to 1 by default
-CORES=${CORES:=1}
+if [ -d "/sdf/data/lcls/" ]; then
+    ON_S3DF=true
+    SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+    DEFQUEUE='milano'
+else
+    ON_S3DF=false
+fi
+
+# Define # of cores
 QUEUE=${QUEUE:=$DEFQUEUE}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
-# select tasks per node to match the number of cores:
-if [[ $QUEUE == *psanaq* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
-elif [[ $QUEUE == *psfeh* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=16}
-elif [[ $QUEUE == *ffb* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=60}
-elif [[ $QUEUE == *milano* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=120}
+# Select number of cores and max nodes
+if [[ $QUEUE == *milano*  ]]; then
+    CORES=${CORES:=120} # a full node by default
+    MAX_NODES=${MAX_NODES:=4}
 else
-    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
-fi
-
-if [ $TASKS_PER_NODE -gt $CORES ]; then
-    TASKS_PER_NODE=$CORES 
-fi
-
-if [ -d "/sdf/data/lcls" ]; then
-    ON_S3DF=true
-    SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
-else
-    ON_S3DF=false
+    CORES=${CORES:=1} # default to 1 outside S3DF
+    MAX_NODES=${MAX_NODES:=4}
 fi
 
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
@@ -209,9 +200,9 @@ export SIT_PSDM_DATA=$DATAPATH
 
 echo "SIT_PSDM_DATA: $SIT_PSDM_DATA"
 
-echo ---- Print environment ----
-env | sort
-echo ---- Printed environment ----
+#echo ---- Print environment ----
+#env | sort
+#echo ---- Printed environment ----
 
 if [ -v INTERACTIVE ]; then
     # run in local terminal
@@ -233,7 +224,7 @@ if [ -v LOGDIR ]; then
 fi
 
 #SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE" # test without exclusive for now
+SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES -o $LOGFILE"
 MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
 
 
