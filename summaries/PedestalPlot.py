@@ -549,4 +549,4 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
     return tabs
 
 
-tabs = plotPedestals(expname,run, make_ped_imgs=True, make_ped_data_imgs=False, save_elog=save_elog)
+tabs = plotPedestals(expname,run, make_ped_imgs=True, make_ped_data_imgs=False, nosave_elog=nosave_elog)
