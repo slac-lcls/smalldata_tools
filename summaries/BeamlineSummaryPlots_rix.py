@@ -44,7 +44,11 @@ def postRunTable(runtable_data):
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
     user=args.experiment[:3]+'opr'
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+    elogPostFile='/cds/home/opr/%s/forElogPost.txt'%user
+    hostname=socket.gethostname()
+    if hostname.find('sdf')>=0:
+        elogPostFile='/sdf/group/lcls/ds/tools/forElogPost.txt'
+    with open(elogPostFile,'r') as reader:
         answer = reader.readline()
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
                       auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
@@ -254,8 +258,8 @@ if ttpos is not None:
 ## save the html file
 ##################################
 
-elogDir = '/reg/d/psdm/%s/%s/stats/summary/BeamlineSummary/BeamlineSummary_Run%03d'%\
-                (expname[0:3],expname,run)
+elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
+
 if save_elog:
     import os
     if not os.path.isdir(elogDir):
