@@ -1131,16 +1131,21 @@ class BaseSmallDataAna_psana(object):
         #cspad save as 5920 lines, 388 entries
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
+            calibDir=det.env.calibDir()
             if det.dettype==DetObjectClass.CsPad:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
+                dirname='/%s/CsPad2x2::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.CsPad2M:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+                dirname='%s/CsPad::CalibV1/%s/'%(calibDir,srcStr)        
             elif det.dettype==DetObjectClass.Epix:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)
+                dirname='%s/Epix100a::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.Rayonix:
-                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+                dirname='%s/Camera::CalibV1/%s/'%(calibDir,srcStr)        
+            elif det.dettype==DetObjectClass.Epix10k:
+                dirname='%s/Epix10ka::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.Epix10k2M:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.expname[:3],self.expname,srcStr)        
+                dirname='%s/Epix10ka2M::CalibV1/%s/'%(calibDir,srcStr)
+  
+            dirname+='pixel_mask/'
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
