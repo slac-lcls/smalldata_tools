@@ -34,14 +34,14 @@ logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser()
 parser.add_argument('--run', help='run', type=str, default=os.environ.get('RUN_NUM', ''))
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
-parser.add_argument('--postElog', help='post plot to elog', action='store_true', default=False)
+parser.add_argument('--nopostElog', help='do not post plot &status to elog', action='store_true', default=False)
 parser.add_argument('--pedImgs', help='make images of pedestals', action='store_true', default=False)
 parser.add_argument('--pedDiffImgs', help='make images of first 10 subtracted images ', action='store_true', default=False)
 parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
 args = parser.parse_args()
 logger.debug('Args to be used for pedestal plots: {0}'.format(args))
 
-save_elog = args.postElog
+nosave_elog = args.nopostElog
 make_ped_imgs = args.pedImgs
 make_ped_data_imgs = args.pedImgs
 expname = args.experiment
@@ -500,7 +500,7 @@ def allPlots(det_name, run, make_ped_imgs=False, make_ped_data_imgs=False, tabs=
     
     return tabs
 
-def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
+def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs=False, make_ped_data_imgs=False,
                  detImgMaxSize=400):
     isLCLS2=False
     if expname[:3] in ['tmo','rix','ued']: isLCLS2=True
@@ -535,7 +535,7 @@ def plotPedestals(expname='mfxc00118', run=364, save_elog=False, make_ped_imgs=F
         print('runTableData:')
         print(runTableData)
 
-    if save_elog:
+    if not nosave_elog:
         elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
 
         import os

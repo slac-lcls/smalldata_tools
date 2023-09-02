@@ -11,6 +11,7 @@ import argparse
 import logging
 import requests
 import numpy as np
+from pathlib import Path
 from requests.auth import HTTPBasicAuth
 import holoviews as hv
 from holoviews import dim
@@ -41,9 +42,13 @@ def postRunTable(runtable_data):
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
     user=args.experiment[:3]+'opr'
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+    elogPostFile='/cds/home/opr/%s/forElogPost.txt'%user
+    hostname=socket.gethostname()
+    if hostname.find('sdf')>=0:
+        elogPostFile='/sdf/group/lcls/ds/tools/forElogPost.txt'
+    with open(elogPostFile,'r') as reader:
         answer = reader.readline()
-    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
+        r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
                       auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     #we might need to use this for non=current expetiments. Currently does not work in ARP
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
@@ -98,6 +103,8 @@ save_elog = args.postElog
 detImgMaxSize = 500 #max dimension of image.
 expname = args.experiment
 run = int(args.run)
+
+SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA"))
 
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Started"}])
@@ -187,38 +194,38 @@ if ttPosDim.name in ana.Keys():
 ##############################################################
 
 diodeUDim = hv.Dimension(('diodeU/channels','ipmU'))
-diodeU = ana.getVar(diodeUDim.name, useFilter=iniFilter)
-diodeUMed =  np.array([np.nanmedian(diodeU[i*120:i*120+120,:], axis=0) for i in range(int(eventTimeR.shape[0]/120))])
+if diodeUDim.name in ana.Keys():
+    diodeU = ana.getVar(diodeUDim.name, useFilter=iniFilter)
+    diodeUMed =  np.array([np.nanmedian(diodeU[i*120:i*120+120,:], axis=0) for i in range(int(eventTimeR.shape[0]/120))])
+    diodeU0vTime = hv.Scatter((eventTimeR, diodeU[:,0]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU0vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,0]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
+    diodeU1vTime = hv.Scatter((eventTimeR, diodeU[:,1]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU1vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,1]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
+    diodeU2vTime = hv.Scatter((eventTimeR, diodeU[:,2]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU2vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,2]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
+    diodeU3vTime = hv.Scatter((eventTimeR, diodeU[:,3]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU3vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,3]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
 
-diodeU0vTime = hv.Scatter((eventTimeR, diodeU[:,0]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU0vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,0]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
-diodeU1vTime = hv.Scatter((eventTimeR, diodeU[:,1]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU1vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,1]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
-diodeU2vTime = hv.Scatter((eventTimeR, diodeU[:,2]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU2vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,2]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
-diodeU3vTime = hv.Scatter((eventTimeR, diodeU[:,3]), kdims=[eventTimeDim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU3vTimeMed= hv.Curve((eventTimeRMed, diodeUMed[:,3]), kdims=[eventTimeDim, diodeUDim]).options(color='k')
+    diodeU0vIpm2 = hv.Scatter((ipm2Var, diodeU[:,0]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU1vIpm2 = hv.Scatter((ipm2Var, diodeU[:,1]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU2vIpm2 = hv.Scatter((ipm2Var, diodeU[:,2]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
+    diodeU3vIpm2 = hv.Scatter((ipm2Var, diodeU[:,3]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
 
-diodeU0vIpm2 = hv.Scatter((ipm2Var, diodeU[:,0]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU1vIpm2 = hv.Scatter((ipm2Var, diodeU[:,1]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU2vIpm2 = hv.Scatter((ipm2Var, diodeU[:,2]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
-diodeU3vIpm2 = hv.Scatter((ipm2Var, diodeU[:,3]), kdims=[ipm2Dim, diodeUDim]).options(color='g', alpha=0.3)
+    ## defining subplots
+    tabDiodeU = pn.GridSpec(sizing_mode='stretch_both', max_width=1200, name='IPM User')
 
-## defining subplots
-tabDiodeU = pn.GridSpec(sizing_mode='stretch_both', max_width=1200, name='IPM User')
+    # time plots for the 4 user IPM channels
+    tabDiodeU[0:1,0:4] = pn.Column(diodeU0vTime*diodeU0vTimeMed)
+    tabDiodeU[1:2,0:4] = pn.Column(diodeU1vTime*diodeU1vTimeMed)
+    tabDiodeU[2:3,0:4] = pn.Column(diodeU2vTime*diodeU2vTimeMed)
+    tabDiodeU[3:4,0:4] = pn.Column(diodeU3vTime*diodeU3vTimeMed)
 
-# time plots for the 4 user IPM channels
-tabDiodeU[0:1,0:4] = pn.Column(diodeU0vTime*diodeU0vTimeMed)
-tabDiodeU[1:2,0:4] = pn.Column(diodeU1vTime*diodeU1vTimeMed)
-tabDiodeU[2:3,0:4] = pn.Column(diodeU2vTime*diodeU2vTimeMed)
-tabDiodeU[3:4,0:4] = pn.Column(diodeU3vTime*diodeU3vTimeMed)
-
-# correlation plots for the 4 user IPM channels
-tabDiodeU[4:6,0:2] = pn.Column(diodeU0vIpm2)
-tabDiodeU[4:6,2:4] = pn.Column(diodeU1vIpm2)
-tabDiodeU[6:8,0:2] = pn.Column(diodeU2vIpm2)
-tabDiodeU[6:8,2:4] = pn.Column(diodeU3vIpm2)
-tabs.append(tabDiodeU)
+    # correlation plots for the 4 user IPM channels
+    tabDiodeU[4:6,0:2] = pn.Column(diodeU0vIpm2)
+    tabDiodeU[4:6,2:4] = pn.Column(diodeU1vIpm2)
+    tabDiodeU[6:8,0:2] = pn.Column(diodeU2vIpm2)
+    tabDiodeU[6:8,2:4] = pn.Column(diodeU3vIpm2)
+    tabs.append(tabDiodeU)
 
 
 diode2Dim = hv.Dimension(('diode2/channels', 'PIM3'))
@@ -274,9 +281,8 @@ nOff = ana.getFilter(offFilter).sum() # total number of OFF shots, if this numbe
 ## save the html file
 ##################################
 
-elogDir = '/reg/d/psdm/%s/%s/stats/summary/BeamlineSummary/BeamlineSummary_Run%03d'%\
-                (expname[0:3],expname,run)
 if save_elog:
+    elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{run:03d}"
     import os
     if not os.path.isdir(elogDir):
         os.makedirs(elogDir)
