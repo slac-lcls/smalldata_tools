@@ -649,18 +649,19 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         if dirname == 'calib':
             #detname, img, avImage = self.getAvImage(detname=None)
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
+            calibDir=det.env.calibDir()
             if det.dettype==DetObjectClass.CsPad:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
+                dirname='/%s/CsPad2x2::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.CsPad2M:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
+                dirname='%s/CsPad::CalibV1/%s/'%(calibDir,srcStr)        
             elif det.dettype==DetObjectClass.Epix:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)
+                dirname='%s/Epix100a::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.Rayonix:
-                dirname='/reg/d/psdm/%s/%s/calib/Camera::CalibV1/%s/'%(self.expname[:3],self.expname,srcStr)        
+                dirname='%s/Camera::CalibV1/%s/'%(calibDir,srcStr)        
             elif det.dettype==DetObjectClass.Epix10k:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/Epix10ka::CalibV1/%s/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.Epix10k2M:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/Epix10ka2M::CalibV1/%s/'%(calibDir,srcStr)
 
         if not os.path.exists(dirname+'pedestals'):
             os.makedirs(dirname+'pedestals')
@@ -774,16 +775,20 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         if raw_input("Save to calibdir?\n") in ["y","Y"]:
             mask = (~(mask.astype(bool))).astype(int)
             srcStr=det.source.__str__().replace('Source("DetInfo(','').replace(')")','')
+            calibDir=det.env.calibDir()
             if det.dettype==DetObjectClass.CsPad:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad2x2::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)
+                dirname='/%s/CsPad2x2::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.CsPad2M:
-                dirname='/reg/d/psdm/%s/%s/calib/CsPad::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/CsPad::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)        
             elif det.dettype==DetObjectClass.Epix:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix100a::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/Epix100a::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)
+            elif det.dettype==DetObjectClass.Rayonix:
+                dirname='%s/Camera::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)        
             elif det.dettype==DetObjectClass.Epix10k:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/Epix10ka::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)
             elif det.dettype==DetObjectClass.Epix10k2M:
-                dirname='/reg/d/psdm/%s/%s/calib/Epix10ka2M::CalibV1/%s/pixel_mask/'%(self.sda.expname[:3],self.sda.expname,srcStr)        
+                dirname='%s/Epix10ka2M::CalibV1/%s/pixel_mask/'%(calibDir,srcStr)
+
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
             fname='%s-end.data'%self.run
@@ -888,6 +893,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
             needsGeo=True
         #now look at directory and get filenames of darks. Hmm. extra function?
         detNameStr = det.name.__str__()
+        calibDir=det.env.calibDir()
         if detNameStr.find('Epix')>=0 or detNameStr.find('epix')>=0:
             if detNameStr.find('10k')>=0:
                 detTypeStr='Epix10ka2M::CalibV1'
@@ -899,7 +905,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
             detTypeStr='CsPad2x2::CalibV1'
         else:
             detTypeStr='CsPad::CalibV1'
-        fnames = os.listdir('/reg/d/psdm/%s/%s/calib/%s/%s/pedestals/'%(self.hutch, self.expname, detTypeStr, detNameStr))
+        fnames = os.listdir('/%s/%s/%s/pedestals/'%(calibDir, detTypeStr, detNameStr))
         pedNames=[]
         pedRuns=[]
         for fname in fnames:
@@ -1028,12 +1034,12 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                              vdims=[hv.Dimension('pedVals', range=pedZ)]) \
                         .options(cmap='viridis',colorbar=True, width=plotwidth) + \
                     hv.Image(self.calibhisto['rms2d'], 
-                             kdims=[hv.Dimension('rmsestal'),runDim], 
+                             kdims=[hv.Dimension('rms'),runDim], 
                              bounds=boundsRms, 
                              vdims=[hv.Dimension('rmsVals', range=rmsZ)]) \
                         .options(cmap='viridis',colorbar=True, width=plotwidth) + \
                     hv.Image(self.calibhisto['rms2dNorm'], 
-                             kdims=[hv.Dimension('rmsestal/ref'),runDim], 
+                             kdims=[hv.Dimension('rms/ref'),runDim], 
                              bounds=boundsRms, 
                              vdims=[hv.Dimension('rmsValsNorm', range=rmsZNorm)]) \
                         .options(cmap='viridis',colorbar=True, width=plotwidth) 
