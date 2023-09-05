@@ -126,10 +126,14 @@ def postRunTable(runtable_data):
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     print(r)
 
-def statusStats(det_name, printme=False):
+def statusStats(det_name, printme=False, request_run=None):
     det = psana.Detector(det_name)
-    statusmask = det.mask(run,status=True)
-    status = det.status(run)
+    if request_run:
+        statusmask = det.mask(request_run,status=True)
+        status = det.status(request_run)
+    else:
+        statusmask = det.mask(run,status=True)
+        status = det.status(run)
     status_type = 'camera' #see if different detector types here are different?
     if det.is_epix10ka_any(): status_type = 'epix10k'
     elif det.is_jungfrau(): status_type = 'jungfrau'
@@ -155,6 +159,62 @@ def statusStats(det_name, printme=False):
         for k,v in statusStatDict.items():
             print(k,v)
     return statusStatDict
+
+def postBadPixMsg(
+        det_name: str,
+        exp: str,
+        run: int,
+        tag: str = "SUMMARY_BAD_PIX",
+        title: str = "Detector Bad Pixel Info -"
+):
+    """Post bad pixel data for a given detector and run to the eLog.
+
+    Parameters
+    ----------
+    det_name (str) Name of detector to pull bad pixel data for.
+    exp (str) Experiment name.
+    run (int) Run number. Pulls data for this run and all previous dark runs.
+    """
+    # Setup auth for elog posting
+    opr_name: str = f"{exp[:3]}opr"
+    auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
+    with open(auth_path, "r") as f:
+        pw = f.readline()[:-1]
+
+    base_url: str = "https://pswww.slac.stanford.edu/ws/lgbk/lgbk"
+
+    # Pull list of all dark runs
+    darks_url: str = f"{base_url}/{exp}/ws/get_runs_with_tag?tag=DARK"
+    resp: requests.models.Response = requests.get(
+        darks_url,
+        auth=HTTPBasicAuth(opr_name, pw)
+    )
+    if resp.json()['success']:
+        dark_runs: list = resp.json()['value']
+        dark_runs = [r for r in dark_runs if r <= run]
+
+        bad_pix: list = []
+
+        for dr in dark_runs:
+            stat_dict: dict = statusStats(det_name, request_run=dr)
+            bad_pix.append(stat_dict['total_masked'])
+
+        # Only report current DARK run and the difference vs previous
+        curr_bad_pix = bad_pix[-1]
+        diff_bad_pix = bad_pix[-1] - bad_pix[-2]
+        msg: str = (
+            f"Current bad pixel count for {det_name}: {curr_bad_pix}\n"
+            f"Difference vs previous DARK run: {diff_bad_pix}"
+        )
+    else:
+        msg: str = "Cannot communicate with eLog to retrieve DARK run list."
+
+    post: dict = {}
+    post['log_text'] = msg
+    post['log_tags'] = tag
+    post['log_title'] = f"{title} {det_name}"
+    post_url = f"{base_url}/{exp}/ws/new_elog_entry"
+    requests.post(post_url, data=post, auth=HTTPBasicAuth(opr_name, pw))
 
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Ped=1e6
@@ -532,6 +592,7 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
         statusDict = statusStats(this_det_name)
         for k,v in statusDict.items():
             runTableData[f'Pixel Status/{this_det_name}_n_{k}'] = v
+        postBadPixMsg(det_name=det_name, exp=expname, run=run)
         print('runTableData:')
         print(runTableData)
 
