@@ -285,18 +285,18 @@ def postElogMsg(
         logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
 
 def postBadPixMsg(
-        det_name: str,
+        detectors: list,
         exp: str,
         run: int,
         *,
         tag: str = "SUMMARY_BAD_PIX",
-        title: str = "Detector Bad Pixel Info -"
+        title: str = "Detector Bad Pixel Info"
 ) -> None:
     """Post bad pixel data for a given detector and run to the eLog.
 
     Parameters
     ----------
-    det_name (str) Name of detector to pull bad pixel data for.
+    detectors (str) Names of detectors to pull bad pixel data for.
     exp (str) Experiment name.
     run (int) Run number. Pulls data for this run and all previous DARK runs.
     tag (str) Optional. Tag for the bad pixel summary posts.
@@ -310,22 +310,38 @@ def postBadPixMsg(
         dark_runs = [dr for dr in dark_runs if dr <= run]
 
         bad_pix: list = []
-        for dr in dark_runs:
-            stat_dict: dict = statusStats(det_name, request_run=dr)
-            bad_pix.append(stat_dict['total_masked'])
-
-        # Report current DARK run bad pix and the delta vs previous DARK run
-        curr_bad_pix = bad_pix[-1]
-        diff_bad_pix = bad_pix[-1] - bad_pix[-2]
-        msg: str = (
-            f"Current bad pixel count for run {run}: {curr_bad_pix}\n"
-            f"Difference vs previous DARK run: {diff_bad_pix}"
+        table_header: str = (
+            "<thead><tr><th colspan=\"3\">"
+            f"<center>{title}</center>"
+            "</th></tr></thead>"
         )
+        table_body: str = (
+            "<tbody><tr>"
+            "<td><b><center>Detector</center></b></td>"
+            "<td><b><center>Number of bad pixels</center></b></td>"
+            "<td><b><center>Difference vs previous DARK</center></b></td></tr>"
+        )
+
+        for det_name in detectors:
+            for dr in dark_runs:
+                stat_dict: dict = statusStats(det_name, request_run=dr)
+                bad_pix.append(stat_dict['total_masked'])
+
+            # Report current DARK run bad pix and the delta vs previous DARK run
+            curr_bad_pix = bad_pix[-1]
+            diff_bad_pix = bad_pix[-1] - bad_pix[-2]
+            det_entry: str = (
+                f"<tr><td><center>{det_name}</center></td>"
+                f"<td><center>{curr_bad_pix}</center></td>"
+                f"<td><center>{diff_bad_pix}</center></td></tr>"
+            )
+            table_body += det_entry
+        table_body += "</tbody>"
+        msg: str = f"<table border=\"1\">{table_header}{table_body}</table>"
     else:
         msg: str = "No DARK runs or cannot communicate with eLog."
         logger.debug(msg)
 
-    title = f"{title} {det_name}"
     postElogMsg(exp=exp, msg=msg, tag=tag, title=title)
 
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
@@ -704,10 +720,10 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
         statusDict = statusStats(this_det_name)
         for k,v in statusDict.items():
             runTableData[f'Pixel Status/{this_det_name}_n_{k}'] = v
-        postBadPixMsg(det_name=det_name, exp=expname, run=run)
         print('runTableData:')
         print(runTableData)
 
+    postBadPixMsg(detectors=det_names, exp=expname, run=run)
     if not nosave_elog:
         elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
 
