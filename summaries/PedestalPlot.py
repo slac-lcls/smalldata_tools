@@ -13,6 +13,8 @@ import requests
 from pathlib import Path
 from requests.auth import HTTPBasicAuth
 import socket
+from typing import Optional
+import mimetypes
 try:
     basestring
 except NameError:
@@ -160,61 +162,171 @@ def statusStats(det_name, printme=False, request_run=None):
             print(k,v)
     return statusStatDict
 
+def getKerberosAuthHeaders() -> dict: ...
+
+def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
+    """Return an authentication object for the eLog API for an opr account.
+
+    This method will only work for active experiments. "opr" accounts are
+    removed from the authorized users list after the experiment ends.
+
+    Paramters
+    ---------
+    exp (str) Experiment name (to determine operator username).
+
+    Returns
+    -------
+    http_auth (HTTPBasicAuth) Authentication for eLog API.
+    """
+    opr_name: str = f"{exp[:3]}opr"
+    hostname: str = socket.gethostname()
+    if hostname.find('sdf') >= 0:
+        auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
+    else:
+        auth_path: str = f"/cds/home/opr/{opr_name}/forElogPost.txt"
+
+    with open(auth_path, "r") as f:
+        pw: str = f.readline()[:-1]
+
+    return HTTPBasicAuth(username=opr_name, password=pw)
+
+def getRunsWithTag(
+        exp: str,
+        tag: str,
+        http_auth: Optional[HTTPBasicAuth]=None
+) -> list:
+    """Return a list of runs tagged with a specific `tag`.
+
+    Parameters
+    ----------
+    exp (str) Experiment name.
+    tag (str) Tag to match against run tags.
+    http_auth (HTTPBasicAuth) Authentication for eLog API.
+
+    Returns
+    -------
+    tagged_runs (list[int]) List of runs with the specified tag. Empty if none
+        were found or there was a communication error.
+    """
+    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
+    tag_url: str = f"{base_url}/{exp}/ws/get_runs_with_tag?tag={tag}"
+    http_auth: HTTPBasicAuth = http_auth or getElogBasicAuth(exp)
+    resp: requests.models.Response = requests.get(tag_url, auth=http_auth)
+
+    tagged_runs: list = []
+    if resp.json()['success']:
+        tagged_runs = resp.json()['value']
+
+    return tagged_runs
+
+def postElogMsg(
+        exp: str,
+        msg: str,
+        *,
+        tag: Optional[str] = "",
+        title: Optional[str] = "",
+        files: list = []
+) -> None:
+    """Post a new message to the eLog.
+
+    Parameters
+    ----------
+    exp (str) Experiment name.
+    msg (str) Body of the eLog post.
+    tag (str) Optional. A tag to include for the post.
+    title (str) Optional. A title for the eLog post.
+    files (list) Optional. Either a list of paths (str) to files (figures) to
+        include with the eLog post, OR, a list of 2-tuples of strings of the
+        form (`path`, `description`).
+    """
+    post_files: list = []
+    for f in files:
+        if isinstance(f, str):
+            desc: str = os.path.basename(f)
+            formatted_file: tuple = (
+                "files",
+                (desc, open(f, "rb")),
+                mimetypes.guess_type(f)[0]
+            )
+        elif isinstance(f, tuple) or isinstance(f, list):
+            formatted_file: tuple = (
+                "files",
+                (f[1], open(f[0], "rb")),
+                mimetypes.guess_type(f[0])[0]
+            )
+        else:
+            logger.debug(f"Can't parse file {f} for eLog attachment. Skipping.")
+            continue
+        post_files.append(formatted_file)
+
+    post: dict = {}
+    post['log_text'] = msg
+    if tag:
+        post['log_tags'] = tag
+    if title:
+        post['log_title'] = title
+
+    http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
+    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
+    post_url = f"{base_url}/{exp}/ws/new_elog_entry"
+
+    params = {'url': post_url, 'data': post, 'auth': http_auth}
+    if post_files:
+        params.update({'files': post_files})
+
+    resp: requests.models.Response = requests.post(**params)
+
+    if resp.status_code >= 300:
+        logger.debug(
+            f"Error when posting to eLog: HTTP status code {resp.status_code}"
+        )
+
+    if not resp.json()['success']:
+        logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
+
 def postBadPixMsg(
         det_name: str,
         exp: str,
         run: int,
+        *,
         tag: str = "SUMMARY_BAD_PIX",
         title: str = "Detector Bad Pixel Info -"
-):
+) -> None:
     """Post bad pixel data for a given detector and run to the eLog.
 
     Parameters
     ----------
     det_name (str) Name of detector to pull bad pixel data for.
     exp (str) Experiment name.
-    run (int) Run number. Pulls data for this run and all previous dark runs.
+    run (int) Run number. Pulls data for this run and all previous DARK runs.
+    tag (str) Optional. Tag for the bad pixel summary posts.
+    title (str) Optional. Title for bad pixel summary posts.
     """
-    # Setup auth for elog posting
-    opr_name: str = f"{exp[:3]}opr"
-    auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    with open(auth_path, "r") as f:
-        pw = f.readline()[:-1]
+    http_auth: HTTPBasicAuth = getElogBasicAuth(exp=exp)
 
-    base_url: str = "https://pswww.slac.stanford.edu/ws/lgbk/lgbk"
+    dark_runs: list = getRunsWithTag(exp=exp, tag="DARK", http_auth=http_auth)
 
-    # Pull list of all dark runs
-    darks_url: str = f"{base_url}/{exp}/ws/get_runs_with_tag?tag=DARK"
-    resp: requests.models.Response = requests.get(
-        darks_url,
-        auth=HTTPBasicAuth(opr_name, pw)
-    )
-    if resp.json()['success']:
-        dark_runs: list = resp.json()['value']
-        dark_runs = [r for r in dark_runs if r <= run]
+    if dark_runs:
+        dark_runs = [dr for dr in dark_runs if dr <= run]
 
         bad_pix: list = []
-
         for dr in dark_runs:
             stat_dict: dict = statusStats(det_name, request_run=dr)
             bad_pix.append(stat_dict['total_masked'])
 
-        # Only report current DARK run and the difference vs previous
+        # Report current DARK run bad pix and the delta vs previous DARK run
         curr_bad_pix = bad_pix[-1]
         diff_bad_pix = bad_pix[-1] - bad_pix[-2]
         msg: str = (
-            f"Current bad pixel count for {det_name}: {curr_bad_pix}\n"
+            f"Current bad pixel count for run {run}: {curr_bad_pix}\n"
             f"Difference vs previous DARK run: {diff_bad_pix}"
         )
     else:
-        msg: str = "Cannot communicate with eLog to retrieve DARK run list."
+        msg: str = "No DARK runs or cannot communicate with eLog."
+        logger.debug(msg)
 
-    post: dict = {}
-    post['log_text'] = msg
-    post['log_tags'] = tag
-    post['log_title'] = f"{title} {det_name}"
-    post_url = f"{base_url}/{exp}/ws/new_elog_entry"
-    requests.post(post_url, data=post, auth=HTTPBasicAuth(opr_name, pw))
+    title = f"{title} {det_name}"
+    postElogMsg(exp=exp, msg=msg, tag=tag, title=title)
 
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=''):
     min5Ped=1e6
