@@ -329,7 +329,10 @@ def postBadPixMsg(
 
             # Report current DARK run bad pix and the delta vs previous DARK run
             curr_bad_pix = bad_pix[-1]
-            diff_bad_pix = bad_pix[-1] - bad_pix[-2]
+            if len(dark_runs) > 1:
+                diff_bad_pix = bad_pix[-1] - bad_pix[-2]
+            else:
+                diff_bad_pix = "-"
             det_entry: str = (
                 f"<tr><td><center>{det_name}</center></td>"
                 f"<td><center>{curr_bad_pix}</center></td>"
