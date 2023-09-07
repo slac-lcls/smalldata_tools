@@ -84,6 +84,7 @@ SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 
 #Define cores if we don't have them
 QUEUE=${QUEUE:='milano'}
+ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
@@ -116,5 +117,5 @@ echo calling $ABS_PATH/$PLOT_PY.py $@
 if [[ -v INTERACTIVE ]]; then
     $ABS_PATH/$PLOT_PY.py $@
 else
-    sbatch -p $QUEUE $ABS_PATH/$PLOT_PY.py $@
+    sbatch -p $QUEUE --account $ACCOUNT $ABS_PATH/$PLOT_PY.py $@
 fi
