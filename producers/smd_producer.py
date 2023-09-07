@@ -410,14 +410,14 @@ if hostname.find('sdf')>=0:
         waitFilesStart=datetime.now()
         while nFiles == 0:
             if n_wait > max_wait:
-                print(f"Waited {str(n_wait*10)}s, still no files available." \
-                       "Giving up, please check dss nodes and data movers." \
+                print(f"Waited {str(n_wait*10)}s, still no files available. " \
+                       "Giving up, please check dss nodes and data movers. " \
                        "Exiting now.")
                 sys.exit()
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
-                print(f"We have no xtc files for run {run} in {exp} in the FFB system," \
+                print(f"We have no xtc files for run {run} in {exp} in the FFB system, " \
                       "we will wait for 10 second and check again.")
                 n_wait+=1
                 time.sleep(10)

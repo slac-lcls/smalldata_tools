@@ -380,7 +380,7 @@ def get_offVar_nomean(varArray, filterOff, startOffIdx, nNbr=3, mean=True):
     return np.array(varOff)
 _ = get_offVar_nomean(np.arange(5), np.ones(5).astype(int), np.array([0,0,1,1,2]), nNbr=1)
 
-@jit
+@jit(nopython=True)
 def get_offVar_mean(varArray, filterOff, startOffIdx, nNbr=3):
     assert (varArray.shape[0] == filterOff.shape[0])
     assert (varArray[filterOff].shape[0] >= (startOffIdx[-1]+nNbr))

@@ -15,6 +15,7 @@ import requests
 import sys
 from glob import glob
 from requests.auth import HTTPBasicAuth
+from pathlib import Path
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
 size = MPI.COMM_WORLD.Get_size()
@@ -104,7 +105,8 @@ def getROIs(run):
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['andor_dir', 'andor_vls', 'hsd','rix_fim0' ,'rix_fim1' ,'rix_fim2', 'atmopal']
+    #detnames = ['andor_dir', 'andor_vls', 'hsd','rix_fim0' ,'rix_fim1' ,'rix_fim2', 'atmopal']
+    detnames = []
     dets = []
     # Load DetObjectFunc parameters (if defined)
     try:
@@ -240,9 +242,12 @@ HUTCHES = [
 	'DIA'
 ]
 
-FFB_BASE = '/cds/data/drpsrcf'
-PSDM_BASE = '/reg/d/psdm'
-SD_EXT = '/hdf5/smalldata'
+S3DF_BASE = Path('/sdf/data/lcls/ds/')
+FFB_BASE = Path('/cds/data/drpsrcf/')
+PSANA_BASE = Path('/cds/data/psdm/')
+PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
+SD_EXT = Path('./hdf5/smalldata/')
+logger.debug(f"PSDM_BASE={PSDM_BASE}")
 
 # Define Args
 parser = argparse.ArgumentParser()
@@ -270,36 +275,38 @@ args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
 ###### Helper Functions ##########
-
-def get_xtc_files(base, hutch, run):
-	"""File all xtc files for given experiment and run"""
-	run_format = ''.join(['r', run.zfill(4)])
-	data_dir = ''.join([base, '/', hutch.lower(), '/', exp, '/xtc'])
-	xtc_files = glob(''.join([data_dir, '/', '*', '-', run_format, '*']))
-
-	return xtc_files
+def get_xtc_files(base, exp, run):
+    """File all xtc files for given experiment and run"""
+    run_format = ''.join(['r', run.zfill(4)])
+    data_dir = Path(base) / exp[:3] / exp / 'xtc'
+    xtc_files = list(data_dir.glob(f'*{run_format}*'))
+    logger.info(f'xtc file list: {xtc_files}')
+    return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
     if write_dir is None:
-        if useFFB:
-            write_dir = ''.join([FFB_BASE, '/', hutch.lower(), '/', exp, '/scratch', SD_EXT])
+        if useFFB and not onS3DF: # when on a drp node
+            write_dir = FFB_BASE / hutch.lower() / exp / '/scratch' / SD_EXT
+        elif onPSANA: # when on old psana system
+            write_dir = PSANA_BASE / hutch.lower() / exp, SD_EXT
+        elif onS3DF: # S3DF should now be the default
+            write_dir = S3DF_BASE / hutch.lower() / exp / SD_EXT
         else:
-            write_dir = ''.join([PSDM_BASE, '/', hutch.lower(), '/', exp, SD_EXT])
-    if args.default:
-        if useFFB:
-            write_dir = write_dir.replace('hdf5','hdf5_def')
-        else:
-            write_dir = write_dir.replace('hdf5','scratch')
-    h5_f_name = ''.join([write_dir, '/', exp, '_Run', run.zfill(4), '.h5'])
-    if not os.path.isdir(write_dir):
-        logger.info('{0} does not exist, creating directory'.format(write_dir))
+            print('get_sd_file problem. Please fix.')
+    logger.debug(f'hdf5 directory: {write_dir}')
+
+    write_dir = Path(write_dir)
+    h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
+    if not write_dir.exists():
+        logger.info(f'{write_dir} does not exist, creating directory now.')
         try:
-            os.mkdir(write_dir)
-        except OSError as e:
-            logger.info('Unable to make directory {0} for output, exiting: {1}'.format(write_dir, e))
+            write_dir.mkdir(parents=True)
+        except (PermissionError, FileNotFoundError) as e:
+            logger.info(f'Unable to make directory {write_dir} for output' \
+                        f'exiting on error: {e}')
             sys.exit()
-    logger.debug('Will write small data file to {0}'.format(h5_f_name))
+    logger.info('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
 
 ##### START SCRIPT ########
@@ -321,65 +328,97 @@ if hutch not in HUTCHES:
 	sys.exit()	
 
 xtc_files = []
-# If experiment matches, check for files in ffb
-useFFB=False
-#with the new FFB, no need to check both on & offline as systems are independant.
-if hostname.find('drp')>=0:
+useFFB = False
+onS3DF = False
+onPSANA = False
+
+if hostname.find('sdf')>=0:
+    logger.debug('On S3DF')
+    onS3DF = True
+    if 'ffb' in PSDM_BASE.as_posix():
+        useFFB = True
+        # wait for files to appear
+        nFiles = 0
+        n_wait = 0
+        max_wait = 20 # 10s wait per cycle.
+        waitFilesStart=datetime.now()
+        while nFiles == 0:
+            if n_wait > max_wait:
+                print(f"Waited {str(n_wait*10)}s, still no files available. " \
+                       "Giving up, please check dss nodes and data movers. " \
+                       "Exiting now.")
+                sys.exit()
+            xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+            nFiles = len(xtc_files)
+            if nFiles == 0:
+                print(f"We have no xtc files for run {run} in {exp} in the FFB system, " \
+                      "we will wait for 10 second and check again.")
+                n_wait+=1
+                time.sleep(10)
+        waitFilesEnd = datetime.now()
+        print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+
+    xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+    if len(xtc_files)==0:
+        print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
+        sys.exit()
+
+elif hostname.find('drp')>=0:
     nFiles=0
     logger.debug('On FFB')
     waitFilesStart=datetime.now()
     while nFiles==0:
         xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-        print (xtc_files)
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
-                print('We have no xtc files for run %s in %s in the FFB system, we will quit')
+                print("We have no xtc files for run %s in %s in the FFB system,"\
+                      "Quitting now.")
                 sys.exit()
             else:
-                print('We have no xtc files for run %s in %s in the FFB system, we will wait for 10 second and check again.'%(run,exp))
+                print("We have no xtc files for run %s in %s in the FFB system," \
+                      "we will wait for 10 second and check again."%(run,exp))
                 time.sleep(10)
-    waitFilesEnd=datetime.now()
+    waitFilesEnd = datetime.now()
     print('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
     useFFB = True
 
-# If not a current experiment or files in ffb, look in psdm
-else:
-    logger.debug('Not on FFB, use offline system')
-    xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
-    if len(xtc_files)==0:
-        print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
-        sys.exit()
 
-print('define output')
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 print(h5_f_name)
-#if args.default:
-#    if useFFB:
-#        h5_f_name = h5_f_name.replace('hdf5','hdf5_def')
-#    else:
-#        h5_f_name = h5_f_name.replace('hdf5','scratch')
 
 # Define data source name and generate data source object, don't understand all conditions yet
 os.environ['PS_SRV_NODES']='1'
 
 if rank==0: print('Opening the data source:')
-try:
+if args.nevents<1e9:
     if useFFB:
-        xtcdir = '/cds/data/drpsrcf/%s/%s/xtc'%(exp[0:3],exp)
-        if args.nevents<1e9:
-            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, max_events=args.nevents, live=True)
-        else:
-            ds = psana.DataSource(exp=exp, run=int(run), dir=xtcdir, live=True)
+        ds = psana.DataSource(exp=exp, run=int(run), max_events=args.nevents, live=True)
+        if not onS3DF:
+            ds = psana.DataSource(
+                exp=exp, 
+                run=int(run),
+                dir=f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc',
+                max_events=args.nevents,
+                live=True
+            )
     else:
-        if args.nevents<1e9:
-            ds = psana.DataSource(exp=exp, run=int(run), max_events=args.nevents)
-        else:
-            ds = psana.DataSource(exp=exp, run=int(run))
-except Exception as e:
-    logger.info('Could not instantiate DataSource with {0},{1}: {2}'.format(exp, run, e))
-    sys.exit()
+        ds = psana.DataSource(exp=exp, run=int(run), max_events=args.nevents)
+else:
+    if useFFB:
+        ds = psana.DataSource(exp=exp, run=int(run), live=True)
+        if not onS3DF:
+            ds = psana.DataSource(
+                exp=exp,
+                run=int(run),
+                dir=f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc',
+                live=True
+            )
+    else:
+        ds = psana.DataSource(exp=exp, run=int(run)) 
+
+
 #LCLS-2: need to get run to get detectors....
 if rank==0: print('Opened the data source, now get run')
 thisrun = next(ds.runs())
@@ -392,6 +431,7 @@ print('smalldata file has been created on rank %d'%rank)
 # Not sure why, but here
 if rank == 0:
     logger.info('psana conda environment is {0}'.format(os.environ['CONDA_DEFAULT_ENV']))
+
 ########################################################## 
 ##
 ## Setting up the default detectors
@@ -515,7 +555,6 @@ for evt_num, evt in enumerate(event_iter):
         else:
             if rank==0: print('Processed evt %d'%evt_num)
 
-print('Sums:')
 sumDict={'Sums': {}}
 for det in dets:
     for key in det.storeSum().keys():
@@ -557,7 +596,7 @@ end_job = time.time()
 prod_time = (end_job-start_job)/60
 if rank==0:
     print('########## JOB TIME: {:03f} minutes ###########'.format(prod_time))
-logger.info('rank {0} on {1} is finished'.format(rank, hostname))
+logger.debug('rank {0} on {1} is finished'.format(rank, hostname))
 
 #finishing up here....
 try:
@@ -566,16 +605,16 @@ except:
     small_data.done()
     pass
 
-if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+#if (int(os.environ.get('RUN_NUM', '-1')) > 0):
+if os.environ.get('ARP_JOB_ID', None) is not None:
     if size > 2 and rank == 2:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
-logger.info('Saved all small data')
+logger.debug('Saved all small data')
 
-if args.postRuntable and rank>0:
-            
-    print('posting to the run tables.')
+if args.postRuntable and rank>0:            
+    print('Posting to the run tables.')
     locStr=''
     if useFFB:
         locStr='_ffb'
@@ -598,8 +637,13 @@ if args.postRuntable and rank>0:
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     user=(args.experiment[:3]+'opr').replace('dia','mcc')
-    with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-        answer = reader.readline()
+    if os.environ.get("ARP_LOCATION", None) == "S3DF":
+        with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader: 
+            answer = reader.readline()
+    else:
+        with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
+            answer = reader.readline()
+
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)
     if det_presence!={}:
