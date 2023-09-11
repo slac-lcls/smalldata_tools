@@ -18,7 +18,7 @@ def get_file_location(exp, run, location):
     r = requests.get(ws_url, params={"location": location})
     r.raise_for_status()
     on_sdf = r.json()['value']['all_present']
-    
+
     if on_sdf:
         logger.info("Data files found on s3df.")
         print("/sdf/data/lcls/ds/")

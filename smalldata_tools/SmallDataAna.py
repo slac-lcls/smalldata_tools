@@ -8,7 +8,8 @@ only if using bokeh!
 plot as in live feedback where you can select the x&y axis. Scatter plot, optional with hextiles.
 favorite list/hutch.
 addToFavoriteList function that will add self created vars (or maybe add any ROI_sum, azav, nDroplet variables)
-""" 
+"""
+import os
 from os import makedirs
 from os import path
 from os import walk
@@ -18,6 +19,7 @@ import time
 import json
 import subprocess
 import socket
+from pathlib import Path
 from scipy import sparse
 import tables
 from matplotlib import gridspec
@@ -54,6 +56,13 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
+
+
+S3DF_BASE = Path('/sdf/data/lcls/ds/')
+FFB_BASE = Path('/cds/data/drpsrcf/')
+PSANA_BASE = Path('/cds/data/psdm/')
+PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
+
 
  
 class Cube(object):
@@ -229,12 +238,22 @@ class Selection(object):
             self.cuts.append(cut)
         self._filter=None
 
+
+
 class SmallDataAna(object):
     """ 
     class to deal with data in smallData hdf5 file. 
     Most functions assume standard variables to be present
     """
-    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, plotWith='matplotlib'):
+    def __init__(
+        self,
+        expname='',
+        run=-1,
+        dirname='',
+        filename='',
+        intable=None,
+        plotWith='matplotlib'
+    ):
         self._fields={}
         self.expname=expname
         self.run=int(run)
@@ -247,14 +266,14 @@ class SmallDataAna(object):
 
         if len(expname)>3:
             self.hutch=self.expname[:3]
-            self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
+            self.plot_dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/results/smalldata_plots/'
             if dirname=='':
                 hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
-                    self.dirname = '/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = f'{FFB_BASE}/{self.hutch}/{self.expname}/scratch/hdf5/smalldata'
                 elif self.onS3DF:
-                    self.dirname = '/sdf/data/lcls/ds/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
-                    self.plot_dirname='/sdf/data/lcls/ds/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
+                    self.dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/hdf5/smalldata'
+                    self.plot_dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/results/smalldata_plots/'
                 else:
                     self.dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
                 #run 13 and past.

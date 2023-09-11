@@ -68,22 +68,22 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
         hostname = socket.gethostname()
         if hostname.find('drp-srcf')>=0:
-            xtcdirname='/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
-            self.dsname+=':dir=%s'%xtcdirname
-        self.dsnameIdx=self.dsname.replace('smd','idx').replace(':live','')
+            xtcdirname = '/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
+            self.dsname += ':dir=%s'%xtcdirname
+        self.dsnameIdx = self.dsname.replace('smd','idx').replace(':live','')
         if self.isLive:
             self.dsname=self.dsname+':live:stream=0-79'
-            self.dsnameIdx=None
+            self.dsnameIdx = None
         comm.bcast(self.dsnameIdx, root=0)
 
-        printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
+        printR(rank, '/nMake SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
             self.ds = psana.DataSource(str(self.dsname))
         except:
-            printR(rank, 'Failed to set up small data psana dataset!')
+            printR(rank, 'Failed to set up psana datasource!')
             self.ds = None
         if self.dsnameIdx is None:
-            printR(rank, 'Failed to set up index based psana dataset, likely because this run is still live')
+            printR(rank, 'Failed to set up index-based psana datasource, likely because this run is still live')
         else:
             try:
                 self.dsIdx = psana.DataSource(str(self.dsnameIdx))

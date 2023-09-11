@@ -211,7 +211,6 @@ if [ -v INTERACTIVE ]; then
     else
         mpirun -np $CORES python -u $ABS_PATH/$PYTHONEXE $@
     fi
-
     exit 0
 fi
 
@@ -225,7 +224,7 @@ fi
 
 #SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
 SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES -o $LOGFILE"
-MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+MPI_CMD="mpirun -np $CORES python -u -m mpi4py.run ${ABS_PATH}/${PYTHONEXE} $*"
 
 
 if [[ $QUEUE == *milano* ]]; then

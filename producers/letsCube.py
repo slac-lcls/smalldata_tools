@@ -12,6 +12,7 @@ import re
 import requests
 from requests.auth import HTTPBasicAuth
 import tables
+from pathlib import Path
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -67,8 +68,6 @@ if rank==0:
     
     # Constants
     HUTCHES = [
-        'AMO',
-        'SXR',
         'XPP',
         'XCS',
         'MFX',
@@ -76,9 +75,12 @@ if rank==0:
         'MEC'
     ]
 
-    FFB_BASE = '/cds/data/drpsrcf'
-    PSDM_BASE = '/reg/d/psdm'
-    SD_EXT = '/hdf5/smalldata'
+    S3DF_BASE = Path('/sdf/data/lcls/ds/')
+    FFB_BASE = Path('/cds/data/drpsrcf/')
+    PSANA_BASE = Path('/cds/data/psdm/')
+    PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
+    SD_EXT = Path('./hdf5/smalldata/')
+    logger.info(f"PSDM_BASE={PSDM_BASE}")
 
     begin_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
@@ -90,12 +92,12 @@ if rank==0:
     # Parse hutch name from experiment and check it's a valid hutch
     exp = args.experiment
     run = args.run
-    logger.debug('Analyzing data for EXP:{0} - RUN:{1}'.format(args.experiment, args.run))
+    logger.debug(f'Analyzing data for EXP:{args.experiment} - RUN:{args.run}')
 
     hutch = exp[:3].upper()
     if hutch not in HUTCHES:
-        logger.debug('Could not find {0} in list of available hutches'.format(hutch))
-        sys.exit()
+        print(f'Could not find {hutch} in list of available hutches')
+        comm.Abort()
     # load config file
     if args.config is None:
         if hutch=='XPP':
@@ -112,7 +114,6 @@ if rank==0:
 
 
     dirname=''
-#     dirname='/cds/data/psdm/xpp/xpplv9818/scratch/ffb/hdf5/smalldata'
     if args.indirectory:
         dirname = args.indirectory
         if dirname.find('/')<=0:
@@ -121,11 +122,11 @@ if rank==0:
     ana = None
     anaps = SmallDataAna_psana(exp,run,dirname)
     if anaps and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
-        print('create ana module from anaps')
+        print('/nCreate ana module from anaps')
         ana = anaps.sda
     else:
-        print('we will now try to open the smallData file directly')
-        ana = SmallDataAna(exp,run, dirname, fname)
+        print('We will now try to open the smallData file directly')
+        ana = SmallDataAna(exp, run, dirname, fname)
         if 'fh5' not in ana.__dict__.keys():
             ana = None
     if ana is None:
@@ -188,7 +189,7 @@ if rank==0:
         binVar=ana.getVar(binName)
         binSteps=np.nanpercentile(binVar,[0,25,50,75,100])
 
-    print('Bin name: {}, bins: {}'.format(binName, binSteps))
+    print(f'Bin name: {binName}, bins: {binSteps}')
 
     if int(args.nevents)>0: # not really implemented
         cubeName+='_%sEvents'%args.nevents
@@ -199,8 +200,8 @@ if rank==0:
             cubeName = cubeName_base+'_'+filterName
         else:
             cubeName = cubeName_base
-        ana.addCube(cubeName,binName,binSteps,filterName)
-        ana.addToCube(cubeName,varList)
+        ana.addCube(cubeName, binName, binSteps, filterName)
+        ana.addToCube(cubeName, varList)
             
     nBins = binSteps.shape[0]
     try:
@@ -228,33 +229,47 @@ if rank==0:
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
     
     cube_infos = []
-    for ii,cubeName in enumerate(ana.cubes):
+    for ii, cubeName in enumerate(ana.cubes):
         print('Cubing {}'.format(cubeName))
         comm.bcast('Work!', root=0)
         time.sleep(1) # is this necessary? Just putting it here in case...
         if config.laser:
             #request 'on' events base on input filter (add optical laser filter)
-            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=1, nEvtsPerBin=args.nevents, \
-                dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(
+                cubeName,
+                onoff=1,
+                nEvtsPerBin=args.nevents,
+                dirname=args.outdirectory
+            )
             cube_infos.append([f'{cubeName}_on', bins, nEntries])
             comm.bcast('Work!', root=0)
             time.sleep(1) # is this necessary? Just putting it here in case...
+            
             #request 'off' events base on input filter (switch optical laser filter, drop tt
-            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=0, nEvtsPerBin=args.nevents, \
-                dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(
+                cubeName,
+                onoff=0, 
+                nEvtsPerBin=args.nevents,
+                dirname=args.outdirectory
+            )
             cube_infos.append([f'{cubeName}_off', bins, nEntries])
+        
         else:
             # no laser filters
-            cubeName, bins, nEntries = anaps.makeCubeData(cubeName, onoff=2, nEvtsPerBin=args.nevents, \
-                dirname=args.outdirectory)
+            cubeName, bins, nEntries = anaps.makeCubeData(
+                cubeName,
+                onoff=2,
+                nEvtsPerBin=args.nevents,
+                dirname=args.outdirectory
+            )
             cube_infos.append([cubeName, bins, nEntries])
     comm.bcast('Go home!', root=0)
             
-    if nSplit > 1 and args.optimize_cores and rank==0:
+    if nSplit > 1 and args.optimize_cores:
         cubedirectory= args.outdirectory
         cubeFNames = []
         for cubeName in ana.cubes:
-            cubeFName = 'Cube_%s_Run%04d_%s.h5'%(args.experiment, int(run), cubeName )
+            cubeFName = f'Cube_{args.experiment}_Run{int(run).zfill(4)}_{cubeName}.h5'
             if config.laser:
                 cubeFNames.append(cubeFName.replace('.h5','_on.h5'))
                 cubeFNames.append(cubeFName.replace('.h5','_off.h5'))
@@ -309,7 +324,7 @@ if rank==0:
     if int(os.environ.get('RUN_NUM', '-1')) > 0:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
     
-    # Make histogram summary plots
+    # Make summary plots
     tabs = utils.make_report(anaps, cube_infos, config.hist_list, config.filters, config.varList, exp, run)
         
 else:

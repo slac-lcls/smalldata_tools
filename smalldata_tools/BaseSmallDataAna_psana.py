@@ -99,10 +99,15 @@ class BaseSmallDataAna_psana(object):
             if end_time is None:
                 self.isLive = True
         
-        printR(rank, 'Try to make SmallDataAna using dirname %s, for exp %s and run %s.'%(dirname,expname,run))
+        printR(rank, '\nTry to make SmallDataAna using dirname %s, for exp %s and run %s.'%(dirname,expname,run))
         try:
             printR(rank, 'Setting up SmallData ana from anaps.')
-            self.sda = sda.SmallDataAna(expname, self.run, dirname=dirname, filename=filename, plotWith=plotWith)
+            self.sda = sda.SmallDataAna(
+                expname,
+                self.run,
+                dirname=dirname,
+                filename=filename,
+                plotWith=plotWith)
         except:
             printR(rank, 'Failed, set anaps.sda to None.')
             self.sda = None
