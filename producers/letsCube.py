@@ -320,11 +320,12 @@ if rank==0:
                 im = Image.fromarray(cubedata)
                 tiff_file = '%s/Run_%s_%s_filter_%s.tiff'%(tiffdir, run, detname, filterName)
                 im.save(tiff_file)
-                
-    if int(os.environ.get('RUN_NUM', '-1')) > 0:
+ 
+    if os.environ.get('ARP_JOB_ID', None) is not None:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
     
     # Make summary plots
+    logger.info('###### MAKE REPORT #####')
     tabs = utils.make_report(anaps, cube_infos, config.hist_list, config.filters, config.varList, exp, run)
         
 else:

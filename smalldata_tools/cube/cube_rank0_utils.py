@@ -11,7 +11,7 @@ hv.extension('bokeh')
 logger = logging.getLogger()
 
 TOTAL_WIDTH = 850
-
+S3DF_BASE = Path('/sdf/data/lcls/ds')
 
 def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
     """ 
@@ -119,6 +119,7 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
         elif var not in anaps.sda._fields:
             dets.append(var)
     if dets != []:
+        logger.debug(f'Area detector: {dets}')
         dets_tab = pn.GridSpec(height=500*len(dets), width=TOTAL_WIDTH, name='Detectors')
         for ii,det in enumerate(dets):
             threshold = None
@@ -129,7 +130,19 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
                 maxHis = getattr(det, 'maxHis', None)
             else:
                 detname = det
-            counts, bin_centers, bin_edges = anaps.pixelHistogram(detname=detname, numEvts=100, nSkip=0, common_mode=None, nBins=150, maxHis=maxHis)
+                maxHis = None
+            try:
+                counts, bin_centers, bin_edges = anaps.pixelHistogram(
+                    detname=detname,
+                    numEvts=100,
+                    nSkip=0,
+                    common_mode=None,
+                    nBins=150,
+                    maxHis=maxHis
+                )
+            except AttributeError:
+                logger.info(f'Can\'t do pixel histogram on detector {det}')
+                continue
         #     fig = hv.Histogram((bin_edges, counts))
         #     fig.opts(title='jungfrau1M', fill_color='#000080', logy=True)
             fig = figure(title=detname, x_axis_label='Intensity (ADU)', y_axis_label='Count', 
@@ -148,7 +161,7 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
         tabs.append(dets_tab)
     
     # save to stats dir
-    reports_dir = Path(f'/cds/data/psdm/{exp[:3]}/{exp}/stats/summary/Cube/Cube_{int(run):03d}')
+    reports_dir = S3DF_BASE / (f'{exp[:3]}/{exp}/stats/summary/Cube/Cube_{int(run):03d}')
     if not reports_dir.exists():
         reports_dir.mkdir()
     report_file = reports_dir / 'report.html'

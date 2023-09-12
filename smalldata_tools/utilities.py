@@ -21,6 +21,9 @@ from numba.types import List
 
 import sys
 
+import logging
+logger = logging.getLogger()
+
 def MAD(a, c=0.6745, axis=None):
     """
     Median Absolute Deviation along given axis of an array:
@@ -720,11 +723,10 @@ def shapeFromKey_h5(fh5, thiskey):
 
 
 def rename_reduceRandomVar(outFileName):
-    print('rename_reduceRandomVar ',outFileName)
+    logger.debug(f'rename_reduceRandomVar {outFileName}')
     if outFileName.find('.inprogress')<0:
         print('filename does not end in inprogress, will quit')
         sys.exit()
-    print('Renaming file now from %s to %s'%(outFileName,outFileName.replace('.inprogress','')))
 
     #open file.
     fin = h5py.File(outFileName,'r')
@@ -791,8 +793,6 @@ def rename_reduceRandomVar(outFileName):
 
     fout.close()
     os.remove(outFileName)
-    #for now, rename org file as well.
-    #os.rename(outFileName, outFileName.replace('.inprogress',''))
 
 def getCMpeak(img, nPeakSel=4, minPeakNum=100, ADUmin=-100, ADUmax=200, step=0.5):
     his = np.histogram(img, np.arange(ADUmin, ADUmax, step))
