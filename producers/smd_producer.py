@@ -245,14 +245,14 @@ logger = logging.getLogger(__name__)
 
 # Constants
 HUTCHES = [
-	'AMO',
-	'SXR',
-	'XPP',
-	'XCS',
-	'MFX',
-	'CXI',
-	'MEC',
-	'DIA'
+    'AMO',
+    'SXR',
+    'XPP',
+    'XCS',
+    'MFX',
+    'CXI',
+    'MEC',
+    'DIA'
 ]
 
 S3DF_BASE = Path('/sdf/data/lcls/ds/')
@@ -260,7 +260,7 @@ FFB_BASE = Path('/cds/data/drpsrcf/')
 PSANA_BASE = Path('/cds/data/psdm/')
 PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
 SD_EXT = Path('./hdf5/smalldata/')
-logger.debug(f"PSDM_BASE={PSDM_BASE}")
+logger.info(f"PSDM_BASE={PSDM_BASE}")
 
 # Define Args
 parser = argparse.ArgumentParser()

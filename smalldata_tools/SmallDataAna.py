@@ -8,7 +8,8 @@ only if using bokeh!
 plot as in live feedback where you can select the x&y axis. Scatter plot, optional with hextiles.
 favorite list/hutch.
 addToFavoriteList function that will add self created vars (or maybe add any ROI_sum, azav, nDroplet variables)
-""" 
+"""
+import os
 from os import makedirs
 from os import path
 from os import walk
@@ -18,6 +19,7 @@ import time
 import json
 import subprocess
 import socket
+from pathlib import Path
 from scipy import sparse
 import tables
 from matplotlib import gridspec
@@ -54,6 +56,13 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
+
+
+S3DF_BASE = Path('/sdf/data/lcls/ds/')
+FFB_BASE = Path('/cds/data/drpsrcf/')
+PSANA_BASE = Path('/cds/data/psdm/')
+PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
+
 
  
 class Cube(object):
@@ -229,17 +238,27 @@ class Selection(object):
             self.cuts.append(cut)
         self._filter=None
 
+
+
 class SmallDataAna(object):
     """ 
     class to deal with data in smallData hdf5 file. 
     Most functions assume standard variables to be present
     """
-    def __init__(self, expname='', run=-1, dirname='', filename='',intable=None, plotWith='matplotlib'):
-        self._fields={}
-        self.expname=expname
-        self.run=int(run)
-        self.runLabel='Run%03d'%self.run
-        self.plotWith=plotWith
+    def __init__(
+        self,
+        expname='',
+        run=-1,
+        dirname='',
+        filename='',
+        intable=None,
+        plotWith='matplotlib'
+    ):
+        self._fields = {}
+        self.expname = expname
+        self.run = int(run)
+        self.runLabel = 'Run%03d'%self.run
+        self.plotWith = plotWith
         self.onS3DF = False
         hostname = socket.gethostname()
         if hostname.find('sdf')>=0:
@@ -247,17 +266,16 @@ class SmallDataAna(object):
 
         if len(expname)>3:
             self.hutch=self.expname[:3]
-            self.plot_dirname='/reg/d/psdm/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
+            self.plot_dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/results/smalldata_plots/'
             if dirname=='':
-                hostname = socket.gethostname()
                 if hostname.find('drp-srcf')>=0:
-                    self.dirname = '/cds/data/drpsrcf/%s/%s/scratch/hdf5/smalldata'%(self.hutch,self.expname)
+                    self.dirname = f'{FFB_BASE}/{self.hutch}/{self.expname}/scratch/hdf5/smalldata'
                 elif self.onS3DF:
-                    self.dirname = '/sdf/data/lcls/ds/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
-                    self.plot_dirname='/sdf/data/lcls/ds/%s/%s/results/smalldata_plots/'%(self.hutch,self.expname)
+                    self.dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/hdf5/smalldata'
+                    self.plot_dirname = f'{S3DF_BASE}/{self.hutch}/{self.expname}/results/smalldata_plots/'
                 else:
                     self.dirname = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(self.hutch,self.expname)
-                #run 13 and past.
+                #run 13 and past. Do we still want to keep that?
                 if not path.isdir(self.dirname):
                     print('Directory did not exist? ',self.dirname)
                     self.dirname='/reg/d/psdm/%s/%s/ftc'%(self.hutch,self.expname)
@@ -266,7 +284,6 @@ class SmallDataAna(object):
                 self.dirname = dirname
                 self.plot_dirname = dirname+'/smalldata_plots'
             if not path.isdir(self.plot_dirname):
-                #makedirs(self.plot_dirname)
                 self.plot_dirname = None
 
         if filename == '':
@@ -1992,6 +2009,7 @@ class SmallDataAna(object):
 
         return cube, onoff
 
+
     def makeCubeData(self, cubeName, debug=False, toHdf5=None, replaceNan=False, onoff=2, returnIdx=False):
         cube, cubeName_onoff = self.prepCubeData(cubeName)
         if onoff == 2:
@@ -2014,7 +2032,6 @@ class SmallDataAna(object):
 
         if debug and rank==0:
             cube.printCube()
-            #self.printSelections(self.Sels[cube.useFilter])
             self.printSelections(cube.useFilter)
 
         cubeFilter = self.getFilter(cube.useFilter)
@@ -2080,11 +2097,9 @@ class SmallDataAna(object):
         for tVar in cube.targetVars:
             if not self.hasKey(tVar):                
                 continue
-            #printR(rank, 'addvar: ',tVar,self.getVar(tVar,cubeFilter).shape)
             filteredVar = self.getVar(tVar,cubeFilter).squeeze()
             tVar=tVar.replace('/','__')
             if len(filteredVar.shape)==1:
-                #newXr = xr.merge([newXr, xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar) ])
                 newDar = xr.DataArray(filteredVar, coords={'time': timeFiltered}, dims=('time'),name=tVar)
             else:
                 coords={'time': timeFiltered}
@@ -2101,13 +2116,10 @@ class SmallDataAna(object):
 
         if debug: print('make cube.binBounds later.', Bins)
         #now we actually bin.
-        #cubeData = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).sum(dim='time')                  
         cubeData = newXr.groupby_bins('binVar',Bins,labels=Bins[:-1],include_lowest=True, right=False).sum(dim='time')
-        #cubeData = newXr.groupby_bins('binVar',Bins,include_lowest=True, right=False).sum(dim='time')
 
         #could add error using the std of the values.
         cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=Bins[:-1],include_lowest=True, right=False).std(dim='time')
-        #cubeDataErr = newXr.groupby_bins('binVar',Bins,labels=(Bins[1:]+Bins[:-1])*0.5,include_lowest=True, right=False).std(dim='time')
         
         if len(cube.addBinVars.keys())>0:
             newXr = None
@@ -2152,8 +2164,6 @@ class SmallDataAna(object):
 
             for key in cubeDataErr.variables:
                 ##treat only actual data
-                #if key in cubeDataErr.dims:
-                #    continue
                 if key == 'nEntries' or key == 'binVar':
                     continue
                 #get dimensions & coords for reshaped data
@@ -2845,7 +2855,13 @@ class SmallDataAna(object):
         binBoundaries = da_epics.time.copy()
         #bb = np.append(binBoundaries[0]-1, binBoundaries)
         #binBoundaries = np.append(bb, binBoundaries[-1]+1)
-        binnedData = self.xrData.fiducials.time.groupby_bins('time',binBoundaries, labels=(binBoundaries[:-1].astype(int)),include_lowest=True, right=False)
+        binnedData = self.xrData.fiducials.time.groupby_bins(
+            'time',
+            binBoundaries,
+            labels=(binBoundaries[:-1].astype(int)),
+            include_lowest=True,
+            right=False
+        )
         
         newArray=np.array([])
         for epicsTime, epicsValue in zip(np.array(da_epics.time), da_epics.data):

@@ -19,6 +19,7 @@ import psana
 import logging
 import time
 import requests
+from pathlib import Path
 try:
     basestring
 except NameError:
@@ -68,22 +69,22 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         self.dsname='exp=%s:run=%i:smd'%(expname,self.run)
         hostname = socket.gethostname()
         if hostname.find('drp-srcf')>=0:
-            xtcdirname='/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
-            self.dsname+=':dir=%s'%xtcdirname
-        self.dsnameIdx=self.dsname.replace('smd','idx').replace(':live','')
+            xtcdirname = '/cds/data/drpsrcf/%s/%s/xtc'%(self.hutch.lower(),expname)
+            self.dsname += ':dir=%s'%xtcdirname
+        self.dsnameIdx = self.dsname.replace('smd','idx').replace(':live','')
         if self.isLive:
             self.dsname=self.dsname+':live:stream=0-79'
-            self.dsnameIdx=None
+            self.dsnameIdx = None
         comm.bcast(self.dsnameIdx, root=0)
 
-        printR(rank, 'make SmallDataAna_psana from dsname: %s'%self.dsname)
+        printR(rank, '\nMake SmallDataAna_psana from dsname: %s'%self.dsname)
         try:
             self.ds = psana.DataSource(str(self.dsname))
         except:
-            printR(rank, 'Failed to set up small data psana dataset!')
+            printR(rank, 'Failed to set up psana datasource!')
             self.ds = None
         if self.dsnameIdx is None:
-            printR(rank, 'Failed to set up index based psana dataset, likely because this run is still live')
+            printR(rank, 'Failed to set up index-based psana datasource, likely because this run is still live')
         else:
             try:
                 self.dsIdx = psana.DataSource(str(self.dsnameIdx))
@@ -1145,18 +1146,19 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         if self.sda is None:
             return
         if dirname=='':
-            dirname=self.sda.dirname
+            dirname = self.sda.dirname+'/cube'
 
         myCube, cubeName_onoff = self.sda.prepCubeData(cubeName)
         
-        print('Variables to be read from xtc: ',myCube.targetVarsXtc)
+        print('\nVariables to be read from xtc: ',myCube.targetVarsXtc)
 
         if isinstance(nEvtsPerBin, str): nEvtsPerBin=int(nEvtsPerBin)
 
         #smallData only version: only run on single core
         if len(myCube.targetVarsXtc)<=0:
             if rank==0:
-                outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5'%cubeName)
+                outFileName = '/Cube_'+self.sda.fname.split('/')[-1].replace('.h5',f'_{cubeName}.h5')
+                outFileName = dirname + outFileName
                 if (onoff==0):
                     outFileName=outFileName.replace('.h5','_off.h5')
                 elif (onoff==1):
@@ -1181,11 +1183,12 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
 
         printR(rank,'Now make big cube')
         #only run on rank=0 & broadcast.
-        outFileName = dirname+'/Cube_'+self.sda.fname.split('/')[-1].replace('.h5','_%s.h5.inprogress'%cubeName)
+        outFileName = '/Cube_'+self.sda.fname.split('/')[-1].replace('.h5',f'_{cubeName}.h5.inprogress')
+        outFileName = dirname + outFileName
         if (onoff==0):
-            outFileName=outFileName.replace('.h5','_off.h5')
+            outFileName = outFileName.replace('.h5','_off.h5')
         elif (onoff==1):
-            outFileName=outFileName.replace('.h5','_on.h5')
+            outFileName = outFileName.replace('.h5','_on.h5')
         printR(rank, 'now write outputfile to : %s'%outFileName)
         
         #configuration for cube making
@@ -1231,7 +1234,7 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
             else:
                 bins_info.append([np.asarray(f), np.asarray(t)])
         nbins = len(bins_info)
-        print('****** Total number of bins: {}'.format(nbins))
+        print('\n\n****** Total number of bins: {}'.format(nbins))
         #print('****** BINS: {}'.format(bin))
         print('****** Make big data placeholder dataset and save det config.')
         dets = []
@@ -1289,9 +1292,9 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         bin_distrib.distribute()
         t3 = time.time()
 
-        print("***** ALL BINS DONE AFTER {:0.2f} min. *****".format((t3-t0)/60))
+        print("\n***** ALL BINS DONE AFTER {:0.2f} min. *****\n".format((t3-t0)/60))
 
-        print(f'Renaming file from {outFileName} to {outFileName.replace(".inprogress","")}, remove random variable if applicable')
+        print(f'Renaming file from {outFileName} to {outFileName.replace(".inprogress","")}, remove random variable if applicable\n\n')
         rename_reduceRandomVar(outFileName)
 
         bins, nEntries = cubeData.binVar_bins.values, cubeData.nEntries.values
