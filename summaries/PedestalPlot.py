@@ -193,7 +193,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
 def getRunsWithTag(
         exp: str,
         tag: str,
-        http_auth: Optional[HTTPBasicAuth]=None
+        http_auth: Optional[HTTPBasicAuth] = None
 ) -> list:
     """Return a list of runs tagged with a specific `tag`.
 
@@ -227,7 +227,7 @@ def postElogMsg(
         title: Optional[str] = "",
         files: list = []
 ) -> None:
-    """Post a new message to the eLog.
+    """Post a new message to the eLog. Adapted from `elog` package.
 
     Parameters
     ----------
@@ -268,9 +268,9 @@ def postElogMsg(
 
     http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
     base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    post_url = f"{base_url}/{exp}/ws/new_elog_entry"
+    post_url: str = f"{base_url}/{exp}/ws/new_elog_entry"
 
-    params = {'url': post_url, 'data': post, 'auth': http_auth}
+    params: dict = {'url': post_url, 'data': post, 'auth': http_auth}
     if post_files:
         params.update({'files': post_files})
 
@@ -726,7 +726,7 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
         print('runTableData:')
         print(runTableData)
 
-    postBadPixMsg(detectors=det_names, exp=expname, run=run)
+    postBadPixMsg(detectors=sorted(det_names, reverse=True), exp=expname, run=run)
     if not nosave_elog:
         elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
 
