@@ -309,7 +309,6 @@ def postBadPixMsg(
     if dark_runs:
         dark_runs = [dr for dr in dark_runs if dr <= run]
 
-        bad_pix: list = []
         table_header: str = (
             "<thead><tr><th colspan=\"3\">"
             f"<center>{title}</center>"
@@ -323,9 +322,18 @@ def postBadPixMsg(
         )
 
         for det_name in detectors:
+            bad_pix: list = []
             for dr in dark_runs:
-                stat_dict: dict = statusStats(det_name, request_run=dr)
-                bad_pix.append(stat_dict['total_masked'])
+                try:
+                    stat_dict: dict = statusStats(det_name, request_run=dr)
+                    bad_pix.append(stat_dict['total_masked'])
+                except TypeError as err:
+                    # `statusStats` throws TypeError if detector not in run
+                    logger.debug(
+                        f"Is {det_name} not present in DARK run {dr}?\n"
+                        f"ERROR: {err}"
+                    )
+                    bad_pix.append(0)
 
             # Report current DARK run bad pix and the delta vs previous DARK run
             curr_bad_pix = bad_pix[-1]
