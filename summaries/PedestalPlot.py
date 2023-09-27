@@ -193,7 +193,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
 def getRunsWithTag(
         exp: str,
         tag: str,
-        http_auth: Optional[HTTPBasicAuth]=None
+        http_auth: Optional[HTTPBasicAuth] = None
 ) -> list:
     """Return a list of runs tagged with a specific `tag`.
 
@@ -227,7 +227,7 @@ def postElogMsg(
         title: Optional[str] = "",
         files: list = []
 ) -> None:
-    """Post a new message to the eLog.
+    """Post a new message to the eLog. Adapted from `elog` package.
 
     Parameters
     ----------
@@ -268,9 +268,9 @@ def postElogMsg(
 
     http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
     base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    post_url = f"{base_url}/{exp}/ws/new_elog_entry"
+    post_url: str = f"{base_url}/{exp}/ws/new_elog_entry"
 
-    params = {'url': post_url, 'data': post, 'auth': http_auth}
+    params: dict = {'url': post_url, 'data': post, 'auth': http_auth}
     if post_files:
         params.update({'files': post_files})
 
@@ -309,7 +309,6 @@ def postBadPixMsg(
     if dark_runs:
         dark_runs = [dr for dr in dark_runs if dr <= run]
 
-        bad_pix: list = []
         table_header: str = (
             "<thead><tr><th colspan=\"3\">"
             f"<center>{title}</center>"
@@ -323,9 +322,25 @@ def postBadPixMsg(
         )
 
         for det_name in detectors:
+            bad_pix: list = []
             for dr in dark_runs:
-                stat_dict: dict = statusStats(det_name, request_run=dr)
-                bad_pix.append(stat_dict['total_masked'])
+                try:
+                    stat_dict: dict = statusStats(det_name, request_run=dr)
+                    bad_pix.append(stat_dict['total_masked'])
+                except TypeError as err:
+                    # `statusStats` may throw TypeError if detector not in run
+                    logger.debug(
+                        f"Is {det_name} not present in DARK run {dr}?\n"
+                        f"ERROR: {err}"
+                    )
+                    bad_pix.append(0)
+                except KeyError as err:
+                    # `statusStats` may throw KeyError if detector not in run
+                    logger.debug(
+                        f"Is {det_name} not present in DARK run {dr}?\n"
+                        f"ERROR: {err}"
+                    )
+                    bad_pix.append(0)
 
             # Report current DARK run bad pix and the delta vs previous DARK run
             curr_bad_pix = bad_pix[-1]
@@ -726,7 +741,7 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
         print('runTableData:')
         print(runTableData)
 
-    postBadPixMsg(detectors=det_names, exp=expname, run=run)
+    postBadPixMsg(detectors=sorted(det_names, reverse=True), exp=expname, run=run)
     if not nosave_elog:
         elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
 
