@@ -333,18 +333,16 @@ def postBadPixMsg(
                         f"Is {det_name} not present in DARK run {dr}?\n"
                         f"ERROR: {err}"
                     )
-                    bad_pix.append(0)
                 except KeyError as err:
                     # `statusStats` may throw KeyError if detector not in run
                     logger.debug(
                         f"Is {det_name} not present in DARK run {dr}?\n"
                         f"ERROR: {err}"
                     )
-                    bad_pix.append(0)
 
             # Report current DARK run bad pix and the delta vs previous DARK run
             curr_bad_pix = bad_pix[-1]
-            if len(dark_runs) > 1:
+            if len(bad_pix) > 1:
                 diff_bad_pix = bad_pix[-1] - bad_pix[-2]
             else:
                 diff_bad_pix = "-"
