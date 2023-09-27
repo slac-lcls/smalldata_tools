@@ -927,7 +927,6 @@ class Epix10kObject(TiledCameraObject):
         epixCfg = env.configStore().get(psana.Epix.Config10kaV1, det.source)              
         if epixCfg is None:
             epixCfg = env.configStore().get(psana.Epix.Config10kaV2, det.source)    
-        self.trbit = []
         self.pixelGain=[]
         self.nomGain=[1.,3.,100.,100.,3.,100.] #H,M,L,(HL auto), (ML auto - 2 values)
         #asicList=[0,3,1,2]
@@ -938,7 +937,7 @@ class Epix10kObject(TiledCameraObject):
         trbits=[]
         for ia in range(epixCfg.asics_shape()[0]):
             trbits.append(epixCfg.asics(ia).trbit())
-        self.trbit = trbits
+        self.trbit = np.array(trbits)
 
         cfgShape=epixCfg.asicPixelConfigArray().shape
         cfgReshape=epixCfg.asicPixelConfigArray().reshape(int(cfgShape[0]/2), cfgShape[1]*2,order='F')
@@ -1118,6 +1117,7 @@ class Epix10k2MObject(TiledCameraObject):
             pixelGain=pixelGain.reshape(cfgShape,order='F')
             self.pixelGain.append(pixelGain)
         self.pixelGain=np.array(self.pixelGain)
+        self.trbit = np.array(self.trbit)
         self.gainSetting = 0
         if self.pixelGain.mean()==0:
             if self.trbit.mean()==1:
