@@ -328,7 +328,8 @@ for xes_grid in xesPlots:
 if (int(os.environ.get('RUN_NUM', '-1')) > 0):
     requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Done"}])
 
-elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
+#elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
+elogDir = f"/sdf/data/lcls/ds/{expname[:3]}/{expname}/stats/summary/BeamlineSummary/BeamlineSummary_Run{run:03d}"
 
 if save_elog:
     import os
