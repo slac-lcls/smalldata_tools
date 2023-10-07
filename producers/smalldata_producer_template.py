@@ -173,6 +173,43 @@ def getAutocorrParams(run):
     return ret_dict
 
 
+# 6) PROJECTIONS (ROI or full detector)
+def getProjection_ax0(run):
+    if isinstance(run, str):
+        run = int(run)
+    ret_dict = {}
+
+    if run > 0:
+        proj_dict = {}
+        #proj_dict["name"] = "proj_ax0" # Can override name in SmallData file
+        proj_dict["threshADU"] = 1e-6
+        proj_dict["axis"] = 0
+        proj_dict["mean"] = False
+        proj_dict["threshRms"] = 1e-6
+        proj_dict["singlePhoton"] = False
+
+        ret_dict['ePix100_1'] = proj_dict
+        ret_dict['ePix100_2'] = proj_dict
+    return ret_dict
+
+def getProjection_ax1(run):
+    if isinstance(run, str):
+        run = int(run)
+    ret_dict = {}
+
+    if run > 0:
+        proj_dict = {}
+        #proj_dict["name"] = "proj_ax1" # Can override name in SmallData file
+        proj_dict["threshADU"] = 1e-6
+        proj_dict["axis"] = 1
+        proj_dict["mean"] = False
+        proj_dict["threshRms"] = 1e-6
+        proj_dict["singlePhoton"] = False
+
+        ret_dict['ePix100_1'] = proj_dict
+        ret_dict['ePix100_2'] = proj_dict
+    return ret_dict
+
 
 ##########################################################
 # run independent parameters 
@@ -240,7 +277,19 @@ def define_dets(run):
     except Exception as e:
         print(f'Can\'t instantiate SVD args: {e}')
         svd = []
-        
+
+    # For retrieving projection parameters
+    try:
+        proj_ax0 = getProjection_ax0(run)
+    except Exception as e:
+        print(f"Can't instantiate Projection_ax1 args: {e}")
+        proj_ax0 = []
+    try:
+        proj_ax1 = getProjection_ax1(run)
+    except Exception as e:
+        print(f"Can't instantiate Projection_ax1 args: {e}")
+        proj_ax1 = []
+
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
@@ -257,11 +306,20 @@ def define_dets(run):
             # ROIs:
             if detname in ROIs:
                 for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                        ROI=ROI,
-                                        writeArea=ROIs[detname]['writeArea'],
-                                        thresADU=ROIs[detname]['thresADU']))
-            
+                    detROIFunc = ROIFunc(name=f"ROI_{iROI}",
+                                         ROI=ROI,
+                                         writeArea=ROIs[detname]['writeArea'],
+                                         thresADU=ROIs[detname]['thresADU'])
+                    # APPLYING PROJECTIONS TO ROIs
+                    if detname in proj_ax0:
+                        projax0Func = projectionFunc(**proj_ax0[detname])
+                        detROIFunc.addFunc(projax0Func)
+                    if detname in proj_ax1:
+                        projax1Func = projectionFunc(**proj_ax1[detname])
+                        detROIFunc.addFunc(projax1Func)
+                    det.addFunc(detROIFunc)
+
+
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
