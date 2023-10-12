@@ -177,7 +177,8 @@ class BaseSmallDataAna_psana(object):
 
     def _getDetName(self, detname=None):
         detNameList = ['cs','Cs','epix','Epix','opal','Opal','zyla','Zyla',
-                       'jungfrau','Jungfrau','gige','Camera','icarus','rayonix']
+                       'jungfrau','Jungfrau','gige','Camera','icarus','rayonix',
+                       'alvium']
         #look for detector
         aliases=[]
         for key in self.Keys():
