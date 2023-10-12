@@ -95,7 +95,7 @@ args = parser.parse_args()
 logger.debug('Args to be used for data quality plots: {0}'.format(args))
 
 if args.directory is None:
-    args.directory = '/reg/d/psdm/%s/%s/hdf5/smalldata'%(args.experiment[:3], args.experiment)
+    args.directory = '/sdf/data/lcls/ds/%s/%s/hdf5/smalldata'%(args.experiment[:3], args.experiment)
 ##############################################
 ## Setup Global parameters and run numbers ###
 ##############################################
@@ -142,7 +142,10 @@ ttfwhmDim = hv.Dimension(('ttfwhm','tt step width'))
   
 #fim0All = -1.*dat.det_rix_fim0.full_fimSum_fimSum.read().sum(axis=1)
 gdet = dat.gas_detector.f_11_ENRC.read()
-dg2ipm = dat.ipm_dg2.sum.read()
+try:
+    dg2ipm = dat.ipm_dg2.sum.read()
+except:
+    dg2ipm = dat.ipm_hfx_dg2.sum.read()
 
 eventTimeRaw = dat.event_time.read()
 eventTime = (eventTimeRaw>>32).astype(float)+((eventTimeRaw<<32)>>32).astype(float)*1e-9
@@ -214,6 +217,7 @@ except:
 detImgs=[]
 detGrids=[]
 for detImgName in ana.Keys('Sums'):
+    if detImgName.find('Acqiris')>=0: continue
     image = ana.fh5.get_node('/%s'%detImgName).read()
     if len(image.shape)>2:
         if detImgName.find('135')<0:
@@ -228,6 +232,7 @@ for detImgName in ana.Keys('Sums'):
             #image = image.squeeze()
     if max(image.shape[0], image.shape[1])>detImgMaxSize:
         rebinFactor = float(detImgMaxSize)/max(image.shape[0],image.shape[1])
+        #print('rebinning: ',rebinFactor, image.shape, detImgName)
         imageR = rebin(image, [int(image.shape[0]*rebinFactor), int(image.shape[1]*rebinFactor)])/(ana.getVar('fiducials').shape[0])
     else:
         imageR = image/(ana.getVar('fiducials').shape[0])
@@ -243,7 +248,7 @@ for detImgName in ana.Keys('Sums'):
 if nOff>100:
     detNames = []
     for detImgName in ana.Keys('Sums'):
-        detName = detImgName.replace('_calib','').replace('_img','').replace('Sums/','')
+        detName = detImgName.replace('_calib','').replace('_img','').replace('_dropped','').replace('_square','').replace('Sums/','')
         if detName in detNames: continue
         detNames.append(detName)
         try:
@@ -314,6 +319,9 @@ for detGrid in detGrids:
 ## save the html file
 ##################################
 
+from pathlib import Path
+SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA"))
+runnum=int(args.run)
 elogDir = Path(SIT_PSDM_DATA) / expname[:3] / expname / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
 if save_elog:
     import os
