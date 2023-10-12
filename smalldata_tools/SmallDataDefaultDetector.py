@@ -370,7 +370,7 @@ class feeBldDetector(defaultDetector):
         return dl
 
 class ttDetector(defaultDetector):
-    def __init__(self, name='tt', baseName=None):
+    def __init__(self, name='tt', baseName=None, env=None):
         """
         Throughout LCLS history, different tt prefix have been used. This class aims at 
         get the right timetool automatically.
@@ -395,6 +395,28 @@ class ttDetector(defaultDetector):
                 except:
                     print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
+        if env is not None:
+            for cfgKey in env.configStore().keys():
+                if cfgKey.type() == psana.TimeTool.ConfigV2:
+                    ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
+                elif cfgKey.type() == psana.TimeTool.ConfigV1:
+                    ttCfg = env.configStore().get(psana.TimeTool.ConfigV1, cfgKey.src())
+                elif cfgKey.type() == psana.TimeTool.ConfigV3:
+                    ttCfg = env.configStore().get(psana.TimeTool.ConfigV3, cfgKey.src())
+            if ttCfg is not None:
+                self.ttProj=ttCfg.write_projections()
+                self.ttROI_signal = [[ttCfg.sig_roi_lo().row(),ttCfg.sig_roi_hi().row()],\
+                                 [ttCfg.sig_roi_lo().column(),ttCfg.sig_roi_hi().column()]]
+                self.ttROI_sideband = [[ttCfg.sb_roi_lo().row(),ttCfg.sb_roi_hi().row()],\
+                                   [ttCfg.sb_roi_lo().column(),ttCfg.sb_roi_hi().column()]]
+                self.ttROI_signal = np.array(self.ttROI_signal)
+                self.ttROI_sideband = np.array(self.ttROI_sideband)
+                self.calib_poly = ttCfg.calib_poly()
+                self.weights = ttCfg.weights()
+                self.sb_convergence=ttCfg.sb_convergence()
+                self.ref_convergence=ttCfg.ref_convergence()
+                self.subtract_sideband=ttCfg.subtract_sideband()
+                self.ttCalib = ttCfg.calib_poly()
     
     def inRun(self):
         if len(self.pvs)>0:
@@ -540,12 +562,15 @@ class ttRawDetector(defaultDetector):
                                  [ttCfg.sig_roi_lo().column(),ttCfg.sig_roi_hi().column()]]
             self.ttROI_sideband = [[ttCfg.sb_roi_lo().row(),ttCfg.sb_roi_hi().row()],\
                                    [ttCfg.sb_roi_lo().column(),ttCfg.sb_roi_hi().column()]]
+            self.ttROI_signal = np.array(self.ttROI_signal)
+            self.ttROI_sideband = np.array(self.ttROI_sideband)
             if ttCfg.use_reference_roi()>0:
                 self.ttROI_reference = [[ttCfg.ref_roi_lo().row(),ttCfg.ref_roi_hi().row()],\
                                         [ttCfg.ref_roi_lo().column(),ttCfg.ref_roi_hi().column()]]
             else:
                 self.ttROI_reference = self.ttROI_signal
 
+            self.calib_poly = ttCfg.calib_poly()
             self.weights = ttCfg.weights()
             self.sb_convergence=ttCfg.sb_convergence()
             self.ref_convergence=ttCfg.ref_convergence()
@@ -559,7 +584,7 @@ class ttRawDetector(defaultDetector):
 
         else:
             defaultDetector.__init__(self, self.detname, 'ttRaw')
-            
+        
     def inRun(self):
         if self.detname=='':
             return False
