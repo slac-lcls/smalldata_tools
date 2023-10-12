@@ -256,7 +256,6 @@ class droplet2Photons(DetObjectFunc):
         img = data['_image']
         imgDrop = data['_imgDrop']
         drop_ind = np.arange(1, np.nanmax(imgDrop)+1)
-        
         adu_drop = ndi.sum_labels(img, labels=imgDrop, index=drop_ind)
         
         # find all droplets whose intensity is in the single photon range
@@ -273,7 +272,7 @@ class droplet2Photons(DetObjectFunc):
             else:
                 ones_dict =  self.onephoton(img, imgDrop, drop_ind_single, detail=False)
         else:
-            ones_dict['pos'] = []
+            ones_dict = {'pos': []}
 
         if drop_ind_multi.size > 0:
             twos, multpixs, multpixadus = self.multi_photon(img, imgDrop.copy(), drop_ind_multi)
@@ -285,18 +284,25 @@ class droplet2Photons(DetObjectFunc):
         timed = time.time()
         
         if len(ones_dict['pos'])>0:
-            photonlist = np.append(ones_dict['pos'], photonlist, axis=0) 
- 
-        timep = time.time()        
+            if len(photonlist)>0:
+                photonlist = np.append(ones_dict['pos'], photonlist, axis=0) 
+            else:
+                photonlist = ones_dict['pos']
+        timep = time.time()
         p = getProb_img(photonlist, data['_mask'], 12)
         # output dictionary
         ret_dict = {'prob': np.squeeze(p)}
-            
-        photon_dict={'tile': photonlist[:,0]}
-        # Reverse columns and rows because of legacy C-code array order.
-        photon_dict['col'] = photonlist[:,2]
-        photon_dict['row'] = photonlist[:,1]
-        photon_dict['data'] = np.ones(photonlist[:,0].shape[0])
+        if len(photonlist)==0:
+            photon_dict={'tile': []}
+            photon_dict['col'] = []
+            photon_dict['row'] = []
+            photon_dict['data'] = []
+        else:
+            photon_dict={'tile': photonlist[:,0]}
+            # Reverse columns and rows because of legacy C-code array order.
+            photon_dict['col'] = photonlist[:,2]
+            photon_dict['row'] = photonlist[:,1]
+            photon_dict['data'] = np.ones(photonlist[:,0].shape[0])
 
         if self.cputime: ret_dict['cputime'] = np.array([time.time()-time0, timed-time0, timep-timed, time.time()-timep]) 
         self.dat = photon_dict                                             
