@@ -188,8 +188,7 @@ def getProjection_ax0(run):
         proj_dict["threshRms"] = 1e-6
         proj_dict["singlePhoton"] = False
 
-        ret_dict['ePix100_1'] = proj_dict
-        ret_dict['ePix100_2'] = proj_dict
+        ret_dict['epix_1'] = proj_dict
     return ret_dict
 
 def getProjection_ax1(run):
@@ -206,8 +205,7 @@ def getProjection_ax1(run):
         proj_dict["threshRms"] = 1e-6
         proj_dict["singlePhoton"] = False
 
-        ret_dict['ePix100_1'] = proj_dict
-        ret_dict['ePix100_2'] = proj_dict
+        ret_dict['epix_1'] = proj_dict
     return ret_dict
 
 
