@@ -473,7 +473,7 @@ if not args.default:
     #try-except as not every rank seems to know thisdet....
     try:
         dets = define_dets(args.run)
-        print([d for d in dets])
+        logger.debug(f'Default detectors:{[d for d in dets]}')
     except:
         pass
 
