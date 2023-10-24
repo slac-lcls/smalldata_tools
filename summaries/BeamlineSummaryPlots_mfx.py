@@ -638,7 +638,7 @@ if save_elog:
         os.makedirs(elogDir)
     print('Made Directory to save data:', elogDir)
     tabs.save(('%s/report.html'%elogDir))
-        postDetectorDamageMsg(
+    postDetectorDamageMsg(
         detectors=detNames,
         exp=expname,
         run=run,
