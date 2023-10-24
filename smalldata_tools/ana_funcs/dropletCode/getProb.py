@@ -63,8 +63,11 @@ def getProb(photonlist, i0s, roi, Np = 12):
 
 def getProb_img(photonlist, mask, Np=12):
     p = np.zeros((1,Np))
-    if mask is None:
+    if mask is None or len(photonlist)==0:
         return p
+    #print('prob2 - shape', isinstance(mask, np.ndarray))
+    if len(mask.shape)>2:
+        mask = mask.sum(axis=0)
     nx,ny = mask.shape
     #note the x and y in python and in c 
 #     fr = np.append(ones[:,[0,2,1]],photonlist,axis = 0)

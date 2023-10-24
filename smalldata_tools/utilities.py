@@ -879,6 +879,7 @@ def unsparsify(data, shape):
     if 'data' not in data or 'row' not in data or 'col' not in data:
         print('unsparsify takes a dict with data, row & col keys! ', data.keys())
         return
+    if len(data['data'])==0: return np.zeros(shape)
     if len(shape) == 2:
         dropdata = sparse.coo_matrix((data['data'],
                                       ((data['row']).astype(int),\

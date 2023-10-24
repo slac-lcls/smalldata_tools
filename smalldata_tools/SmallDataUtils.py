@@ -5,21 +5,21 @@ from smalldata_tools.SmallDataDefaultDetector import *
 from smalldata_tools.epicsarchive import EpicsArchive
 from datetime import datetime
 
-def defaultDetectors(hutch, run=None):
+def defaultDetectors(hutch, run=None, env=None):
     if hutch.lower()=='amo':
         dets = amoDetectors()
     elif hutch.lower()=='sxr':
         dets = sxrDetectors()
     elif hutch.lower()=='xpp':
-        dets = xppDetectors()
+        dets = xppDetectors(env=env)
     elif hutch.lower()=='xcs':
-        dets = xcsDetectors()
+        dets = xcsDetectors(env=env)
     elif hutch.lower()=='mfx':
-        dets = mfxDetectors()
+        dets = mfxDetectors(env=env)
     elif hutch.lower()=='cxi':
-        dets = cxiDetectors()
+        dets = cxiDetectors(env=env)
     elif hutch.lower()=='mec':
-        dets = mecDetectors()
+        dets = mecDetectors(env=env)
     elif hutch.lower()=='det':
         dets = detDetectors()
     elif hutch.lower()=='dia':
@@ -91,7 +91,7 @@ def sxrDetectors(beamCodes=[[162],[91]]):
     dets.append(GMDDetector())
     return dets
 
-def xppDetectors(beamCodes=[[-137],[91]]):
+def xppDetectors(beamCodes=[[-137],[91]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp', 'las_drift_correction']))
@@ -111,7 +111,7 @@ def xppDetectors(beamCodes=[[-137],[91]]):
         dets.append(adcDetector('adc','adc'))
     except:
         print('did not find slow Adc detector')
-    dets.append(ttDetector())
+    dets.append(ttDetector(env=env))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('XPP-SB2-BMMON','ipm2'))
     dets.append(bmmonDetector('XPP-SB3-BMMON','ipm3'))
@@ -132,7 +132,7 @@ def xppDetectors(beamCodes=[[-137],[91]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def xcsDetectors(beamCodes=[[-137],[89]]):
+def xcsDetectors(beamCodes=[[-137],[89]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -152,7 +152,7 @@ def xcsDetectors(beamCodes=[[-137],[89]]):
     dets.append(bmmonDetector('HFX-DG2-BMMON','ipm2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
     dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
-    dets.append(ttDetector())
+    dets.append(ttDetector(env=env))
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(xtcavDetector('xtcav','xtcav'))
     try:
@@ -166,13 +166,13 @@ def xcsDetectors(beamCodes=[[-137],[89]]):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def mfxDetectors(beamCodes=[[-137],[]]):
+def mfxDetectors(beamCodes=[[-137],[]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(aiDetector('MFX-AIN-01','ai')) 
-    dets.append(ttDetector())
+    dets.append(ttDetector(env=env))
     dets.append(bmmonDetector('MFX-DG1-BMMON','ipm_dg1'))
     dets.append(bmmonDetector('MFX-DG2-BMMON','ipm_dg2'))
     dets.append(damageDetector())
@@ -188,15 +188,19 @@ def mfxDetectors(beamCodes=[[-137],[]]):
                                       'BeamMonitor_target','Dg1Ipm_target']))
     return dets
 
-def cxiDetectors(beamCodes=[[-137],[184]]):
+def cxiDetectors(beamCodes=[[-137],[184]], env=None):
     dets=[]
     #dets.append(lightStatus(codes=beamCodes, evrName='evr0'))
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
+    dets.append(epicsDetector(PVlist=['dia_trans1', 'dia_trans3', 'atc_trans1', 'atc_trans3', 'laser_time_target', 'lxt', 'las_uv_waveplate', 'las_evo_waveplate', 'las_drift_correction']))
+    dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
+    dets.append(bmmonDetector('HFX-DG2-BMMON','ipm_hfx_dg2'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
     dets.append(bmmonDetector('CXI-DG3-BMMON','ipm_dg3'))
-    dets.append(ttDetector())
+    dets.append(bmmonDetector('CXI-USR-DIO','usr_dio',savePos=False))
+    dets.append(ttDetector(env=env))
     dets.append(xtcavDetector('xtcav','xtcav'))
     try:
         dets.append(impDetector('Sc1Imp'))
@@ -217,7 +221,7 @@ def cxiDetectors(beamCodes=[[-137],[184]]):
         pass
     return dets
 
-def mecDetectors(beamCodes=[[-137],[-182]]):
+def mecDetectors(beamCodes=[[-137],[-182]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -229,7 +233,7 @@ def mecDetectors(beamCodes=[[-137],[-182]]):
     dets.append(ipmDetector('MEC-XT2-IPM-03','ipm3'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-02','xt2_ipm2'))
     dets.append(bmmonDetector('MEC-XT2-BMMON-03','xt2_ipm3'))
-    dets.append(ttDetector())
+    dets.append(ttDetector(env=env))
     dets.append(aiDetector('MEC-AIN-01','ai')) 
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(xtcavDetector('xtcav','xtcav'))
