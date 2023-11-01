@@ -166,7 +166,7 @@ def xcsDetectors(beamCodes=[[-137],[89]], env=None):
     setParameter(dets, dets, detName='damage')
     return dets
 
-def mfxDetectors(beamCodes=[[-137],[]], env=None):
+def mfxDetectors(beamCodes=[[-137],[204]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
@@ -185,7 +185,8 @@ def mfxDetectors(beamCodes=[[-137],[]], env=None):
     dets.append(epicsDetector(PVlist=['atten_trans1','atten_trans3',
                                       'fee_Attenuator_transmission',
                                       'lens_energy',
-                                      'BeamMonitor_target','Dg1Ipm_target']))
+                                      'BeamMonitor_target','Dg1Ipm_target',
+                                      'lxt', 'txt']))
     return dets
 
 def cxiDetectors(beamCodes=[[-137],[184]], env=None):
