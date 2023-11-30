@@ -20,7 +20,7 @@ Functions:
         Post data to a Run Table.
 """
 
-__all__ = ["getElogBasicAuth", "getRunsWithTag", "postElogMsg"]
+__all__ = ["getElogBasicAuth", "getRunsWithTag", "postElogMsg", "postRunTable"]
 
 import os
 import logging
@@ -33,6 +33,8 @@ from requests.auth import HTTPBasicAuth
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+BASE_URL: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
 
 def getKerberosAuthHeaders() -> dict: ...
 
@@ -80,8 +82,7 @@ def getRunsWithTag(
     tagged_runs (list[int]) List of runs with the specified tag. Empty if none
         were found or there was a communication error.
     """
-    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    tag_url: str = f"{base_url}/{exp}/ws/get_runs_with_tag?tag={tag}"
+    tag_url: str = f"{BASE_URL}/{exp}/ws/get_runs_with_tag?tag={tag}"
     http_auth: HTTPBasicAuth = http_auth or getElogBasicAuth(exp)
     resp: requests.models.Response = requests.get(tag_url, auth=http_auth)
 
@@ -139,8 +140,7 @@ def postElogMsg(
         post['log_title'] = title
 
     http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
-    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    post_url: str = f"{base_url}/{exp}/ws/new_elog_entry"
+    post_url: str = f"{BASE_URL}/{exp}/ws/new_elog_entry"
 
     params: Dict[str, Any] = {'url': post_url, 'data': post, 'auth': http_auth}
     if post_files:
@@ -156,19 +156,21 @@ def postElogMsg(
     if not resp.json()['success']:
         logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
 
-def postRunTable(runtable_data):
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL:',ws_url)
-    user=args.experiment[:3]+'opr'
-    elogPostFile='/cds/home/opr/%s/forElogPost.txt'%user
-    hostname=socket.gethostname()
-    if hostname.find('sdf')>=0:
-        elogPostFile='/sdf/group/lcls/ds/tools/forElogPost.txt'
-    with open(elogPostFile,'r') as reader:
-        answer = reader.readline()
-        r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, \
-                      auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-    #we might need to use this for non=current expetiments. Currently does not work in ARP
-    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
+def postRunTable(exp: str, run: int, runtable_data: Dict[str, Union[int, float]]) -> None:
+    ws_url: str = f"{BASE_URL}/run_control/{exp}/ws/add_run_params"
+    http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
+
+    post_params: Dict[str, int] = {"run_num": run}
+
+    resp: requests.models.Response = requests.post(
+        ws_url,
+        params=post_params,
+        json=runtable_data,
+        auth=http_auth
+    )
+
+    if resp.status_code >= 300:
+        logger.debug(f"Error posting run table - status {resp.status_code}")
+
+    if not resp.json()['success']:
+        logger.debug(f"Error posting run table: {resp.json()['error_msg']}")

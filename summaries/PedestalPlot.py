@@ -608,7 +608,7 @@ def plotPedestals(expname='mfxc00118', run=364, nosave_elog=False, make_ped_imgs
         print('Made Directory to save data:', elogDir)
         tabs.save(('%s/report.html'%elogDir))
 
-        postRunTable(runTableData)
+        postRunTable(args.experiment, args.run, runTableData)
         
     return tabs
 
