@@ -33,97 +33,7 @@ sys.path.append(fpath)
 from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import image_from_dxy
 from smalldata_tools.utilities import rebin
-
-def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
-    """Return an authentication object for the eLog API for an opr account.
-
-    This method will only work for active experiments. "opr" accounts are
-    removed from the authorized users list after the experiment ends.
-
-    Paramters
-    ---------
-    exp (str) Experiment name (to determine operator username).
-
-    Returns
-    -------
-    http_auth (HTTPBasicAuth) Authentication for eLog API.
-    """
-    opr_name: str = f"{exp[:3]}opr"
-    hostname: str = socket.gethostname()
-    if hostname.find('sdf') >= 0:
-        auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    else:
-        auth_path: str = f"/cds/home/opr/{opr_name}/forElogPost.txt"
-
-    with open(auth_path, "r") as f:
-        pw: str = f.readline()[:-1]
-
-    return HTTPBasicAuth(username=opr_name, password=pw)
-
-def postElogMsg(
-        exp: str,
-        msg: str,
-        *,
-        tag: Optional[str] = "",
-        title: Optional[str] = "",
-        files: list = []
-) -> None:
-    """Post a new message to the eLog. Adapted from `elog` package.
-
-    Parameters
-    ----------
-    exp (str) Experiment name.
-    msg (str) Body of the eLog post.
-    tag (str) Optional. A tag to include for the post.
-    title (str) Optional. A title for the eLog post.
-    files (list) Optional. Either a list of paths (str) to files (figures) to
-        include with the eLog post, OR, a list of 2-tuples of strings of the
-        form (`path`, `description`).
-    """
-    post_files: list = []
-    for f in files:
-        if isinstance(f, str):
-            desc: str = os.path.basename(f)
-            formatted_file: tuple = (
-                "files",
-                (desc, open(f, "rb")),
-                mimetypes.guess_type(f)[0]
-            )
-        elif isinstance(f, tuple) or isinstance(f, list):
-            formatted_file: tuple = (
-                "files",
-                (f[1], open(f[0], "rb")),
-                mimetypes.guess_type(f[0])[0]
-            )
-        else:
-            logger.debug(f"Can't parse file {f} for eLog attachment. Skipping.")
-            continue
-        post_files.append(formatted_file)
-
-    post: dict = {}
-    post['log_text'] = msg
-    if tag:
-        post['log_tags'] = tag
-    if title:
-        post['log_title'] = title
-
-    http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
-    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    post_url: str = f"{base_url}/{exp}/ws/new_elog_entry"
-
-    params: dict = {'url': post_url, 'data': post, 'auth': http_auth}
-    if post_files:
-        params.update({'files': post_files})
-
-    resp: requests.models.Response = requests.post(**params)
-
-    if resp.status_code >= 300:
-        logger.debug(
-            f"Error when posting to eLog: HTTP status code {resp.status_code}"
-        )
-
-    if not resp.json()['success']:
-        logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
+from summaries.elog_utilities import *
 
 def postDetectorDamageMsg(
         detectors: list,
@@ -168,7 +78,7 @@ def postDetectorDamageMsg(
         "<td><b><center>Missing/Damaged Events</center></b></td>"
         "<td><b><center>Percentage Missing/Damaged</center></b></td></tr>"
     )
-    
+
     post_msg: bool = False
 
     for det_name in detectors:
