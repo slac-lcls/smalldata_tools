@@ -12,7 +12,7 @@ class dropletFunc(DetObjectFunc):
     ----------
     threshold : float (default = 1)
          Treshold in sigma or ADU, depending on the value of the useRms parameters
-    thresholdLow : float (default = 1)
+    thresholdLow : float (default = same as threshold)
         Lower threshold: this is to make the spectrum sharper, but not find peaks 
         out of pixels with low significance.
     mask: np.ndarray (default = None)
@@ -37,12 +37,11 @@ class dropletFunc(DetObjectFunc):
         self._name = kwargs.get('name', 'droplet')
         super(dropletFunc, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold', 1.)
-        self.thresholdLow = kwargs.get('thresholdLow', 1.)
+        self.thresholdLow = kwargs.get('thresholdLow', self.threshold)
         self.thresADU = kwargs.get('thresADU', 0.)
         self.useRms = kwargs.get('useRms', True)
         self.relabel = kwargs.get('relabel', True)
         self._mask = kwargs.get('mask', None)
-        # new way to store this info
         self._debug = False
         self.footprint = np.array([
             [0,1,0],
@@ -72,7 +71,6 @@ class dropletFunc(DetObjectFunc):
                 self._compData *= self._rms[0]/det.gain[0]
             else:
                 self._compData *= self._rms/det.gain
-        #self._grid = np.meshgrid(range(max(self._compData.shape)),range(max(self._compData.shape)))
         if len(det.ped.shape)>2:
             self.footprint = np.array([ 
                 [[0,0,0],[0,0,0],[0,0,0]], 
@@ -97,9 +95,9 @@ class dropletFunc(DetObjectFunc):
     def applyThreshold(self, img, donut=False, invert=False, low=False):
         if not donut:
             if low:
-                    threshold = self.thresholdLow
+                threshold = self.thresholdLow
             else:
-                    threshold = self.threshold
+                threshold = self.threshold
             if not invert:
                 img[img < self._compData*threshold] = 0.0
             else:
@@ -135,7 +133,7 @@ class dropletFunc(DetObjectFunc):
 
 
     def process(self, data):
-        ret_dict=self.dropletize(data)
+        ret_dict = self.dropletize(data)
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
@@ -212,7 +210,7 @@ class dropletFunc(DetObjectFunc):
                 labels=imgDrop,
                 index=drop_ind_thres
             )).astype(int)
-            
+
             dat_dict = {'data': drop_adu}  # adu_drop}
             dat_dict['npix'] = npix_drop
             if drop_adu.shape[0] == 0:
@@ -226,7 +224,6 @@ class dropletFunc(DetObjectFunc):
                 dat_dict['tile'] = pos_drop[:, 0]
         else:
             # this should be tested for tiled detectors!
-            # t2 = time.time()
             self.regions = measure.regionprops(imgDrop,
                                                intensity_image=img,
                                                cache=True)
