@@ -38,7 +38,7 @@ class dropletFunc(DetObjectFunc):
         super(dropletFunc, self).__init__(**kwargs)
         self.threshold = kwargs.get('threshold', 1.)
         self.thresholdLow = kwargs.get('thresholdLow', self.threshold)
-        self.thresADU = kwargs.get('thresADU', 0.)
+        self.thresADU = kwargs.get('thresADU', None)
         self.useRms = kwargs.get('useRms', True)
         self.relabel = kwargs.get('relabel', True)
         self._mask = kwargs.get('mask', None)
