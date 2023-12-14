@@ -80,7 +80,7 @@ class dropletFunc(DetObjectFunc):
                 [[0,1,0],[1,1,1],[0,1,0]],  
                 [[0,0,0],[0,0,0],[0,0,0]] 
             ])
-            self._is_tiles = True
+            self._is_tiled = True
         return
 
             
