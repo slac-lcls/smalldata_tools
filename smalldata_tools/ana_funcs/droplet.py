@@ -11,7 +11,8 @@ class dropletFunc(DetObjectFunc):
     Parameters
     ----------
     threshold : float (default = 1)
-         Treshold in sigma or ADU, depending on the value of the useRms parameters
+         Treshold for pixel to be part of a droplet in sigma or ADU, depending on the 
+         value of the useRms parameters.
     thresholdLow : float (default = same as threshold)
         Lower threshold: this is to make the spectrum sharper, but not find peaks 
         out of pixels with low significance.
@@ -19,7 +20,7 @@ class dropletFunc(DetObjectFunc):
         Pass a mask in here, is None: use mask stored in DetObject
     name: str (default: 'droplet') 
         Name used in hdf5 for data field
-    thresADU: float (default = 0)
+    thresADU: float (default = None)
         Threshold on droplets' ADU (sum of all pixels in a droplet) for droplet 
         to be further processed. Rejects droplets that are considered too low, i.e.
         that do not contain enough intensity for a single photon.
@@ -27,7 +28,9 @@ class dropletFunc(DetObjectFunc):
         If True, threshold and thresholdLow are # of rms of data, otherwise ADU are used.
     relabel (def True): 
         After initial droplet finding and allowing pixels above the lower threshold, 
-        relabel the image (so that droplets merge)
+        relabel the image (so that droplets merge). This allows pixel below the first 
+        threshold that are neigboring to existing droplet to be accounted for and perhaps 
+        round the intensity to a full photon ADU for example.
 
     By default, only total number of droplets is returned by process(data)
     
