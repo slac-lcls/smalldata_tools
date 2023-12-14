@@ -31,7 +31,7 @@ class dropletFunc(DetObjectFunc):
 
     By default, only total number of droplets is returned by process(data)
     
-    Many more information about the droplets ca be saved there.
+    Many more information about the droplets can be saved there.
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
@@ -64,19 +64,20 @@ class dropletFunc(DetObjectFunc):
         if self._mask is None and det.mask is not None:
             setattr(self, '_mask', det.mask.astype(np.uint8))
         setattr(self, '_rms', det.rms)
-        setattr(self, '_needsGeo', det._needsGeo)
         self._compData = np.ones_like(self._mask).astype(float)
         if self.useRms:
             if (len(self._rms.shape) > len(det.mask.shape)):
                 self._compData *= self._rms[0]/det.gain[0]
             else:
                 self._compData *= self._rms/det.gain
+        self._is_tiled = False
         if len(det.ped.shape)>2:
             self.footprint = np.array([ 
                 [[0,0,0],[0,0,0],[0,0,0]], 
                 [[0,1,0],[1,1,1],[0,1,0]],  
                 [[0,0,0],[0,0,0],[0,0,0]] 
             ])
+            self._is_tiles = True
         return
 
             
@@ -150,7 +151,6 @@ class dropletFunc(DetObjectFunc):
             return
         time_start = time.time()
         img = self.prepareImg(data)
-        # Is faster than measure.label(img, connectivity=1)
         img_drop = ndi.label(img, structure=self.footprint)
         time_label = time.time()
         
@@ -174,31 +174,24 @@ class dropletFunc(DetObjectFunc):
         adu_drop = ndi.sum_labels(img, labels=imgDrop, index=drop_ind)
         tfilled = time.time()
 
-        # clean list with thresADU. Only that one!
-        vThres = np.where(adu_drop<self.thresADU)[0]
-        vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
-        imgDrop[vetoed] = 0
-        drop_ind_thres = np.delete(drop_ind, vThres)
-
-        ret_dict['nDroplets'] = len(drop_ind_thres)
+        if self.thresADU is not None:
+            # Apply threshold to droplet total ADU (i.e. all pixels in droplet)
+            vThres = np.where(adu_drop<self.thresADU)[0]
+            vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
+            imgDrop[vetoed] = 0
+            drop_ind_thres = np.delete(drop_ind, vThres)
+            ret_dict['nDroplets'] = len(drop_ind_thres)
+        else:
+            drop_ind_thres = drop_ind
+            ret_dict['nDroplets'] = ret_dict['nDroplets_all']
 
         if not self._saveDrops:
             return ret_dict
 
-        ###
-        # add label_img_neighbor w/ mask as image -> sum ADU , field "masked" (binary)?
-        ###
-        pos_drop = []
-        moments = []
-        bbox = []
-        adu_drop = []
-        npix_drop = []
-        images = []
-        # use region props - this is not particularly performant on busy data.
-        # if no information other than adu, npix & is requested in _any_ dropletSave, then to back to old code.
-        # <checking like for flagmask>
-        # <old code> -- check result against new code.
+
+        # Get more info on the droplets if requested
         if not self._needProps:
+            # Faster option
             drop_adu = np.array(ndi.sum_labels(img, labels=imgDrop, index=drop_ind_thres))
             pos_drop = np.array(ndi.center_of_mass(
                 img,
@@ -216,14 +209,23 @@ class dropletFunc(DetObjectFunc):
             if drop_adu.shape[0] == 0:
                 dat_dict['row'] = np.array([])
                 dat_dict['col'] = np.array([])
-                if self._needsGeo:
-                    dat_dict['tile'] = np.array([])
             else:
                 dat_dict['row'] = pos_drop[:, pos_drop.shape[1] - 2]
                 dat_dict['col'] = pos_drop[:, pos_drop.shape[1] - 1]
-                dat_dict['tile'] = pos_drop[:, 0]
+                if self._is_tiled:
+                    dat_dict['tile'] = pos_drop[:, 0]
+                else:
+                    dat_dict['tile'] = np.zeros_like(pos_drop[:, 0])
         else:
+            # Use region props - this is not particularly performant on busy data.
             # this should be tested for tiled detectors!
+            pos_drop = []
+            moments = []
+            bbox = []
+            adu_drop = []
+            npix_drop = []
+            images = []
+        
             self.regions = measure.regionprops(imgDrop,
                                                intensity_image=img,
                                                cache=True)
