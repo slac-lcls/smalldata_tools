@@ -10,7 +10,7 @@ class dropletFunc(DetObjectFunc):
     """ 
     Parameters
     ----------
-    threshold : float (default = 1)
+    threshold : float (default = 5)
          Treshold for pixel to be part of a droplet in sigma or ADU, depending on the 
          value of the useRms parameters.
     thresholdLow : float (default = same as threshold)
@@ -39,7 +39,7 @@ class dropletFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
         super(dropletFunc, self).__init__(**kwargs)
-        self.threshold = kwargs.get('threshold', 1.)
+        self.threshold = kwargs.get('threshold', 5.)
         self.thresholdLow = kwargs.get('thresholdLow', self.threshold)
         self.thresADU = kwargs.get('thresADU', None)
         self.useRms = kwargs.get('useRms', True)
