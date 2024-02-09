@@ -10,38 +10,41 @@ class dropletFunc(DetObjectFunc):
     """ 
     Parameters
     ----------
-    threshold : float (default = 10.0)
-         Treshold in sigma or ADU, depending on the value of the useRms parameters
-    thresholdLow : float (default = 3.0)
+    threshold : float (default = 5)
+         Treshold for pixel to be part of a droplet in sigma or ADU, depending on the 
+         value of the useRms parameters.
+    thresholdLow : float (default = same as threshold)
         Lower threshold: this is to make the spectrum sharper, but not find peaks 
         out of pixels with low significance.
     mask: np.ndarray (default = None)
         Pass a mask in here, is None: use mask stored in DetObject
     name: str (default: 'droplet') 
         Name used in hdf5 for data field
-    thresADU: float (default = 10)
+    thresADU: float (default = None)
         Threshold on droplets' ADU (sum of all pixels in a droplet) for droplet 
-        to be further processed.
+        to be further processed. Rejects droplets that are considered too low, i.e.
+        that do not contain enough intensity for a single photon.
     useRms (def True): 
         If True, threshold and thresholdLow are # of rms of data, otherwise ADU are used.
     relabel (def True): 
         After initial droplet finding and allowing pixels above the lower threshold, 
-        relabel the image (so that droplets merge)
+        relabel the image (so that droplets merge). This allows pixel below the first 
+        threshold that are neigboring to existing droplet to be accounted for and perhaps 
+        round the intensity to a full photon ADU for example.
 
     By default, only total number of droplets is returned by process(data)
     
-    Many more information about the droplets ca be saved there.
+    Many more information about the droplets can be saved there.
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'droplet')
         super(dropletFunc, self).__init__(**kwargs)
-        self.threshold = kwargs.get('threshold', 10.)
-        self.thresholdLow = kwargs.get('thresholdLow', 3.)
-        self.thresADU = kwargs.get('thresADU', 10.)
+        self.threshold = kwargs.get('threshold', 5.)
+        self.thresholdLow = kwargs.get('thresholdLow', self.threshold)
+        self.thresADU = kwargs.get('thresADU', None)
         self.useRms = kwargs.get('useRms', True)
         self.relabel = kwargs.get('relabel', True)
         self._mask = kwargs.get('mask', None)
-        # new way to store this info
         self._debug = False
         self.footprint = np.array([
             [0,1,0],
@@ -53,9 +56,9 @@ class dropletFunc(DetObjectFunc):
             [1,1,1],
             [0,1,0]
         ])
-        self._saveDrops = None
-        self._flagMasked = None
-        self._needProps = None
+        self._saveDrops = False
+        self._flagMasked = False
+        self._needProps = False
         self._nMaxPixels = 15
  
 
@@ -64,20 +67,20 @@ class dropletFunc(DetObjectFunc):
         if self._mask is None and det.mask is not None:
             setattr(self, '_mask', det.mask.astype(np.uint8))
         setattr(self, '_rms', det.rms)
-        setattr(self, '_needsGeo', det._needsGeo)
         self._compData = np.ones_like(self._mask).astype(float)
         if self.useRms:
             if (len(self._rms.shape) > len(det.mask.shape)):
                 self._compData *= self._rms[0]/det.gain[0]
             else:
                 self._compData *= self._rms/det.gain
-        #self._grid = np.meshgrid(range(max(self._compData.shape)),range(max(self._compData.shape)))
+        self._is_tiled = False
         if len(det.ped.shape)>2:
             self.footprint = np.array([ 
                 [[0,0,0],[0,0,0],[0,0,0]], 
                 [[0,1,0],[1,1,1],[0,1,0]],  
                 [[0,0,0],[0,0,0],[0,0,0]] 
             ])
+            self._is_tiled = True
         return
 
             
@@ -96,9 +99,9 @@ class dropletFunc(DetObjectFunc):
     def applyThreshold(self, img, donut=False, invert=False, low=False):
         if not donut:
             if low:
-                    threshold = self.thresholdLow
+                threshold = self.thresholdLow
             else:
-                    threshold = self.threshold
+                threshold = self.threshold
             if not invert:
                 img[img < self._compData*threshold] = 0.0
             else:
@@ -117,7 +120,7 @@ class dropletFunc(DetObjectFunc):
         imgIn = img.copy()
         if self._mask is not None:
             imgIn[self._mask==0] = 0
-        self.applyThreshold(imgIn, donut, invert, low)
+        self.applyThreshold(imgIn, donut, invert, low) # modifies in place
         return imgIn
 
     
@@ -134,13 +137,7 @@ class dropletFunc(DetObjectFunc):
 
 
     def process(self, data):
-        if self._saveDrops is None:
-            self._saveDrops = False
-        if self._flagMasked is None:
-            self._flagMasked = False
-        if self._needProps is None:
-            self._needProps = False
-        ret_dict=self.dropletize(data)
+        ret_dict = self.dropletize(data)
 
         subfuncResults = self.processFuncs()
         for k in subfuncResults:
@@ -157,7 +154,6 @@ class dropletFunc(DetObjectFunc):
             return
         time_start = time.time()
         img = self.prepareImg(data)
-        # Is faster than measure.label(img, connectivity=1)
         img_drop = ndi.label(img, structure=self.footprint)
         time_label = time.time()
         
@@ -181,37 +177,24 @@ class dropletFunc(DetObjectFunc):
         adu_drop = ndi.sum_labels(img, labels=imgDrop, index=drop_ind)
         tfilled = time.time()
 
-        # clean list with lower threshold. Only that one!
-        vThres = np.where(adu_drop<self.thresADU)[0]
-        vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
-        imgDrop[vetoed] = 0
-        drop_ind_thres = np.delete(drop_ind, vThres)
-
-        ret_dict['nDroplets'] = len(drop_ind_thres)
+        if self.thresADU is not None:
+            # Apply threshold to droplet total ADU (i.e. all pixels in droplet)
+            vThres = np.where(adu_drop<self.thresADU)[0]
+            vetoed = np.in1d(imgDrop.ravel(), (vThres+1)).reshape(imgDrop.shape)
+            imgDrop[vetoed] = 0
+            drop_ind_thres = np.delete(drop_ind, vThres)
+            ret_dict['nDroplets'] = len(drop_ind_thres)
+        else:
+            drop_ind_thres = drop_ind
+            ret_dict['nDroplets'] = ret_dict['nDroplets_all']
 
         if not self._saveDrops:
             return ret_dict
 
-        ###
-        # add label_img_neighbor w/ mask as image -> sum ADU , field "masked" (binary)?
-        ###
-        # adu_drop = np.delete(adu_drop,vThres)
-        pos_drop = []
-        moments = []
-        bbox = []
-        adu_drop = []
-        npix_drop = []
-        images = []
-        # use region props - this is not particularly performant on busy data.
-        # if no information other than adu, npix & is requested in _any_ dropletSave, then to back to old code.
-        # <checking like for flagmask>
-        # <old code> -- check result against new code.
-        # if not '_needProps' in self.__dict__keys():
+
+        # Get more info on the droplets if requested
         if not self._needProps:
-            # not sure why I'm not using imgNpix for npix calculation
-            # imgNpix = img.copy(); imgNpix[img>0]=1
-            # drop_npix = (measurements.sum(imgNpix,imgDrop, drop_ind_thres)).astype(int)
-            # drop_npix = (measurements.sum(img.astype(bool).astype(int),imgDrop, drop_ind_thres)).astype(int)
+            # Faster option
             drop_adu = np.array(ndi.sum_labels(img, labels=imgDrop, index=drop_ind_thres))
             pos_drop = np.array(ndi.center_of_mass(
                 img,
@@ -223,21 +206,29 @@ class dropletFunc(DetObjectFunc):
                 labels=imgDrop,
                 index=drop_ind_thres
             )).astype(int)
-            
+
             dat_dict = {'data': drop_adu}  # adu_drop}
             dat_dict['npix'] = npix_drop
             if drop_adu.shape[0] == 0:
                 dat_dict['row'] = np.array([])
                 dat_dict['col'] = np.array([])
-                if self._needsGeo:
-                    dat_dict['tile'] = np.array([])
             else:
                 dat_dict['row'] = pos_drop[:, pos_drop.shape[1] - 2]
                 dat_dict['col'] = pos_drop[:, pos_drop.shape[1] - 1]
-                dat_dict['tile'] = pos_drop[:, 0]
+                if self._is_tiled:
+                    dat_dict['tile'] = pos_drop[:, 0]
+                else:
+                    dat_dict['tile'] = np.zeros_like(pos_drop[:, 0])
         else:
+            # Use region props - this is not particularly performant on busy data.
             # this should be tested for tiled detectors!
-            # t2 = time.time()
+            pos_drop = []
+            moments = []
+            bbox = []
+            adu_drop = []
+            npix_drop = []
+            images = []
+        
             self.regions = measure.regionprops(imgDrop,
                                                intensity_image=img,
                                                cache=True)
@@ -248,7 +239,6 @@ class dropletFunc(DetObjectFunc):
                 bbox.append(droplet['bbox'])
                 adu_drop.append(droplet['intensity_image'].sum())
                 npix_drop.append((droplet['intensity_image'] > 0).sum())
-                # self._nMaxPixels = 15
                 pixelArray = droplet['intensity_image'].flatten()
 
                 if pixelArray.shape[0] > self._nMaxPixels:
