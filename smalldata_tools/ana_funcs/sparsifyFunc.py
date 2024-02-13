@@ -34,6 +34,7 @@ class sparsifyFunc(DetObjectFunc):
             self.nData = int(self.nData)
 
     def process(self, data):
+        ret_dict={}
         #apply mask - set to zero, so pixels will fall out in sparify step.
         if isinstance(data, np.ma.masked_array):            
             data = data.filled(fill_value=0)
@@ -44,7 +45,7 @@ class sparsifyFunc(DetObjectFunc):
                 print('cannot make a make a sparse, rectangular array of', data)
                 return
             ret_dict = data
-        
+            
         #sparsify image
         if  isinstance(data, np.ndarray):
             photonsImg = data.copy()
@@ -95,6 +96,7 @@ class sparsifyFunc(DetObjectFunc):
         else:
             for key, d in data_dict.items():
                 if key[0]=='_': continue
+                if len(d)==0: continue
                 ret_dict[f'var_{key}'] = d
 
         subfuncResults = self.processFuncs()
