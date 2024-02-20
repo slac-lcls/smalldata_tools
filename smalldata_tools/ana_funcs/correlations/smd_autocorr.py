@@ -29,7 +29,7 @@ class Autocorrelation(DetObjectFunc):
                 can be passed by as the first dimension of the array. If several masks are passed,
                 save_range must be set.
             save_lineout (bool):
-                Save full autocorr image or only vertical and horizontal lineouts. Default: False
+                Save autocorr image or only vertical and horizontal lineouts. Default: False
             save_range (2-tuple):
                 Size (square) of the autocorr image to save. Default: (50, 50)
         """
@@ -47,6 +47,23 @@ class Autocorrelation(DetObjectFunc):
         if self.mask is not None:
             print('A mask is given, ROI set to None')
             self.roi = None
+        
+        
+        # check save_range vs data shape to avoid wrapping issues
+        min_size = 1e6
+        
+        if self.mask.ndim == 2:
+            mask_list = [self.mask]
+        else:
+            mask_list = self.mask
+        for ii, mask in enumerate(mask_list):
+            _, c_mask = utils.box_to_roi(mask, mask)
+            print(f"Cropped mask shape: {c_mask.shape}")
+            if np.min(c_mask.shape) < min_size:
+                min_size = np.min(c_mask.shape)
+        if min_size//2 < np.max(self.save_range):
+            print(f"save_range is bigger than the autocorr array. Reducing it to ({min_size//2-1}, {min_size//2-1})")
+            self.save_range = (min_size//2-1, min_size//2-1)
         return
     
             
@@ -71,7 +88,6 @@ class Autocorrelation(DetObjectFunc):
                 #autocorr = np.asarray(autocorr) # autocorr are of different sizes at this point
                 cr = [img[mask].mean() for mask in self.mask]
                 cr = np.asarray(cr)
-            
             else:
                 autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
                 cr = img[self.mask].mean()
