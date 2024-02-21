@@ -4,6 +4,7 @@ import glob
 import os
 import numpy as np
 import sys
+import time
 
 from smalldata_tools.ana_funcs.correlations import correlation as corr
 from smalldata_tools.ana_funcs.correlations import utils
@@ -41,7 +42,7 @@ class Autocorrelation(DetObjectFunc):
         self.correct_illumination = kwargs.get('correct_illumination', False) # not implemented
         self.roi = kwargs.get('roi', None)
         if 'mask' in kwargs:
-            self.mask = np.load(kwargs['mask'])
+            self.mask = np.load(kwargs['mask']).astype(bool)
         else:
             self.mask = None
         if self.mask is not None:
@@ -86,15 +87,15 @@ class Autocorrelation(DetObjectFunc):
             if self.mask.ndim==3:
                 autocorr = [corr.spatial_correlation_fourier(img, mask=mask) for mask in self.mask]
                 #autocorr = np.asarray(autocorr) # autocorr are of different sizes at this point
-                cr = [img[mask].mean() for mask in self.mask]
+                cr = [img[mask].mean() for mask in self.mask] # careful if mask is not bool, this does weird things
                 cr = np.asarray(cr)
             else:
                 autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
-                cr = img[self.mask].mean()
+                cr = img[self.mask].mean() # careful if mask is not bool, this does weird things
         else:
             autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
             cr = img.mean()
-        
+
         if self.save_range is not None:
             if not isinstance(autocorr, list):
                 autocorr = [autocorr]
