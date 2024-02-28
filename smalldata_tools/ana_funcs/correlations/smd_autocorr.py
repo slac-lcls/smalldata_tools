@@ -30,13 +30,15 @@ class Autocorrelation(DetObjectFunc):
                 Several mask can be passed by as the first dimension of the array.
                 If several masks are passed, save_range must be set.
             save_lineout (bool):
-                Save autocorr image or only vertical and horizontal lineouts. Default: False
+                Save autocorr image or only vertical and horizontal lineouts.
+                Default: False
             save_range (2-tuple):
                 Size (square) of the autocorr image to save. Default: (50, 50)
             illumination_correction (dict):
                 Correction arrays for each mask.
                 Dict items:
-                    'correction':  path to correction array
+                    'correction': path to correction arrays. One array per mask /
+                                  ROI.
                     'kernel': kernel size used in the creation of the illumination
                               correction
                 Default: None
@@ -63,8 +65,6 @@ class Autocorrelation(DetObjectFunc):
                 allow_pickle=True
             )
             self.illumination_kernel = kwargs['illumination_correction']['kernel']
-            # self.illumination_roi = np.load(kwargs['illumination_correction']['roi']).astype(bool)
-            # self.prepare_illumination_correction()
         else:
             self.illumination_correction = None
         
@@ -77,22 +77,6 @@ class Autocorrelation(DetObjectFunc):
         """ """
         super(Autocorrelation, self).setFromDet(det)
         return
-
-
-    # def prepare_illumination_correction(self):
-    #     if self.illumination_correction['correction'].ndim == 2:
-    #         self.illumination_correction = np.asarray([self.illumination_correction])
-    #         self.illumination_roi = np.asarray([self.illumination_roi])
-    #     if (self.mask.shape[0] != self.illumination_correction['correction'].shape[0]) and \
-    #         (self.mask.shape[0] != self.illumination_correction['roi'].shape[0]):
-    #         raise ValueError('There must be the same number of masks and illumination corrections arrays') 
-    #     iis, jjs = np.where(roi)
-    #     shapes = [(1+max(i)-min(i), 1+max(j)-min(j)) for i,j in zip(iis, jjs)]
-    #     for ii, shape in enumerate(shapes):
-    #         if shape != self.illumination_correction[ii].shape:
-    #             raise ValueError('The shape of the roi and illumination correction do not match')
-    #     print(f'Illumination shapes: {shapes}')
-    #     return
 
 
     def check_mask_save_range(self):
@@ -133,7 +117,6 @@ class Autocorrelation(DetObjectFunc):
                 else:
                     autocorr.append(corr.spatial_correlation_fourier(img, mask=mask))
                     cr.append(img[mask].mean()) # careful if mask is not bool, this does weird things
-                #autocorr = np.asarray(autocorr) # autocorr are of different sizes at this point
             cr = np.asarray(cr)
         else:
             autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
