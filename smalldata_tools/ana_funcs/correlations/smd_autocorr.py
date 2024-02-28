@@ -26,38 +26,78 @@ class Autocorrelation(DetObjectFunc):
                 [roi0, roi1, roi3, roi4] rectangular ROI coordinates
             mask (str or Path object):
                 path to an npy file containing mask(s).
-                The mask can be used to define non-rectangular region of interest. Several mask 
-                can be passed by as the first dimension of the array. If several masks are passed,
-                save_range must be set.
+                The mask can be used to define non-rectangular region of interest. 
+                Several mask can be passed by as the first dimension of the array.
+                If several masks are passed, save_range must be set.
             save_lineout (bool):
                 Save autocorr image or only vertical and horizontal lineouts. Default: False
             save_range (2-tuple):
                 Size (square) of the autocorr image to save. Default: (50, 50)
+            illumination_correction (dict):
+                Correction arrays for each mask.
+                Dict items:
+                    'correction':  path to correction array
+                    'kernel': kernel size used in the creation of the illumination
+                              correction
+                Default: None
         """
         self._name = kwargs.get('name','autocorr')
         super(Autocorrelation, self).__init__(**kwargs)
         self.thresholds = kwargs.get('thresADU', [-1e6, 1e6])
         self.save_range = kwargs.get('save_range', (50, 50))
         self.save_lineout = kwargs.get('save_lineout', False)
-        self.correct_illumination = kwargs.get('correct_illumination', False) # not implemented
         self.roi = kwargs.get('roi', None)
         if 'mask' in kwargs:
             self.mask = np.load(kwargs['mask']).astype(bool)
+            if self.mask.ndim == 2:
+                self.mask = np.asarray([self.mask])
         else:
             self.mask = None
         if self.mask is not None:
             print('A mask is given, ROI set to None')
             self.roi = None
-        
+
+        if 'illumination_correction' in kwargs:
+            self.illumination_correction = np.load(
+                kwargs['illumination_correction']['correction'],
+                allow_pickle=True
+            )
+            self.illumination_kernel = kwargs['illumination_correction']['kernel']
+            # self.illumination_roi = np.load(kwargs['illumination_correction']['roi']).astype(bool)
+            # self.prepare_illumination_correction()
+        else:
+            self.illumination_correction = None
         
         # check save_range vs data shape to avoid wrapping issues
+        self.check_mask_save_range() 
+        return
+    
+            
+    def setFromDet(self, det):
+        """ """
+        super(Autocorrelation, self).setFromDet(det)
+        return
+
+
+    # def prepare_illumination_correction(self):
+    #     if self.illumination_correction['correction'].ndim == 2:
+    #         self.illumination_correction = np.asarray([self.illumination_correction])
+    #         self.illumination_roi = np.asarray([self.illumination_roi])
+    #     if (self.mask.shape[0] != self.illumination_correction['correction'].shape[0]) and \
+    #         (self.mask.shape[0] != self.illumination_correction['roi'].shape[0]):
+    #         raise ValueError('There must be the same number of masks and illumination corrections arrays') 
+    #     iis, jjs = np.where(roi)
+    #     shapes = [(1+max(i)-min(i), 1+max(j)-min(j)) for i,j in zip(iis, jjs)]
+    #     for ii, shape in enumerate(shapes):
+    #         if shape != self.illumination_correction[ii].shape:
+    #             raise ValueError('The shape of the roi and illumination correction do not match')
+    #     print(f'Illumination shapes: {shapes}')
+    #     return
+
+
+    def check_mask_save_range(self):
         min_size = 1e6
-        
-        if self.mask.ndim == 2:
-            mask_list = [self.mask]
-        else:
-            mask_list = self.mask
-        for ii, mask in enumerate(mask_list):
+        for ii, mask in enumerate(self.mask):
             _, c_mask = utils.box_to_roi(mask, mask)
             print(f"Cropped mask shape: {c_mask.shape}")
             if np.min(c_mask.shape) < min_size:
@@ -66,13 +106,7 @@ class Autocorrelation(DetObjectFunc):
             print(f"save_range is bigger than the autocorr array. Reducing it to ({min_size//2-1}, {min_size//2-1})")
             self.save_range = (min_size//2-1, min_size//2-1)
         return
-    
-            
-    def setFromDet(self, det):
-        """ """
-        super(Autocorrelation, self).setFromDet(det)
-        return
-    
+
     
     def process(self, img):
         """
@@ -84,14 +118,23 @@ class Autocorrelation(DetObjectFunc):
         img[img>self.thresholds[1]] = 0
         
         if self.mask is not None:
-            if self.mask.ndim==3:
-                autocorr = [corr.spatial_correlation_fourier(img, mask=mask) for mask in self.mask]
+            autocorr = []
+            cr = []
+            for ii, mask in enumerate(self.mask):
+                if self.illumination_correction is not None:
+                    img_box, mask = utils.box_to_roi_extend(
+                        img,
+                        mask,
+                        extend = 2*self.illumination_kernel
+                    )
+                    img_corr = img_box / self.illumination_correction[ii]
+                    autocorr.append(corr.spatial_correlation_fourier(img_box, mask=mask))
+                    cr.append(img_box[mask].mean()) # careful if mask is not bool, this does weird things
+                else:
+                    autocorr.append(corr.spatial_correlation_fourier(img, mask=mask))
+                    cr.append(img[mask].mean()) # careful if mask is not bool, this does weird things
                 #autocorr = np.asarray(autocorr) # autocorr are of different sizes at this point
-                cr = [img[mask].mean() for mask in self.mask] # careful if mask is not bool, this does weird things
-                cr = np.asarray(cr)
-            else:
-                autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
-                cr = img[self.mask].mean() # careful if mask is not bool, this does weird things
+            cr = np.asarray(cr)
         else:
             autocorr = corr.spatial_correlation_fourier(img, mask=self.mask)
             cr = img.mean()
