@@ -27,7 +27,7 @@ class EpicsArchive(object):
         self._pts_cache = None
         self._pv_cache = None
 
-    def get_points(self, PV=None, start=30, end=None, unit="days", chunk=False, two_lists=False, raw=False):
+    def get_points(self, PV=None, start=30, end=None, unit="days", chunk=False, two_lists=False, raw=False, useMS=False):
         """
         Get points from the archive, returning them as a list of tuples.
         You may set two_lists=True to get a list of positions and a list of
@@ -43,7 +43,7 @@ class EpicsArchive(object):
             json_start, json_end = self._json_args(start, end, unit)
             if valid_date_arrays(json_start, json_end):
                 json_obj = self._get_json(PV, json_start, json_end, chunk)
-                pts = self._json_to_pts(json_obj)
+                pts = self._json_to_pts(json_obj, useMS)
                 self._pts_cache = pts
                 self._pv_cache = PV
             else:
@@ -142,21 +142,13 @@ class EpicsArchive(object):
         if end is None:
             end = datetime_to_array(datetime.datetime.now())
 
-        # Convert to datetime
+        # Convert to UTC datetime
         start = to_datetime(start, unit)
         end = to_datetime(end, unit)
 
-        # Adjust to UTC
-        utcnow = datetime.datetime.utcnow()
-        herenow = datetime.datetime.now()
-        offset = round((utcnow - herenow).total_seconds()/(60*60), 2)
-
-        utc_start = start + datetime.timedelta(hours=offset)
-        utc_end = end + datetime.timedelta(hours=offset)
-
         # Switch to date arrays for url construction
-        json_start = datetime_to_array(utc_start)
-        json_end = datetime_to_array(utc_end)
+        json_start = datetime_to_array(start)
+        json_end = datetime_to_array(end)
 
         return json_start, json_end
 
@@ -179,11 +171,11 @@ class EpicsArchive(object):
             url += url_flag.format("donotchunk")
         return url_query(url)
 
-    def _json_to_pts(self, json_obj):
+    def _json_to_pts(self, json_obj, useMS):
         """
-        Inteprets a data retrieval json object as an array of tuple points.
+        Interprets a data retrieval json object as an array of tuple points.
         """
-        return [ (x["secs"], x["val"]) for x in json_obj[0]["data"] ]
+        return [ (x["secs"] + (x['nanos']/1e9 if useMS else 0), x["val"]) for x in json_obj[0]["data"] ]
 
     def _pts_to_arrays(self, pts):
         """
@@ -214,20 +206,20 @@ def url_query(url):
 
 def to_datetime(arg, unit):
     """
-    Convert some form of date input into a datetime object.
+    Convert some form of date input into a UTC datetime object.
     """
     if isinstance(arg, datetime.datetime):
-        return arg
+        return arg.astimezone(datetime.timezone.utc)
     if isinstance(arg, (int, float)):
         if (arg < 10000):
             return datetime_ago(arg, unit)
         else: #big - must be time in secs since epoch.
-            return datetime.datetime.fromtimestamp(int(arg))
+            return datetime.datetime.fromtimestamp(int(arg)).astimezone(datetime.timezone.utc)
     if isinstance(arg, (list, tuple)):
         arg = list(arg)
         while len(arg) < 3:
             arg.append(0)
-        return datetime.datetime(*arg)
+        return datetime.datetime(*arg).astimezone(datetime.timezone.utc)
  
 def datetime_ago(delta, unit):
     """
@@ -237,13 +229,14 @@ def datetime_ago(delta, unit):
     time equivalent to 2 days ago.
     """
     days = delta * days_map[unit]
-    return datetime.datetime.now() - datetime.timedelta(days)
+    t = datetime.datetime.now() - datetime.timedelta(days)
+    return t.astimezone(datetime.timezone.utc)
 
 def datetime_to_array(dt):
     """
-    Convert datetime object to an array that can be passed to date_format.
+    Convert UTC datetime object to an array that can be passed to date_format.
     """
-    return [dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second]
+    return [dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond]
 
 def date_format(year=2015, month=1, day=1, hr=0, min=0, s=0, ms=0):
     """Convert date/time parameters to date format string for archiver"""
