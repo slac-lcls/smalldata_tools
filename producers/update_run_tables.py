@@ -89,13 +89,6 @@ if __name__ == '__main__':
                                   headers=krbheaders).json()['value']['params']
 
         start  = datetime.fromisoformat(rundata[run]['begin_time'])
-        if rundata[run]['end_time'] is None: # This probably doesn't happen outside of the devlgbk.
-            finish = start.timestamp() + 300
-        else:
-            finish = datetime.fromisoformat(rundata[run]['end_time'])
-            # We don't need more than 5 minutes of data for this!!!
-            if finish.timestamp() - start.timestamp() > 300:
-                finish = start.timestamp() + 300
         logger.debug("Run %d: start %s (%.9f)" % (run, rundata[run]['begin_time'], start.timestamp()))
         #print("old_params=%s" % old_params)
 
@@ -104,17 +97,9 @@ if __name__ == '__main__':
             if p in old_params.keys():
                 logger.debug("%s is already a run param in run %d, skipping..." % (p, run))
                 continue
-            timePoints,valPoints = archive.get_points(PV=p,
-                                                      start=start,
-                                                      end=finish,
-                                                      two_lists=True, 
-                                                      raw=True,
-                                                      useMS=True)
-            # Do we want to do something clever here?  Check the timestamp?  See if we are
-            # disconnected?  Let's say 'no' for now and just use the last value right before
-            # the run.
-            if len(valPoints) >= 1:
-                new_params[PV2JSON(p)] = valPoints[0]
+            v = archive.get_point(PV=p, when=start, value_only=True)
+            if v is not None:
+                new_params[PV2JSON(p)] = v
 
         #print("new_params=%s" % new_params)
         if len(new_params) > 0:

@@ -27,6 +27,56 @@ class EpicsArchive(object):
         self._pts_cache = None
         self._pv_cache = None
 
+    def get_point(self, PV=None, when=None, value_only=False):
+        """
+        Get the value from a particular point in time.  Returns (timestamp, value)
+        unless value_only is true.  Returns None if the archiver does not have
+        a value for that time.
+
+        when should either be a timestamp or datetime object.
+
+        This tries to be a bit smarter about detecting disconnects.
+        """
+        when_start = to_datetime(when, "days")
+        json_start, json_end = self._json_args(when, when, "days")
+        incr = datetime.timedelta(seconds=60)   # How far to look forward for a second data point.
+        found = False
+        now = datetime.datetime.now().astimezone(datetime.timezone.utc)
+        while not found:
+            when_end = when_start + incr
+            if when_end > now:
+                when_end = now
+            json_end = datetime_to_array(when_end)
+            json_obj = self._get_json(PV, json_start, json_end, False)
+            if len(json_obj) == 0:  # Time must be before archiving!
+                return None
+            if len(json_obj[0]['data']) > 1 or when_end >= now:
+                found = True
+            else:
+                # We only have 0-1 data points.
+                if incr.days == 0:
+                    incr = 10 * incr
+                else:
+                    incr = incr + datetime.timedelta(days=1)
+        data = json_obj[0]['data']
+        # Now, data[0] is a data point archived before when.  But
+        # data[1] might contain a fields/cnxlostepsecs tag that
+        # invalidates it!
+        #
+        # What if we *don't* have a second point though.  Does this
+        # mean that we are *still* disconnected?  Or is the data valid?
+        #
+        # For now, let's pretend that it's valid.
+        if (len(data) > 1 and 
+            'fields' in data[1].keys() and 
+            'cnxlostepsecs' in data[1]['fields'].keys() and
+            float(data[1]['fields']['cnxlostepsecs']) < when_start.timestamp()):
+            return None
+        if value_only:
+            return data[0]['val']
+        else:
+            return (data[0]["secs"] + data[0]['nanos']/1e9, data[0]["val"])
+
     def get_points(self, PV=None, start=30, end=None, unit="days", chunk=False, two_lists=False, raw=False, useMS=False):
         """
         Get points from the archive, returning them as a list of tuples.
