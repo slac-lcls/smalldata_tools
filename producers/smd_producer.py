@@ -752,8 +752,6 @@ logger.debug('Saved all small data')
 if args.postRuntable and ds.rank==0:
     print('Posting to the run tables.')
     locStr=''
-    if useFFB:
-        locStr='_ffb'
     runtable_data = {"Prod%s_end"%locStr:end_prod_time,
                      "Prod%s_start"%locStr:begin_prod_time,
                      "Prod%s_jobstart"%locStr:begin_job_time,
