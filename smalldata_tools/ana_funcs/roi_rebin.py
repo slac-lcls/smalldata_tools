@@ -130,7 +130,7 @@ class ROIFunc(DetObjectFunc):
 
     def process(self, data):
         ret_dict = {}
-        ROIdata=self.applyROI(data)
+        ROIdata = self.applyROI(data)
         if self.mask is not None:
             ROIdata = ma.array(ROIdata, mask=self.mask)
         else:

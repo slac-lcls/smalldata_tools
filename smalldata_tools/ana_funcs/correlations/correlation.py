@@ -74,7 +74,7 @@ def correct_illumination(imgs, roi, kernel_size=5):
     Returns:
         imgs: corrected images, cropped to an extended box aroung the roi
         roi: new roi for the cropped image
-        bp: correction factor imgae
+        bp: correction factor image
     """
     if kernel_size is None:
         extend = 0
