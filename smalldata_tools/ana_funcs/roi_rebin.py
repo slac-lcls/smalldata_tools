@@ -174,6 +174,116 @@ class ROIFunc(DetObjectFunc):
                     ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
 
+class EvtSumFunc(DetObjectFunc):
+    """
+    apply as ROI to input data
+    ROI: boundary for ROI
+    userMask (default None): apply mask for calculation or subfunctions
+    """
+    def __init__(self, **kwargs):
+        self._name = kwargs.get('name','EvtSum')
+        super(EvtSumFunc, self).__init__(**kwargs)
+        ROI = kwargs.get('ROI',None)
+        if ROI is None:
+            if self._name == 'ROI': self._name='full'
+            ROI=[0, 1e6]
+        if isinstance(ROI, list):
+            ROI = np.array(ROI)
+        else:
+            ROI=ROI
+        if ROI.ndim==1 and ROI.shape[0]>2:
+            ROI = ROI.reshape(ROI.shape[0]/2,2)
+        self.bound = ROI.squeeze()
+        self._calcPars = kwargs.get('calcPars',True)
+        self.mask =  kwargs.get('userMask',None)
+        self.thresADU = kwargs.get('thresADU',None)
+        self.Nsat = kwargs.get('Nsat',None)
+
+    def setFromDet(self, det):
+        super(EvtSumFunc, self).setFromDet(det)
+        self._rms = det.rms
+        if self._rms is not None:
+            if self._rms.ndim==4:
+                self._rms = self._rms[0]#.squeeze()
+            self._rms = self.applyROI(self._rms)
+        if self.mask is not None and det.mask is not None and self.mask.shape == det.mask.shape:
+            self.mask = ~(self.mask.astype(bool)&det.mask.astype(bool))
+        else:
+            try:
+                self.mask = ~(det.cmask.astype(bool)&det.mask.astype(bool))
+            except:
+                if det.ped is None:
+                    self.mask = None
+                else:
+                    try:
+                        self.mask = ~(np.ones_like(det.ped).astype(bool))
+                    except:
+                        self.mask = None
+        if self.mask is not None:
+            try:
+                self.mask = self.applyROI(self.mask)
+            except:
+                pass
+        try:
+            self._x = self.applyROI(det.x)
+            self._y = self.applyROI(det.y)
+        except:
+            pass
+
+    def applyROI(self, array):
+        #array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
+        if array.ndim < self.bound.ndim:
+            print('array has fewer dimensions that bound: ',array.ndim,' ',len(self.bound))
+            return array
+        #ideally would check this from FrameFexConfig and not on every events
+        if array.ndim == self.bound.ndim:
+            new_bound=[]
+            if array.ndim==1:
+                new_bound=[max(min(self.bound), 0), min(max(self.bound), array.shape[0])]
+            else:
+                for dim,arsz in zip(self.bound, array.shape):
+                    if max(dim) > arsz:
+                        new_bound.append([min(dim), arsz])
+                    else:
+                        new_bound.append([min(dim), max(dim)])
+            self.bound = np.array(new_bound)
+        elif self.bound.ndim==1:
+            self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])]).astype(int)
+        #this needs to be more generic....of maybe just ugly spelled out for now.
+        if self.bound.shape[0]==2 and len(self.bound.shape)==1:
+            subarr = array[self.bound[0]:self.bound[1]]
+        elif self.bound.shape[0]==2 and len(self.bound.shape)==2:
+            subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1]]
+        elif self.bound.shape[0]==3:
+            subarr = array[self.bound[0,0]:self.bound[0,1],self.bound[1,0]:self.bound[1,1],self.bound[2,0]:self.bound[2,1]]
+        #return subarr.copy()
+        return subarr
+
+    def process(self, data):
+        ret_dict = {}
+        ROIdata=self.applyROI(data)
+        if self.mask is not None:
+            ROIdata = ma.array(ROIdata, mask=self.mask)
+        else:
+            ROIdata = ma.array(ROIdata)
+            #if ROIdata.dtype == np.uint16:
+            #    ROIdata[self.mask]=0
+            #else:
+            #    ROIdata[self.mask]=np.nan
+###
+        if self.thresADU is not None:
+            if isinstance(self.thresADU, list):
+                ROIdata[ROIdata<self.thresADU[0]] = 0
+                ROIdata[ROIdata>self.thresADU[1]] = 0
+            else:
+                ROIdata[ROIdata<self.thresADU] = 0
+###
+        ret_dict['sum'] = ROIdata.filled(fill_value=0).sum()
+        ret_dict['mean'] = ROIdata.filled(fill_value=0).mean()
+        if self.Nsat is not None:
+            ret_dict['nsat'] =  (ROIdata.filled(fill_value=0) >= self.Nsat).astype(int).sum()
+        return ret_dict
+
 #DEBUG ME WITH MASKED ARRAY#
 class rebinFunc(DetObjectFunc):
     """
