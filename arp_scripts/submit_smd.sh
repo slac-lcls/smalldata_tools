@@ -39,6 +39,8 @@ $(basename "$0"):
             save log-files in specified directory
         --s3df
             Forces to load xtc files from the S3DF location
+        --integ
+            Use integrating detector mode
 EOF
 
 }
@@ -121,6 +123,10 @@ do
         FORCE_S3DF=1
         shift
         ;;
+    --integ)
+        INTEG=1
+        shift
+        ;;
     *)
         POSITIONAL+=("$1")
         shift
@@ -179,6 +185,10 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
     source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
     PYTHONEXE=smd2_producer.py
+    if [ -v INTEG ]; then
+        echo 'test integrating det setup'
+        PYTHONEXE=smd2int_producer.py
+    fi
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
