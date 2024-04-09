@@ -473,7 +473,7 @@ if not args.default:
     #try-except as not every rank seems to know thisdet....
     try:
         dets = define_dets(args.run)
-        print([d for d in dets])
+        logger.debug([d for d in dets])
     except:
         pass
 
@@ -599,11 +599,7 @@ if rank==0:
 logger.debug('rank {0} on {1} is finished'.format(rank, hostname))
 
 #finishing up here....
-try:
-    small_data.save()
-except:
-    small_data.done()
-    pass
+small_data.done()
 
 #if (int(os.environ.get('RUN_NUM', '-1')) > 0):
 if os.environ.get('ARP_JOB_ID', None) is not None:
@@ -613,7 +609,7 @@ if os.environ.get('ARP_JOB_ID', None) is not None:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
 logger.debug('Saved all small data')
 
-if args.postRuntable and rank>0:            
+if args.postRuntable and ((size > 2 and rank == 2) or size<=2):
     print('Posting to the run tables.')
     locStr=''
     if useFFB:
