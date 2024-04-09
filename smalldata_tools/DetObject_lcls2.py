@@ -22,6 +22,8 @@ def DetObject_lcls2(srcName, run, **kwargs):
     try:
         det = run.Detector(srcName)
     except:
+        print('failed to make detector for ',srcName)
+        print(run.detnames)
         return None
     det.alias = srcName
     detector_classes = {
@@ -111,7 +113,7 @@ class DetObjectClass_lcls2(object):
         except:
             self.evt = event()
         self.evt.dat = None
-
+        
     def addFunc(self, func):
         func.setFromDet(self) #pass parameters from det (rms, geometry, .....)
         try:
@@ -328,8 +330,8 @@ class Epix10kObject_lcls2(TiledCameraObject_lcls2):
 class PVObject_lcls2(CameraObject_lcls2): 
     def __init__(self, det, run,**kwargs):
         super(PVObject_lcls2, self).__init__(det, run, **kwargs)
-
-    def getData(self, evt):
+        
+    def getData(self, evt):        
         super(PVObject_lcls2, self).getData(evt)
         if self.common_mode<0:
             self.evt.dat = self.det.raw.value(evt)
@@ -398,7 +400,7 @@ class Wave8Object(WaveformObject_lcls2):
     def __init__(self, det,run,**kwargs):
         super(Wave8Object, self).__init__(det,run, **kwargs)
         self._chan_names = [name for name in dir(det.raw) if name[0]!='_']
-        if 'raw_all' in self._chan_names: self._chan_names='raw_all'
+        if 'raw_all' in self._chan_names: self._chan_names=['raw_all']
         self.chan_names = ' '.join(self._chan_names)
 
     def getData(self, evt):
@@ -406,7 +408,6 @@ class Wave8Object(WaveformObject_lcls2):
         vetolist=['config']
         self.evt.dat = [ getattr(self.det.raw, name)(evt) for name in self._chan_names if name not in vetolist]
         try:
-            self.evt.dat = np.array(self.evt.dat)
+            self.evt.dat = np.squeeze(np.array(self.evt.dat))
         except:
             print('Wave8: could not cast waveform times to array ',self.evt.dat)
-
