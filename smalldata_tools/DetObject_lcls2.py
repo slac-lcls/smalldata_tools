@@ -398,6 +398,7 @@ class Wave8Object(WaveformObject_lcls2):
     def __init__(self, det,run,**kwargs):
         super(Wave8Object, self).__init__(det,run, **kwargs)
         self._chan_names = [name for name in dir(det.raw) if name[0]!='_']
+        if 'raw_all' in self._chan_names: self._chan_names='raw_all'
         self.chan_names = ' '.join(self._chan_names)
 
     def getData(self, evt):
