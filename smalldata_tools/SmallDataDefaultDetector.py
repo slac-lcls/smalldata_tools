@@ -936,7 +936,7 @@ class ttlcls2Detector(defaultDetector):
     def data(self, evt):
         dl={}
         fex=getattr( self.det, 'ttfex')
-        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw' ]
+        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
         if fex is not None:
            fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
            for field in fields:
@@ -946,7 +946,7 @@ class ttlcls2Detector(defaultDetector):
 
         if self.saveTraces:
             fex=getattr( self.det, 'ttproj')
-            veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw' ]
+            veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
             if fex is not None:
                fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
                for field in fields:

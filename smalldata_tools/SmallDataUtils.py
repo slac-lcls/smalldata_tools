@@ -67,6 +67,7 @@ def rixDetectors(run, beamCodes=[[-136],[77]]):
     dets.append(fimfexDetector('rix_fim0',run))
     dets.append(fimfexDetector('rix_fim1',run))
     dets.append(fimfexDetector('rix_fim2',run))
+    dets.append(fimfexDetector('crix_w8',run))
     dets.append(genlcls2Detector('mono_encoder',run))
 
     dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
