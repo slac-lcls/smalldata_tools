@@ -176,7 +176,7 @@ if [[ $QUEUE == *milano*  ]]; then
     CORES=${CORES:=120} # a full node by default
     MAX_NODES=${MAX_NODES:=4}
 else
-    CORES=${CORES:=1} # default to 1 outside S3DF
+    CORES=${CORES:=1} # default to 1 outside S3DF queue
     MAX_NODES=${MAX_NODES:=4}
 fi
 
@@ -225,6 +225,11 @@ if [ -v INTERACTIVE ]; then
 fi
 
 LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
+if [ ! -v LOGDIR ]; then
+    if [ $ON_S3DF ]; then
+        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
+    fi
+fi
 if [ -v LOGDIR ]; then
     if [ ! -d "$LOGDIR" ]; then
         mkdir -p "$LOGDIR"
