@@ -225,11 +225,12 @@ if [ -v INTERACTIVE ]; then
 fi
 
 LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
-if [ ! -v LOGDIR ]; then
-    if [ $ON_S3DF ]; then
-        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
-    fi
-fi
+# Roll back when ACL and K8s issues are resolved
+#if [ ! -v LOGDIR ]; then
+#    if [ $ON_S3DF ]; then
+#        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
+#    fi
+#fi
 if [ -v LOGDIR ]; then
     if [ ! -d "$LOGDIR" ]; then
         mkdir -p "$LOGDIR"
@@ -238,8 +239,7 @@ if [ -v LOGDIR ]; then
 fi
 
 #SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
-#SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES -o $LOGFILE"
-SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES"
+SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES -o $LOGFILE"
 MPI_CMD="mpirun -np $CORES python -u -m mpi4py.run ${ABS_PATH}/${PYTHONEXE} $*"
 
 
