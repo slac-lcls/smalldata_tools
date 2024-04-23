@@ -225,11 +225,12 @@ if [ -v INTERACTIVE ]; then
 fi
 
 LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
-if [ ! -v LOGDIR ]; then
-    if [ $ON_S3DF ]; then
-        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
-    fi
-fi
+# Roll back when ACL and K8s issues are resolved
+#if [ ! -v LOGDIR ]; then
+#    if [ $ON_S3DF ]; then
+#        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
+#    fi
+#fi
 if [ -v LOGDIR ]; then
     if [ ! -d "$LOGDIR" ]; then
         mkdir -p "$LOGDIR"
