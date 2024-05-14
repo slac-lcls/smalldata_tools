@@ -473,6 +473,8 @@ if useFFB:
         ds_name += ':live'
         if not onS3DF:
             ds_name += f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc'
+        psana.setOption('PSXtcInput.XtcInputModule.liveTimeout', 300)
+        # bigger timeout so that the live mode does not fail
 
 logger.debug(f'DataSource name: {ds_name}')
 try:
