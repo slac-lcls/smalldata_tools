@@ -495,7 +495,7 @@ small_data = ds.small_data(h5_f_name, gather_interval=args.gather_interval)
 
 start_setup_dets = time.time()
 
-default_dets = defaultDetectors(hutch.lower())
+default_dets = defaultDetectors(hutch.lower(), env=ds.env())
 if args.xtcav and not args.norecorder:
     #default_dets.append(xtcavDetector('xtcav','xtcav',method='COM'))
     default_dets.append(xtcavDetector('xtcav','xtcav'))
@@ -503,20 +503,23 @@ if args.xtcav and not args.norecorder:
 #
 # add stuff here to save all EPICS PVs.
 #
-if args.full or args.epicsAll:
-    logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
-    if args.experiment.find('dia')>=0:
-        epicsPV=ds.env().epicsStore().pvNames()
-    else:
-        epicsPV=ds.env().epicsStore().aliases()
-    if len(epicsPV)>0:
-        logger.debug('adding all epicsPVs....')
-        default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
-elif len(epicsPV)>0:
+# is someone has provided a list, save in epicsUser
+if len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
-
+# make a list of all PVs in data
+logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
+if args.experiment.find('dia')>=0:
+    epicsPVlist=ds.env().epicsStore().pvNames()
+else:
+    epicsPVlist=ds.env().epicsStore().aliases()
+if (args.full or args.epicsAll) and len(epicsPVlist)>0:
+    logger.debug('adding all epicsPVs....')
+    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+#save specified list of PVs once/run, not nothing has been passed, save all.
 if len(epicsOncePV)>0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
+elif len(epicsPVlist)>0:
+    EODet = epicsDetector(PVlist=epicsPVlist, name='epicsOnce')
 else:
     EODet = None
 
