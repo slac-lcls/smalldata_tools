@@ -396,6 +396,7 @@ class ttDetector(defaultDetector):
                     print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
         if env is not None:
+            ttCfg = None
             for cfgKey in env.configStore().keys():
                 if cfgKey.type() == psana.TimeTool.ConfigV2:
                     ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
@@ -441,8 +442,8 @@ class ttDetector(defaultDetector):
             #pixel 0 is special:
             #it indicates that fit was not attempted/unsuccessful
             if ttOrg == 0:
-                dl['ttCorr'] = 0
-        return dl
+                dl['ttCorr'] = 0.
+            return dl
 
 class damageDetector(defaultDetector):
     def __init__(self, name='damage'):

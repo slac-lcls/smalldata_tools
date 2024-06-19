@@ -223,6 +223,7 @@ print(f'\n{fpathup}')
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
 from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
+from smalldata_tools.SmallDataDefaultDetector import ttRawDetector
 from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
 from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
 from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
@@ -335,6 +336,9 @@ parser.add_argument("--noarch",
                     help="dont use archiver data", 
                     action='store_true',
                     default=False)
+parser.add_argument("--ttRaw",
+                    help="add timetool projections",
+                    action='store_true')
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -499,6 +503,14 @@ default_dets = defaultDetectors(hutch.lower(), env=ds.env())
 if args.xtcav and not args.norecorder:
     #default_dets.append(xtcavDetector('xtcav','xtcav',method='COM'))
     default_dets.append(xtcavDetector('xtcav','xtcav'))
+#adding raw timetool traces:
+if args.ttRaw:
+    try:
+        ttRawDet = ttRawDetector(env=ds.env())
+        ttRawDet.setPars({'beamOff':[-137], 'refitData': False})
+        default_dets.append(ttRawDet)
+    except:
+        pass
 
 #
 # add stuff here to save all EPICS PVs.
