@@ -441,8 +441,8 @@ class ttDetector(defaultDetector):
             #pixel 0 is special:
             #it indicates that fit was not attempted/unsuccessful
             if ttOrg == 0:
-                dl['ttCorr'] = 0
-        return dl
+                dl['ttCorr'] = 0.
+            return dl
 
 class damageDetector(defaultDetector):
     def __init__(self, name='damage'):
