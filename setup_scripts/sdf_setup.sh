@@ -27,11 +27,11 @@ do
 		usage
 		exit
 		;;
-    -e)
+    -e|--experiment)
         EXP="$2"
         shift 2
         ;;
-    -q)
+    -q|--queue)
         QUEUE="$2"
         shift 2
         ;;
