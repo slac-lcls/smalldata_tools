@@ -396,6 +396,7 @@ class ttDetector(defaultDetector):
                     print('could not find timetool EPICS PV %s in data'%pv)
         self.ttCalib=None
         if env is not None:
+            ttCfg = None
             for cfgKey in env.configStore().keys():
                 if cfgKey.type() == psana.TimeTool.ConfigV2:
                     ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
