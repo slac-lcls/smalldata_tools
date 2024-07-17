@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 from smalldata_tools.ana_funcs import svd_waveform_processing as proc
-from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 
 class svdFit(DetObjectFunc):

@@ -9,7 +9,7 @@ from scipy import sparse
 import time
 from numba import jit
 from numba.typed import List as NTL
-from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 class droplet2Photons(DetObjectFunc):
     """

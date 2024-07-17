@@ -6,7 +6,7 @@ import itertools
 
 import time
 from smalldata_tools.utilities import unsparsify
-from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 #
 # for now, this works in "raw" coordinates.

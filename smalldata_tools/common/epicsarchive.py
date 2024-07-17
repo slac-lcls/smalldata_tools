@@ -59,7 +59,7 @@ class EpicsArchive(object):
                 else:
                     incr = incr + datetime.timedelta(days=1)
         data = json_obj[0]['data']
-        # Now, data[0] is a data point archived before when.  But
+        # Now, data[0] is a data point archived before when. But
         # data[1] might contain a fields/cnxlostepsecs tag that
         # invalidates it!
         #

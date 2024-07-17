@@ -8,7 +8,7 @@ import time
 
 from smalldata_tools.ana_funcs.correlations import correlation as corr
 from smalldata_tools.ana_funcs.correlations import utils
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 
 class Autocorrelation(DetObjectFunc):

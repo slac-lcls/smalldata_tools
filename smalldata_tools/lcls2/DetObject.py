@@ -40,7 +40,7 @@ def DetObject_lcls2(srcName, run, **kwargs):
     #return None
 
 class DetObjectClass_lcls2(object):
-    def __init__(self,det, run, **kwargs):#name=None, common_mode=None, applyMask=0):
+    def __init__(self, det, run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
         self._detid=det._detid
         self._name = kwargs.get('name', self.det._det_name)#srcName)

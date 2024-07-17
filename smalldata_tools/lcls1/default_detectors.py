@@ -6,53 +6,64 @@ try:
     basestring
 except NameError:
     basestring = str
+from smalldata_tools.common.detector_base import DefaultDetector_base
 
-#
-# classes for default detector types
-#
-class defaultDetector(object):
-    __metaclass__ = abc.ABCMeta
-    def __init__(self, detname, name, run=None):
-        self.name=name
-        self.detname=detname
-        self._debug = False
-        self._run = run
-        self.det = None
-        if self.inRun():
-            if run is None:
-                self.det=psana.Detector(detname)
-            else:
-                self.det=run.Detector(detname)
-    def inRun(self):
-        dNames=[]
+
+defaultDetector = DefaultDetector_base
+
+def detData(detList, evt):
+    data={}
+    for det in detList:
         try:
-            detnames = psana.DetNames()
-            for dn in detnames:
-                for dnn in dn:
-                    if dnn!='':
-                        dNames.append(dnn)
+            data[det.name] = det.data(evt)
         except:
-            detnames = self._run.detinfo
-            for dn in detnames:
-                dNames.append(dn[0])
-        if self.detname in dNames:
-            return True
-        return False
-    def _setDebug(self, debug):
-        self._debug = debug 
-    def params_as_dict(self):
-        """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
-        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
-        parList.update({key: np.array(self.__dict__[key]) for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), list) and len(getattr(self,key))>0 and isinstance(getattr(self,key)[0], (basestring, int, float, np.ndarray))) })
-        #remKeys = [key for key in self.__dict__ if (key not in parList)]
-        #print('DEBUG: keys which are not parameters:',remKeys)
-        #for k in remKeys:
-        #    if k[0]!='_':
-        #        print k, self.__dict__[k]
-        return parList
-    @abc.abstractmethod
-    def data(self,evt):
-        """method that should return a dict of values from event"""
+            #print('could not get data in this event for detector ',det.name)
+            pass
+    return data
+
+def detOnceData(det, evt, noarch):
+    data = detData([det], evt)
+    if not noarch and data == {}:
+        # If we've missed something, look for it in the archiver.
+        # Look at the timestamp of evt and convert to linux epoch.
+        ts = evt.get(psana.EventId).time()[0]
+        data = addArchiverData(det, data, ts)
+    return data
+
+def setParameter(detList, Params, detName='tt'):
+    for det in detList:
+        if det.name==detName:
+            det.setPars(Params)
+
+
+def addArchiverData(det, data, ts):
+    try:
+        arch = EpicsArchive()
+    except Exception:
+        print('Failed to create the EPICS archiver')
+        return data
+    for (i, pv) in enumerate(det.missingPV):
+        try:
+            (t, v) = arch.get_points(pv, start=ts, end=ts+30, two_lists=True, raw=True)
+        except Exception:
+            continue # Not in the archiver!
+        #
+        # OK, t[0] < ts, but t[1] > ts, *if* it exists.
+        # So, let's take t[1] if it exists, and t[0] if it's "recent-ish".
+        #
+        if len(t) >= 2:
+            t = t[1]
+            v = v[1]
+        elif len(t) == 1 and abs(t[0]-ts) < 30:
+            t = t[0]
+            v = v[0]
+        else:
+            continue
+        al = det.missing[i]
+        det.addPV(al, pv)
+        data['epicsOnce'][al] = v
+    return data
+
 
 class lightStatus(defaultDetector):
     def __init__(self, codes=[[162],[]], evrName=None):

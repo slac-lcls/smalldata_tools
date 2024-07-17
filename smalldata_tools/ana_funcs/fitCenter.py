@@ -1,6 +1,6 @@
 import numpy as np
 from smalldata_tools.utilities_FitCenter import fitCircle
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 
 class fitCenter(DetObjectFunc):

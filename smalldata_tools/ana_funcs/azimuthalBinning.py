@@ -5,7 +5,7 @@ import time
 import h5py
 from scipy.interpolate import griddata
 import smalldata_tools.utilities as util
-from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 from mpi4py import MPI
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 comm = MPI.COMM_WORLD

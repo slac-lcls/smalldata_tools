@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 from scipy.signal import fftconvolve
-from from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 class acf(DetObjectFunc):
     def __init__(self,  **kwargs):

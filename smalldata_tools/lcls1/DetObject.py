@@ -6,8 +6,7 @@ import tables
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
 from smalldata_tools.read_uxi import getDarks
-from smalldata_tools.DetObjectFunc import DetObjectFunc
-from smalldata_tools.DetObjectFunc import event
+from smalldata_tools.common.detector_base import DetObjectFunc, event
 from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -108,7 +107,7 @@ class DetObjectClass(object):
     OceanOptics = 98      # ?
     Imp = 99              # ?
     
-    def __init__(self,det,env,run, **kwargs):#name=None, common_mode=None, applyMask=0):
+    def __init__(self, det, env, run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det=det
         self._src=det.source
         self._name = kwargs.get('name', self.det.alias)#srcName)
@@ -202,7 +201,7 @@ class DetObjectClass(object):
 
     def storeSum(self, sumAlgo=None):
         if sumAlgo is not None:
-            self._storeSum[sumAlgo]=None
+            self._storeSum[sumAlgo] = None
         else:
             return self._storeSum
 
@@ -315,7 +314,7 @@ class DetObjectClass(object):
                     print('could not to ',self._storeSum[key])
 
 class WaveformObject(DetObjectClass): 
-    def __init__(self, det,env,run,**kwargs):
+    def __init__(self, det, env, run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(WaveformObject, self).__init__(det,env,run, **kwargs)
         self.common_mode = kwargs.get('common_mode', -1)

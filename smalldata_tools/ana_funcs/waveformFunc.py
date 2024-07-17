@@ -3,7 +3,7 @@ import numpy as np
 import itertools
 import scipy
 from scipy import signal as scipy_signal
-from smalldata_tools.DetObjectFunc import DetObjectFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.ana_funcs.roi_rebin import spectrumFunc
 from smalldata_tools.utilities import templateArray as utility_templateArray
 from smalldata_tools.utilities_waveforms import hsdBaselineFourierEliminate

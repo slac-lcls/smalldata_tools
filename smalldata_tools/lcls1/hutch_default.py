@@ -1,8 +1,5 @@
-# importing generic python modules
 import numpy as np
-#import psana
-from smalldata_tools.SmallDataDefaultDetector import *
-from smalldata_tools.epicsarchive import EpicsArchive
+from smalldata_tools.lcls1.default_detectors import *
 from datetime import datetime
 
 def defaultDetectors(hutch, run=None, env=None):
@@ -39,41 +36,6 @@ def defaultDetectors(hutch, run=None, env=None):
 def amoDetectors():
     return []
 
-def tmoDetectors(run, beamCodes=[[162],[91]]):
-    dets=[]
-    dets.append(scanDetector('scan', run))
-    dets.append(genlcls2Detector('timing',run))
-    dets.append(lcls2_lightStatus(beamCodes,run))
-    dets.append(genlcls2Detector('gmd',run))
-    dets.append(genlcls2Detector('xgmd',run))
-    dets.append(genlcls2Detector('ebeam',run))
-    dets.append(genlcls2Detector('pcav',run))
-    dets.append(fimfexDetector('tmo_fim0',run))
-    dets.append(fimfexDetector('tmo_fim1',run))
-    dets.append(ttlcls2Detector('tmoopal2',run, saveTraces=True))
-    dets.append(lcls2_epicsDetector(PVlist=['MR1K4_pitch', 'MR2K4_pitch'],run=run))
-
-    return dets
-
-def rixDetectors(run, beamCodes=[[-136],[77]]):
-    dets=[]
-    dets.append(scanDetector('scan', run))
-    dets.append(genlcls2Detector('timing',run))
-    dets.append(lcls2_lightStatus(beamCodes,run))
-    dets.append(genlcls2Detector('gmd',run))
-    dets.append(genlcls2Detector('xgmd',run))
-    dets.append(genlcls2Detector('ebeam',run))
-    dets.append(genlcls2Detector('pcav',run))
-    dets.append(fimfexDetector('rix_fim0',run))
-    dets.append(fimfexDetector('rix_fim1',run))
-    dets.append(fimfexDetector('rix_fim2',run))
-    dets.append(fimfexDetector('crix_w8',run))
-    dets.append(genlcls2Detector('mono_encoder',run))
-
-    dets.append(ttlcls2Detector('atmopal',run, saveTraces=True))
-    #check a RIX scan to figure out controlDetector.
-    return dets
-
 def uedDetectors(run, beamCodes=[[162],[91]]):
     dets=[]
     dets.append(scanDetector('scan', run))
@@ -95,7 +57,21 @@ def sxrDetectors(beamCodes=[[162],[91]]):
 def xppDetectors(beamCodes=[[-137],[91]], env=None):
     dets=[]
     dets.append(lightStatus(codes=beamCodes))
-    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw', 'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E', 'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r', 'gon_x', 'gon_y', 'gon_z', 'gon_roll', 'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa', 'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy', 'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z', 'robot_x', 'robot_y', 'robot_z', 'robot_rx', 'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele', 'robot_rad', 'las_comp_wp', 'las_opa_wp', 'las_drift_correction']))
+    dets.append(epicsDetector(PVlist=[
+                                        'att_T', 'att_T3rd', 'slit_s1_hw', 'slit_s1_vw', 
+                                        'slit_s2_hw', 'slit_s2_vw', 'slit_s3_hw',
+                                        'slit_s3_vw', 'slit_s4_hw', 'slit_s4_vw',
+                                        'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe', 'ccm_E',
+                                        'lom_E', 'lom_EC', 'gon_v', 'gon_h', 'gon_r',
+                                        'gon_x', 'gon_y', 'gon_z', 'gon_roll',
+                                        'gon_pitch', 'gon_kappa_eta', 'gon_kappa_kappa',
+                                        'gon_kappa_phi', 'gon_kappa_samx','gon_kappa_samy',
+                                        'gon_kappa_samz', 'gon_sam_phi', 'gon_sam_z',
+                                        'robot_x', 'robot_y', 'robot_z', 'robot_rx',
+                                        'robot_ry', 'robot_rz', 'robot_azi', 'robot_ele',
+                                        'robot_rad', 'las_comp_wp',
+                                        'las_opa_wp', 'las_drift_correction'
+                                    ]))
     dets.append(controlDetector())
     dets.append(ipmDetector('NH2-SB1-IPM-01','ipm1'))
     dets.append(ipmDetector('NH2-SB1-IPM-02','ipm1c'))
@@ -152,7 +128,16 @@ def xcsDetectors(beamCodes=[[-137],[89]], env=None):
     dets.append(bmmonDetector('XCS-SB2-BMMON','ipm5'))
     dets.append(bmmonDetector('HFX-DG2-BMMON','ipm2'))
     dets.append(aiDetector('XCS-AIN-01','ai'))
-    dets.append(epicsDetector(PVlist=['att_T', 'att_T3rd', 'ccm_E', 'lom_E', 'diff_phis', 'diff_th', 'diff_tth', 'diff_xs', 'diff_ys', 'diff_zs', 'diff_x', 'diff_y', 'diff_chis','diff_dety','ladm_theta','lam_z','lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y','lam_det_x','las_comp_wp', 'las_opa_wp', 'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc', 'lxe' ]))
+    dets.append(epicsDetector(PVlist=[
+                                        'att_T', 'att_T3rd', 'ccm_E', 'lom_E',
+                                        'diff_phis', 'diff_th', 'diff_tth', 'diff_xs',
+                                        'diff_ys', 'diff_zs', 'diff_x', 'diff_y',
+                                        'diff_chis','diff_dety', 'ladm_theta','lam_z',
+                                        'lam_x1','lam_x2','lam_y1','lam_y2','lam_det_y',
+                                        'lam_det_x', 'las_comp_wp', 'las_opa_wp',
+                                        'las_drift_correction', 'lxt_vitara', 'lxt', 'lxt_ttc',
+                                        'lxe'
+                                    ]))
     dets.append(ttDetector(env=env))
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
     dets.append(xtcavDetector('xtcav','xtcav'))
@@ -196,7 +181,12 @@ def cxiDetectors(beamCodes=[[-137],[184]], env=None):
     dets.append(lightStatus(codes=beamCodes))
     dets.append(controlDetector())
     dets.append(feeBldDetector('FEE-SPEC0','feeBld'))
-    dets.append(epicsDetector(PVlist=['dia_trans1', 'dia_trans3', 'atc_trans1', 'atc_trans3', 'laser_time_target', 'lxt', 'las_uv_waveplate', 'las_evo_waveplate', 'las_drift_correction']))
+    dets.append(epicsDetector(PVlist=[
+                                        'dia_trans1', 'dia_trans3', 'atc_trans1',
+                                        'atc_trans3', 'laser_time_target', 'lxt',
+                                        'las_uv_waveplate', 'las_evo_waveplate',
+                                        'las_drift_correction'
+                                    ]))
     dets.append(bmmonDetector('HX2-SB1-BMMON','ipm_hx2'))
     dets.append(bmmonDetector('HFX-DG2-BMMON','ipm_hfx_dg2'))
     dets.append(bmmonDetector('CXI-DG2-BMMON','ipm_dg2'))
@@ -270,142 +260,10 @@ def diaDetectors():
 
 def detDetectors():
     return []
-
-def detData(detList, evt):
-    #mpiDataSource Issue? cpo, tjlane
-    #if one of the keys here contains an empty dict (say: no user PV that are in the data)
-    #then it will not be saved. Also any keys _after_ that dir will be lost!
-    #test: misspell userPV in producer file and see that the scan directory disappears....
-    data={}
-    for det in detList:
-        try:
-            data[det.name] = det.data(evt)
-        except:
-            #print('could not get data in this event for detector ',det.name)
-            pass
-    return data
-
-def addArchiverData(det, data, ts):
-    try:
-        arch = EpicsArchive()
-    except Exception:
-        print('Failed to create the EPICS archiver')
-        return data
-    for (i, pv) in enumerate(det.missingPV):
-        try:
-            (t, v) = arch.get_points(pv, start=ts, end=ts+30, two_lists=True, raw=True)
-        except Exception:
-            continue # Not in the archiver!
-        #
-        # OK, t[0] < ts, but t[1] > ts, *if* it exists.
-        # So, let's take t[1] if it exists, and t[0] if it's "recent-ish".
-        #
-        if len(t) >= 2:
-            t = t[1]
-            v = v[1]
-        elif len(t) == 1 and abs(t[0]-ts) < 30:
-            t = t[0]
-            v = v[0]
-        else:
-            continue
-        al = det.missing[i]
-        det.addPV(al, pv)
-        data['epicsOnce'][al] = v
-    return data
-
-def detOnceData(det, evt, noarch):
-    data = detData([det], evt)
-    if not noarch:
-        # If we've missed something, look for it in the archiver.
-        # Look at the timestamp of evt and convert to linux epoch.
-        ts = evt.get(psana.EventId).time()[0]
-        data = addArchiverData(det, data, ts)
-    return data
-
-def lcls2_detOnceData(det, data, ts, noarch):
-    if not noarch:
-        # If we've missed something, look for it in the archiver.
-        # ts is our timestamp.
-        data = addArchiverData(det, data, ts)
-    return data
-
-def setParameter(detList, Params, detName='tt'):
-    for det in detList:
-        if det.name==detName:
-            det.setPars(Params)
+    
 ###
 #userData functions
 ###
-def getUserData(det):
-    """return dictionary with event-based user data from input detector, apply mask here."""
-    det_dict= {}
-    try:
-        userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('_write_')>=0 ]
-        #print('DEBUG SmallDataUtils: getting keys: ',userData_keys)
-        for key in userData_keys:
-            #print('DEBUG SmallDataUtils: getting data for key: ',key)
-            if isinstance(getattr(det.evt, key),dict):
-                for kkey in getattr(det.evt,key).keys():
-                    #print('DEBUG SmallDataUtils: getting data for key, kkey: ',key, kkey)
-                    fieldName = ('%s_%s'%(key,kkey)).replace('_write_','')
-                    #print 'fieldname ',fieldName
-                    if isinstance(getattr(det.evt,key)[kkey], tuple):
-                        det_dict[fieldName] = np.array(getattr(det.evt,key)[kkey])
-                    else:
-                        det_dict[fieldName] = getattr(det.evt,key)[kkey]
-                    #print 'local det_dict ',det_dict
-            elif isinstance(det.evt.__dict__[key], np.ndarray):
-                if isinstance(det.evt.__dict__[key], np.ma.masked_array):
-                    data = det.evt.__dict__[key].data
-                    if np.issubdtype(data.dtype, np.integer):
-                        data[det.evt.__dict__[key].mask]=0
-                    else:
-                        data[det.evt.__dict__[key].mask]=np.nan
-                    #print(eventNr,' is ndarray ',key)
-                    det_dict[key.replace('_write_','')] = data
-                else:
-                    det_dict[key.replace('_write_','')] = det.evt.__dict__[key]
-            else:
-                det_dict[key.replace('_write_','')] = np.array(det.evt.__dict__[key])
-    except:
-        pass
-    newDict = {}
-    for key in det_dict:
-        if key.find('ragged')>=0:
-            newDict['ragged_%s'%(key.replace('ragged_',''))] = det_dict[key]
-        elif key.find('var')>=0:
-            fname = key.split('_')[-1]
-            dname = key.replace(f'_{fname}','').replace('_var','')
-            if 'var_%s'%dname in newDict:
-                newDict[f'var_{dname}'][fname] = det_dict[key]
-            else:
-                newDict[f'var_{dname}'] = {fname : det_dict[key]}
-
-
-        else:
-            newDict['%s'%(key)] = det_dict[key]
-    det_dict = newDict
-    #print 'det_dict ',det_dict.keys()
-    return det_dict
-
-def getUserEnvData(det):
-    """return environment data for a detectors as a dictionary (temperatures,....)"""
-    env_dict= {}
-    try:
-        envData_keys = [ key for key in det.evt.__dict__.keys() if key.find('env_')>=0 ]
-        for key in envData_keys:
-            if isinstance(det.evt.__dict__[key], np.ndarray):
-                if isinstance(det.evt.__dict__[key], np.ma.masked_array):
-                    data = det.evt.__dict__[key].data
-                    data[det.evt.__dict__[key].mask]=np.nan
-                    env_dict[key.replace('env_','')] = data
-                else:
-                    env_dict[key.replace('env_','')] = det.evt.__dict__[key]
-            else:
-                env_dict[key.replace('env_','')] = np.array(det.evt.__dict__[key])
-    except:
-        pass
-    return env_dict
 
 def getCfgOutput(det):
     """return the configuration data for the user data (parameters for feature extraction) as a dict"""

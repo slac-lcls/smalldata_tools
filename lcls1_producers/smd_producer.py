@@ -43,7 +43,7 @@ def getROIs(run):
         roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
         roi_dict['writeArea'] = True
         roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M'] = roi_dict
+        ret_dict['jungfrau1M_alcove'] = roi_dict
     return ret_dict
 
 def isDropped(def_data):
@@ -78,7 +78,7 @@ aioParams=[]
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M'] # add detector here
+    detnames = ['jungfrau1M_alcove'] # add detector here
     dets = []
     
     # Load DetObjectFunc parameters (if defined)
@@ -221,14 +221,15 @@ sys.path.append(fpathup)
 print(f'\n{fpathup}')
 
 from smalldata_tools.utilities import printMsg, checkDet
-from smalldata_tools.SmallDataUtils import setParameter, getUserData, getUserEnvData
-from smalldata_tools.SmallDataUtils import defaultDetectors, detData, detOnceData
-from smalldata_tools.SmallDataDefaultDetector import ttRawDetector
-from smalldata_tools.SmallDataDefaultDetector import epicsDetector, eorbitsDetector
-from smalldata_tools.SmallDataDefaultDetector import bmmonDetector, ipmDetector
-from smalldata_tools.SmallDataDefaultDetector import encoderDetector, adcDetector
-from smalldata_tools.SmallDataDefaultDetector import xtcavDetector
-from smalldata_tools.DetObject import DetObject
+from smalldata_tools.common.detector_base import getUserData, getUserEnvData
+from smalldata_tools.lcls1.default_detectors import detData, detOnceData
+from smalldata_tools.lcls1.default_detectors import ttRawDetector
+from smalldata_tools.lcls1.default_detectors import epicsDetector, eorbitsDetector
+from smalldata_tools.lcls1.default_detectors import bmmonDetector, ipmDetector
+from smalldata_tools.lcls1.default_detectors import encoderDetector, adcDetector
+from smalldata_tools.lcls1.default_detectors import xtcavDetector
+from smalldata_tools.lcls1.hutch_default import defaultDetectors
+from smalldata_tools.lcls1.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
@@ -790,17 +791,10 @@ if args.postRuntable and ds.rank==0:
     else:
         with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
             answer = reader.readline()
-    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, 
+                      auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)
     if det_presence!={}:
-        rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
+        rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence,
+                           auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
         print(rp)
-
-# Debug stuff
-# How to implement barrier from ds?
-# if ds.rank == 0:
-#    time.sleep(60)#ideally should use barrier or so to make sure all cores have fnished.
-#     if 'temp' in h5_f_name: # only for hanging job investigation (to be deleted later)
-#         h5_f_name_2 = get_sd_file(None, exp, hutch)
-#         os.rename(h5_f_name, h5_f_name_2)
-#         logger.debug('Move file from temp directory')
