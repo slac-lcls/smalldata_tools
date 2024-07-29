@@ -251,7 +251,7 @@ def mecDetectors(beamCodes=[[-137],[-182]], env=None):
                                       'MEC:USR:MMS:17.RBV',
                                       'MEC:LAS:DDG:05:aDelaySI',
                                       'MEC:LAS:DDG:05:eDelaySI',
-                                      'SIOC:SYS0:LM00:AO627',
+                                      'SIOC:SYS0:ML00:AO627',
                                       'MEC:TC1:GCC:01:PMON',
                                       'MEC:TC1:GPI:01:PMON',
                                       'MEC:TC1:VGC:01:OPN_OK',
