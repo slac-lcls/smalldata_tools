@@ -203,10 +203,9 @@ class templateFitFunc(DetObjectFunc):
 
         return ret_dict
 
+
 class hsdsplitFunc(DetObjectFunc):
     """
-    function to rebin input data to new shape
-    shape: desired shape of array
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','full')
@@ -220,29 +219,29 @@ class hsdsplitFunc(DetObjectFunc):
         super(hsdsplitFunc, self).setFromDet(det)
         self._cidx = det.cidx
         self._wfxlen = None
-        self._det=det
+        self._det = det
 
     def process(self, data):
-        pass_dict={}
+        pass_dict = {}
         if self._wfxlen is None:
             self._wfxlen = self._det.wfxlen
             self._wfx = self._det.wfx
-            #split the wfx array into separate pieces
-            startidx=0
-            for cidx,wfxlen in zip(self._cidx, self._wfxlen):
+            # split the wfx array into separate pieces
+            startidx = 0
+            for cidx, wfxlen in zip(self._cidx, self._wfxlen):
                 timesName = 'times_%d'%cidx
                 if ('hsd_%d'%cidx) in self.hsdName:
                     timesName = 'times_%s'%(self.hsdName['hsd_%d'%cidx])
                 setattr(self, timesName, self._wfx[startidx:(startidx+wfxlen)])
-                startidx+=wfxlen
+                startidx += wfxlen
                 
         startidx=0
-        for cidx,wfxlen in zip(self._cidx, self._wfxlen):
+        for cidx, wfxlen in zip(self._cidx, self._wfxlen):
             cName = 'hsd_%d'%cidx
             if ('hsd_%d'%cidx) in self.hsdName:
                 cName = self.hsdName['hsd_%d'%cidx]
             pass_dict[cName] = data[startidx:(startidx+wfxlen)]
-            startidx+=wfxlen
+            startidx += wfxlen
 
         #save full waveforms if desired
         ret_dict = {}
@@ -265,10 +264,9 @@ class hsdsplitFunc(DetObjectFunc):
                 ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
 
+
 class hsdROIFunc(DetObjectFunc):
     """
-    function to rebin input data to new shape
-    shape: desired shape of array
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','hsd_0__ROI')
@@ -281,7 +279,7 @@ class hsdROIFunc(DetObjectFunc):
 
     def setFromDet(self, det):
         super(hsdROIFunc, self).setFromDet(det)
-        self._det=det
+        self._det = det
 
     def process(self, data):
         ret_dict={}
@@ -309,8 +307,6 @@ class hsdROIFunc(DetObjectFunc):
 
 class hsdBaselineCorrectFunc(DetObjectFunc):
     """
-    function to rebin input data to new shape
-    shape: desired shape of array
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','baseline')
@@ -347,10 +343,9 @@ class hsdBaselineCorrectFunc(DetObjectFunc):
                 ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
 
+
 class hitFinderCFDFunc(DetObjectFunc):
     """
-    function to rebin input data to new shape
-    shape: desired shape of array
     """
     def __init__(self, **kwargs):
         self._name = kwargs.get('name','hitFinderCFD')
@@ -398,42 +393,34 @@ class hitFinderCFDFunc(DetObjectFunc):
         #        ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
 
+
 class fimSumFunc(DetObjectFunc):
     """
-    function to rebin input data to new shape
-    shape: desired shape of array
     """
     def __init__(self, **kwargs):
-        self._name = kwargs.get('name','fimSum')
+        self._name = kwargs.get('name', 'fimSum')
         super(fimSumFunc, self).__init__(**kwargs)
         ## later add different methods.
-        self._bkgROI = kwargs.get('bkgROI',None)
+        self._bkgROI = kwargs.get('bkgROI', None)
         if self._bkgROI is not None:
             if isinstance(self._bkgROI, slice):
-                self.bkgROI=[self._bkgROI.start, self._bkgROI.stop]
+                self.bkgROI = [self._bkgROI.start, self._bkgROI.stop]
             else:
                 self.bkgROI = self._bkgROI.copy()
-                self._bkgROI=slice(self.bkgROI[0], self.bkgROI[1])
-        self._sigROI = kwargs.get('sigROI',[0,-1])
+                self._bkgROI = slice(self.bkgROI[0], self.bkgROI[1])
+        self._sigROI = kwargs.get('sigROI', [0,-1])
         if isinstance(self._sigROI, slice):
             self.sigROI=[self._sigROI.start, self._sigROI.stop]
         else:
             self.sigROI = self._sigROI.copy()
-            self._sigROI=slice(self.sigROI[0], self.sigROI[1])
+            self._sigROI = slice(self.sigROI[0], self.sigROI[1])
 
     def process(self, data):
         ret_dict={}
-        bkgData=np.zeros(data.shape[0])
+        bkgData = np.zeros(data.shape[0])
         if self._bkgROI is not None:
             bkgData = data[:,self._bkgROI].mean(axis=1)
-        data = data-(bkgData.reshape((bkgData.shape[0],1)))
+        data = data - (bkgData.reshape((bkgData.shape[0],1)))
         dataS = data[:,self._sigROI]
         ret_dict['sum'] = data[:,self._sigROI].sum(axis=1)
-
-        #self.dat = ret_dict
-        #subfuncResults = self.processFuncs()
-        #for k in subfuncResults:
-        #    for kk in subfuncResults[k]:
-        #        ret_dict['%s_%s'%(k,kk)] = subfuncResults[k][kk]
         return ret_dict
-

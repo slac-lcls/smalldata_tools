@@ -6,10 +6,18 @@ try:
     basestring
 except NameError:
     basestring = str
-from smalldata_tools.common.BaseDetector import DefaultDetector_base
+from smalldata_tools.common.detector_base import DefaultDetector_base
 
 
 defaultDetector = DefaultDetector_base
+
+
+def detOnceData(det, data, ts, noarch):
+    if not noarch:
+        # If we've missed something, look for it in the archiver.
+        # ts is our timestamp.
+        data = addArchiverData(det, data, ts)
+    return data
 
 
 class genericDetector(defaultDetector):

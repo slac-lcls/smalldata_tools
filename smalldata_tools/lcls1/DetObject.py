@@ -6,7 +6,7 @@ import tables
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
 from smalldata_tools.read_uxi import getDarks
-from smalldata_tools.common.detector_base import DetObjectFunc, event
+from smalldata_tools.common.detector_base import DetObjectFunc, Event
 from future.utils import iteritems
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
@@ -243,7 +243,7 @@ class DetObjectClass(object):
         try:
             getattr(self, 'evt')
         except:
-            self.evt = event()
+            self.evt = Event()
         self.evt.dat = None
 
     def addFunc(self, func):
@@ -705,16 +705,16 @@ class JungfrauObject(TiledCameraObject):
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
         super(JungfrauObject, self).__init__(det,env,run, **kwargs)
-        self._common_mode_list = [0, 7,71,72,-1, 30] #none, epix-style corr on row*col, row, col, raw, calib
+        self._common_mode_list = [0, 7, 71, 72, -1, 30] #none, epix-style corr on row*col, row, col, raw, calib
         self.common_mode = kwargs.get('common_mode', self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
         if self.common_mode not in self._common_mode_list:
             print('Common mode %d is not an option for Jungfrau, please choose from: '%self.common_mode, self._common_mode_list)
-        self.pixelsize=[75e-6]
-        self.isGainswitching=True
+        self.pixelsize = [75e-6]
+        self.isGainswitching = True
         self.offset=self.det.offset(run)
-        self.pixel_status=self.det.status(run)
+        self.pixel_status = self.det.status(run)
         try:
             self.imgShape = self.det.image(run, self.ped[0]).shape
         except:
@@ -907,9 +907,22 @@ class EpixObject(TiledCameraObject):
             pass
         self._getRawShape()
 
-#
-# as a
-#
+
+#epix10k: thermisotr value to temp in C
+def getThermistorTemp(x):
+    if x==0:
+        return 0.
+    u = x/16383.0 * 2.5
+    i = u / 100000
+    r = (2.5 - u)/i
+    try:
+        l = np.log(r/10000)
+        t = 1.0 / (3.3538646E-03 + 2.5654090E-04 * l + 1.9243889E-06 * (l*l) + 1.0969244E-07 * (l*l*l))
+        return t - 273.15
+    except:
+        return np.nan
+
+
 class Epix10kObject(TiledCameraObject): 
     def __init__(self, det,env,run,**kwargs):
         #super().__init__(det,env,run, **kwargs)
@@ -1410,7 +1423,7 @@ class UxiObject(DetObjectClass):
         try:
             getattr(self, 'evt')
         except:
-            self.evt = event()
+            self.evt = Event()
         self.evt.dat = None
 
         #get the timestamp. 

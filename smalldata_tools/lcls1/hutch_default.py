@@ -266,7 +266,7 @@ def detDetectors():
 ###
 
 def getCfgOutput(det):
-    """return the configuration data for the user data (parameters for feature extraction) as a dict"""
+    """ Return the configuration data for the user data (parameters for feature extraction) as a dict"""
     cfgDict={}
     #baseName=det._name+'_'
     baseName=''

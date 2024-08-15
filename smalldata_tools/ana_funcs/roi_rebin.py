@@ -35,7 +35,7 @@ class ROIFunc(DetObjectFunc):
             ROI=ROI
         if ROI.ndim==1 and ROI.shape[0]>2:
             ROI = ROI.reshape(ROI.shape[0]/2,2)
-        self.bound = ROI.squeeze()
+        self.bound = ROI.squeeze()#.astype(int)
         self.writeArea = kwargs.get('writeArea',False)
         self._calcPars = kwargs.get('calcPars',True)
         self.mask =  kwargs.get('userMask',None)
@@ -87,10 +87,11 @@ class ROIFunc(DetObjectFunc):
         if array.ndim < self.bound.ndim:
             print('array has fewer dimensions that bound: ',array.ndim,' ',len(self.bound))
             return array
+        
         #ideally would check this from FrameFexConfig and not on every events
         if array.ndim == self.bound.ndim:
             new_bound=[]
-            if array.ndim==1:
+            if array.ndim == 1:
                 new_bound=[max(min(self.bound), 0), min(max(self.bound), array.shape[0])]
             else:
                 for dim,arsz in zip(self.bound, array.shape):
@@ -98,10 +99,10 @@ class ROIFunc(DetObjectFunc):
                         new_bound.append([min(dim), arsz])
                     else:
                         new_bound.append([min(dim), max(dim)])
-            self.bound = np.array(new_bound)
-        elif self.bound.ndim==1:
+            self.bound = np.array(new_bound).astype(int)
+        elif self.bound.ndim == 1:
             self.bound = np.array([min(self.bound), min(max(self.bound), array.shape[0])]).astype(int)
-        #this needs to be more generic....of maybe just ugly spelled out for now.
+
         if self.bound.shape[0]==2 and len(self.bound.shape)==1:
             subarr = array[self.bound[0]:self.bound[1]]
         elif self.bound.shape[0]==2 and len(self.bound.shape)==2:
@@ -139,10 +140,10 @@ class ROIFunc(DetObjectFunc):
             #    ROIdata[self.mask]=0
             #else:
             #    ROIdata[self.mask]=np.nan
-###
-### this is why processFuns works. For droplet & photon, store dict of ADU, x, y (& more?)
-### photons: row & col. make droplet use that too.
-###
+        ###
+        ### this is why processFuns works. For droplet & photon, store dict of ADU, x, y (& more?)
+        ### photons: row & col. make droplet use that too.
+        ###
         if self.thresADU is not None:
             if isinstance(self.thresADU, list):
                 ROIdata[ROIdata<self.thresADU[0]] = 0
@@ -150,7 +151,7 @@ class ROIFunc(DetObjectFunc):
             else:
                 ROIdata[ROIdata<self.thresADU] = 0
         self.dat = ROIdata
-###
+
         if self.writeArea:
             ret_dict['area'] = ROIdata.data.squeeze()
         if self._calcPars:

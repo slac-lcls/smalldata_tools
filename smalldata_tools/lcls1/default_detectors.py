@@ -12,6 +12,14 @@ from smalldata_tools.common.detector_base import DefaultDetector_base
 defaultDetector = DefaultDetector_base
 
 def detData(detList, evt):
+    """
+    Retrieve all data for a given event and set of detectors
+    Parameters
+    ----------
+        detList (list): List of detector. Each of them must be a subclass of
+                        DefaultDetector_base
+        evt: psana.Event
+    """
     data={}
     for det in detList:
         try:
@@ -887,6 +895,7 @@ class ebeamDetector(defaultDetector):
         else:
             self.name = name
         defaultDetector.__init__(self, 'EBeam', self.name)
+    
     def data(self, evt):
         dl={}
         ebeamData = self.det.get(evt)
@@ -896,6 +905,7 @@ class ebeamDetector(defaultDetector):
                 dl[field]=getattr(ebeamData, field)()
         return dl
 
+
 class gasDetector(defaultDetector):
     def __init__(self, name=None):
         if name is None:
@@ -903,6 +913,7 @@ class gasDetector(defaultDetector):
         else:
             self.name = name
         defaultDetector.__init__(self, 'FEEGasDetEnergy', self.name)
+    
     def data(self, evt):
         dl={}
         gdetData = self.det.get(evt)
@@ -936,6 +947,7 @@ class genlcls2Detector(defaultDetector):
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
 
+
 class ttlcls2Detector(defaultDetector):
     def __init__(self,  name=None, run=None, saveTraces=False):
         if name is None:
@@ -967,6 +979,7 @@ class ttlcls2Detector(defaultDetector):
                    if isinstance(dl[field], list): dl[field]=np.array(dl[field])        
         return dl
 
+
 class fimfexDetector(defaultDetector):
     def __init__(self,  name=None, run=None):
         if name is None:
@@ -986,6 +999,7 @@ class fimfexDetector(defaultDetector):
                dl[field]=getattr(fex, field)(evt)
                if isinstance(dl[field], list): dl[field]=np.array(dl[field])
         return dl
+
 
 class lcls2_lightStatus(defaultDetector):
     def __init__(self, codes, run):
@@ -1022,6 +1036,7 @@ class lcls2_lightStatus(defaultDetector):
         dl['xray']=xfel_status
         dl['laser']=laser_status
         return dl
+
 
 class lcls2_epicsDetector(defaultDetector):
     def __init__(self, name='epics', PVlist=[],run=None):
@@ -1102,6 +1117,7 @@ class lcls2_epicsDetector(defaultDetector):
         parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
         parList.update({'PVname_%d'%ipv: self.al2pv[pv] for ipv,pv in enumerate(PVlist) if pv is not None})
         return parList
+
 
 class scanDetector(defaultDetector):
     def __init__(self, name='scan',run=None):

@@ -1,18 +1,41 @@
 import abc
+import logging
+from dataclasses import dataclass
 from future.utils import iteritems
 import numpy as np
 
 import psana  # do we really want to do that in the common section?
 
+logger = logging.getLogger(__name__)
 
 class DetObject_base(abc.ABC):
     pass
 
-          
-class event(object):
+
+@dataclass
+class Event:
     # This class is a container which will hold the event based data.
     # It will be created in the getData step.  
     pass
+
+
+def detData(detList, evt):
+    """
+    Retrieve all data for a given event and set of detectors
+    Parameters
+    ----------
+        detList (list): List of detector. Each of them must be a subclass of
+                        DefaultDetector_base
+        evt: psana.Event
+    """
+    data={}
+    for det in detList:
+        try:
+            data[det.name] = det.data(evt)
+        except:
+            #print('could not get data in this event for detector ',det.name)
+            pass
+    return data
 
 
 class DefaultDetector_base(abc.ABC):
@@ -21,7 +44,7 @@ class DefaultDetector_base(abc.ABC):
         self.detname = detname
         self._debug = False
         self._run = run
-        self.det = None # To be defined in relevant sub-class
+        self.det = None # Move definition to relevant sub-classes?
         if self.inRun():
             if run is None:
                 self.det = psana.Detector(detname)
@@ -123,9 +146,14 @@ class DetObjectFunc(object):
     def setDebug(self, debug):
         if isinstance(debug, bool):
             self._debug = debug
+    
     def process(self, data):
-        """returns results as dictionary to be stored in the hdf5 file (each event)"""
+        """
+        Returns results as dictionary to be stored in the hdf5 file (each event).
+        To be overwritten in sub-classes
+        """
         return {}
+    
     def addFunc(self, func):
         self.__dict__[func._name] = func
             
@@ -134,11 +162,12 @@ class DetObjectFunc(object):
             setattr(self, key, data)
         except:
             print('cound not set attribute %s of %s to:'%(key, self._name), data)
+    
     def processFuncs(self):
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         subFuncResults={}
         if 'dat' not in self.__dict__.keys() and len(subFuncs)>0:
-            print('cannot process subfunctions for %s as data is not being passed'%self.name)
+            print('Cannot process subfunctions for %s as data is not being passed'%self.name)
             return
         for tfunc in subFuncs:
             subFuncResults[tfunc._name] = tfunc.process(self.dat)
@@ -147,7 +176,7 @@ class DetObjectFunc(object):
 
 # Utility functions to retrive data etc
 def getUserData(det):
-    """ Return dictionary with event-based user data from input detector, apply mask here."""
+    """ Return dictionary with event-based user data from input detector, apply mask here. """
     det_dict= {}
     try:
         userData_keys = [ key for key in det.evt.__dict__.keys() if key.find('_write_')>=0 ]
@@ -172,6 +201,7 @@ def getUserData(det):
             else:
                 det_dict[key.replace('_write_', '')] = np.array(det.evt.__dict__[key])
     except:
+        logger.info(f"Could not retrieve data for det {det}")
         pass
     newDict = {}
     for key in det_dict:
@@ -191,7 +221,7 @@ def getUserData(det):
 
 
 def getUserEnvData(det):
-    """return environment data for a detectors as a dictionary (temperatures,....)"""
+    """ Return environment data for a detectors as a dictionary (temperatures,....)"""
     env_dict= {}
     try:
         envData_keys = [ key for key in det.evt.__dict__.keys() if key.find('env_')>=0 ]

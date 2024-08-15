@@ -6,9 +6,9 @@ import scipy.fft
 import math
 from scipy.signal import argrelmax, argrelmin
 
-#sys.path.insert(0, '/cds/home/a/akamalov/MRCO_Scripts/SharedMemoryAnalysis/library')
-
-#calculatePSD takes a time-domain input, dataIn, and calculates the PSD in frequency space.  The frequency components are trimmed to only return non-degenerate positive frequencies.
+#calculatePSD takes a time-domain input, dataIn, and calculates the PSD 
+# in frequency space.
+# The frequency components are trimmed to only return non-degenerate positive frequencies.
 def calculatePSD(dataIn):
     #calculate the FFT of the raw trace
     discreteFourierTransform = scipy.fft.fft(dataIn)
@@ -33,9 +33,11 @@ def convertTimeAxisToFrequencies(timeAxis):
 
     return freqAxis
 
-#method for cutting the frequency spectrum in half.  Fourier transforms produce identical positive and negative frequency components.  Plotting both is unnecessary, so it is useful to have a method that scales an axis in half.
+# Method for cutting the frequency spectrum in half.
+# Fourier transforms produce identical positive and negative frequency components.
+# Plotting both is unnecessary, so it is useful to have a method that scales an axis in half.
 def cutFourierScaleInHalf(inputFourierSpaceArray):
-    #there's a slightly different procedure depending on whether the length of the array is even or odd
+    # There's a slightly different procedure depending on whether the length of the array is even or odd
     numElements = len(inputFourierSpaceArray)
     if((numElements % 2) == 0):
         #the number of elements is even
@@ -53,7 +55,11 @@ def cutFourierScaleInHalf(inputFourierSpaceArray):
     return nonDegenerateAxis
 
 
-#compute and return the convolution of a supplied vector, 'vectorToConvolve', when the vector is convolved with a gaussian filter of length 'filterLength'.  The convolution is done using he mode='same' mode of np.convolve.  The filter is a normal distribution described by a linear spacing that spans from -1*maxSigma to maxSigma, such that the end points are not included in the linear spacing.
+# Compute and return the convolution of a supplied vector, 'vectorToConvolve', 
+# when the vector is convolved with a gaussian filter of length 'filterLength'.
+# The convolution is done using he mode='same' mode of np.convolve.
+# The filter is a normal distribution described by a linear spacing that spans 
+# from -1*maxSigma to maxSigma, such that the end points are not included in the linear spacing.
 def convolveWithGaussian(vectorToConvolve, filterLength, maxSigma=3):
     #create a gaussian of filterLength.  Filter should have a uniform spacing of standard deviation values with boundaries of -minSigma to +maxSigma
     tempStdDevSpacing = np.linspace(-1*maxSigma, maxSigma, filterLength + 2)
@@ -74,7 +80,11 @@ def convolveWithGaussian(vectorToConvolve, filterLength, maxSigma=3):
 
     return convolvedVector
 
-#filter out the frequencies of an input below some thresholdFrequency, as provided in Hz.  By default is close to an ideal high pass filter.  The signal to be filtered is provided as timeDependentFunction, sampled with time steps of timeSpacing provided in seconds.  If a non-ideal filter is desired, can provide power=1 for a high pass filter with 20dB/octave loss, power=2 for a 40dB/octave loss, etc.
+# Filter out the frequencies of an input below some thresholdFrequency, as provided in Hz.
+# By default is close to an ideal high pass filter. 
+# The signal to be filtered is provided as timeDependentFunction, sampled with time steps
+# of timeSpacing provided in seconds.  If a non-ideal filter is desired, can provide 
+# power=1 for a high pass filter with 20dB/octave loss, power=2 for a 40dB/octave loss, etc.
 def filterOutFrequenciesBelowThreshold(timeDependentFunction, timeSpacing, thresholdFrequency, power=25):
     #figure out which frequncies fall outside of the threshold
     signalSize = timeDependentFunction.size
@@ -90,7 +100,12 @@ def filterOutFrequenciesBelowThreshold(timeDependentFunction, timeSpacing, thres
     
     return filteredTimeDependentFunction
 
-#filter out the frequencies of an input above some thresholdFrequency, as provided in Hz.  By default is close to an ideal low pass filter.  The signal to be filtered is provided as timeDependentFunction, sampled with time steps of timeSpacing provided in seconds.  If a non-ideal filter is desired, can provide power=1 for a low pass filter with 20dB/octave loss, power=2 for a 40dB/octave loss, etc.
+# Filter out the frequencies of an input above some thresholdFrequency, as provided in Hz. 
+# By default is close to an ideal low pass filter. 
+# The signal to be filtered is provided as timeDependentFunction, sampled with time steps 
+# of timeSpacing provided in seconds. 
+# If a non-ideal filter is desired, can provide power=1 for a low pass filter with 20dB/octave 
+# loss, power=2 for a 40dB/octave loss, etc.
 def filterOutFrequenciesAboveThreshold(timeDependentFunction, timeSpacing, thresholdFrequency, power=25):
     #figure out which frequncies fall outside of the threshold
     signalSize = timeDependentFunction.size
@@ -106,27 +121,45 @@ def filterOutFrequenciesAboveThreshold(timeDependentFunction, timeSpacing, thres
     
     return filteredTimeDependentFunction
 
-#This method helps filterout artifact frequencies associated with digitizer readouts.  Some digitizers consist of multiple sub-digitizer units that interweave their sampling, but report a different baseline.  The result of this is a high frequency zig-zagging.  This method is designed to help eliminate that zig-zagging by cutting out the spikes seen in the fourier transform.
-#signal is the raw trace, in time domain and timeAxis is the associated time vector.  frequenciesToEliminate is the array/list of frequencies (in Hz) that need to be eliminated.  replacementFrequenciesIndexOffsets is the list of indices surrounding the index of the targeted frequency, whose associated frequency values get averaged together to form the replacement value.
+# This method helps filterout artifact frequencies associated with digitizer readouts.
+# Some digitizers consist of multiple sub-digitizer units that interweave their 
+# sampling, but report a different baseline.
+# The result of this is a high frequency zig-zagging.
+# This method is designed to help eliminate that zig-zagging by cutting out the spikes
+# seen in the fourier transform.
 def eliminateListedSpikeFrequenciesFromSignal(signal, timeAxis, frequenciesToEliminate, replacementFrequenciesIndexOffsets=np.array([-2, -1, 1, 2])):
+    """
+    signal : raw trace, in time domain
+    timeAxis : the associated time vector
+    frequenciesToEliminate : array/list of frequencies (in Hz) that need to be eliminated.
+    replacementFrequenciesIndexOffsets : list of indices surrounding the index of the targeted 
+                                         frequency, whose associated frequency values get averaged 
+                                         together to form the replacement value.
+    """
     #calculate the FFT of the raw trace
     discreteFourierTransform = scipy.fft.fft(signal)
     #calculate the frequency axis associated with provided time axis
     freqAxis = convertTimeAxisToFrequencies(timeAxis)
-    #find the index at which frequencies need to be eliminated, and smooth out the frequencies based on provided index
+    # Find the index at which frequencies need to be eliminated, and smooth out 
+    # the frequencies based on provided index.
     for i in frequenciesToEliminate:
-        #convert from frequency to eliminate to index that represents the frequency, and index that represents the degenerate inverse
+        # Convert from frequency to eliminate to index that represents the frequency,
+        # and index that represents the degenerate inverse.
         indexToEliminate = indexOfArrayClosestToValue(freqAxis, i)
         indexInverseToEliminate = indexOfArrayClosestToValue(freqAxis, -1*i)
-        #calculate the averaged value that will serve as replacement value for the frequency that is being eliminated
+        # Calculate the averaged value that will serve as replacement value for 
+        # the frequency that is being eliminated.
         sumReplacement = 0
         for j in replacementFrequenciesIndexOffsets:
             sumReplacement += discreteFourierTransform[indexToEliminate + j]
         replacement = sumReplacement/replacementFrequenciesIndexOffsets.size
-        #replace the i'th frequency to eliminate with the calculated replacement, replace degenerate negative frequency as well
+        # Replace the i'th frequency to eliminate with the calculated replacement, replace 
+        # degenerate negative frequency as well.
         discreteFourierTransform[indexToEliminate] = replacement
         discreteFourierTransform[indexInverseToEliminate] = np.conj(replacement)
-    #calculate the time signal with spike frequencies removed.  returning the value ifft(discreteFourierTransform) itself yields an array with complex arguments.  try returning the real value only and hoping that's close enough
+    # Calculate the time signal with spike frequencies removed.
+    # Returning the value ifft(discreteFourierTransform) itself yields an array with complex arguments.
+    # Try returning the real value only and hoping that's close enough.
     traceWithoutFrequencies = np.real(scipy.fft.ifft(discreteFourierTransform))#*(np.angle(scipy.fft.ifft(discreteFourierTransform))/np.absolute(np.angle(scipy.fft.ifft(discreteFourierTransform))))
     
     #return value
@@ -169,9 +202,11 @@ def hsdBaselineFourierEliminate(wf, times):
     freqMax = np.amax(np.absolute(freqAxisFull))
     fftFull = np.absolute(scipy.fft.fft(wf))
     
-    #eliminate listed frequencies (as freqMax/i, where i is listed), from the fourier spectra.  This section eliminates frequencies that are somewhat broader.
+    # Eliminate listed frequencies (as freqMax/i, where i is listed), from the fourier spectra.
+    # This section eliminates frequencies that are somewhat broader.
     frequencyList = []
-    dividerListStrong = [8, 5, 5/2, 5/3, 5/4, 4, 2, -1] #use -1 and not 1.  this is because of how FFT's work for frequency axis with an odd number of elements
+    # Use -1 and not 1. This is because of how FFT's work for frequency axis with an odd number of elements
+    dividerListStrong = [8, 5, 5/2, 5/3, 5/4, 4, 2, -1] 
     for i in dividerListStrong:
         frequency = freqMax/i
         maxInd = indexOfArrayClosestToValue(freqAxisFull, frequency)
@@ -179,10 +214,10 @@ def hsdBaselineFourierEliminate(wf, times):
         for j in range(-5, 6):
             frequencyList.append(freqAxisFull[maxInd + j])
         frequenciesToEliminate = np.array(frequencyList)
-    #call a helper method to eliminate the frequencies listed
+    # Call a helper method to eliminate the frequencies listed
     filteredTrace = eliminateListedSpikeFrequenciesFromSignal(wf, times, frequenciesToEliminate, replacementFrequenciesIndexOffsets=np.array([-10, -9, -8, -7, 7, 8, 9, 10]))
     
-    #repeat the process for the frequency components that are somewhat weaker/narrower
+    # Repeat the process for the frequency components that are somewhat weaker/narrower
     frequencyList = []
     dividerListWeak = [64/i for i in range(1, 64)]
     for i in dividerListWeak:
@@ -296,7 +331,11 @@ def hitFinder_CFD(dataIn, convFilterLength = 35, CFDOffset = 25,
 
 
 
-#compute and return the convolution of a supplied vector, 'vectorToConvolve', when the vector is convolved with a gaussian filter of length 'filterLength'.  The convolution is done using he mode='same' mode of np.convolve.  The filter is a normal distribution described by a linear spacing that spans from -1*maxSigma to maxSigma, such that the end points are not included in the linear spacing.
+# Compute and return the convolution of a supplied vector, 'vectorToConvolve', when the 
+# vector is convolved with a gaussian filter of length 'filterLength'.
+# The convolution is done using he mode='same' mode of np.convolve.
+# The filter is a normal distribution described by a linear spacing that spans 
+# from -1*maxSigma to maxSigma, such that the end points are not included in the linearspacing.
 def convolveWithGaussian(vectorToConvolve, filterLength, maxSigma=3):
     #create a gaussian of filterLength.  Filter should have a uniform spacing of standard deviation values with boundaries of -minSigma to +maxSigma
     tempStdDevSpacing = np.linspace(-1*maxSigma, maxSigma, filterLength + 2)
