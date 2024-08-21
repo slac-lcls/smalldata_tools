@@ -400,7 +400,7 @@ class fimSumFunc(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get('name', 'fimSum')
         super(fimSumFunc, self).__init__(**kwargs)
-        ## later add different methods.
+        
         self._bkgROI = kwargs.get('bkgROI', None)
         if self._bkgROI is not None:
             if isinstance(self._bkgROI, slice):
@@ -414,6 +414,7 @@ class fimSumFunc(DetObjectFunc):
         else:
             self.sigROI = self._sigROI.copy()
             self._sigROI = slice(self.sigROI[0], self.sigROI[1])
+        return
 
     def process(self, data):
         ret_dict={}

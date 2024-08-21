@@ -238,7 +238,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
-from smalldata_tools.ana_funcs.smd_svd import svdFit
+# from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
 #logging.basicConfig(level=logging.DEBUG)

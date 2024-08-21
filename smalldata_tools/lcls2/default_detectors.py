@@ -9,7 +9,67 @@ except NameError:
 from smalldata_tools.common.detector_base import DefaultDetector_base
 
 
-defaultDetector = DefaultDetector_base
+# defaultDetector = DefaultDetector_base
+
+
+class DefaultDetector(abc.ABC):
+    def __init__(self, detname, name, run):
+        self.name = name
+        self.detname = detname
+        self._run = run
+        self._debug = False
+        if self.in_run():
+            self.det = self._run.Detector(detname)
+        if not hasattr(self, '_veto_fields'):
+            self._veto_fields = ['TypeId', 'Version', 'config']
+    
+    def in_run(self):
+        detnames = self._run.detnames
+        for dn in detnames:
+            if dn == self.detname:
+                return True
+        return False
+    
+    def get_fields(self, top_field):
+        """ 
+        Parameters
+        ----------
+        Top field: str
+            Usually 'fex' or 'raw'
+        """
+        top_field_obj = getattr(self.det, top_field)
+        if top_field_obj is None:
+            return top_field_obj, None
+        fields = [ field for field in dir(top_field_obj) if (field[0]!='_' and field not in self._veto_fields) ]
+        return top_field_obj, fields
+    
+    def _setDebug(self, debug):
+        self._debug = debug
+    
+    def params_as_dict(self):
+        """ Returns parameters as dictionary to be stored in the hdf5 file (once/file) """
+        parList =  {
+            key: self.__dict__[key] for key in self.__dict__ if (
+                key[0]!='_' \
+                and isinstance(getattr(self, key), (str, int, float, np.ndarray, tuple))
+            ) 
+        }
+        parList.update(
+            {
+                key: np.array(self.__dict__[key]) for key in self.__dict__ if (
+                    key[0]!='_' \
+                    and isinstance(getattr(self,key), list) \
+                    and len(getattr(self,key))>0 \
+                    and isinstance(getattr(self,key)[0], (str, int, float, np.ndarray))
+                )
+            }
+        )
+        return parList
+    
+    @abc.abstractmethod
+    def data(self, evt):
+        """ Method that should return a dict of values from event """
+        pass
 
 
 def detOnceData(det, data, ts, noarch):
@@ -20,84 +80,97 @@ def detOnceData(det, data, ts, noarch):
     return data
 
 
-class genericDetector(defaultDetector):
-    def __init__(self,  name=None, run=None, h5name=None):
+class genericDetector(DefaultDetector):
+    def __init__(self, detname, run=None, name=None):
         if name is None:
-            self.name = 'anydet'
-        else:
-            self.name = name
-        if h5name is None: h5name = self.name
-        defaultDetector.__init__(self, self.name, h5name, run)
+            name = detname
+        super().__init__(detname, name, run)
+        if self.in_run():
+            self._data_field, self._sub_fields = self.get_fields('raw')
 
     def data(self, evt):
         dl = {}
-        raw = getattr( self.det, 'raw')
-        vetolist = ['TypeId', 'Version', 'config']
-        if raw is not None:
-           fields = [ field for field in dir(raw) if (field[0]!='_' and field not in vetolist) ]
-           for field in fields:
-               if getattr(raw, field)(evt) is None: continue
-               dl[field] = getattr(raw, field)(evt)
-               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+        # raw = getattr( self.det, 'raw')
+        # vetolist = ['TypeId', 'Version', 'config']
+        if self._data_field is not None:
+        #    fields = [ field for field in dir(raw) if (field[0]!='_' and field not in vetolist) ]
+            for field in self._sub_fields:
+                dat = getattr(self._data_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[field] = dat
+                if isinstance(dl[field], list):
+                    dl[field]=np.array(dl[field])
         return dl
 
 
-class ttDetector(defaultDetector):
-    def __init__(self,  name=None, run=None, saveTraces=False):
-        if name is None:
-            self.name = 'anydet'
-        else:
-            self.name = name
+class ttDetector(DefaultDetector):
+    def __init__(self, detname, run=None, saveTraces=False):
+        self._veto_fields = ['TypeId', 'Version', 'calib', 'image',
+                            'raw', 'config' ]
+        super().__init__(detname, 'tt', run)
         self.saveTraces = saveTraces
-        defaultDetector.__init__(self, self.name, 'tt', run)
+        if self.in_run():
+            self._data_field, self._sub_fields = self.get_fields('ttfex')
+            if self.saveTraces:
+                self.proj_field, self.proj__sub_fields = self.get_fields('ttproj')
+        
 
     def data(self, evt):
-        dl={}
-        fex=getattr( self.det, 'ttfex')
-        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
-        if fex is not None:
-           fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
-           for field in fields:
-               if getattr(fex, field)(evt) is None: continue
-               dl[field]=getattr(fex, field)(evt)
-               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+        dl = {}
+        # fex = getattr(self.det, 'ttfex')
+        # _veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
+        if self._data_field is not None:
+            # fields = self.get_fields('ttfex')
+            # fields = [ field for field in dir(fex) if (field[0]!='_' and field not in _veto_fields) ]
+            for field in self._sub_fields:
+                dat = getattr(self._data_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[field] = dat
+                if isinstance(dl[field], list):
+                    dl[field]=np.array(dl[field])
 
         if self.saveTraces:
-            fex=getattr( self.det, 'ttproj')
-            veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
-            if fex is not None:
-               fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
-               for field in fields:
-                   if getattr(fex, field)(evt) is None: continue
-                   dl[field]=getattr(fex, field)(evt)
-                   if isinstance(dl[field], list): dl[field]=np.array(dl[field])        
+            # fex = getattr( self.det, 'ttproj')
+            # _veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
+            if self.proj_field is not None:
+            #    fields = [ field for field in dir(fex) if (field[0]!='_' and field not in _veto_fields) ]
+               for field in self.proj__sub_fields:
+                dat = getattr(self.proj_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[field] = dat
+                if isinstance(dl[field], list):
+                    dl[field]=np.array(dl[field])        
         return dl
 
 
-class fimfexDetector(defaultDetector):
-    def __init__(self,  name=None, run=None):
+class fimfexDetector(DefaultDetector):
+    def __init__(self, detname, run=None, name=None):
         if name is None:
-            self.name = 'anydet'
-        else:
-            self.name = name
-        defaultDetector.__init__(self, self.name, self.name, run)
+            name = detname
+        self._veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config']
+        super().__init__(detname, name, run)
+        if self.in_run():
+            self._data_field, self._sub_fields = self.get_fields('fex')
 
     def data(self, evt):
-        dl={}
-        fex=getattr( self.det, 'fex')
-        veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
-        if fex is not None:
-           fields = [ field for field in dir(fex) if (field[0]!='_' and field not in veto_fields) ]
-           for field in fields:
-               if getattr(fex, field)(evt) is None: continue
-               dl[field]=getattr(fex, field)(evt)
-               if isinstance(dl[field], list): dl[field]=np.array(dl[field])
+        dl = {}
+        if self._data_field is not None:
+           for field in self._sub_fields:
+                dat = getattr(self._data_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[field] = dat
+                if isinstance(dl[field], list):
+                    dl[field]=np.array(dl[field])
         return dl
 
 
-class lightStatus(defaultDetector):
+class lightStatus(DefaultDetector):
     def __init__(self, codes, run):
-        defaultDetector.__init__(self, 'timing', 'lightStatus', run)
+        super().__init__('timing', 'lightStatus', run)
         self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
         self.laserCodes_drop = [ c for c in codes[1] if c > 0]
         self.xrayCodes_req = [ -c for c in codes[0] if c < 0]
@@ -105,7 +178,7 @@ class lightStatus(defaultDetector):
 
     def data(self,evt):
         xfel_status, laser_status = (1,1) # default if no EVR code matches
-        dl={}
+        dl = {}
         evtCodes = getattr(getattr( self.det, 'raw'), 'eventcodes')(evt)
         if evtCodes is not None:
             for xOff in self.xrayCodes_drop:
@@ -132,8 +205,10 @@ class lightStatus(defaultDetector):
         return dl
 
 
-class epicsDetector(defaultDetector):
-    def __init__(self, name='epics', PVlist=[],run=None):
+class epicsDetector(DefaultDetector):
+    ### TO REVISE / REVIEW for (det)name, super, etc. Does it inherit DefaultDetector?
+    def __init__(self, PVlist=[], run=None, name='epics'):
+        # super().__init__('epics', name, run)
         self.name = name
         self.detname='epics'
         self.PVlist = []
@@ -142,37 +217,39 @@ class epicsDetector(defaultDetector):
         self.pvs = []
         # run.epicsinfo is an alias or (alias, pvname) --> pvname dict.
         # Let's rearrange this somewhat to make it more useful.
-        self.al2pv = {}
-        self.pv2al = {}
+        self.alias_2_pv = {}
+        self.pv_to_alias = {}
+        
         for (k, pv) in run.epicsinfo:
             if type(k) == tuple:
                 al = k[0]
             else:
                 al = k
-            self.al2pv[al] = pv
-            self.pv2al[pv] = al
+            self.alias_2_pv[al] = pv
+            self.pv_to_alias[pv] = al
+
         for p in PVlist:
             try:
                 if type(p) == tuple:
                     # User specified PV and alias.
                     pv = p[0]
                     al = p[1]
-                    self.pv2al[pv] = al
-                    self.al2pv[al] = pv
-                elif p in self.al2pv.keys():
+                    self.pv_to_alias[pv] = al
+                    self.alias_2_pv[al] = pv
+                elif p in self.alias_2_pv.keys():
                     # Known Alias
                     al = p
-                    pv = self.al2pv[al]
-                elif p in self.pv2al.keys():
+                    pv = self.alias_2_pv[al]
+                elif p in self.pv_to_alias.keys():
                     # Known PV
                     pv = p
-                    al = self.pv2al[pv]
+                    al = self.pv_to_alias[pv]
                 else:
                     # We don't know.  Assume it's a PV we'll find later.
                     pv = p
                     al = p
-                    self.pv2al[pv] = al
-                    self.al2pv[al] = pv
+                    self.pv_to_alias[pv] = al
+                    self.alias_2_pv[al] = pv
                 self.pvs.append(run.Detector(pv))
                 self.addPV(al, pv)
             except:
@@ -181,12 +258,12 @@ class epicsDetector(defaultDetector):
                 self.missingPV.append(pv)
         # Add these now so they don't interfere in the above loop.
         for (al, pv) in run.epicsinfo:
-            self.al2pv[pv] = pv
+            self.alias_2_pv[pv] = pv
 
     def addPV(self, al, pv):
         self.PVlist.append(al)
 
-    def inRun(self):
+    def in_run(self):
         if len(self.pvs)>0:
             return True
         return False
@@ -209,14 +286,14 @@ class epicsDetector(defaultDetector):
         parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
         PVlist = getattr(self,'PVlist')
         parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
-        parList.update({'PVname_%d'%ipv: self.al2pv[pv] for ipv,pv in enumerate(PVlist) if pv is not None})
+        parList.update({'PVname_%d'%ipv: self.alias_2_pv[pv] for ipv,pv in enumerate(PVlist) if pv is not None})
         return parList
 
 
-class scanDetector(defaultDetector):
-    def __init__(self, name='scan',run=None):
-        self.name = name
-        self.detname='scan'
+class scanDetector(DefaultDetector): # ##### NEED FIX
+    def __init__(self, detname='scan', run=None, name=None):
+        name = name or detname
+        super().__init__(detname, name, run)
         self.scans = []
         self.scanlist = []
         vetolist = ['step_docstring']
@@ -231,13 +308,13 @@ class scanDetector(defaultDetector):
         except:
             pass
 
-    def inRun(self):
+    def in_run(self):
         if len(self.scans)>0:
             return True
         return False
 
     def data(self,evt):
-        dl={}
+        dl = {}
         for scanname,scan in zip(self.scanlist,self.scans):
             try:
                 if scan(evt) is not None:

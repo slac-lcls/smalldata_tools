@@ -7,6 +7,7 @@ try:
 except NameError:
     basestring = str
 from smalldata_tools.common.detector_base import DefaultDetector_base
+from smalldata_tools.common.epicsarchive import EpicsArchive
 
 
 defaultDetector = DefaultDetector_base
@@ -29,7 +30,11 @@ def detData(detList, evt):
             pass
     return data
 
+
 def detOnceData(det, evt, noarch):
+    """
+    Get data once at the beginning of the run
+    """
     data = detData([det], evt)
     if not noarch and data == {}:
         # If we've missed something, look for it in the archiver.
@@ -37,6 +42,7 @@ def detOnceData(det, evt, noarch):
         ts = evt.get(psana.EventId).time()[0]
         data = addArchiverData(det, data, ts)
     return data
+
 
 def setParameter(detList, Params, detName='tt'):
     for det in detList:

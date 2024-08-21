@@ -39,7 +39,7 @@ def DetObject(srcName, run, **kwargs):
 
 
 class DetObjectClass(object):
-    def __init__(self,det, run, **kwargs):#name=None, common_mode=None, applyMask=0):
+    def __init__(self, det, run, **kwargs):#name=None, common_mode=None, applyMask=0):
         self.det = det
         self._detid = det._detid
         self._name = kwargs.get('name', self.det._det_name)#srcName)
@@ -54,7 +54,7 @@ class DetObjectClass(object):
         """ Returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
         parList =  {
             key:self.__dict__[key] for key in self.__dict__ if (
-                key[0]!='_'
+                key[0] != '_'
                 and isinstance(getattr(self, key), (str, int, float, np.ndarray)) 
                 )
             }
@@ -67,13 +67,13 @@ class DetObjectClass(object):
             }) 
         parList.update({
             key: np.array(self.__dict__[key]) for key in self.__dict__ if (
-                key[0]!='_'
+                key[0] != '_'
                 and isinstance(getattr(self,key), list)
                 and isinstance(getattr(self,key)[0], (str, int, float, np.ndarray))
                 )
             })
         
-        #add parameters of function to dict with composite keyt(sf._name, key)
+        # Add parameters of function to dict with composite keyt(sf._name, key)
         subFuncs = [ self.__dict__[key] for key in self.__dict__ if isinstance(self.__dict__[key], DetObjectFunc) ]
         # We cannot save arrays of chars/strings. There should be a proper test instead of this explicit rejection of coords.
         # I can't see how to do that in a single line, but that is not a great reason...
@@ -81,9 +81,9 @@ class DetObjectClass(object):
             sfPars = sf.params_as_dict()
             parList.update({
                 '%s__%s'%(sf._name,key): value for key,value in iteritems(sfPars) if (
-                    key[0]!='_'
+                    key[0] != '_'
                     and isinstance(value, (str, int, float, np.ndarray, tuple))
-                    and key.find('coords')<0
+                    and key.find('coords') < 0
                     )
                 })
         return parList

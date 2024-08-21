@@ -9,12 +9,18 @@ except:
     from urllib2 import urlopen
 import matplotlib.pyplot as plt
 import json
+import logging
 
-base_url = "http://pscaa02"
-retrieval_url = base_url + ":17668/retrieval/data/getData.json"
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# base_url = "http://pscaa02"
+# retrieval_url = base_url + ":17668/retrieval/data/getData.json"
+base_url = "https://pswww.slac.stanford.edu/archiveviewer"
+retrival_url = base_url + "/retrieval/data/getData.json"
 mgmt_url = base_url + ":17665/mgmt/bpl/"
 pv_arg = "?pv={}"
-url_arg = "&{0}={1}"
+url_arg = "\&{0}={1}"
 url_flag = "&{0}"
 date_spec_format   = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
 
@@ -163,14 +169,15 @@ class EpicsArchive(object):
             plot_points.
 
         start and end represent the time period to use.
-            There are three ways to provide these time periods:
+            There are four ways to provide these time periods:
             1. numeric arguments are relative time: e.g. start=30, unit="days"
                 begins the archiver request at 30 days ago.
-            2. list/tuple arguments are absolute time, in the format
+            2. Large integers (>=10000) give time since epoch.
+            3. list/tuple arguments are absolute time, in the format
                 [year, month, day, hour, min, sec], which does not need to be
                 fully specified. For example, start=[2016,1,14] end=[2016,2,14]
                 gives you the one month period between Jan 14 and Feb 14.
-            3. None gives you the endpoint. start=None is the beginning of
+            4. None gives you the endpoint. start=None is the beginning of
                 archivable data, end=None is now.
 
         The unit argument is only used if start or end is an integer. Most
@@ -219,6 +226,7 @@ class EpicsArchive(object):
         url += url_arg.format("to", date_format(*end))
         if not chunk:
             url += url_flag.format("donotchunk")
+        logger.debug(f"URL: {url}")
         return url_query(url)
 
     def _json_to_pts(self, json_obj, useMS):
