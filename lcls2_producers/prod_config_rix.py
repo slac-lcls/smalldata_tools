@@ -53,3 +53,15 @@ def getFIMs(run):
         "bkgROI" : slice(0,50)
     }
     return ret_dict
+
+
+##########################################################
+# run independent parameters
+##########################################################
+# These lists are either PV names, aliases, or tuples with both.
+#epicsPV = ['las_fs14_controller_time']
+#epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'),
+#               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
+#epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
+epicsPV = []
+epicsOncePV = []

@@ -1,7 +1,22 @@
 import numpy as np
-#import psana
+from enum import Enum
 from smalldata_tools.lcls2.default_detectors import *
 from datetime import datetime
+
+class BeamDestination(Enum):
+    """ Current reference:
+    https://confluence.slac.stanford.edu/display/~carolina/Destinations+SC+agreement+MPS+and+Timing
+     """
+    LASER_Standby = 0
+    SC_DIAG0 = 1
+    SC_BSYD = 2
+    SC_HXR = 3
+    SC_SXR = 4
+    SC_LESA= 5
+    MPS_RESERVED_Laser_Heater_Shutter = 12
+    MPS_RESERVED_Mechanical_Shutter = 13
+    MPS_RESERVED = 14
+    BSYD_STANDBY_TRIGGERS = 15
 
 
 def defaultDetectors(hutch, run=None, env=None):
@@ -37,11 +52,11 @@ def tmoDetectors(run, beamCodes=[[162], [91]]):
     return dets
 
 
-def rixDetectors(run, beamCodes=[[-136], [77]]):
+def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[]):
     dets=[]
     # dets.append(scanDetector('scan', run))
     dets.append(genericDetector('timing', run))
-    dets.append(lightStatus(beamCodes, run))
+    dets.append(lightStatus(beam_destination, laser_codes, run))
     dets.append(genericDetector('gmd', run))
     dets.append(genericDetector('xgmd', run))
     dets.append(genericDetector('ebeam', run))

@@ -7,6 +7,8 @@ try:
     from urllib.request import urlopen
 except:
     from urllib2 import urlopen
+import asyncio
+import httpx
 import matplotlib.pyplot as plt
 import json
 import logging
@@ -14,15 +16,18 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# base_url = "http://pscaa02"
-# retrieval_url = base_url + ":17668/retrieval/data/getData.json"
+
 base_url = "https://pswww.slac.stanford.edu/archiveviewer"
-retrival_url = base_url + "/retrieval/data/getData.json"
+retrieval_url = base_url + "/retrieval/data/getData.json"
 mgmt_url = base_url + ":17665/mgmt/bpl/"
 pv_arg = "?pv={}"
-url_arg = "\&{0}={1}"
+# url_arg = "\&{0}={1}"
+url_arg = "&{0}={1}"
 url_flag = "&{0}"
-date_spec_format   = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
+date_spec_format = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
+
+offset_to_epoch = 31536000*20
+
 
 class EpicsArchive(object):
     """
@@ -83,7 +88,8 @@ class EpicsArchive(object):
         else:
             return (data[0]["secs"] + data[0]['nanos']/1e9, data[0]["val"])
 
-    def get_points(self, PV=None, start=30, end=None, unit="days", chunk=False, two_lists=False, raw=False, useMS=False):
+    async def get_points(self, PV=None, start=30, end=None, unit="days", 
+                         chunk=False, two_lists=False, raw=False, useMS=False):
         """
         Get points from the archive, returning them as a list of tuples.
         You may set two_lists=True to get a list of positions and a list of
@@ -98,7 +104,7 @@ class EpicsArchive(object):
         else:
             json_start, json_end = self._json_args(start, end, unit)
             if valid_date_arrays(json_start, json_end):
-                json_obj = self._get_json(PV, json_start, json_end, chunk)
+                json_obj = await self._get_json(PV, json_start, json_end, chunk)
                 pts = self._json_to_pts(json_obj, useMS)
                 self._pts_cache = pts
                 self._pv_cache = PV
@@ -112,7 +118,7 @@ class EpicsArchive(object):
         else:
             return pts
 
-    def plot_points(self, PV=None, start=30, end=None, unit="days", chunk=False):
+    def plot_points(self, PV=None, start=5, end=None, unit="days", chunk=False):
         """
         Use matplotlib to plot points from the archive.
         """
@@ -209,7 +215,7 @@ class EpicsArchive(object):
 
         return json_start, json_end
 
-    def _get_json(self, PV, start, end, chunk):
+    async def _get_json(self, PV, start, end, chunk):
         """
         Do a url query of the new archiver. Return the json result unmodified.
 
@@ -221,13 +227,14 @@ class EpicsArchive(object):
         chunk: boolean for whether or not you want data to be chunked.
         """
         url = retrieval_url
-        url += pv_arg.format(urllib.parse.quote(PV, safe=""))
+        url += pv_arg.format(PV)
         url += url_arg.format("from", date_format(*start))
         url += url_arg.format("to", date_format(*end))
         if not chunk:
             url += url_flag.format("donotchunk")
         logger.debug(f"URL: {url}")
-        return url_query(url)
+        data = await url_query(url)
+        return data
 
     def _json_to_pts(self, json_obj, useMS):
         """
@@ -256,11 +263,16 @@ days_map.update({ x: 1./24/60         for x in ("minutes", "mins", "min")       
 days_map.update({ x: 1./24/60/60      for x in ("seconds", "secs", "sec", "s")     })
 days_map.update({ x: 1./24/60/60/1000 for x in ("milliseconds", "msec", "ms")      })
 
-def url_query(url):
-    """Makes the URL request."""
-    req = urlopen(url)
-    data = json.load(req)
-    return data
+async def url_query(url):
+    """
+    Makes the URL request.
+    Comment: httpx automatically encodes the URL, so it does not need
+    to be done here (with urllib.parse.quote for example).
+    https://www.w3schools.com/tags/ref_urlencode.ASP
+    """
+    async with httpx.AsyncClient() as client:
+        req = await client.get(url)
+    return req.json()
 
 def to_datetime(arg, unit):
     """
@@ -299,7 +311,8 @@ def datetime_to_array(dt):
 def date_format(year=2015, month=1, day=1, hr=0, min=0, s=0, ms=0):
     """Convert date/time parameters to date format string for archiver"""
     d = date_spec_format.format(year, month, day, hr, min, s, ms)
-    return urllib.parse.quote(d, safe="")
+    # return urllib.parse.quote(d, safe="")  # if urllib is used
+    return d
 
 def valid_date_arrays(start, end):
     """

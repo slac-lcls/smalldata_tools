@@ -17,6 +17,7 @@ from requests.auth import HTTPBasicAuth
 from pathlib import Path
 from importlib import import_module
 from mpi4py import MPI
+COMM = MPI.COMM_WORLD
 rank = MPI.COMM_WORLD.Get_rank()
 size = MPI.COMM_WORLD.Get_size()
 
@@ -106,36 +107,10 @@ def define_dets(run, det_list):
 
 
 
-
-##########################################################
-# run independent parameters
-##########################################################
-# These lists are either PV names, aliases, or tuples with both.
-#epicsPV = ['las_fs14_controller_time']
-#epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'),
-#               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
-#epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
-epicsPV = []
-epicsOncePV = []
-#fix timetool calibration if necessary
-#ttCalib=[0.,2.,0.]
-ttCalib=[]
-#ttCalib=[1.860828, -0.002950]
-#decide which analog input to save & give them nice names
-#aioParams=[[1],['laser']]
-aioParams=[]
-##########################################################
-##
-## <-- User Input end
-##
-##########################################################
-
-
-
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
 
-fpath=os.path.dirname(os.path.abspath(__file__))
+fpath = os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
 if rank==0: print(fpathup)
@@ -384,6 +359,7 @@ if ds.unique_user_rank():
     print('Opening the h5file %s, gathering at %d'%(h5_f_name,args.gather_interval))
 small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
 if ds.unique_user_rank():
+    print(f"rank: {rank}")
     print('smalldata file has been successfully created.')
 
 
@@ -393,7 +369,8 @@ if ds.unique_user_rank():
 ## Setting up the default detectors
 ##
 ##########################################################
-if not ds.is_srv(): # srv nodes do not have access to detectors
+if not ds.is_srv(): # srv nodes do not have access to detectors.
+# if True:
     default_dets = defaultDetectors(hutch.lower(), thisrun)
     if ds.unique_user_rank():
         logger.info('Default detectors loaded.')
@@ -410,18 +387,17 @@ if not ds.is_srv(): # srv nodes do not have access to detectors
                 pass
             logger.info('adding all epicsPVs....')
             default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
-    elif len(epicsPV)>0:
+    elif len(config.epicsPV) > 0:
         default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser', run=thisrun))
 
-    if len(epicsOncePV)>0:
+    if len(config.epicsOncePV) > 0:
         EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce', run=thisrun)
     else:
         EODet = None
     EODetData = {'epicsOnce': {}}
     EODetTS   = None
 
-    if not ds.is_srv():
-        default_det_aliases = [det.name for det in default_dets]
+    default_det_aliases = [det.name for det in default_dets]
 
     if args.rawFim:
         for fim in default_det_aliases:
@@ -509,30 +485,31 @@ for evt_num, evt in enumerate(event_iter):
     det_data.update(userDict)
 
     #timing - inhibit counts - collect in default data?
-    #save
     if len(intdets) > 0:
         userDictInt = {}
         #userDict has keys we could sum & remove!
         #normdict['inhibit']+=det_data['timing']['inhibit'][2]
         for det in intdets:
-            normdict[det._name]['count']+=1
-            #for now, sum up all default data....
+            normdict[det._name]['count'] += 1
+            # for now, sum up all default data....
             for k,v in det_data.items():
                 if isinstance(v, dict):
-                    for kk,vv in v.items():
-                        sumkey=k+'_sum_'+kk
+                    for kk, vv in v.items():
+                        sumkey = k+'_sum_'+kk
                         if k not in normdict[det._name]:
-                            normdict[det._name][k]={}
+                            normdict[det._name][k] = {}
+                            normdict[det._name][k][sumkey] = np.array(vv)
                         if sumkey in normdict[det._name][k].keys():
-                            normdict[det._name][k][sumkey]+=np.array(vv)
+                            normdict[det._name][k][sumkey] += np.array(vv)
                         else:
-                            normdict[det._name][k][sumkey]=np.array(vv)
+                            normdict[det._name][k][sumkey] = np.array(vv)
                 else:
-                    sumkey=k+'_sum'
+                    sumkey = k+'_sum'
                     if sumkey in normdict[det._name]:
-                        normdict[det._name][sumkey]+=v
+                        normdict[det._name][sumkey] += v
                     else:
-                        normdict[det._name][sumkey]=v
+                        normdict[det._name][sumkey] = v
+
             normdict[det._name]['timestamp_max']=max(normdict[det._name]['timestamp_max'], evt.timestamp)
             if normdict[det._name]['timestamp_min'] == 0: normdict[det._name]['timestamp_min']=evt.timestamp
             else: normdict[det._name]['timestamp_min']=min(normdict[det._name]['timestamp_min'], evt.timestamp)
@@ -640,6 +617,27 @@ if not ds.is_srv():
     if small_data.summary:
         small_data.save_summary(Config) # this only works w/ 1 rank!
 
+# Finishing up:
+# The filesystem seems to make smalldata.done fail. Some dirty tricks
+# are needed here.
+# Hopefully this can be removed soon.
+print(f"Smalldata type for rank {rank}: {small_data._type}")
+import h5py
+
+if small_data._type == 'server':
+    print(f"Close smalldata server file on {rank}")
+    # flush the data caches (in case did not hit cache_size yet)
+    for dset, cache in small_data._server._cache.items():
+        if cache.n_events > 0:
+            small_data._server.write_to_file(dset, cache)
+    time.sleep(1)
+    small_data._server.file_handle.close()
+    time.sleep(15)
+
+print(f"smalldata.done() on rank {rank}")
+small_data.done()
+
+
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 end_job = time.time()
 prod_time = (end_job-start_job)/60
@@ -647,8 +645,7 @@ if ds.unique_user_rank():
     print('########## JOB TIME: {:03f} minutes ###########'.format(prod_time))
 logger.debug('rank {0} on {1} is finished'.format(rank, hostname))
 
-#finishing up here....
-small_data.done()
+
 
 #if args.sort:
 #    if ds.unique_user_rank():
@@ -656,13 +653,11 @@ small_data.done()
 #        cmd = ['timestamp_sort_h5', h5_f_name, h5_f_name]
 
 
-#if (int(os.environ.get('RUN_NUM', '-1')) > 0):
 if os.environ.get('ARP_JOB_ID', None) is not None:
     if size > 2 and rank == 2:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(size,evt_num)}])
     else:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": evt_num}])
-logger.debug('Saved all small data')
 
 if args.postRuntable and ds.unique_user_rank():
     print('Posting to the run tables.')
@@ -680,22 +675,19 @@ if args.postRuntable and ds.unique_user_rank():
         runtable_data["SmallData%s"%locStr]="default"
     else:
         runtable_data["SmallData%s"%locStr]="done"
+    
     time.sleep(5)
+    
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL: ', ws_url)
-    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    user=(args.experiment[:3]+'opr').replace('dia','mcc')
+    logger.debug('URL: ', ws_url)
+    user = (args.experiment[:3]+'opr').replace('dia','mcc')
     if os.environ.get("ARP_LOCATION", None) == "S3DF":
         with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader: 
             answer = reader.readline()
-    else:
-        with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-            answer = reader.readline()
 
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-    print(r)
-    if det_presence!={}:
+    logger.debug(r)
+    if det_presence != {}:
         rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence, auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-        print(rp)
+        logger.debug(rp)
 

@@ -169,39 +169,42 @@ class fimfexDetector(DefaultDetector):
 
 
 class lightStatus(DefaultDetector):
-    def __init__(self, codes, run):
+    def __init__(self, destination, laser_codes, run):
+        """
+        Parameters
+        ----------
+        destination : <enum 'BeamDestination'>
+            X-ray beam destination. See enum definition in hutch_default.py
+        laser_codes : list of int
+            Positive values are event codes marking dropped shots
+            Negative values are event codes marking requested shots
+        """
         super().__init__('timing', 'lightStatus', run)
-        self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
-        self.laserCodes_drop = [ c for c in codes[1] if c > 0]
-        self.xrayCodes_req = [ -c for c in codes[0] if c < 0]
-        self.laserCodes_req =  [ -c for c in codes[1] if c < 0]
-
-    def data(self,evt):
-        xfel_status, laser_status = (1,1) # default if no EVR code matches
-        dl = {}
-        evtCodes = getattr(getattr( self.det, 'raw'), 'eventcodes')(evt)
-        if evtCodes is not None:
-            for xOff in self.xrayCodes_drop:
-                if evtCodes[xOff]:
-                    xfel_status = 0
-            for lOff in self.laserCodes_drop:
+        self.destination = destination
+        print(f"Beam destination target: {destination}")
+        self.laserCodes_drop = [ c for c in laser_codes if c > 0]
+        self.laserCodes_req = [ -c for c in laser_codes if c > 0]
+    
+    def data(self, evt):
+        xfel_status, laser_status = (0,1) # Can we make laser default to 0 as well?
+        # x-ray
+        if self.det.raw.destination(evt) == self.destination.value:
+            xfel_status = 1
+        
+        # laser
+        event_codes = self.det.raw.eventcodes(evt)
+        
+        for lOff in self.laserCodes_drop:
                 if evtCodes[lOff]:
                     laser_status = 0
-            if len(self.xrayCodes_req)>0 and xfel_status==1:
-                xfel_status = 0
-                for xOff in self.xrayCodes_req:
-                    if evtCodes[xOff]:
-                        xfel_status = 1
-            if len(self.laserCodes_req)>0 and laser_status==1:
+        if len(self.laserCodes_req) > 0:
                 laser_status = 0
-                for lOff in self.laserCodes_req:
+                for lOff in self.laserCodes_req and laser_status==1:
                     if evtCodes[lOff]:
                         laser_status = 1
 
-        else:
-            xfel_status, laser_status = (-1,-1) # default if no EVR code matches
-        dl['xray']=xfel_status
-        dl['laser']=laser_status
+        dl = {'xray' : xfel_status,
+              'laser' : laser_status}
         return dl
 
 
@@ -270,7 +273,7 @@ class epicsDetector(DefaultDetector):
 
     def data(self,evt):
         dl={}
-        for pvname,pv in zip(self.PVlist,self.pvs):
+        for pvname,pv in zip(self.PVlist, self.pvs):
             try:
                 if pv(evt) is not None:
                     dl[pvname]=pv(evt)
@@ -315,7 +318,7 @@ class scanDetector(DefaultDetector): # ##### NEED FIX
 
     def data(self,evt):
         dl = {}
-        for scanname,scan in zip(self.scanlist,self.scans):
+        for scanname, scan in zip(self.scanlist, self.scans):
             try:
                 if scan(evt) is not None:
                     dl[scanname]=scan(evt)

@@ -44,7 +44,7 @@ class DetObjectClass(object):
         self._detid = det._detid
         self._name = kwargs.get('name', self.det._det_name)#srcName)
 
-        self.run=run
+        self.run = run
         self._storeSum = {}
         self.applyMask = kwargs.get('applyMask', 0)
 

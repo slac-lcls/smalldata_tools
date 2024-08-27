@@ -125,7 +125,8 @@ export SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 
 # Source env. Needed to get python
 echo "Sourcing LCLS-II environment"
-source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
+#source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
+source /sdf/home/e/espov/dev/lcls2/setup_env.sh
 
 # Figure out the right base path for the data (or use S3DF in force case)
 if [ -v FORCE_S3DF ]; then
