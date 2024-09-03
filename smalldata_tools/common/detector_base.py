@@ -15,7 +15,7 @@ class DetObject_base(abc.ABC):
 @dataclass
 class Event:
     # This class is a container which will hold the event based data.
-    # It will be created in the getData step.  
+    # It will be created in the getData step.
     pass
 
 

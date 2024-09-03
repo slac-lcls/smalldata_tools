@@ -1,3 +1,4 @@
+import sys
 import requests
 import json
 import shutil
@@ -37,40 +38,11 @@ if 'milano' in args.queue:
     executable_summaries = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
     queue_summaries = args.queue
     args_summaries = ''
-
-elif 'ffb' in args.queue:
-    location = 'SRCF_FFB'
-    cores = 60
-    # smd
-    executable = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_smd.sh')
-    trigger = 'START_OF_RUN'
-    
-    # cube
-    executable_cube = str(FFB_BASE / 'smalldata_tools/arp_scripts/cubeRun.sh')
-    run_param_name = 'SmallData_ffb'
-    args_cube = f'--indirectory {FFB_BASE}/hdf5/smalldata --outdirectory {FFB_BASE}/hdf5/smalldata/cube'
-    
-    # summaries
-    executable_summaries = str(FFB_BASE / 'smalldata_tools/arp_scripts/submit_plots.sh')
-    queue_summaries = args.queue.replace('h','l')
-    args_summaries = f'--directory {FFB_BASE}/hdf5/smalldata'
-    
 else:
-    location = 'SLAC'
-    cores = 12
+    print('No known system related to this queue. Exit now.')
+    sys.exit(0)
     
-    # smd
-    executable = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
-    trigger = 'ALL_FILES_TRANSFERRED'
-    
-    # cube
-    executable_cube = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
-    run_param_name = 'SmallData'
-    args_cube = f''
-    
-    # summaries
-    executable_summaries = str(PSANA_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
-    queue_summaries = args.queue.replace('h','l')
+
 
     
 job_defs = []

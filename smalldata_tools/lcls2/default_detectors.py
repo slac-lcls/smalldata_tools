@@ -22,16 +22,16 @@ class DefaultDetector(abc.ABC):
             self.det = self._run.Detector(detname)
         if not hasattr(self, '_veto_fields'):
             self._veto_fields = ['TypeId', 'Version', 'config']
-    
+
     def in_run(self):
         detnames = self._run.detnames
         for dn in detnames:
             if dn == self.detname:
                 return True
         return False
-    
+
     def get_fields(self, top_field):
-        """ 
+        """
         Parameters
         ----------
         Top field: str
@@ -42,17 +42,17 @@ class DefaultDetector(abc.ABC):
             return top_field_obj, None
         fields = [ field for field in dir(top_field_obj) if (field[0]!='_' and field not in self._veto_fields) ]
         return top_field_obj, fields
-    
+
     def _setDebug(self, debug):
         self._debug = debug
-    
+
     def params_as_dict(self):
         """ Returns parameters as dictionary to be stored in the hdf5 file (once/file) """
         parList =  {
             key: self.__dict__[key] for key in self.__dict__ if (
                 key[0]!='_' \
                 and isinstance(getattr(self, key), (str, int, float, np.ndarray, tuple))
-            ) 
+            )
         }
         parList.update(
             {
@@ -65,7 +65,7 @@ class DefaultDetector(abc.ABC):
             }
         )
         return parList
-    
+
     @abc.abstractmethod
     def data(self, evt):
         """ Method that should return a dict of values from event """
@@ -114,7 +114,7 @@ class ttDetector(DefaultDetector):
             self._data_field, self._sub_fields = self.get_fields('ttfex')
             if self.saveTraces:
                 self.proj_field, self.proj__sub_fields = self.get_fields('ttproj')
-        
+
 
     def data(self, evt):
         dl = {}
@@ -142,7 +142,7 @@ class ttDetector(DefaultDetector):
                     continue
                 dl[field] = dat
                 if isinstance(dl[field], list):
-                    dl[field]=np.array(dl[field])        
+                    dl[field]=np.array(dl[field])
         return dl
 
 
@@ -184,16 +184,16 @@ class lightStatus(DefaultDetector):
         print(f"Beam destination target: {destination}")
         self.laserCodes_drop = [ c for c in laser_codes if c > 0]
         self.laserCodes_req = [ -c for c in laser_codes if c > 0]
-    
+
     def data(self, evt):
         xfel_status, laser_status = (0,1) # Can we make laser default to 0 as well?
         # x-ray
         if self.det.raw.destination(evt) == self.destination.value:
             xfel_status = 1
-        
+
         # laser
         event_codes = self.det.raw.eventcodes(evt)
-        
+
         for lOff in self.laserCodes_drop:
                 if evtCodes[lOff]:
                     laser_status = 0
@@ -222,7 +222,7 @@ class epicsDetector(DefaultDetector):
         # Let's rearrange this somewhat to make it more useful.
         self.alias_2_pv = {}
         self.pv_to_alias = {}
-        
+
         for (k, pv) in run.epicsinfo:
             if type(k) == tuple:
                 al = k[0]

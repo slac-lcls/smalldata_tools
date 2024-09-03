@@ -4,7 +4,7 @@ usage()
 {
 cat << EOF
 $(basename "$0"): 
-	Script to setup smalldata_tools for an experiment.
+	Script to setup smalldata_tools on the S3DF for a given experiment.
 	
 	OPTIONS:
         -h|--help
@@ -13,10 +13,6 @@ $(basename "$0"):
             Experiment name (i.e. cxilr6716)
         -q
             Queue. Jobs are not setup if a queue is not given
-        --nopsana
-            Do not setup smalldata on psana.
-        --noffb
-            Do not setup smalldata on the FFB.
         --cube
             Make cube job
 EOF
@@ -31,21 +27,13 @@ do
 		usage
 		exit
 		;;
-    -e)
+    -e|--experiment)
         EXP="$2"
         shift 2
         ;;
-    -q)
+    -q|--queue)
         QUEUE="$2"
         shift 2
-        ;;
-    --noffb)
-        FFB=0
-        shift 1
-        ;;
-    --nopsana)
-        PSANA=0
-        shift 1
         ;;
     --cube)
         CUBE=1
@@ -61,85 +49,54 @@ done
 
 umask 002
 
-FFB=${FFB:=1}
-PSANA=${PSANA:=1}
 QUEUE=${QUEUE:=0}
 CUBE=${CUBE:=0}
 MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
-if [ $FFB -eq 1 ]; then
-    if [ $(echo $HOSTNAME | grep -ic -e "drp-srcf") -eq 0 ]
-    then
-        echo "Should be run from a FFB node."
-        exit
-    fi
-elif [ $PSANA -eq 1 ]; then
-    if [ $(echo $HOSTNAME | grep -ic -e "drp-srcf" -e "psana") -eq 0 ]
-    then
-        echo "Should be run from a FFB or PSANA node."
-        exit
-    fi
+if [ $(echo $HOSTNAME | grep -ic -e "sdf") -eq 0 ]
+then
+    echo "This script should be run from a S3DF node. Exiting now."
+    exit
 fi
 
 HUTCH=${EXP:0:3}
-FFB_BASE="/cds/data/drpsrcf/$HUTCH/$EXP/scratch"
-PSANA_BASE="/cds/data/psdm/$HUTCH/$EXP"
+FFB_BASE="/sdf/data/lcls/drpsrcf/ffb/$HUTCH/$EXP"
+SDF_BASE="/sdf/data/lcls/ds/$HUTCH/$EXP"
 
 # Exit if directories dont exist
-if [ $FFB -eq 1 ]; then
-    if [ ! -d "$FFB_BASE" ]; then
-      exit
-    fi
+if [ ! -d "$SDF_BASE" ]; then
+    echo "Experiment folder does not exist. Exiting now."
+    exit
 fi
-if [ $PSANA -eq 1 ]; then
-    if [ ! -d "$PSANA_BASE" ]; then
-      exit
-    fi
+if [ ! -d "$FFB_BASE" ]; then
+    echo "FFB directory or mount not available for this experiment."
 fi
 
-# setup smalldata code
-# On PSANA
-if [ $PSANA -eq 1 ]; then
-    echo "Cloning smalldata to PSANA experiment directory..."
-    if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
-        echo "Smalldata_tools already on PSANA"
-    else
-        git clone https://github.com/slac-lcls/smalldata_tools.git $PSANA_BASE/results/smalldata_tools
-        git -C $PSANA_BASE/results/smalldata_tools config receive.denyCurrentBranch updateInstead
-    fi
-    echo "... Done."
+# Clone smalldata code
+echo "Cloning smalldata to S3DF experiment directory..."
+if [ -d "$SDF_BASE/results/smalldata_tools" ]; then
+    echo "Smalldata_tools already deployed. Skipping this step."
+else
+    git clone https://github.com/slac-lcls/smalldata_tools.git $SDF_BASE/results/smalldata_tools
 fi
-echo "Sleep 1"
-sleep 1
-# On FFB
-if [ $FFB -eq 1 ]; then
-    echo "Cloning smalldata to FFB experiment directory..."
-    if [ -d "$FFB_BASE/smalldata_tools" ]; then
-        echo "Smalldata_tools already on FFB"
-    else
-        if [ -d "$PSANA_BASE/results/smalldata_tools" ]; then
-            echo "Cloning from the PSANA directory."
-            git clone $PSANA_BASE/results/smalldata_tools $FFB_BASE/smalldata_tools
-        else
-            echo "Cloning from the remote."
-            git clone https://github.com/slac-lcls/smalldata_tools.git $FFB_BASE/smalldata_tools
-        fi
-    fi
-    echo "... Done."
-fi
+echo "... Done."
 
+# change smalldata_tool permissions for the ARP (temporary?)
+# ARP kubernetes pods do not have the ACL
+chmod -R o+r $SDF_BASE/results/smalldata_tools
+chmod o+x $SDF_BASE/results/smalldata_tools
+chmod -R o+x $SDF_BASE/results/smalldata_tools/arp_scripts
+chmod -R o+x $SDF_BASE/results/smalldata_tools/lcls1_producers
+chmod -R o+x $SDF_BASE/results/smalldata_tools/lcls2_producers
 
 # Create h5 and plot directories
-mkdir $PSANA_BASE/stats/summary/Cube
-
-if [ $FFB -eq 1 ]; then
-    mkdir -p $FFB_BASE/hdf5/smalldata
-    mkdir -p $FFB_BASE/hdf5/smalldata/cube
-fi
+mkdir -p $SDF_BASE/hdf5/smalldata
+mkdir -p $SDF_BASE/hdf5/smalldata/cube
+mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
 if [ $QUEUE != "0" ]; then
-    source /reg/g/psdm/etc/psconda.sh -py3
+    source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
     python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
 fi
