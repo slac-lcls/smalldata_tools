@@ -1,25 +1,21 @@
 # importing generic python modules
 import psana
-import abc
 import numpy as np
-try:
-    basestring
-except NameError:
-    basestring = str
+from abc import ABCMeta, abstractmethod
+
 from smalldata_tools.common.detector_base import DefaultDetector_base
 
 
-# defaultDetector = DefaultDetector_base
-
-
-class DefaultDetector(abc.ABC):
+class DefaultDetector(DefaultDetector_base, metaclass=ABCMeta):
     def __init__(self, detname, name, run):
-        self.name = name
-        self.detname = detname
         self._run = run
-        self._debug = False
-        if self.in_run():
-            self.det = self._run.Detector(detname)
+        super().__init__(detname, name)
+        # self.name = name
+        # self.detname = detname
+        # self._debug = False
+        
+        # if self.in_run():
+            # self.det = self._run.Detector(detname)
         if not hasattr(self, '_veto_fields'):
             self._veto_fields = ['TypeId', 'Version', 'config']
 
@@ -29,6 +25,9 @@ class DefaultDetector(abc.ABC):
             if dn == self.detname:
                 return True
         return False
+    
+    def get_psana_det(self):
+        return self._run.Detector(self.detname)
 
     def get_fields(self, top_field):
         """
@@ -66,10 +65,10 @@ class DefaultDetector(abc.ABC):
         )
         return parList
 
-    @abc.abstractmethod
-    def data(self, evt):
-        """ Method that should return a dict of values from event """
-        pass
+    # @abstractmethod
+    # def data(self, evt):
+    #     """ Method that should return a dict of values from event """
+    #     pass
 
 
 def detOnceData(det, data, ts, noarch):
@@ -277,7 +276,7 @@ class epicsDetector(DefaultDetector):
             try:
                 if pv(evt) is not None:
                     dl[pvname]=pv(evt)
-                    if isinstance(dl[pvname], basestring):
+                    if isinstance(dl[pvname], str):
                         dl[pvname]=np.nan
             except:
                 #print('we have issues with %s in this event'%pvname)
@@ -286,7 +285,7 @@ class epicsDetector(DefaultDetector):
 
     def params_as_dict(self):
         """returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
-        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (basestring, int, float, np.ndarray, tuple))) }
+        parList =  {key:self.__dict__[key] for key in self.__dict__ if (key[0]!='_' and isinstance(getattr(self,key), (str, int, float, np.ndarray, tuple))) }
         PVlist = getattr(self,'PVlist')
         parList.update({'PV_%d'%ipv: pv for ipv,pv in enumerate(PVlist) if pv is not None})
         parList.update({'PVname_%d'%ipv: self.alias_2_pv[pv] for ipv,pv in enumerate(PVlist) if pv is not None})
@@ -322,7 +321,7 @@ class scanDetector(DefaultDetector): # ##### NEED FIX
             try:
                 if scan(evt) is not None:
                     dl[scanname]=scan(evt)
-                    if isinstance(dl[scanname], basestring):
+                    if isinstance(dl[scanname], str):
                         dl[scanname]=np.nan
             except:
                 #print('we have issues with %s in this event'%scanname)

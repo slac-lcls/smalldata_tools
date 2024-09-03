@@ -1,16 +1,28 @@
 # importing generic python modules
 import psana
-import abc
+from abc import ABCMeta
 import numpy as np
-try:
-    basestring
-except NameError:
-    basestring = str
 from smalldata_tools.common.detector_base import DefaultDetector_base
-from smalldata_tools.common.epicsarchive import EpicsArchive
+# from smalldata_tools.common.epicsarchive import EpicsArchive
 
 
-defaultDetector = DefaultDetector_base
+class DefaultDetector(DefaultDetector_base, metaclass=ABCMeta):
+    def __init__(self, detname, name):
+        super().__init__(detname, name)
+
+    def in_run(self):
+        dNames = []
+        detnames = psana.DetNames()
+        for dn in detnames:
+            for dnn in dn:
+                if dnn!='':
+                    dNames.append(dnn)
+        if self.detname in dNames:
+            return True
+        return False
+    
+    def get_psana_det(self):
+        return psana.Detector(self.detname)
 
 def detData(detList, evt):
     """
@@ -52,6 +64,7 @@ def setParameter(detList, Params, detName='tt'):
 
 def addArchiverData(det, data, ts):
     try:
+        from smalldata_tools.common.epicsarchive import EpicsArchive
         arch = EpicsArchive()
     except Exception:
         print('Failed to create the EPICS archiver')
@@ -79,7 +92,7 @@ def addArchiverData(det, data, ts):
     return data
 
 
-class lightStatus(defaultDetector):
+class lightStatus(DefaultDetector):
     def __init__(self, codes=[[162],[]], evrName=None):
         if evrName is None:
             evrNames = [ n[0] for  n in psana.DetNames() if ':Evr.' in n[0] ]
@@ -99,7 +112,7 @@ class lightStatus(defaultDetector):
             #snelson: at some point after 2020, Dan D. implemented that the first/lower EVR would be 
             #    the main one carrying the event codes
             evrName = evrNames[0]    
-        defaultDetector.__init__(self, evrName, 'lightStatus')
+        super().__init__(evrName, 'lightStatus')
         self.xrayCodes_drop = [ c for c in codes[0] if c > 0]
         self.laserCodes_drop = [ c for c in codes[1] if c > 0]
         self.xrayCodes_req = [ -c for c in codes[0] if c < 0]
@@ -132,13 +145,13 @@ class lightStatus(defaultDetector):
         dl['laser']=laser_status
         return dl
         
-class ipmDetector(defaultDetector):
+class ipmDetector(DefaultDetector):
     def __init__(self, detname, name=None, savePos=False):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
         self.savePos = savePos
     def data(self, evt):
         dl={}
@@ -150,13 +163,13 @@ class ipmDetector(defaultDetector):
                 dl['ypos']=self.det.ypos(evt)
         return dl
 
-class bmmonDetector(defaultDetector):
+class bmmonDetector(DefaultDetector):
     def __init__(self, detname, name=None, savePos=True):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
         self.savePos = savePos
     def data(self, evt):
         dl={}
@@ -177,14 +190,14 @@ class bmmonDetector(defaultDetector):
             dl['ypos']=data.Y_Position()
         return dl
 
-class wave8Detector(defaultDetector):
+class wave8Detector(DefaultDetector):
     def __init__(self, detname, name=None, saveTime=False):
         if name is None:
             self.name = detname
         else:
             self.name = name
         self.saveTime = saveTime
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
         cfg = self.det.env.configStore().get(psana.Generic1D.ConfigV0, psana.Source(detname))
         self.wave8_shape = None
         if cfg is not None:
@@ -202,14 +215,14 @@ class wave8Detector(defaultDetector):
                     dl['wftime_ch%02d'%itrace]=wftime
         return dl
 
-class impDetector(defaultDetector):
+class impDetector(DefaultDetector):
     def __init__(self, detname, name=None, saveTime=False):
         if name is None:
             self.name = detname
         else:
             self.name = name
         self.saveTime = saveTime
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
         cfg = self.det.env.configStore().get(psana.Imp.ConfigV1, psana.Source(detname))
         self.imp_shape = None
         if cfg is not None:
@@ -226,7 +239,7 @@ class impDetector(defaultDetector):
                 dl['wftime']=wftime
         return dl
 
-class epicsDetector(defaultDetector):
+class epicsDetector(DefaultDetector):
     def __init__(self, name='epics', PVlist=[]):
         self.name = name
         self.detname='epics'
@@ -267,7 +280,7 @@ class epicsDetector(defaultDetector):
         self.PVlist.append(al)
         self.PVlist_PV.append(pv)
 
-    def inRun(self):
+    def in_run(self):
         if len(self.pvs)>0:
             return True
         return False
@@ -277,7 +290,7 @@ class epicsDetector(defaultDetector):
         for pvname,pv in zip(self.PVlist,self.pvs):
             try:
                 dl[pvname]=pv()
-                if isinstance(dl[pvname], basestring):
+                if isinstance(dl[pvname], str):
                     dl[pvname]=np.nan
             except:
                 #print('we have issues with %s in this event'%pvname)
@@ -296,13 +309,13 @@ class epicsDetector(defaultDetector):
             pass
         return d
 
-class encoderDetector(defaultDetector):
+class encoderDetector(DefaultDetector):
     def __init__(self, detname, name=None):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
     def data(self, evt):
         dl={}
         if self.det.descriptions() is None:
@@ -313,9 +326,9 @@ class encoderDetector(defaultDetector):
                     dl[desc]=value
         return dl
 
-class controlDetector(defaultDetector):
+class controlDetector(DefaultDetector):
     def __init__(self, name='scan'):
-        defaultDetector.__init__(self, 'ControlData', 'scan')
+        super().__init__('ControlData', 'scan')
         try:
             self.stepPV = psana.Detector('scan_current_step')
         except:
@@ -334,13 +347,13 @@ class controlDetector(defaultDetector):
             dl[cpv.name()]=cpv.value()
         return dl
 
-class aiDetector(defaultDetector):
+class aiDetector(DefaultDetector):
     def __init__(self, detname, name=None):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
         self.aioInfo = [[ i for i in range(0,16)], [ 'ch%02d'%i for i in range(0,16)], [ 1. for i in range(0,16)], [ 0. for i in range(0,16)]]
 
     def setPars(self, AIOPars):
@@ -367,13 +380,13 @@ class aiDetector(defaultDetector):
                 break
         return dl
 
-class adcDetector(defaultDetector):
+class adcDetector(DefaultDetector):
     def __init__(self, detname, name=None):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
 
     def data(self, evt):
         dl={}
@@ -381,20 +394,20 @@ class adcDetector(defaultDetector):
             dl['ch%d'%ichn]=chv
         return dl
 
-class feeBldDetector(defaultDetector):
+class feeBldDetector(DefaultDetector):
     def __init__(self, detname, name=None):
         if name is None:
             self.name = detname
         else:
             self.name = name
-        defaultDetector.__init__(self, detname, self.name)
+        super().__init__(detname, self.name)
 
     def data(self, evt):
         dl={}
         dl['hproj'] = self.det.get(evt).hproj()
         return dl
 
-class ttDetector(defaultDetector):
+class ttDetector(DefaultDetector):
     def __init__(self, name='tt', baseName=None, env=None):
         """
         Throughout LCLS history, different tt prefix have been used. This class aims at 
@@ -444,7 +457,7 @@ class ttDetector(defaultDetector):
                 self.subtract_sideband=ttCfg.subtract_sideband()
                 self.ttCalib = ttCfg.calib_poly()
     
-    def inRun(self):
+    def in_run(self):
         if len(self.pvs)>0:
             return True
         return False
@@ -470,7 +483,7 @@ class ttDetector(defaultDetector):
                 dl['ttCorr'] = 0.
             return dl
 
-class damageDetector(defaultDetector):
+class damageDetector(DefaultDetector):
     def __init__(self, name='damage'):
         self.name = name
         self.detNames=[]
@@ -480,8 +493,10 @@ class damageDetector(defaultDetector):
             else:
                 self.detNames.append(dn[0])
         self.detAlias=[ det for det in self.detNames]
-    def inRun(self):
+    
+    def in_run(self):
         return True
+    
     def setPars(self, detList):
         for det in detList:
             try:
@@ -489,6 +504,7 @@ class damageDetector(defaultDetector):
                     self.detAlias[self.detNames.index(det.detname)]=det.name
             except:
                 pass    
+    
     def data(self,evt):
         #check if detectors are in event
         dl={}
@@ -517,7 +533,7 @@ class l3tDetector(object):
         self._debug = False
 
     #rely on fail save
-    def inRun(self):
+    def in_run(self):
         return True
 
     def _setDebug(self, debug):
@@ -539,7 +555,7 @@ class l3tDetector(object):
 #
 # needs testing with data.
 #
-class ttRawDetector(defaultDetector):
+class ttRawDetector(DefaultDetector):
     def __init__(self, name='ttRaw', env=None):
         self.name = name
         self.detname = ''
@@ -570,17 +586,17 @@ class ttRawDetector(defaultDetector):
             if cfgKey.type() == psana.TimeTool.ConfigV2:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV2, cfgKey.src())
                 self.detname = cfgKey.alias()
-                defaultDetector.__init__(self, self.detname, 'ttRaw')
+                super().__init__(self.detname, 'ttRaw')
                 self.ttCfg = 'TimeToolV2'
             elif cfgKey.type() == psana.TimeTool.ConfigV1:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV1, cfgKey.src())
                 self.detname = cfgKey.alias()
-                defaultDetector.__init__(self, self.detname, 'ttRaw')
+                super().__init__(self.detname, 'ttRaw')
                 self.ttCfg = 'TimeToolV1'
             elif cfgKey.type() == psana.TimeTool.ConfigV3:
                 ttCfg = env.configStore().get(psana.TimeTool.ConfigV3, cfgKey.src())
                 self.detname = cfgKey.alias()
-                defaultDetector.__init__(self, self.detname, 'ttRaw')
+                super().__init__(self.detname, 'ttRaw')
                 self.ttCfg = 'TimeToolV3'
         if ttCfg is not None:
             self.ttProj=ttCfg.write_projections()
@@ -609,12 +625,12 @@ class ttRawDetector(defaultDetector):
                 self.laserOff.append(el.event_code())
 
         else:
-            defaultDetector.__init__(self, self.detname, 'ttRaw')
+            super().__init__(self.detname, 'ttRaw')
         
-    def inRun(self):
+    def in_run(self):
         if self.detname=='':
             return False
-        return defaultDetector.inRun(self)
+        return super().in_run(self)
 
     def setPars(self, ttPars):
         parsList = ['ttProj','ttROI_signal', 'ttROI_sideband','ttROI_reference','weights','runningRef','refitData','useProjection','sb_convergence','ref_convergence','subtract_sideband','ttCalib','beamOff', 'laserOff', 'kind']
@@ -790,7 +806,7 @@ class ttRawDetector(defaultDetector):
 
         return retDict
 
-class xtcavDetector(defaultDetector):
+class xtcavDetector(DefaultDetector):
     def __init__(self, name='xtcav', detname='xtcav', method=''):
         self.name = name
         self.detname = detname
@@ -856,13 +872,13 @@ class xtcavDetector(defaultDetector):
 
         return dl
 
-class gmdDetector(defaultDetector):
+class gmdDetector(DefaultDetector):
     def __init__(self,  name=None):
         if name is None:
             self.name = 'GMD'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'GMD', self.name)
+        super().__init__('GMD', self.name)
 
     def data(self, evt):
         dl={}
@@ -873,13 +889,13 @@ class gmdDetector(defaultDetector):
                dl[field]=getattr(raw, field)()
         return dl
 
-class eorbitsDetector(defaultDetector):
+class eorbitsDetector(DefaultDetector):
     def __init__(self, name=None):
         if name is None:
             self.name = 'EOrbits'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'EOrbits', self.name)
+        super().__init__('EOrbits', self.name)
     def data(self, evt):
         dl={}
         detData = self.det.get(evt)
@@ -894,13 +910,13 @@ class eorbitsDetector(defaultDetector):
 # mpiData fields are not available here.
 #
 
-class ebeamDetector(defaultDetector):
+class ebeamDetector(DefaultDetector):
     def __init__(self, name=None):
         if name is None:
             self.name = 'ebeam'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'EBeam', self.name)
+        super().__init__('EBeam', self.name)
     
     def data(self, evt):
         dl={}
@@ -912,13 +928,13 @@ class ebeamDetector(defaultDetector):
         return dl
 
 
-class gasDetector(defaultDetector):
+class gasDetector(DefaultDetector):
     def __init__(self, name=None):
         if name is None:
             self.name = 'gas_detector'
         else:
             self.name = name
-        defaultDetector.__init__(self, 'FEEGasDetEnergy', self.name)
+        super().__init__('FEEGasDetEnergy', self.name)
     
     def data(self, evt):
         dl={}
@@ -930,37 +946,38 @@ class gasDetector(defaultDetector):
         return dl
 
 
-class scanDetector(defaultDetector):
-    def __init__(self, name='scan',run=None):
-        self.name = name
-        self.detname='scan'
+class scanDetector(DefaultDetector):
+    def __init__(self, name='scan', run=None):
+        super().__init__('scan', name)
+        # self.name = name
+        # self.detname='scan'
         self.scans = []
         self.scanlist = []
         vetolist = ['step_docstring']
-        try:
-            scanlist = [k[0] for k in run.scaninfo if k[0] not in vetolist]
-            for scan in scanlist:
-                try:
-                    self.scans.append(run.Detector(scan))
-                    self.scanlist.append(scan)
-                except:
-                    print('could not find LCLS2 EPICS PV %s in data'%pv)
-        except:
-            pass
+        # try:
+        #     scanlist = [k[0] for k in run.scaninfo if k[0] not in vetolist]
+        #     for scan in scanlist:
+        #         try:
+        #             self.scans.append(run.Detector(scan))
+        #             self.scanlist.append(scan)
+        #         except:
+        #             print('could not find LCLS2 EPICS PV %s in data'%pv)
+        # except:
+        #     pass
 
-    def inRun(self):
+    def in_run(self):
         if len(self.scans)>0:
             return True
         return False
 
     def data(self,evt):
         dl={}
-        for scanname,scan in zip(self.scanlist,self.scans):
+        for scanname, scan in zip(self.scanlist, self.scans):
             try:
                 if scan(evt) is not None:
-                    dl[scanname]=scan(evt)
-                    if isinstance(dl[scanname], basestring):
-                        dl[scanname]=np.nan
+                    dl[scanname] = scan(evt)
+                    if isinstance(dl[scanname], str):
+                        dl[scanname] = np.nan
             except:
                 #print('we have issues with %s in this event'%scanname)
                 pass

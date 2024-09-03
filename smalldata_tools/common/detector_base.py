@@ -1,14 +1,12 @@
-import abc
 import logging
+import numpy as np
 from dataclasses import dataclass
 from future.utils import iteritems
-import numpy as np
-
-import psana  # do we really want to do that in the common section?
+from abc import ABCMeta, abstractmethod
 
 logger = logging.getLogger(__name__)
 
-class DetObject_base(abc.ABC):
+class DetObject_base(metaclass=ABCMeta):
     pass
 
 
@@ -38,34 +36,39 @@ def detData(detList, evt):
     return data
 
 
-class DefaultDetector_base(abc.ABC):
-    def __init__(self, detname, name, run=None):
+class DefaultDetector_base(metaclass=ABCMeta):
+    def __init__(self, detname, name):
         self.name = name
         self.detname = detname
         self._debug = False
-        self._run = run
         self.det = None # Move definition to relevant sub-classes?
-        if self.inRun():
-            if run is None:
-                self.det = psana.Detector(detname)
-            else:
-                self.det = run.Detector(detname)
+
+        if self.in_run():
+            self.det = self.get_psana_det()
+
+    @abstractmethod
+    def in_run(self):
+        """ Returns whether the detector is available for this data source. """
+        pass
+        # dNames=[]
+        # try:
+        #     detnames = psana.DetNames()
+        #     for dn in detnames:
+        #         for dnn in dn:
+        #             if dnn!='':
+        #                 dNames.append(dnn)
+        # except:
+        #     detnames = self._run.detinfo
+        #     for dn in detnames:
+        #         dNames.append(dn[0])
+        # if self.detname in dNames:
+        #     return True
+        # return False
     
-    def inRun(self):
-        dNames=[]
-        try:
-            detnames = psana.DetNames()
-            for dn in detnames:
-                for dnn in dn:
-                    if dnn!='':
-                        dNames.append(dnn)
-        except:
-            detnames = self._run.detinfo
-            for dn in detnames:
-                dNames.append(dn[0])
-        if self.detname in dNames:
-            return True
-        return False
+    @abstractmethod
+    def get_psana_det(self):
+        """ Method to return the underlying detector object """
+        pass
     
     def _setDebug(self, debug):
         self._debug = debug
@@ -88,7 +91,7 @@ class DefaultDetector_base(abc.ABC):
         )
         return parList
     
-    @abc.abstractmethod
+    @abstractmethod
     def data(self, evt):
         """ Method that should return a dict of values from event """
         pass

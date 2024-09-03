@@ -29,7 +29,7 @@ def defaultDetectors(hutch, run=None, env=None):
         dets = uedDetectors(run)
     else:
         dets = []
-    detsInRun= [ det for det in dets if det.inRun() ]
+    detsInRun= [ det for det in dets if det.in_run() ]
     #print('found %d detectors '%len(detsInRun))
     return detsInRun
 

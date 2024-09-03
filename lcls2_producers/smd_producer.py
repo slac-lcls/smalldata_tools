@@ -80,17 +80,18 @@ def define_dets(run, det_list):
                                     ROI=ROIs[detname][sdetname])
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
+            continue
 
-        elif detname in rois_args:
+        if detname in rois_args:
             for iROI,ROI in enumerate(rois_args[detname]):
                 try:
-                    proj_dir = ROI.pop('proj_dir')
+                    proj_ax = ROI.pop('proj_ax')
                 except:
-                    proj_dir = None
+                    proj_ax = None
 
                 thisROIFunc = ROIFunc(**ROI)
-                if proj_dir is not None:
-                    thsiROIFunc.addfunc(projectionFunc(axis=proj_dir))
+                if proj_ax is not None:
+                    thsiROIFunc.addfunc(projectionFunc(axis=proj_ax))
                 det.addFunc(thisROIFunc)
 
 
@@ -636,6 +637,18 @@ if small_data._type == 'server':
 
 print(f"smalldata.done() on rank {rank}")
 small_data.done()
+
+
+# Epics data from the archiver
+h5_rank = None
+if small_data._type == 'client' and small_data._full_filename is not None:
+    if small_data._client_comm.Get_rank() == 0:
+        h5_rank = rank
+
+# Add epics PVs from archiver to the file
+if rank == h5_rank:
+    logger.info(f"Getting epics data from Archiver (rank: {rank})")
+    from smalldata_tools.common.epicsarchive import EpicsArchive
 
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
