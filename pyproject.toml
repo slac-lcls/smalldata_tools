@@ -13,3 +13,8 @@ filterwarnings = [
 log_cli = 1
 log_cli_level = "INFO"
 log_cli_format = "[%(levelname)6s] %(message)s"
+
+
+[tool.black]
+line-length = 88
+target-version = ['py39']

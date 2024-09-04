@@ -2,11 +2,8 @@ import math
 import os
 import time
 import datetime
+from dateutil.relativedelta import relativedelta
 import urllib
-try:
-    from urllib.request import urlopen
-except:
-    from urllib2 import urlopen
 import asyncio
 import httpx
 import matplotlib.pyplot as plt
@@ -26,7 +23,7 @@ url_arg = "&{0}={1}"
 url_flag = "&{0}"
 date_spec_format = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
 
-offset_to_epoch = 31536000*20
+offset_to_epoch = 31536000 * 20
 
 
 class EpicsArchive(object):
@@ -34,6 +31,7 @@ class EpicsArchive(object):
     Class that accesses data from the new archiver.
     Currently supports getting points, plotting points, and searching for pvs.
     """
+
     def __init__(self):
         self._pts_cache = None
         self._pv_cache = None
@@ -50,7 +48,9 @@ class EpicsArchive(object):
         """
         when_start = to_datetime(when, "days")
         json_start, json_end = self._json_args(when, when, "days")
-        incr = datetime.timedelta(seconds=60)   # How far to look forward for a second data point.
+        incr = datetime.timedelta(
+            seconds=60
+        )  # How far to look forward for a second data point.
         found = False
         now = datetime.datetime.now().astimezone(datetime.timezone.utc)
         while not found:
@@ -61,7 +61,7 @@ class EpicsArchive(object):
             json_obj = self._get_json(PV, json_start, json_end, False)
             if len(json_obj) == 0:  # Time must be before archiving!
                 return None
-            if len(json_obj[0]['data']) > 1 or when_end >= now:
+            if len(json_obj[0]["data"]) > 1 or when_end >= now:
                 found = True
             else:
                 # We only have 0-1 data points.
@@ -69,7 +69,7 @@ class EpicsArchive(object):
                     incr = 10 * incr
                 else:
                     incr = incr + datetime.timedelta(days=1)
-        data = json_obj[0]['data']
+        data = json_obj[0]["data"]
         # Now, data[0] is a data point archived before when. But
         # data[1] might contain a fields/cnxlostepsecs tag that
         # invalidates it!
@@ -78,18 +78,29 @@ class EpicsArchive(object):
         # mean that we are *still* disconnected?  Or is the data valid?
         #
         # For now, let's pretend that it's valid.
-        if (len(data) > 1 and 
-            'fields' in data[1].keys() and 
-            'cnxlostepsecs' in data[1]['fields'].keys() and
-            float(data[1]['fields']['cnxlostepsecs']) < when_start.timestamp()):
+        if (
+            len(data) > 1
+            and "fields" in data[1].keys()
+            and "cnxlostepsecs" in data[1]["fields"].keys()
+            and float(data[1]["fields"]["cnxlostepsecs"]) < when_start.timestamp()
+        ):
             return None
         if value_only:
-            return data[0]['val']
+            return data[0]["val"]
         else:
-            return (data[0]["secs"] + data[0]['nanos']/1e9, data[0]["val"])
+            return (data[0]["secs"] + data[0]["nanos"] / 1e9, data[0]["val"])
 
-    async def get_points(self, PV=None, start=30, end=None, unit="days", 
-                         chunk=False, two_lists=False, raw=False, useMS=False):
+    async def get_points(
+        self,
+        PV=None,
+        start=30,
+        end=None,
+        unit="days",
+        chunk=False,
+        two_lists=False,
+        raw=False,
+        useMS=False,
+    ):
         """
         Get points from the archive, returning them as a list of tuples.
         You may set two_lists=True to get a list of positions and a list of
@@ -134,7 +145,7 @@ class EpicsArchive(object):
         fig = plt.figure()
         fig.canvas.set_window_title("EPICS Archive " + PV)
         plt.plot(t, x, "k.")
-        plt.step(t, x, where='post', color='k')
+        plt.step(t, x, where="post", color="k")
         plt.ylabel(PV)
         plt.show(block=False)
 
@@ -190,7 +201,8 @@ class EpicsArchive(object):
             units of time are valid, expressed as a string, and many aliases
             are supported.
         """
-        pass # This only exists to hold the common doc string elements
+        pass  # This only exists to hold the common doc string elements
+
     get_points.__doc__ += __interface.__doc__
     plot_points.__doc__ += __interface.__doc__
 
@@ -240,7 +252,10 @@ class EpicsArchive(object):
         """
         Interprets a data retrieval json object as an array of tuple points.
         """
-        return [ (x["secs"] + (x['nanos']/1e9 if useMS else 0), x["val"]) for x in json_obj[0]["data"] ]
+        return [
+            (x["secs"] + (x["nanos"] / 1e9 if useMS else 0), x["val"])
+            for x in json_obj[0]["data"]
+        ]
 
     def _pts_to_arrays(self, pts):
         """
@@ -248,20 +263,22 @@ class EpicsArchive(object):
         """
         t_array = []
         val_array = []
-        for (t, val) in pts:
+        for t, val in pts:
             t_array.append(t)
             val_array.append(val)
         return t_array, val_array
 
+
 days_map = {}
-days_map.update({ x: 365              for x in ("years", "year", "yr", "y")        })
-days_map.update({ x: 365./12          for x in ("months", "month", "mon")          })
-days_map.update({ x: 7                for x in ("weeks", "week", "wks", "wk", "w") })
-days_map.update({ x: 1                for x in ("days", "day", "d")                })
-days_map.update({ x: 1./24            for x in ("hours", "hour", "hrs", "hr", "h") })
-days_map.update({ x: 1./24/60         for x in ("minutes", "mins", "min")          })
-days_map.update({ x: 1./24/60/60      for x in ("seconds", "secs", "sec", "s")     })
-days_map.update({ x: 1./24/60/60/1000 for x in ("milliseconds", "msec", "ms")      })
+days_map.update({x: 365 for x in ("years", "year", "yr", "y")})
+days_map.update({x: 365.0 / 12 for x in ("months", "month", "mon")})
+days_map.update({x: 7 for x in ("weeks", "week", "wks", "wk", "w")})
+days_map.update({x: 1 for x in ("days", "day", "d")})
+days_map.update({x: 1.0 / 24 for x in ("hours", "hour", "hrs", "hr", "h")})
+days_map.update({x: 1.0 / 24 / 60 for x in ("minutes", "mins", "min")})
+days_map.update({x: 1.0 / 24 / 60 / 60 for x in ("seconds", "secs", "sec", "s")})
+days_map.update({x: 1.0 / 24 / 60 / 60 / 1000 for x in ("milliseconds", "msec", "ms")})
+
 
 async def url_query(url):
     """
@@ -274,6 +291,7 @@ async def url_query(url):
         req = await client.get(url)
     return req.json()
 
+
 def to_datetime(arg, unit):
     """
     Convert some form of date input into a UTC datetime object.
@@ -281,16 +299,19 @@ def to_datetime(arg, unit):
     if isinstance(arg, datetime.datetime):
         return arg.astimezone(datetime.timezone.utc)
     if isinstance(arg, (int, float)):
-        if (arg < 10000):
+        if arg < 10000:
             return datetime_ago(arg, unit)
-        else: #big - must be time in secs since epoch.
-            return datetime.datetime.fromtimestamp(int(arg)).astimezone(datetime.timezone.utc)
+        else:  # big - must be time in secs since epoch.
+            return datetime.datetime.fromtimestamp(int(arg)).astimezone(
+                datetime.timezone.utc
+            )
     if isinstance(arg, (list, tuple)):
         arg = list(arg)
         while len(arg) < 3:
             arg.append(0)
         return datetime.datetime(*arg).astimezone(datetime.timezone.utc)
- 
+
+
 def datetime_ago(delta, unit):
     """
     Return datetime object at the time of delta units ago.
@@ -302,17 +323,20 @@ def datetime_ago(delta, unit):
     t = datetime.datetime.now() - datetime.timedelta(days)
     return t.astimezone(datetime.timezone.utc)
 
+
 def datetime_to_array(dt):
     """
     Convert UTC datetime object to an array that can be passed to date_format.
     """
     return [dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond]
 
+
 def date_format(year=2015, month=1, day=1, hr=0, min=0, s=0, ms=0):
     """Convert date/time parameters to date format string for archiver"""
     d = date_spec_format.format(year, month, day, hr, min, s, ms)
     # return urllib.parse.quote(d, safe="")  # if urllib is used
     return d
+
 
 def valid_date_arrays(start, end):
     """
@@ -327,6 +351,7 @@ def valid_date_arrays(start, end):
         return True
     return False
 
+
 def pts_string_time(pts):
     """
     Convert array of points of the form (unix timestamp, value) to the form
@@ -337,6 +362,7 @@ def pts_string_time(pts):
         newpts.append((time.ctime(pts[i][0]), pts[i][1]))
     return newpts
 
+
 def list_print(data):
     """
     Prints list data in columns as you'd expect from a terminal.
@@ -345,8 +371,8 @@ def list_print(data):
         return False
     text_data = [str(i) for i in data]
     col_width = max([len(i) for i in text_data]) + 2
-    _, term_width = os.popen('stty size', 'r').read().split()
-    n_cols = int(term_width)/col_width
+    _, term_width = os.popen("stty size", "r").read().split()
+    n_cols = int(term_width) / col_width
     n_text = len(text_data)
     n_full_col = int(math.ceil(float(n_text) / n_cols))
     text_rows = []
@@ -367,3 +393,14 @@ def list_print(data):
         print(line)
     return True
 
+
+def ts_to_datetime(ts):
+    """
+    The LCLS timestamp is using the EPICS epoch, which is
+    20 years after the POSIX epoch.
+    """
+    sec = ts >> 32 & 0xFFFFFFFF
+    nsec = nsec = ts & 0xFFFFFFFF
+    dt = datetime.datetime.fromtimestamp(sec + nsec * 1e-9)
+    dt += relativedelta(years=20)
+    return dt

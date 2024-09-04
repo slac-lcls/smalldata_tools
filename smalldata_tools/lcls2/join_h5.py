@@ -7,12 +7,13 @@ import h5py
 import glob
 from psana.smalldata import _get_missing_value, is_unaligned
 
+
 def myjoin(joined_file):
     # Get part files list
     # Assumes that the files are of the form <joined_file)_part<N>.h5
     joined_file = str(joined_file)
-    joined_file = h5py.File(joined_filename, 'w', libver='latest')
-    files = glob.glob(joined_filename.replace('.h5','_part*.h5'))
+    joined_file = h5py.File(joined_filename, "w", libver="latest")
+    files = glob.glob(joined_filename.replace(".h5", "_part*.h5"))
 
     # discover all the dataset names
     file_dsets = {}
@@ -25,7 +26,7 @@ def myjoin(joined_file):
     all_dsets = []
     for fn in files:
         tmp_dsets = {}
-        f = h5py.File(fn, 'r')
+        f = h5py.File(fn, "r")
         f.visititems(assign_dset_info)
         file_dsets[fn] = tmp_dsets
         all_dsets += list(tmp_dsets.keys())
@@ -57,13 +58,12 @@ def myjoin(joined_file):
             # "fillvalue" argument below.  if it's unaligned, then
             # we don't need to extend it at all.
             elif not is_unaligned(dset_name):
-                if '/timestamp' in dsets:
-                    total_events += dsets['/timestamp'][1][0]
+                if "/timestamp" in dsets:
+                    total_events += dsets["/timestamp"][1][0]
 
         combined_shape = (total_events,) + shape[1:]
 
-        layout = h5py.VirtualLayout(shape=combined_shape, 
-                                    dtype=dtype)
+        layout = h5py.VirtualLayout(shape=combined_shape, dtype=dtype)
 
         # part (2): now that the number of events is known for this
         # dataset, fill in the "soft link" that points from the
@@ -76,7 +76,9 @@ def myjoin(joined_file):
             if dset_name in dsets.keys():
                 _, shape = dsets[dset_name]
                 vsource = h5py.VirtualSource(fn, dset_name, shape=shape)
-                layout[index_of_last_fill:index_of_last_fill+shape[0], ...] = vsource
+                layout[index_of_last_fill : index_of_last_fill + shape[0], ...] = (
+                    vsource
+                )
                 index_of_last_fill += shape[0]
 
             else:
@@ -84,13 +86,13 @@ def myjoin(joined_file):
                 if is_unaligned(dset_name):
                     pass
                 else:
-                    if '/timestamp' in dsets:
-                        n_timestamps = dsets['/timestamp'][1][0]
+                    if "/timestamp" in dsets:
+                        n_timestamps = dsets["/timestamp"][1][0]
                         index_of_last_fill += n_timestamps
 
-        joined_file.create_virtual_dataset(dset_name,
-                                           layout,
-                                           fillvalue=_get_missing_value(dtype))
+        joined_file.create_virtual_dataset(
+            dset_name, layout, fillvalue=_get_missing_value(dtype)
+        )
 
     joined_file.close()
     return 0

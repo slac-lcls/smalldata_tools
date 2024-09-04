@@ -11,12 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 class SmallDataAna_psana_lcls2(BaseSmallDataAna_psana):
-    def __init__(self, expname='', run=-1, dirname='', filename='', plotWith='matplotlib'):
-        super().__init__(expname=expname, run=run, dirname=dirname, filename=filename, plotWith=plotWith)
-        
+    def __init__(
+        self, expname="", run=-1, dirname="", filename="", plotWith="matplotlib"
+    ):
+        super().__init__(
+            expname=expname,
+            run=run,
+            dirname=dirname,
+            filename=filename,
+            plotWith=plotWith,
+        )
+
         xtcdirname = None
         hostname = socket.gethostname()
-        if hostname.find('drp-srcf')>=0:
-            xtcdirname='/cds/data/drpsrcf/{self.hutch.lower()/{expname}/xtc'
+        if hostname.find("drp-srcf") >= 0:
+            xtcdirname = "/cds/data/drpsrcf/{self.hutch.lower()/{expname}/xtc"
         self.ds = psana.DataSource(exp=expname, run=run, dir=xtcdirname)
         return
