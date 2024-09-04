@@ -18,3 +18,8 @@ log_cli_format = "[%(levelname)6s] %(message)s"
 [tool.black]
 line-length = 88
 target-version = ['py39']
+extend-exclude = '''(
+    .*.sh
+    #| .*.another_extension
+    | README
+)'''

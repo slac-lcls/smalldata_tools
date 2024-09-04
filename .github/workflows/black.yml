@@ -1,0 +1,13 @@
+name: Black-format
+on: [push, pull_request]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: psf/black@stable
+        with:
+          options: "--verbose --color"
+          src: "./lute"
+          use_pyproject: true
