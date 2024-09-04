@@ -48,8 +48,14 @@ class dropletFunc(DetObjectFunc):
         self.relabel = kwargs.get("relabel", True)
         self._mask = kwargs.get("mask", None)
         self._debug = False
-        self.footprint = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
-        self._footprint2d = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+        # fmt: off
+        self.footprint = np.array([[0, 1, 0],
+                                   [1, 1, 1],
+                                   [0, 1, 0]])
+        self._footprint2d = np.array([[0, 1, 0],
+                                      [1, 1, 1],
+                                      [0, 1, 0]])
+        # fmt: on
         self._saveDrops = False
         self._flagMasked = False
         self._needProps = False
