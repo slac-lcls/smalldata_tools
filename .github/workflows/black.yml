@@ -10,4 +10,3 @@ jobs:
         with:
           options: "--check --verbose --color"
           src: "./smalldata_tools"
-          # use_pyproject: true
