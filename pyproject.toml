@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 # addopts = "-rA"
 testpaths = [
@@ -9,3 +13,13 @@ filterwarnings = [
 log_cli = 1
 log_cli_level = "INFO"
 log_cli_format = "[%(levelname)6s] %(message)s"
+
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+extend-exclude = '''(
+    .*.sh
+    #| .*.another_extension
+    | README
+)'''

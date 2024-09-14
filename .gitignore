@@ -2,5 +2,5 @@
 *.py~
 *.pyc
 *.ipynb_checkpoints
-*.so\
+*.so
 __pycache__/

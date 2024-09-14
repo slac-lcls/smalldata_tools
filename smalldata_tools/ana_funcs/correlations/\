@@ -9,7 +9,7 @@ import sys
 
 import correlation as corr
 import DetObject as dobj
-from smalldata_tools.DetObject import DetObjectFunc
+from smalldata_tools.common.base_detector import DetObjectFunc
 
 
 class Autocorrelation(DetObjectFunc):

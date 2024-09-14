@@ -151,7 +151,6 @@ export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
 # Default queue and S3DF flag
 DEFQUEUE='psanaq'
@@ -183,7 +182,8 @@ fi
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
-    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/lcls2_producers/g`
+    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh    
     PYTHONEXE=smd2_producer.py
     if [ -v INTEG ]; then
         echo 'test integrating det setup'
@@ -192,6 +192,7 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/lcls1_producers/g`
     if $ON_S3DF; then
         source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     else
