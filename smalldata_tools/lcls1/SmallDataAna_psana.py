@@ -32,11 +32,11 @@ except NameError:
     raw_input = input
 
 
-import smalldata_tools.SmallDataAna as sda
+import smalldata_tools.common.SmallDataAna as sda
 
-from smalldata_tools.BaseSmallDataAna_psana import BaseSmallDataAna_psana
-from smalldata_tools.DetObject import DetObject, DetObjectClass
-from smalldata_tools.SmallDataUtils import getUserData
+from smalldata_tools.lcls1.BaseSmallDataAna_psana import BaseSmallDataAna_psana
+from smalldata_tools.lcls1.DetObject import DetObject, DetObjectClass
+from smalldata_tools.common.detector_base import getUserData
 from smalldata_tools.utilities import printR
 from smalldata_tools.utilities import addToHdf5
 from smalldata_tools.utilities import rename_reduceRandomVar
@@ -50,7 +50,7 @@ from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 
 try:
-    import smalldata_tools.cube.cube_mpi_fun as mpi_fun
+    import smalldata_tools.lcls1.cube.cube_mpi_fun as mpi_fun
 except:
     print(
         "Can't import smalldata_tools.cube.cube_mpi_fun."

@@ -131,7 +131,7 @@ export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
+ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/lcls1_producers/g`
 
 # Default queue and S3DF flag
 DEFQUEUE='psanaq'

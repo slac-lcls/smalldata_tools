@@ -32,7 +32,7 @@ from smalldata_tools.utilities import running_median_insort
 from smalldata_tools.utilities import get_startOffIdx, get_offVar
 from smalldata_tools.utilities import getBins as util_getBins
 from smalldata_tools.utilities import printR
-from smalldata_tools.epicsarchive import EpicsArchive
+from smalldata_tools.common.epicsarchive import EpicsArchive
 from smalldata_tools.utilities_plotting import plotImageBokeh, plotMarker
 from smalldata_tools.utilities_plotting import plotImage
 import bokeh

@@ -4,8 +4,8 @@ import time
 import itertools
 
 import psana
-from smalldata_tools.DetObject import DetObject, DetObjectFunc
-from smalldata_tools.SmallDataUtils import getUserData
+from smalldata_tools.lcls1.DetObject import DetObject, DetObjectFunc
+from smalldata_tools.common.detector_base import getUserData
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc

@@ -35,7 +35,6 @@ def DetObject(srcName, run, **kwargs):
         "piranha4": PiranhaObject,
         "archon": ArchonObject,
     }
-    # print('dettype: ', det._dettype)
     cls = detector_classes[det._dettype]
     return cls(det, run, **kwargs)
 
