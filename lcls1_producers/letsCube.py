@@ -22,7 +22,7 @@ fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
 print(fpathup)
-import smalldata_tools.cube.cube_mpi_fun as mpi_fun
+import smalldata_tools.lcls1.cube.cube_mpi_fun as mpi_fun
 
 ##########################################################
 # Custom exception handler to make job abort if a single rank fails.
@@ -62,9 +62,9 @@ exp = args.experiment
 run = args.run
 
 if rank==0:
-    from smalldata_tools.SmallDataAna import SmallDataAna
-    from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana
-    import smalldata_tools.cube.cube_rank0_utils as utils
+    from smalldata_tools.common.SmallDataAna import SmallDataAna
+    from smalldata_tools.lcls1.SmallDataAna_psana import SmallDataAna_psana
+    import smalldata_tools.lcls1.cube.cube_rank0_utils as utils
     
     # Constants
     HUTCHES = [
