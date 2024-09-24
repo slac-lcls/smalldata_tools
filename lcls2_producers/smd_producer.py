@@ -301,7 +301,7 @@ if hostname.find('sdf')>=0:
                 print(f"Waited {str(n_wait*10)}s, still no files available. " \
                        "Giving up, please check dss nodes and data movers. " \
                        "Exiting now.")
-                sys.exit()
+                raise RuntimeError("Waited {str(n_wait*10)}s, still no files available. Giving up.")
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
@@ -315,7 +315,7 @@ if hostname.find('sdf')>=0:
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if len(xtc_files)==0:
         print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
-        sys.exit()
+        raise RuntimeError(f'We have no xtc files for run {run} in {exp} in the offline system.')
 
 else:
     logger.warning('On an unknow system, things may get weird.')
