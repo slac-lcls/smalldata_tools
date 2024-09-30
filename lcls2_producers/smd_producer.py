@@ -298,10 +298,8 @@ if hostname.find('sdf')>=0:
         waitFilesStart=datetime.now()
         while nFiles == 0:
             if n_wait > max_wait:
-                print(f"Waited {str(n_wait*10)}s, still no files available. " \
-                       "Giving up, please check dss nodes and data movers. " \
-                       "Exiting now.")
-                sys.exit()
+                raise RuntimeError("Waited {str(n_wait*10)}s, still no files available. Giving up.")
+
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
@@ -314,9 +312,7 @@ if hostname.find('sdf')>=0:
 
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if len(xtc_files)==0:
-        print(f'We have no xtc files for run {run} in {exp} in the offline system. Exit now.')
-        sys.exit()
-
+        raise RuntimeError(f'We have no xtc files for run {run} in {exp} in the offline system.')
 else:
     logger.warning('On an unknow system, things may get weird.')
 
@@ -337,9 +333,9 @@ if args.nevents != 0:
 
 # Setup if integrating detectors are requested.
 if len(config.integrating_detectors) > 0:
-    datasource_args['intg_det'] = config.integrating_detectors[0]  # problem is we have more than 1 int det here?
+    datasource_args['intg_det'] = config.integrating_detectors[0]  # problem if we have more than 1 int det here?
     datasource_args['batch_size'] = 1
-    os.environ['PS_SMD_N_EVENTS']='1'
+    os.environ['PS_SMD_N_EVENTS'] = '1'
 
 ds = psana.DataSource(**datasource_args)
 
@@ -388,8 +384,8 @@ if not ds.is_srv(): # srv nodes do not have access to detectors.
                 pass
             logger.info('adding all epicsPVs....')
             default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
-    elif len(config.epicsPV) > 0:
-        default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser', run=thisrun))
+    # elif len(config.epicsPV) > 0:
+    #     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser', run=thisrun))
 
     if len(config.epicsOncePV) > 0:
         EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce', run=thisrun)
@@ -567,7 +563,7 @@ for evt_num, evt in enumerate(event_iter):
         
     small_data.event(evt, det_data)
 
-    #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
+    #the ARP will pass run & exp via the environment, if I see that info, the post updates
     if ((evt_num<10) or(evt_num<100 and (evt_num%10)==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
         if (int(os.environ.get('RUN_NUM', '-1')) > 0):
             if not ((evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)): continue
@@ -623,7 +619,8 @@ if not ds.is_srv():
 # are needed here.
 # Hopefully this can be removed soon.
 print(f"Smalldata type for rank {rank}: {small_data._type}")
-import h5py
+if ds.unique_user_rank():
+    print(f"user rank: {rank}")
 
 if small_data._type == 'server':
     print(f"Close smalldata server file on {rank}")
@@ -633,7 +630,7 @@ if small_data._type == 'server':
             small_data._server.write_to_file(dset, cache)
     time.sleep(1)
     small_data._server.file_handle.close()
-    time.sleep(15)
+    time.sleep(15)  # Long wait time needed here. Filesystem...
 
 print(f"smalldata.done() on rank {rank}")
 small_data.done()
@@ -646,9 +643,37 @@ if small_data._type == 'client' and small_data._full_filename is not None:
         h5_rank = rank
 
 # Add epics PVs from archiver to the file
+import pdb
+
 if rank == h5_rank:
     logger.info(f"Getting epics data from Archiver (rank: {rank})")
-    from smalldata_tools.common.epicsarchive import EpicsArchive
+    import asyncio
+    import h5py
+    from smalldata_tools.common.epicsarchive import EpicsArchive, ts_to_datetime
+    h5_for_arch = h5py.File(h5_f_name, 'a')
+    
+    ts = h5_for_arch["timestamp"]
+    start = ts_to_datetime( min(ts[ :int(1e5) ]) )  # assumes the early timestamps are in the first 10k events
+    end = ts_to_datetime( max(ts[ int(-1e5): ]) )  # assumes the early timestamps are in the last 10k events
+
+    epics_archive = EpicsArchive()
+    loop = asyncio.get_event_loop()
+    coroutines = [
+        epics_archive.get_points(PV=pv, start=start, end=end, raw=True, useMS=True)
+        for pv in config.epicsPV
+    ]
+    # pdb.set_trace()
+    logger.debug(f"Run PV retrieval (async)")
+    data = loop.run_until_complete(asyncio.gather(*coroutines))
+    h5_for_arch.create_group("epics_archiver")
+    for pv, data in zip(config.epicsPV, data):
+        pv = pv.replace(':', '_')
+        if data == []:
+            continue
+        data = np.asarray(data)
+        dset = h5_for_arch.create_dataset(f'epics_archiver/{pv}', data=data)
+        logger.info(f"Saved {pv} from archiver data.")
+
 
 
 end_prod_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')

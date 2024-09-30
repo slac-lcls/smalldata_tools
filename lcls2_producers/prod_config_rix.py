@@ -64,4 +64,10 @@ def getFIMs(run):
 #               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
 #epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
+epicsPV = [
+    "EM2K0:XGMD:ETM:01:Reading",
+    "EM2K0:XGMD:ETM:02:Reading",
+    "EM2K0:XGMD:HPS:milliJoulesPerPulse",
+    "EM2K0:XGMD:HPS:AvgPulseIntensityy",
+]
 epicsOncePV = []

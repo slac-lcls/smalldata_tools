@@ -23,7 +23,6 @@ url_arg = "&{0}={1}"
 url_flag = "&{0}"
 date_spec_format = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
 
-offset_to_epoch = 31536000 * 20
 
 
 class EpicsArchive(object):
@@ -38,7 +37,7 @@ class EpicsArchive(object):
 
     def get_point(self, PV=None, when=None, value_only=False):
         """
-        Get the value from a particular point in time.  Returns (timestamp, value)
+        Get the value from a particular point in time. Returns (timestamp, value)
         unless value_only is true.  Returns None if the archiver does not have
         a value for that time.
 
@@ -116,6 +115,9 @@ class EpicsArchive(object):
             json_start, json_end = self._json_args(start, end, unit)
             if valid_date_arrays(json_start, json_end):
                 json_obj = await self._get_json(PV, json_start, json_end, chunk)
+                if isinstance(json_obj, int):  # Handle http error code
+                    logger.warning(f'Not able to retrieve PV {PV} (http code {json_obj}).')
+                    return []
                 pts = self._json_to_pts(json_obj, useMS)
                 self._pts_cache = pts
                 self._pv_cache = PV
@@ -289,6 +291,8 @@ async def url_query(url):
     """
     async with httpx.AsyncClient() as client:
         req = await client.get(url)
+    if req.status_code != 200:
+        return req.status_code
     return req.json()
 
 
@@ -404,3 +408,4 @@ def ts_to_datetime(ts):
     dt = datetime.datetime.fromtimestamp(sec + nsec * 1e-9)
     dt += relativedelta(years=20)
     return dt
+
