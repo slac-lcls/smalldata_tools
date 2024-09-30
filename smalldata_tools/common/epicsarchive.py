@@ -24,7 +24,6 @@ url_flag = "&{0}"
 date_spec_format = "{0:04}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}.{6:03}Z"
 
 
-
 class EpicsArchive(object):
     """
     Class that accesses data from the new archiver.
@@ -116,7 +115,9 @@ class EpicsArchive(object):
             if valid_date_arrays(json_start, json_end):
                 json_obj = await self._get_json(PV, json_start, json_end, chunk)
                 if isinstance(json_obj, int):  # Handle http error code
-                    logger.warning(f'Not able to retrieve PV {PV} (http code {json_obj}).')
+                    logger.warning(
+                        f"Not able to retrieve PV {PV} (http code {json_obj})."
+                    )
                     return []
                 pts = self._json_to_pts(json_obj, useMS)
                 self._pts_cache = pts
@@ -408,4 +409,3 @@ def ts_to_datetime(ts):
     dt = datetime.datetime.fromtimestamp(sec + nsec * 1e-9)
     dt += relativedelta(years=20)
     return dt
-
