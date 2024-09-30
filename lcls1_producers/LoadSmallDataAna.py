@@ -10,7 +10,7 @@ import time
 #    import xarray as xr
 #except:
 #    import xarray as xr
-from smalldata_tools.SmallDataUtils import getUserData
+from smalldata_tools.common.detector_base import getUserData
 from smalldata_tools.utilities import hist2d,rebin,addToHdf5
 from IPython.terminal.prompts import Prompts,Token
 import itertools
@@ -101,12 +101,12 @@ if args.file:
 
 #from smalldata_tools import SmallDataAna
 sys.path.append('./smalldata_tools')
-from smalldata_tools.SmallDataAna import SmallDataAna
+from smalldata_tools.common.SmallDataAna import SmallDataAna
 ana = None
 anaps = None
 t0 = time.time()
 try:
-    from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana
+    from smalldata_tools.lcls1.SmallDataAna_psana import SmallDataAna_psana
     #from smalldata_tools import SmallDataAna_psana
     anaps = SmallDataAna_psana(expname,run,dirname,fname)
 except:
