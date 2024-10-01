@@ -26,7 +26,7 @@ import logging
 logger = logging.getLogger()
 
 
-def MAD(a, c=0.6745,axis=None):
+def MAD(a, c=0.6745, axis=None):
     """
     Median Absolute Deviation along given axis of an array:
 
