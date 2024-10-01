@@ -582,7 +582,7 @@ if not ds.is_srv():
     for det in dets:
         for key in det.storeSum().keys():
             try:
-                sumData=small_data.sum(det.storeSum()[key])
+                sumData = small_data.sum(det.storeSum()[key])
                 sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
             except:
                 print('Problem with data sum for %s and key %s'%(det._name,key))
@@ -591,7 +591,7 @@ if not ds.is_srv():
 
     userDataCfg={}
     for det in default_dets:
-        #make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
+        # Make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
         noConfigSave = ['scan']
         if det.name not in noConfigSave:
             userDataCfg[det.name] = det.params_as_dict()
@@ -610,7 +610,6 @@ if not ds.is_srv():
             Config={'UserDataCfg' : userDataCfg}
     else:
         Config={'UserDataCfg' : userDataCfg}
-    #if rank==0: print(Config)
     if small_data.summary:
         small_data.save_summary(Config) # this only works w/ 1 rank!
 

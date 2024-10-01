@@ -51,20 +51,6 @@ class DefaultDetector_base(metaclass=ABCMeta):
     def in_run(self):
         """Returns whether the detector is available for this data source."""
         pass
-        # dNames=[]
-        # try:
-        #     detnames = psana.DetNames()
-        #     for dn in detnames:
-        #         for dnn in dn:
-        #             if dnn!='':
-        #                 dNames.append(dnn)
-        # except:
-        #     detnames = self._run.detinfo
-        #     for dn in detnames:
-        #         dNames.append(dn[0])
-        # if self.detname in dNames:
-        #     return True
-        # return False
 
     @abstractmethod
     def get_psana_det(self):

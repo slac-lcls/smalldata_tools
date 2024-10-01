@@ -10,12 +10,7 @@ class DefaultDetector(DefaultDetector_base, metaclass=ABCMeta):
     def __init__(self, detname, name, run):
         self._run = run
         super().__init__(detname, name)
-        # self.name = name
-        # self.detname = detname
-        # self._debug = False
 
-        # if self.in_run():
-        # self.det = self._run.Detector(detname)
         if not hasattr(self, "_veto_fields"):
             self._veto_fields = ["TypeId", "Version", "config"]
 
@@ -312,28 +307,24 @@ class epicsDetector(DefaultDetector):
         return parList
 
 
-class scanDetector(DefaultDetector):  # ##### NEED FIX
+class scanDetector(DefaultDetector):
     def __init__(self, detname="scan", run=None, name=None):
-        name = name or detname
-        super().__init__(detname, name, run)
+        self._veto_fields = ["step_docstring"]
         self.scans = []
         self.scanlist = []
-        vetolist = ["step_docstring"]
-        try:
-            scanlist = [k[0] for k in run.scaninfo if k[0] not in vetolist]
-            for scan in scanlist:
-                try:
-                    self.scans.append(run.Detector(scan))
-                    self.scanlist.append(scan)
-                except:
-                    print("could not find LCLS2 EPICS PV %s in data" % pv)
-        except:
-            pass
+        name = name or detname
+        super().__init__(detname, name, run)
 
     def in_run(self):
-        if len(self.scans) > 0:
-            return True
-        return False
+        if self._run.scaninfo == {}:
+            return False
+        return True
+    
+    def get_psana_det(self):
+        scanlist = [k[0] for k in self._run.scaninfo if k[0] not in self._veto_fields]
+        for scan in scanlist:
+            self.scans.append(self._run.Detector(scan))
+            self.scanlist.append(scan)
 
     def data(self, evt):
         dl = {}
@@ -344,6 +335,5 @@ class scanDetector(DefaultDetector):  # ##### NEED FIX
                     if isinstance(dl[scanname], str):
                         dl[scanname] = np.nan
             except:
-                # print('we have issues with %s in this event'%scanname)
                 pass
         return dl

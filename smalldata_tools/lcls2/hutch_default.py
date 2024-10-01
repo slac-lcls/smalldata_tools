@@ -69,6 +69,7 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[]):
     dets.append(fimfexDetector("crix_w8", run))
     dets.append(genericDetector("mono_encoder", run))
     dets.append(ttDetector("atmopal", run, saveTraces=True))
+    dets.append(scanDetector("scan", run))
     # dets.append(epicsDetector(PVlist=[], run=run))
     # check a RIX scan to figure out controlDetector.
     return dets
