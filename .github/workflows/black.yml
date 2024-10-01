@@ -1,12 +1,27 @@
-name: Black-format
+name: Black-format-autocommit
 on: [push, pull_request]
 
 jobs:
   format:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: psf/black@stable
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          options: "--check --verbose --color"
+          ref: "${{ github.head_ref }}"
+      
+      - name: apply-black
+        uses: psf/black@stable
+        with:
+          options: "--verbose --color"
           src: "./smalldata_tools"
+      
+      - name: commit-black
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-commit black formatting"
+          commit_user_name: "Autoformatter"
+          commit_author: "Autoformatter <actions@github.com>"
