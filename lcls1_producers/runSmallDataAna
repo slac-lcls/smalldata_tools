@@ -62,7 +62,7 @@ else
     source /reg/g/psdm/etc/psconda.sh -py3
 fi
 
-LDAP='./producers'
+LDAP='./lcls1_producers'
 
 if [ $RUN -le 0 ]; then
     CMD="%run $LDAP/LoadSmallDataAna.py"

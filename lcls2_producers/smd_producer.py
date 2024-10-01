@@ -299,7 +299,6 @@ if hostname.find('sdf')>=0:
         while nFiles == 0:
             if n_wait > max_wait:
                 raise RuntimeError("Waited {str(n_wait*10)}s, still no files available. Giving up.")
-
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
