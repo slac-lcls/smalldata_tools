@@ -299,7 +299,6 @@ if hostname.find('sdf')>=0:
         while nFiles == 0:
             if n_wait > max_wait:
                 raise RuntimeError("Waited {str(n_wait*10)}s, still no files available. Giving up.")
-
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
@@ -384,7 +383,7 @@ if not ds.is_srv(): # srv nodes do not have access to detectors.
                 pass
             logger.info('adding all epicsPVs....')
             default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll', run=thisrun))
-    # elif len(config.epicsPV) > 0:
+    # elif len(config.epicsPV) > 0:  # Should we still have this option for PVs?
     #     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser', run=thisrun))
 
     if len(config.epicsOncePV) > 0:
@@ -481,15 +480,16 @@ for evt_num, evt in enumerate(event_iter):
     # Combine default data & user data into single dict.
     det_data.update(userDict)
 
-    #timing - inhibit counts - collect in default data?
+    # Integrating detectors
     if len(intdets) > 0:
         userDictInt = {}
         #userDict has keys we could sum & remove!
         #normdict['inhibit']+=det_data['timing']['inhibit'][2]
         for det in intdets:
             normdict[det._name]['count'] += 1
+
             # for now, sum up all default data....
-            for k,v in det_data.items():
+            for k, v in det_data.items():
                 if isinstance(v, dict):
                     for kk, vv in v.items():
                         sumkey = k+'_sum_'+kk
@@ -508,8 +508,11 @@ for evt_num, evt in enumerate(event_iter):
                         normdict[det._name][sumkey] = v
 
             normdict[det._name]['timestamp_max']=max(normdict[det._name]['timestamp_max'], evt.timestamp)
-            if normdict[det._name]['timestamp_min'] == 0: normdict[det._name]['timestamp_min']=evt.timestamp
-            else: normdict[det._name]['timestamp_min']=min(normdict[det._name]['timestamp_min'], evt.timestamp)
+            if normdict[det._name]['timestamp_min'] == 0:
+                normdict[det._name]['timestamp_min'] = evt.timestamp
+            else:
+                normdict[det._name]['timestamp_min'] = min(normdict[det._name]['timestamp_min'], evt.timestamp)
+            
             try:
             #if True:
                 det.getData(evt)
@@ -641,9 +644,6 @@ if small_data._type == 'client' and small_data._full_filename is not None:
     if small_data._client_comm.Get_rank() == 0:
         h5_rank = rank
 
-# Add epics PVs from archiver to the file
-import pdb
-
 if rank == h5_rank:
     logger.info(f"Getting epics data from Archiver (rank: {rank})")
     import asyncio
@@ -661,9 +661,11 @@ if rank == h5_rank:
         epics_archive.get_points(PV=pv, start=start, end=end, raw=True, useMS=True)
         for pv in config.epicsPV
     ]
-    # pdb.set_trace()
+
     logger.debug(f"Run PV retrieval (async)")
     data = loop.run_until_complete(asyncio.gather(*coroutines))
+    
+    # Save to files
     h5_for_arch.create_group("epics_archiver")
     for pv, data in zip(config.epicsPV, data):
         pv = pv.replace(':', '_')
