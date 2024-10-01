@@ -319,7 +319,7 @@ class scanDetector(DefaultDetector):
         if self._run.scaninfo == {}:
             return False
         return True
-    
+
     def get_psana_det(self):
         scanlist = [k[0] for k in self._run.scaninfo if k[0] not in self._veto_fields]
         for scan in scanlist:
