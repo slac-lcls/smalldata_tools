@@ -326,7 +326,12 @@ for detImgName in ana.Keys("Sums"):
     image = ana.fh5.get_node("/%s" % detImgName).read()
     if len(image.shape) > 2:
         if detImgName.find("135") < 0:
-            detName = detImgName.replace("Sums/", "").replace("_calib", "")
+            detName = (
+                detImgName.replace("Sums/", "")
+                .replace("_calib", "")
+                .replace("_dropped", "")
+                .replace("_square", "")
+            )
             ix = ana.fh5.get_node("/UserDataCfg/%s/ix" % detName).read()
             iy = ana.fh5.get_node("/UserDataCfg/%s/iy" % detName).read()
             image = image_from_dxy(image, ix, iy)
@@ -425,12 +430,8 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
         json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Done"}],
     )
 
-elogDir = (
-    Path(SIT_PSDM_DATA)
-    / expname[:3]
-    / expname
-    / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
-)
+SIT_PSDM_DATA = os.getenv("SIT_PSDM_DATA")
+elogDir = f"{SIT_PSDM_DATA}/{expname[:3]}/{expname}/stats/summary/BeamlineSummary/BeamlineSummary_Run{run:04d}"
 
 if save_elog:
     import os
