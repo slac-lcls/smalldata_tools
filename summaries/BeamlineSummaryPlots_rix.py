@@ -26,7 +26,7 @@ try:
 except:
     fpath = fpathup
 sys.path.append(fpath)
-from smalldata_tools.SmallDataAna_psana import SmallDataAna_psana as sdaps
+from smalldata_tools.lcls2.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import rebin
 
 
