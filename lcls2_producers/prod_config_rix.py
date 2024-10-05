@@ -87,7 +87,7 @@ def get_psplot_configs(run):
 
     if run>0:
         andor_vls = {
-            'plot_type' : psplot_rix.SpectrumScan,
+            'plot_type' : psplot.SpectrumScan,
             'data' : 'andor_vls/unaligned_full_area',
             'norm' : 'andor_vls/unaligned_norm_det_rix_fim1_sum_wfintegrate',
             'count' : 'andor_vls/unaligned_norm_count',
