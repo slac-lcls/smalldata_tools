@@ -13,23 +13,22 @@ from smalldata_tools.utilities_waveforms import hsdBaselineFourierEliminate
 from smalldata_tools.utilities_waveforms import hitFinder_CFD
 
 
-
 class WfIntegration(DetObjectFunc):
     def __init__(
         self,
-        sig_roi = None,
-        bkg_roi = None,
+        sig_roi=None,
+        bkg_roi=None,
         # sig_roi: Union(slice, tuple[int, int], list[int, int]) = None,
         # bkg_roi: Union(slice, tuple[int, int], list[int, int]) = None,
         negative_signal: bool = False,
-        **kwargs
-        ):
+        **kwargs,
+    ):
         """
         Simple waveform integration (sum) with optional background subtraction.
 
         Parameters
         ----------
-        sig_roi: Union(slice, tuple[int, int], list[int, int]) 
+        sig_roi: Union(slice, tuple[int, int], list[int, int])
             Start and stop indces for the signal
         bkg_roi: Union(slice, tuple[int, int], list[int, int]), Optional
             Start and stop indces for the background
@@ -38,17 +37,19 @@ class WfIntegration(DetObjectFunc):
         """
         self._name = kwargs.get("name", "wfintegrate")
         super().__init__(**kwargs)
-        
+
         if isinstance(sig_roi, slice):
             self._sig_roi = sig_roi
         else:
-            self._sig_roi = slice(*sig_roi) if sig_roi is not None else slice(None, None, 1)
-        
+            self._sig_roi = (
+                slice(*sig_roi) if sig_roi is not None else slice(None, None, 1)
+            )
+
         if isinstance(sig_roi, slice):
             self._bkg_roi = bkg_roi
         else:
             self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
-        
+
         self._flip = -1 if negative_signal else 1
 
         # just for saving to UserDataCfg
@@ -60,8 +61,6 @@ class WfIntegration(DetObjectFunc):
         if self._bkg_roi is not None:
             data = subtract_background(data, self._bkg_roi)
         return integrate_wfs(self._flip * data, sig_window=self._sig_roi)
-        
-
 
 
 # find the left-most peak (or so.....)

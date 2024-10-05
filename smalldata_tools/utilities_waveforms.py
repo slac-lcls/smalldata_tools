@@ -16,7 +16,7 @@ def subtract_background(signal: np.ndarray, bkg_window=slice(None, None, 1)):
     if signal.ndim == 1:
         return signal - np.median(signal[bkg_window])
     elif signal.ndim == 2:
-        med = np.median(signal[:, bkg_window], axis=1)  
+        med = np.median(signal[:, bkg_window], axis=1)
         return signal - med.reshape(med.shape[0], 1)
 
 
@@ -32,17 +32,17 @@ def integrate_wfs(wfs, sig_window=slice(None, None, 1)):
         return wfs[:, sig_window].sum(axis=1)
 
 
-def simple_filter(waveform, method='savgol', **kwargs):
+def simple_filter(waveform, method="savgol", **kwargs):
     """
     Simple way to filter high frequency in the waveforms.
     Method can ba savgol or fft
     """
-    if method == 'savgol':
-        window_length = kwargs.get('window_length',15)
-        polyorder = kwargs.get('polyorder',3)
+    if method == "savgol":
+        window_length = kwargs.get("window_length", 15)
+        polyorder = kwargs.get("polyorder", 3)
         return savgol_filter(waveform, window_length, polyorder)
-    elif method == 'fft':
-        threshold = kwargs.get('threshold', 1000)
+    elif method == "fft":
+        threshold = kwargs.get("threshold", 1000)
         ft = np.fft.rfft(waveform)
         ft[threshold:] = 0
         return np.fft.irfft(ft)
@@ -101,7 +101,7 @@ def cutFourierScaleInHalf(inputFourierSpaceArray):
         # first, find the inflection point of the FFT axis (final index before negative
         # frequencies are included)
         inflectionIndex = int(math.ceil(numElements / 2))
-        # pick out the section of the fourier space axis to keep.  include all frequencies 
+        # pick out the section of the fourier space axis to keep.  include all frequencies
         # before the inflection point, but drop the 0th term (the DC term)
         nonDegenerateAxis = inputFourierSpaceArray[1:inflectionIndex]
 
@@ -176,7 +176,6 @@ def filterOutFrequenciesBelowThreshold(
     return filteredTimeDependentFunction
 
 
-
 def filterOutFrequenciesAboveThreshold(
     timeDependentFunction, timeSpacing, thresholdFrequency, power=25
 ):
@@ -196,20 +195,17 @@ def filterOutFrequenciesAboveThreshold(
     )
     # create a fourier transform only including the values above threshold
     allFrequencies = scipy.fft.fft(timeDependentFunction)
-    
+
     # Multiply all frequencies by array which says whether the frequenices pass the threshold.
     # Return the time-dependent signal based only on frequencies that pass the filter
-    onlyValidFreqs = (
-        allFrequencies * freqsTransferFunction
-    ) 
+    onlyValidFreqs = allFrequencies * freqsTransferFunction
     filteredTimeDependentFunction = scipy.fft.ifft(onlyValidFreqs)
-    
+
     # Get rid of the imaginary parts. This is a bit sketchy but I think it's slightly better
     # than returning a physical time dependent value with complex values.
     filteredTimeDependentFunction = np.real(filteredTimeDependentFunction)
 
     return filteredTimeDependentFunction
-
 
 
 def eliminateListedSpikeFrequenciesFromSignal(
@@ -547,7 +543,6 @@ def separateArrayIntoTupleOfContinuousArrays(dataIn_AboveThreshold_Indices):
     return tupleOfLists
 
 
-
 def findZeroCrossings(seriesToProcess, comparedTrace):
     """
     Inspects the index series in seriesToProcess, and verifies that the associated y-values
@@ -596,9 +591,7 @@ def findZeroCrossings(seriesToProcess, comparedTrace):
 
         # if indLow and indHigh are adjacent to each other, then the series passed in was
         # a monotonically positive zero-crossing.
-        if (
-            indHigh + 1
-        ) == indLow:
+        if (indHigh + 1) == indLow:
             # the way the while loops are broken out of, it's a valid series if indLow is
             # one value higher than indHigh return true, and the index of the first positive
             # value after the crossing.
