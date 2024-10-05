@@ -45,10 +45,6 @@ do
         shift
         shift
         ;;
-    --integ)
-        INTEG=1
-        shift
-        ;;
     --interactive)
         INTERACTIVE=1
         shift
@@ -95,6 +91,11 @@ do
     --mpi_optim)
         MPI_OPTIM=1
         POSITIONAL+=("--mpi_optim")
+        shift
+        ;;
+    --psplot_live)
+        PSPLOT_LIVE=1
+        POSITIONAL+=("--psplot_live_mode")
         shift
         ;;
     *)
@@ -144,9 +145,6 @@ if [ -v INTERACTIVE ]; then
 fi
 
 # SLURM / MPI parameters
-DEFAULT_NODES=2
-NODES=${NODES:=$DEFAULT_NODES}
-
 DEFPARTITION='milano'
 PARTITION=${PARTITION:=$DEFPARTITION}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
@@ -156,6 +154,8 @@ ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 if [[ "$PARTITION" == "milano" ]]; then
     # For milano:
     CORES_PER_NODE=120
+    DEFAULT_NODES=2
+    NODES=${NODES:=$DEFAULT_NODES}
 
     if [ -v MPI_OPTIM ]; then
         MPI_SLOTS=$(($CORES_PER_NODE*($NODES-1)))  # Number of cores on all nodes but the one for SMD0
@@ -163,6 +163,11 @@ if [[ "$PARTITION" == "milano" ]]; then
     else
         MPI_SLOTS=$(($CORES_PER_NODE*$NODES-1))  # Total number of cores minus SMD0
         DEFAULT_SRV_CORES=$((16*$NODES))  # 16 writers per node seems to be a good number for milano
+    fi
+
+    if [ -v PSPLOT_LIVE ]; then
+        # Use a single SRV node for psplot_live
+        DEFAULT_SRV_CORES=1
     fi
 
     SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}

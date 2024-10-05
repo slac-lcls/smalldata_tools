@@ -183,7 +183,7 @@ class lightStatus(DefaultDetector):
         self.destination = destination
         print(f"Beam destination target: {destination}")
         self.laserCodes_drop = [c for c in laser_codes if c > 0]
-        self.laserCodes_req = [-c for c in laser_codes if c > 0]
+        self.laserCodes_req = [-c for c in laser_codes if c < 0]
 
     def data(self, evt):
         xfel_status, laser_status = (0, 1)  # Can we make laser default to 0 as well?

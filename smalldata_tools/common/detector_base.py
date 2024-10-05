@@ -91,6 +91,7 @@ class DefaultDetector_base(metaclass=ABCMeta):
 
 
 class DetObjectFunc(object):
+# class DetObjectFunc(metaclass=ABCMeta):
     def __init__(self, **kwargs):
         self._debug = False
         self._proc = True  # Will be set to False in cube only

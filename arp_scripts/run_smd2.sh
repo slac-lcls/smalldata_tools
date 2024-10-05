@@ -1,11 +1,7 @@
 #!/bin/bash
-# #SBATCH --partition=milano
-#SBATCH --job-name=smd
-##SBATCH --output=log_smd-%j.txt
-##SBATCH --error=log_smd-%j.txt
-#SBATCH --exclusive
-# #SBATCH --reservation lcls:earlyscience
 
+#SBATCH --job-name=smd
+#SBATCH --exclusive
 # Note: when run trough sbatch, this script runs from the slurm scheduler folder
 
 usage()

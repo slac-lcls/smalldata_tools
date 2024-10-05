@@ -40,14 +40,14 @@ def define_dets(run, det_list):
     # Assumes that the config file with function parameters definition
     # has been imported under "config"
     
-    rois_args = [] # special implementation as a list to support multiple ROIs.
-    fims_args = {}
+    rois_args = []  # special implementation as a list to support multiple ROIs.
+    wfs_int_args = {}
 
     # Get the functions arguments from the production config
     if 'getROIs' in dir(config):
         rois_args = config.getROIs(run)
-    if 'getFIMs' in dir(config):
-        fims_args = config.getFIMs(run)
+    if 'get_wf_integrate' in dir(config):
+        wfs_int_args = config.get_wf_integrate(run)
 
     dets = []
 
@@ -81,13 +81,14 @@ def define_dets(run, det_list):
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
             continue
-
+        
+        ####################################
+        ######## Standard detectors ########
+        ####################################
         if detname in rois_args:
-            for iROI,ROI in enumerate(rois_args[detname]):
-                try:
-                    proj_ax = ROI.pop('proj_ax')
-                except:
-                    proj_ax = None
+            # ROI extraction
+            for iROI, ROI in enumerate(rois_args[detname]):
+                proj_ax = ROI.pop('proj_ax', None)
 
                 thisROIFunc = ROIFunc(**ROI)
                 if proj_ax is not None:
@@ -95,10 +96,10 @@ def define_dets(run, det_list):
                 det.addFunc(thisROIFunc)
 
 
-        if detname in fims_args:
-            # Special treatment for the FIM mimicking a potential FEX config.
-            fimFunc = fimSumFunc(**fims_args[detname])
-            det.addFunc(fimFunc)
+        if detname in wfs_int_args:
+            # Waveform integration
+            wfs_int_func = WfIntegration(**wfs_int_args[detname])
+            det.addFunc(wfs_int_func)
             
         det.storeSum(sumAlgo='calib')
         logger.debug(f'Rank {rank} Add det {detname}: {det}')
@@ -125,13 +126,16 @@ from smalldata_tools.lcls2.DetObject import DetObject
 
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
+from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdBaselineCorrectFunc
 from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc, hsdROIFunc
-from smalldata_tools.ana_funcs.waveformFunc import fimSumFunc
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+
+import psplot
+from psmon import publish
 
 
 # Constants
@@ -220,6 +224,14 @@ parser.add_argument('--noarch',
                     help="dont use archiver data",
                     action='store_true',
                     default=False)
+parser.add_argument('--psplot_live_mode',
+                    help="Run as a server for psplot live mode, i.e. no h5 file being written.",
+                    action='store_true',
+                    default=False)
+parser.add_argument('--intg_delta_t',
+                    help="Offset for the integrating detector batch.",
+                    type=int,
+                    default=0)
 args = parser.parse_args()
 
 logger.debug('Args to be used for small data run: {0}'.format(args))
@@ -254,8 +266,10 @@ def get_sd_file(write_dir, exp, hutch):
             logger.error(f'Unable to make directory {write_dir} for output' \
                         f'exiting on error: {e}')
             sys.exit()
-    if rank==0:
+    if rank==0 and not args.psplot_live_mode:
         logger.info('Will write small data file to {0}'.format(h5_f_name))
+    elif rank==0 and args.psplot_live_mode:
+        logger.warning("Running in psplot_live mode, will not write any h5 file.")
     return h5_f_name
 
 ##### START SCRIPT ########
@@ -333,8 +347,12 @@ if args.nevents != 0:
 # Setup if integrating detectors are requested.
 if len(config.integrating_detectors) > 0:
     datasource_args['intg_det'] = config.integrating_detectors[0]  # problem if we have more than 1 int det here?
+    datasource_args['intg_delta_t'] = args.intg_delta_t
     datasource_args['batch_size'] = 1
-    os.environ['PS_SMD_N_EVENTS'] = '1'
+    os.environ['PS_SMD_N_EVENTS'] = '1'  # must be 1 for any non-zero value of delta_t
+
+if args.psplot_live_mode:
+    datasource_args['psmon_publish'] = publish
 
 ds = psana.DataSource(**datasource_args)
 
@@ -353,7 +371,17 @@ thisrun = next(ds.runs())
 # Generate smalldata object
 if ds.unique_user_rank():
     print('Opening the h5file %s, gathering at %d'%(h5_f_name,args.gather_interval))
-small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
+if args.psplot_live_mode:
+    logger.info("Setting up psplot_live plots.")
+    psplot_configs = config.get_psplot_configs(int(run))
+    
+    psplot_callbacks = psplot.PsplotCallbacks()
+    for key, item in psplot_configs.items():
+        plot_type = item.pop('plot_type')
+        psplot_callbacks.add_callback(plot_type(item), name=key)
+    small_data = ds.smalldata(filename=None, batch_size=args.gather_interval, callbacks=[psplot_callbacks.run])
+else:
+    small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
 if ds.unique_user_rank():
     print(f"rank: {rank}")
     print('smalldata file has been successfully created.')
@@ -401,7 +429,7 @@ if not ds.is_srv(): # srv nodes do not have access to detectors.
                 default_dets.append(genericDetector(fim, run=thisrun, h5name='%s_raw'%fim))
 
     dets = []
-    intdets = []
+    int_dets = []
     if not args.default:
         # print(f"This run: {thisrun}")
         dets = define_dets(int(args.run), config.detectors)
@@ -440,7 +468,7 @@ if not ds.is_srv(): # srv nodes do not have access to detectors.
     if ds.unique_user_rank() == 0: print('And now the event loop....')
 
     normdict={}
-    for det in intdets:
+    for det in int_dets:
         normdict[det._name]={'count' : 0,
                             'timestamp_min' : 0,
                             'timestamp_max' : 0}
@@ -481,11 +509,11 @@ for evt_num, evt in enumerate(event_iter):
     det_data.update(userDict)
 
     # Integrating detectors
-    if len(intdets) > 0:
+    if len(int_dets) > 0:
         userDictInt = {}
-        #userDict has keys we could sum & remove!
-        #normdict['inhibit']+=det_data['timing']['inhibit'][2]
-        for det in intdets:
+        # userDict has keys we could sum & remove!
+        # normdict['inhibit']+=det_data['timing']['inhibit'][2]
+        for det in int_dets:
             normdict[det._name]['count'] += 1
 
             # for now, sum up all default data....
@@ -535,11 +563,11 @@ for evt_num, evt in enumerate(event_iter):
                         if isinstance(v, dict):
                             for kk,vv in v.items():
                                 userDictInt[det._name]['unaligned_norm_'+kk] = vv
-                                normdict[det._name][k][kk] = vv*0 #may not work for arrays....
+                                normdict[det._name][k][kk] = vv*0  # may not work for arrays....
                         else:
                             userDictInt[det._name]['unaligned_norm_'+k] = v
-                            normdict[det._name][k] = v*0 #may not work for arrays....
-                    #print(userDictInt)
+                            normdict[det._name][k] = v*0  # may not work for arrays....
+                    # print(userDictInt)
                     small_data.event(evt, userDictInt)
             except:
                 print(f"Bad int_det processing on evt {evt_num}")
@@ -624,7 +652,7 @@ print(f"Smalldata type for rank {rank}: {small_data._type}")
 if ds.unique_user_rank():
     print(f"user rank: {rank}")
 
-if small_data._type == 'server':
+if small_data._type == 'server' and not args.psplot_live_mode:
     print(f"Close smalldata server file on {rank}")
     # flush the data caches (in case did not hit cache_size yet)
     for dset, cache in small_data._server._cache.items():
