@@ -153,12 +153,12 @@ def define_dets(run):
                 det.addFunc(photonFunc(**phot[detname]))
             # Droplet algo
             if detname in drop:
-                if nData in drop:
-                    nData = drop.pop('nData')
+                if 'nData' in drop[detname]:
+                    nData = drop[detname].pop('nData')
                 else:
                     nData = None
                 func = dropletFunc(**drop[detname])
-                func.addFunc(roi.sparsifyFunc(nData=nData))
+                func.addFunc(sparsifyFunc(nData=nData))
                 det.addFunc(func)
             # Droplet to photons
             if detname in drop2phot:
