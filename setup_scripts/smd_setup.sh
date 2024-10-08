@@ -39,6 +39,9 @@ do
         CUBE=1
         shift 1
         ;;
+    --psplot_live)
+        PSPLOT_LIVE=1
+        shift;;
     *) # all other possibilities
         ARGS+=("$1")
         echo $@
@@ -98,5 +101,5 @@ mkdir -p $SDF_BASE/stats/summary/Cube
 # make arp jobs
 if [ $QUEUE != "0" ]; then
     source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
-    python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
+    python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE --psplot_live $PSPLOT_LIVE
 fi

@@ -3,7 +3,7 @@ import numpy as np
 import logging
 
 from psmon import publish
-from psmon.plots import Image, XYPlot
+from psmon.plots import Image, XYPlot, MultiPlot
 
 
 logger = logging.getLogger(__name__)
@@ -24,9 +24,9 @@ class PsplotCallbacks:
 
 
 class PsplotCallback(metaclass=ABCMeta):
-    def __init__(self, det_dict):
-        self.det_dict = det_dict
-        logger.info(f"Instantiating {type(self).__name__} with det_dict {det_dict}")
+    def __init__(self, **kwargs):
+        logger.info(f"Instantiating {type(self).__name__} with arguments {kwargs}")
+        self.data_fields = kwargs['data_fields']
         self._needed = self.need()
 
     @abstractmethod
@@ -42,7 +42,7 @@ class PsplotCallback(metaclass=ABCMeta):
         """
         # Can probably be done better
         needed = []
-        for key, val in self.det_dict.items():
+        for key, val in self.data_fields.items():
             if isinstance(val, str):
                 needed.append(val)
         return needed
@@ -51,14 +51,13 @@ class PsplotCallback(metaclass=ABCMeta):
 class PsplotScan(PsplotCallback, metaclass=ABCMeta):
     """Psplot callback base class for plotting scans"""
 
-    def __init__(self, det_dict):
+    def __init__(self, bins=None, **kwargs):
         """ """
-        print(det_dict)
-        super().__init__(det_dict)
+        super().__init__(**kwargs)
         self.det_binned = None
         self.i0_binned = None
         self.counts = None
-        self.bins = det_dict.get("bins")  # , default=None)
+        self.bins = bins
         self.nbins = self.bins.size + 1
         return
 
@@ -68,19 +67,22 @@ class PsplotScan(PsplotCallback, metaclass=ABCMeta):
 
 
 class SpectrumScan(PsplotScan):
-    def __init__(self, det_dict):
-        super().__init__(det_dict)
+    def __init__(self, bins=None, **kwargs):
+        print(f"kwargs: {kwargs}")
+        self._range = kwargs.pop("spectrum_range", None)
+        self._lineouts_idx = kwargs.pop("lineouts_idx", None)
+        super().__init__(bins=bins, **kwargs)
         return
 
     def process(self, data_dict):
-        det_dat = data_dict[self.det_dict["data"]]
-        fim1 = data_dict[self.det_dict["norm"]]
-        count = data_dict[self.det_dict["count"]]
-        scan_var = data_dict[self.det_dict["scan"]] / count
+        det_dat = data_dict[self.data_fields["data"]]
+        i0_dat = data_dict[self.data_fields["norm"]]
+        count = data_dict[self.data_fields["count"]]
+        scan_var = data_dict[self.data_fields["scan"]] / count
 
-        det_dat = self.hitfinder(det_dat)
-        det_dat = det_dat[900:1050]
-        i0_fim1 = np.nansum(fim1)
+        if self._range is not None:
+            det_dat = det_dat[self._range[0] : self._range[1]]
+        i0_dat = np.nansum(i0_dat)
 
         if self.det_binned is None:
             self.det_binned = np.zeros((self.nbins, *det_dat.shape))
@@ -90,30 +92,24 @@ class SpectrumScan(PsplotScan):
 
         bin_idx = np.digitize(scan_var, self.bins)
         self.det_binned[bin_idx] += det_dat
-        self.i0_binned[bin_idx, :] += i0_fim1
+        self.i0_binned[bin_idx, :] += i0_dat
         self.counts[bin_idx, :] += count
 
         im = self.det_binned / self.i0_binned
         im /= np.nanmean(im)  # make it a nicer range to work with in the plot
         im[np.where(im == 0)] = np.nan
 
-        scan_plot = Image(0, "Andor VLS scan", im, aspect_lock=False)
-        publish.send("andor_vls_scan", scan_plot)
+        scan_plot = Image(0, "Spectrum Scan", im, aspect_lock=False)
+        publish.send("spectrum_scan", scan_plot)
 
-        y = det_dat
-        x = np.arange(y.size)
-        spectrum = XYPlot(0, "Andor VLS", x, [y, y + 0.5])
-        publish.send("andor_vls", spectrum)
-
-    @staticmethod
-    def hitfinder(data, bkg_roi=(500, 800), threshold=3500, std_threshold=4):
-        amean = data[bkg_roi[0] : bkg_roi[1]].mean()
-        astd = data[bkg_roi[0] : bkg_roi[1]].std()
-
-        data[data > threshold] = 0
-        data[data < (amean + std_threshold * astd)] = 0
-        data[data > (amean + std_threshold * astd)] = 1
-        return data
+        ys = []
+        for ii, idx in enumerate(self._lineouts_idx):
+            x = self.bins
+            y = im[:-1, idx]  # cut last bin to match shape
+            ys.append(y)  # lineouts at idx
+        print(y)
+        lineouts = XYPlot(0, f"Spectrum Lineout", x, ys, leg_label=self._lineouts_idx)
+        publish.send(f"spectrum_lineout", lineouts)
 
 
 # DOCUMENTATION

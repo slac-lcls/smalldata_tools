@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--queue', help='Queue on which to run the jobs', type=str, default='psanaq')
 parser.add_argument('--cube', help='Make cube job as well', type=int, default=0)
+parser.add_argument('--psplot_live', help='Make psplot-live job as well', type=int, default=0)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -54,6 +55,15 @@ job_defs.append( {
     'trigger': trigger,
     'location': location,
     'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait'
+    } )
+
+# psplot_live job
+job_defs.append( {
+    'name': 'smd_psplot_live',
+    'executable': executable,
+    'trigger': trigger,
+    'location': location,
+    'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait --psplot_live'
     } )
 
 # cube job

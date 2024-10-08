@@ -2,7 +2,8 @@ import tables
 import numpy as np
 import itertools
 import scipy
-from typing import Union
+from typing import Union, Optional
+from collections.abc import Iterable
 from scipy import signal as scipy_signal
 
 from smalldata_tools.common.detector_base import DetObjectFunc
@@ -16,10 +17,8 @@ from smalldata_tools.utilities_waveforms import hitFinder_CFD
 class WfIntegration(DetObjectFunc):
     def __init__(
         self,
-        sig_roi=None,
-        bkg_roi=None,
-        # sig_roi: Union(slice, tuple[int, int], list[int, int]) = None,
-        # bkg_roi: Union(slice, tuple[int, int], list[int, int]) = None,
+        sig_roi: Optional[Iterable[int]] = None,
+        bkg_roi: Optional[Iterable[int]] = None,
         negative_signal: bool = False,
         **kwargs,
     ):
@@ -40,27 +39,83 @@ class WfIntegration(DetObjectFunc):
 
         if isinstance(sig_roi, slice):
             self._sig_roi = sig_roi
+            self.sig_roi = [sig_roi.start, sig_roi.stop]
         else:
             self._sig_roi = (
                 slice(*sig_roi) if sig_roi is not None else slice(None, None, 1)
             )
+            self.sig_roi = sig_roi if sig_roi is not None else (0, int(1e6))  # for userDataCfg
 
-        if isinstance(sig_roi, slice):
+        if isinstance(bkg_roi, slice):
             self._bkg_roi = bkg_roi
+            self.bkg_roi = [bkg_roi.start, bkg_roi.stop]
         else:
             self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
+            self.bkg_roi = bkg_roi if bkg_roi is not None else (0, int(1e6))  # for userDataCfg
 
         self._flip = -1 if negative_signal else 1
-
-        # just for saving to UserDataCfg
-        self.sig_roi = sig_roi if sig_roi is not None else (0, int(1e6))
-        self.bkg_roi = sig_roi if bkg_roi is not None else (0, int(1e6))
         return
 
     def process(self, data):
         if self._bkg_roi is not None:
             data = subtract_background(data, self._bkg_roi)
         return integrate_wfs(self._flip * data, sig_window=self._sig_roi)
+
+
+class SimpleHitFinder(DetObjectFunc):
+    def __init__(
+        self,
+        threshold = 1,
+        threshold_max = 1e6,
+        use_rms = False,
+        bkg_roi: Optional[Iterable[int]] = None,
+        **kwargs,
+    ):
+        """
+        Simple hit finder for waveform traces.
+        Values above a certain treshold are considered as a hit.
+
+        Parameters
+        ----------
+        threshold:
+            Threshold above wich a sample is consideted a hit.
+        threshold_max:
+            Samples above this threshold are ignored. This prevents artefacts showing as high
+            intensities to count as hits.          
+        use_rms:
+            Threshold is a multiplier on the caluclated background rms instead of
+            an absolute value.
+        bkg_roi:
+            Roi used to compute the background RMS noise. Ony used if use_rms = True.            
+        """
+        self._name = kwargs.get("name", "hitfinder")
+        super().__init__(**kwargs)
+        self.th = threshold
+        self.th_max = threshold_max
+        self.use_rms = use_rms
+
+        if isinstance(bkg_roi, slice):
+            self._bkg_roi = bkg_roi
+        else:
+            self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
+    
+    def process(self, data):
+        data = data.squeeze().copy()
+        data[data > self.th_max] = 0  # ignore suspiciously high shots
+
+        if self.use_rms:
+            amean = data[self._bkg_roi].mean()
+            astd = data[self._bkg_roi].std()
+
+            data[data < (amean + self.th * astd)] = 0
+            data[data > (amean + self.th * astd)] = 1
+        else:
+            data[data < self.th] = 0
+            data[data > self.th] = 1
+        data = data.squeeze()
+
+        self.dat = data.copy()
+        return data
 
 
 # find the left-most peak (or so.....)

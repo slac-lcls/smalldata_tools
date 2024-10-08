@@ -52,6 +52,8 @@ def define_dets(run, det_list):
         rois_args = config.getROIs(run)
     if "get_wf_integrate" in dir(config):
         wfs_int_args = config.get_wf_integrate(run)
+    if "get_wf_hitfinder" in dir(config):
+        wfs_hitfinder_args = config.get_wf_hitfinder(run)
 
     dets = []
 
@@ -106,6 +108,10 @@ def define_dets(run, det_list):
             # Waveform integration
             wfs_int_func = WfIntegration(**wfs_int_args[detname])
             det.addFunc(wfs_int_func)
+        
+        if detname in wfs_hitfinder_args:
+            # Simple hit finder on waveform
+            det.addFunc(SimpleHitFinder(**wfs_hitfinder_args[detname]))
 
         det.storeSum(sumAlgo="calib")
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
@@ -125,9 +131,8 @@ if rank == 0:
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
-from smalldata_tools.lcls2.default_detectors import detOnceData
+from smalldata_tools.lcls2.default_detectors import detOnceData, epicsDetector, genericDetector
 from smalldata_tools.lcls2.hutch_default import defaultDetectors
-from smalldata_tools.lcls2.default_detectors import epicsDetector, genericDetector
 from smalldata_tools.lcls2.DetObject import DetObject
 
 from smalldata_tools.ana_funcs.roi_rebin import (
@@ -137,10 +142,14 @@ from smalldata_tools.ana_funcs.roi_rebin import (
     imageFunc,
 )
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
-from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
+from smalldata_tools.ana_funcs.waveformFunc import WfIntegration, SimpleHitFinder
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdBaselineCorrectFunc
-from smalldata_tools.ana_funcs.waveformFunc import hitFinderCFDFunc, hsdROIFunc
+from smalldata_tools.ana_funcs.waveformFunc import (
+    hsdsplitFunc,
+    hsdBaselineCorrectFunc,
+    hitFinderCFDFunc,
+    hsdROIFunc
+)
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
@@ -390,11 +399,12 @@ if ds.unique_user_rank():
 if args.psplot_live_mode:
     logger.info("Setting up psplot_live plots.")
     psplot_configs = config.get_psplot_configs(int(run))
-
     psplot_callbacks = psplot.PsplotCallbacks()
+    
     for key, item in psplot_configs.items():
-        plot_type = item.pop("plot_type")
-        psplot_callbacks.add_callback(plot_type(item), name=key)
+        plot_type = item.pop("callback")
+        
+        psplot_callbacks.add_callback(plot_type(**item), name=key)
     small_data = ds.smalldata(
         filename=None, batch_size=args.gather_interval, callbacks=[psplot_callbacks.run]
     )
@@ -568,43 +578,44 @@ for evt_num, evt in enumerate(event_iter):
                     normdict[det._name]["timestamp_min"], evt.timestamp
                 )
 
-            try:
-                # if True:
+            # try:
+            if True:
                 det.getData(evt)
-                if (
-                    det.evt.dat is not None
-                ):  # do I need that or would the try-except work?
-                    det.processFuncs()
-                    userDictInt[det._name] = {}
-                    tmpdict = getUserData(det)
-                    for k, v in tmpdict.items():
-                        userDictInt[det._name]["unaligned_" + k] = v
+                
+                if det.evt.dat is None:
+                    continue
 
-                    try:
-                        envData = getUserEnvData(det)
-                        if len(envData.keys()) > 0:
-                            userDictInt[det._name + "_env"] = envData
-                    except:
-                        pass
+                det.processFuncs()
+                userDictInt[det._name] = {}
+                tmpdict = getUserData(det)
+                for k, v in tmpdict.items():
+                    userDictInt[det._name]["unaligned_" + k] = v
 
-                    # save data in integrating det dictionary & reset norm dictionary
-                    for k, v in normdict[det._name].items():
-                        if isinstance(v, dict):
-                            for kk, vv in v.items():
-                                userDictInt[det._name]["unaligned_norm_" + kk] = vv
-                                normdict[det._name][k][kk] = (
-                                    vv * 0
-                                )  # may not work for arrays....
-                        else:
-                            userDictInt[det._name]["unaligned_norm_" + k] = v
-                            normdict[det._name][k] = (
-                                v * 0
+                try:
+                    envData = getUserEnvData(det)
+                    if len(envData.keys()) > 0:
+                        userDictInt[det._name + "_env"] = envData
+                except:
+                    pass
+
+                # save data in integrating det dictionary & reset norm dictionary
+                for k, v in normdict[det._name].items():
+                    if isinstance(v, dict):
+                        for kk, vv in v.items():
+                            userDictInt[det._name]["unaligned_norm_" + kk] = vv
+                            normdict[det._name][k][kk] = (
+                                vv * 0
                             )  # may not work for arrays....
-                    # print(userDictInt)
-                    small_data.event(evt, userDictInt)
-            except:
-                print(f"Bad int_det processing on evt {evt_num}")
-                pass
+                    else:
+                        userDictInt[det._name]["unaligned_norm_" + k] = v
+                        normdict[det._name][k] = (
+                            v * 0
+                        )  # may not work for arrays....
+                # print(userDictInt)
+                small_data.event(evt, userDictInt)
+            # except:
+            #     print(f"Bad int_det processing on evt {evt_num}")
+            #     pass
 
     # store event-based data
     # if det_data is not None:
