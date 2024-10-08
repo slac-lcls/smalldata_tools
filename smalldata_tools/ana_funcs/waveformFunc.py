@@ -44,14 +44,18 @@ class WfIntegration(DetObjectFunc):
             self._sig_roi = (
                 slice(*sig_roi) if sig_roi is not None else slice(None, None, 1)
             )
-            self.sig_roi = sig_roi if sig_roi is not None else (0, int(1e6))  # for userDataCfg
+            self.sig_roi = (
+                sig_roi if sig_roi is not None else (0, int(1e6))
+            )  # for userDataCfg
 
         if isinstance(bkg_roi, slice):
             self._bkg_roi = bkg_roi
             self.bkg_roi = [bkg_roi.start, bkg_roi.stop]
         else:
             self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
-            self.bkg_roi = bkg_roi if bkg_roi is not None else (0, int(1e6))  # for userDataCfg
+            self.bkg_roi = (
+                bkg_roi if bkg_roi is not None else (0, int(1e6))
+            )  # for userDataCfg
 
         self._flip = -1 if negative_signal else 1
         return
@@ -65,9 +69,9 @@ class WfIntegration(DetObjectFunc):
 class SimpleHitFinder(DetObjectFunc):
     def __init__(
         self,
-        threshold = 1,
-        threshold_max = 1e6,
-        use_rms = False,
+        threshold=1,
+        threshold_max=1e6,
+        use_rms=False,
         bkg_roi: Optional[Iterable[int]] = None,
         **kwargs,
     ):
@@ -81,12 +85,12 @@ class SimpleHitFinder(DetObjectFunc):
             Threshold above wich a sample is consideted a hit.
         threshold_max:
             Samples above this threshold are ignored. This prevents artefacts showing as high
-            intensities to count as hits.          
+            intensities to count as hits.
         use_rms:
             Threshold is a multiplier on the caluclated background rms instead of
             an absolute value.
         bkg_roi:
-            Roi used to compute the background RMS noise. Ony used if use_rms = True.            
+            Roi used to compute the background RMS noise. Ony used if use_rms = True.
         """
         self._name = kwargs.get("name", "hitfinder")
         super().__init__(**kwargs)
@@ -98,7 +102,7 @@ class SimpleHitFinder(DetObjectFunc):
             self._bkg_roi = bkg_roi
         else:
             self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
-    
+
     def process(self, data):
         data = data.squeeze().copy()
         data[data > self.th_max] = 0  # ignore suspiciously high shots
