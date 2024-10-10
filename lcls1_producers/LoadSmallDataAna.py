@@ -15,6 +15,11 @@ from smalldata_tools.utilities import hist2d,rebin,addToHdf5
 from IPython.terminal.prompts import Prompts,Token
 import itertools
 
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 class myPrompt(Prompts):
     def in_prompt_tokens(self, cli=None):
         return [(Token.Prompt, 'SDAna In ['), (Token.PromptNum, str(self.shell.execution_count)), (Token.Prompt, ']: ' ),]
@@ -75,11 +80,8 @@ if not args.exp:
             sys.exit()
 
     try:
-        import logging
         import requests
         ws_url = "https://pswww.slac.stanford.edu/ws/lgbk"
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
         if hutch == 'cxi':
             print('Will assume the first CXI station, if this is wrong, please  -e <expname> on commandline')
         resp = requests.get(ws_url + "/lgbk/ws/activeexperiment_for_instrument_station", {"instrument_name": hutch, "station": 0})
