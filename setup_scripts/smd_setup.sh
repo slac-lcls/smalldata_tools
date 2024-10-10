@@ -39,6 +39,9 @@ do
         CUBE=1
         shift 1
         ;;
+    --psplot_live)
+        PSPLOT_LIVE=1
+        shift;;
     *) # all other possibilities
         ARGS+=("$1")
         echo $@
@@ -51,6 +54,7 @@ umask 002
 
 QUEUE=${QUEUE:=0}
 CUBE=${CUBE:=0}
+PSPLOT_LIVE=${PSPLOT_LIVE:=0}
 MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
@@ -96,7 +100,15 @@ mkdir -p $SDF_BASE/hdf5/smalldata/cube
 mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
+LCLS1_HUTCHES=("xpp" "xcs" "mfx" "cxi" "mec")
+LCLS2_HUTCHES=("tmo" "txi" "rix")
+
 if [ $QUEUE != "0" ]; then
-    source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
-    python $MYDIR/make_arp_jobs.py --experiment $EXP --queue $QUEUE --cube $CUBE
+    if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then
+        source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
+        python $MYDIR/make_arp_jobs_lcls1.py --experiment $EXP --queue $QUEUE --cube $CUBE
+    elif [[ ${LCLS2_HUTCHES[@]} =~ $HUTCH ]]; then
+        source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/psconda.sh
+        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE
+    fi
 fi

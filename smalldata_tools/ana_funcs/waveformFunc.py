@@ -2,12 +2,124 @@ import tables
 import numpy as np
 import itertools
 import scipy
+from typing import Union, Optional
+from collections.abc import Iterable
 from scipy import signal as scipy_signal
+
 from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.ana_funcs.roi_rebin import spectrumFunc
+from smalldata_tools.utilities_waveforms import subtract_background, integrate_wfs
 from smalldata_tools.utilities import templateArray as utility_templateArray
 from smalldata_tools.utilities_waveforms import hsdBaselineFourierEliminate
 from smalldata_tools.utilities_waveforms import hitFinder_CFD
+
+
+class WfIntegration(DetObjectFunc):
+    def __init__(
+        self,
+        sig_roi: Optional[Iterable[int]] = None,
+        bkg_roi: Optional[Iterable[int]] = None,
+        negative_signal: bool = False,
+        **kwargs,
+    ):
+        """
+        Simple waveform integration (sum) with optional background subtraction.
+
+        Parameters
+        ----------
+        sig_roi: Union(slice, tuple[int, int], list[int, int])
+            Start and stop indces for the signal
+        bkg_roi: Union(slice, tuple[int, int], list[int, int]), Optional
+            Start and stop indces for the background
+        negative_signal:
+            Whether to flip the sign of the waveform
+        """
+        self._name = kwargs.get("name", "wfintegrate")
+        super().__init__(**kwargs)
+
+        if isinstance(sig_roi, slice):
+            self._sig_roi = sig_roi
+            self.sig_roi = [sig_roi.start, sig_roi.stop]
+        else:
+            self._sig_roi = (
+                slice(*sig_roi) if sig_roi is not None else slice(None, None, 1)
+            )
+            self.sig_roi = (
+                sig_roi if sig_roi is not None else (0, int(1e6))
+            )  # for userDataCfg
+
+        if isinstance(bkg_roi, slice):
+            self._bkg_roi = bkg_roi
+            self.bkg_roi = [bkg_roi.start, bkg_roi.stop]
+        else:
+            self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
+            self.bkg_roi = (
+                bkg_roi if bkg_roi is not None else (0, int(1e6))
+            )  # for userDataCfg
+
+        self._flip = -1 if negative_signal else 1
+        return
+
+    def process(self, data):
+        if self._bkg_roi is not None:
+            data = subtract_background(data, self._bkg_roi)
+        return integrate_wfs(self._flip * data, sig_window=self._sig_roi)
+
+
+class SimpleHitFinder(DetObjectFunc):
+    def __init__(
+        self,
+        threshold=1,
+        threshold_max=1e6,
+        use_rms=False,
+        bkg_roi: Optional[Iterable[int]] = None,
+        **kwargs,
+    ):
+        """
+        Simple hit finder for waveform traces.
+        Values above a certain treshold are considered as a hit.
+
+        Parameters
+        ----------
+        threshold:
+            Threshold above wich a sample is consideted a hit.
+        threshold_max:
+            Samples above this threshold are ignored. This prevents artefacts showing as high
+            intensities to count as hits.
+        use_rms:
+            Threshold is a multiplier on the caluclated background rms instead of
+            an absolute value.
+        bkg_roi:
+            Roi used to compute the background RMS noise. Ony used if use_rms = True.
+        """
+        self._name = kwargs.get("name", "hitfinder")
+        super().__init__(**kwargs)
+        self.th = threshold
+        self.th_max = threshold_max
+        self.use_rms = use_rms
+
+        if isinstance(bkg_roi, slice):
+            self._bkg_roi = bkg_roi
+        else:
+            self._bkg_roi = slice(*bkg_roi) if bkg_roi is not None else None
+
+    def process(self, data):
+        data = data.squeeze().copy()
+        data[data > self.th_max] = 0  # ignore suspiciously high shots
+
+        if self.use_rms:
+            amean = data[self._bkg_roi].mean()
+            astd = data[self._bkg_roi].std()
+
+            data[data < (amean + self.th * astd)] = 0
+            data[data > (amean + self.th * astd)] = 1
+        else:
+            data[data < self.th] = 0
+            data[data > self.th] = 1
+        data = data.squeeze()
+
+        self.dat = data.copy()
+        return data
 
 
 # find the left-most peak (or so.....)
@@ -438,34 +550,34 @@ class hitFinderCFDFunc(DetObjectFunc):
         return ret_dict
 
 
-class fimSumFunc(DetObjectFunc):
-    """ """
+# class fimSumFunc(DetObjectFunc):
+#     """ """
 
-    def __init__(self, **kwargs):
-        self._name = kwargs.get("name", "fimSum")
-        super(fimSumFunc, self).__init__(**kwargs)
+#     def __init__(self, **kwargs):
+#         self._name = kwargs.get("name", "fimSum")
+#         super(fimSumFunc, self).__init__(**kwargs)
 
-        self._bkgROI = kwargs.get("bkgROI", None)
-        if self._bkgROI is not None:
-            if isinstance(self._bkgROI, slice):
-                self.bkgROI = [self._bkgROI.start, self._bkgROI.stop]
-            else:
-                self.bkgROI = self._bkgROI.copy()
-                self._bkgROI = slice(self.bkgROI[0], self.bkgROI[1])
-        self._sigROI = kwargs.get("sigROI", [0, -1])
-        if isinstance(self._sigROI, slice):
-            self.sigROI = [self._sigROI.start, self._sigROI.stop]
-        else:
-            self.sigROI = self._sigROI.copy()
-            self._sigROI = slice(self.sigROI[0], self.sigROI[1])
-        return
+#         self._bkgROI = kwargs.get("bkgROI", None)
+#         if self._bkgROI is not None:
+#             if isinstance(self._bkgROI, slice):
+#                 self.bkgROI = [self._bkgROI.start, self._bkgROI.stop]
+#             else:
+#                 self.bkgROI = self._bkgROI.copy()
+#                 self._bkgROI = slice(self.bkgROI[0], self.bkgROI[1])
+#         self._sigROI = kwargs.get("sigROI", [0, -1])
+#         if isinstance(self._sigROI, slice):
+#             self.sigROI = [self._sigROI.start, self._sigROI.stop]
+#         else:
+#             self.sigROI = self._sigROI.copy()
+#             self._sigROI = slice(self.sigROI[0], self.sigROI[1])
+#         return
 
-    def process(self, data):
-        ret_dict = {}
-        bkgData = np.zeros(data.shape[0])
-        if self._bkgROI is not None:
-            bkgData = data[:, self._bkgROI].mean(axis=1)
-        data = data - (bkgData.reshape((bkgData.shape[0], 1)))
-        dataS = data[:, self._sigROI]
-        ret_dict["sum"] = data[:, self._sigROI].sum(axis=1)
-        return ret_dict
+#     def process(self, data):
+#         ret_dict = {}
+#         bkgData = np.zeros(data.shape[0])
+#         if self._bkgROI is not None:
+#             bkgData = data[:, self._bkgROI].mean(axis=1)
+#         data = data - (bkgData.reshape((bkgData.shape[0], 1)))
+#         dataS = data[:, self._sigROI]
+#         ret_dict["sum"] = data[:, self._sigROI].sum(axis=1)
+#         return ret_dict
