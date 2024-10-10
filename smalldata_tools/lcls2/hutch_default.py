@@ -54,9 +54,10 @@ def tmoDetectors(run, beamCodes=[[162], [91]]):
     return dets
 
 
-def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[]):
+# def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[-272]):
+def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[-284]):
     dets = []
-    # dets.append(scanDetector('scan', run))
+    dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
     dets.append(lightStatus(beam_destination, laser_codes, run))
     dets.append(genericDetector("gmd", run))
@@ -67,8 +68,7 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[]):
     dets.append(fimfexDetector("rix_fim1", run))
     dets.append(fimfexDetector("rix_fim2", run))
     dets.append(fimfexDetector("crix_w8", run))
-    dets.append(genericDetector("mono_encoder", run))
+    dets.append(interpolatedEncoder("mono_encoder", run))
     dets.append(ttDetector("atmopal", run, saveTraces=True))
     # dets.append(epicsDetector(PVlist=[], run=run))
-    # check a RIX scan to figure out controlDetector.
     return dets

@@ -4,11 +4,11 @@ import numpy as np
 # If no detector in a given category, leave the corresponding 
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
-integrating_detectors = []
-# integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm']
+# integrating_detectors = []
+integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm']
 # Comment: the first integrating detector will set the sub-sampling of all
 # integrating detectors.
-slow_detectors = [] # To do
+slow_detectors = []  # NOT IMPLEMENTED
 
 
 def getROIs(run):
@@ -23,10 +23,10 @@ def getROIs(run):
 
     if run>0:
         # Save the full ANDOR.
-        # ret_dict['andor_dir'] = [full_roi]
-        # ret_dict['andor_vls'] = [full_roi]
-        # ret_dict['andor_norm'] = [full_roi]
-        # ret_dict['c_piranha'] = [full_roi]
+        ret_dict['andor_dir'] = [full_roi]
+        ret_dict['andor_vls'] = [full_roi]
+        ret_dict['andor_norm'] = [full_roi]
+        ret_dict['c_piranha'] = [full_roi]
         
         # and the FIM waveforms
         ret_dict['rix_fim0'] = [full_roi]
@@ -35,23 +35,41 @@ def getROIs(run):
     return ret_dict
 
 
-def getFIMs(run):
+def get_wf_hitfinder(run):
     ret_dict = {}
 
-    ret_dict['rix_fim0'] = {
-        "sigROI" : slice(102,108),
-        "bkgROI" : slice(0,80)
-    }
+    if run>0:
+        andor_vls = {
+            'threshold' : 4,
+            'treshold_max' : 3500,
+            'use_rms' : True,
+            'bkg_roi' : (500, 800)
+        }
+        ret_dict['andor_vls'] = andor_vls
+    return ret_dict
 
-    ret_dict['rix_fim1'] = {
-        "sigROI" : slice(116,122),
-        "bkgROI" : slice(0,80)
-    }
 
-    ret_dict['crix_w8'] = {
-        "sigROI" : slice(69,76),
-        "bkgROI" : slice(0,50)
-    }
+def get_wf_integrate(run):
+    ret_dict = {}
+
+    if run>0:
+        ret_dict['rix_fim0'] = {
+            "sig_roi" : slice(102,108),
+            "bkg_roi" : slice(0,80),
+            "negative_signal" : True
+        }
+
+        ret_dict['rix_fim1'] = {
+            "sig_roi" : slice(116,122),
+            "bkg_roi" : slice(0,80),
+            "negative_signal" : True
+        }
+
+        ret_dict['crix_w8'] = {
+            "sig_roi" : slice(69,76),
+            "bkg_roi" : slice(0,50),
+            "negative_signal" : True
+        }
     return ret_dict
 
 
@@ -71,3 +89,29 @@ epicsPV = [
     "EM2K0:XGMD:HPS:AvgPulseIntensityy",
 ]
 epicsOncePV = []
+
+
+##########################################################
+# psplot config
+##########################################################
+
+import psplot
+
+def get_psplot_configs(run):
+    configs = {}
+
+    if run>0:
+        andor_vls = {
+            'callback' : psplot.SpectrumScan,
+            'data_fields' : {
+                'data' : 'andor_vls/unaligned_hitfinder',
+                'norm' : 'andor_vls/unaligned_norm_det_rix_fim1_sum_wfintegrate',
+                'count' : 'andor_vls/unaligned_norm_count',
+                'scan' : 'andor_vls/unaligned_norm_scan_sum_mono_ev',
+            },
+            'bins' : np.linspace(520, 540, 30),
+            'spectrum_range' : (900, 1050),
+            'lineouts_idx' : (50, 70, 100)
+        }
+        configs['andor_vls'] = andor_vls
+    return configs

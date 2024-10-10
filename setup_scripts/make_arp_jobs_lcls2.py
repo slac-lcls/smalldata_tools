@@ -9,34 +9,28 @@ import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
-parser.add_argument('--queue', help='Queue on which to run the jobs', type=str, default='psanaq')
-parser.add_argument('--cube', help='Make cube job as well', type=int, default=0)
+parser.add_argument('--partition', help='Partition on which to run the jobs', type=str, default='milano')
+parser.add_argument('--psplot_live', help='Make psplot-live job as well', type=int, default=0)
 args = parser.parse_args()
 
 exp = args.experiment
 hutch = exp[:3].lower()
-FFB_BASE = Path("/cds/data/drpsrcf/{hutch}/{exp}/scratch")
-PSANA_BASE = Path("/cds/data/psdm/{hutch}/{exp}")
 SDF_BASE = Path(f"/sdf/data/lcls/ds/{hutch}/{exp}")
 
 # job arguments
-if 'milano' in args.queue:
+if 'milano' in args.partition:
     location = 'S3DF'
-    cores = 120
+    nodes = 2
     account = f"lcls:{exp}"
 
     # smd
-    executable = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_smd.sh')
+    executable = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_smd2.sh')
     trigger = 'START_OF_RUN'
-    
-    # cube
-    executable_cube = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/cubeRun.sh')
-    run_param_name = 'SmallData'
-    args_cube = f''
     
     # summaries
     executable_summaries = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
-    queue_summaries = args.queue
+    queue_summaries = args.partition
+    run_param_name = 'SmallData'
     args_summaries = ''
 else:
     print('No known system related to this queue. Exit now.')
@@ -53,20 +47,17 @@ job_defs.append( {
     'executable': executable,
     'trigger': trigger,
     'location': location,
-    'parameters': f'--queue {args.queue} --norecorder --postRuntable --cores {cores} --wait'
+    'parameters': f'--partition {args.partition} --postRuntable --nodes {nodes} --wait'
     } )
 
-# cube job
-if args.cube>0:
-    job_defs.append( {
-        'name': 'cube',
-        'executable': executable_cube,
-        'trigger': 'RUN_PARAM_IS_VALUE',
-        'run_param_name' : run_param_name,
-        'run_param_value' : 'done',
-        'location': location,
-        'parameters': f'--queue {args.queue} --cores {cores} {args_cube}'
-        } )
+# psplot_live job
+job_defs.append( {
+    'name': 'smd_psplot_live',
+    'executable': executable,
+    'trigger': trigger,
+    'location': location,
+    'parameters': f'--partition {args.partition} --nodes {nodes} --wait --psplot_live'
+    } )
 
 # summary plots job
 if hutch in ['rix','xcs','xpp']:
