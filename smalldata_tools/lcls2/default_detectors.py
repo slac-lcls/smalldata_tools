@@ -87,6 +87,7 @@ class genericDetector(DefaultDetector):
     Detector to get whatever is under the 'raw' field, minus the default
     veto fields.
     """
+
     def __init__(self, detname, run=None, name=None):
         if name is None:
             name = detname
@@ -166,14 +167,17 @@ class interpolatedEncoder(DefaultDetector):
     """
     Detector for interpolated encoder.
     """
+
     def __init__(self, detname, run=None, name=None):
         if name is None:
             name = detname
         super().__init__(detname, name, run)
         if self.in_run():
             self._raw_field, self._raw_sub_fields = self.get_fields("raw")
-            self._interp_field, self._interp_sub_fields = self.get_fields("interpolated")
-    
+            self._interp_field, self._interp_sub_fields = self.get_fields(
+                "interpolated"
+            )
+
     def data(self, evt):
         dl = {}
         if self._raw_field is not None:
@@ -184,7 +188,7 @@ class interpolatedEncoder(DefaultDetector):
                 dl[f"raw_{field}"] = dat
                 if isinstance(dl[f"raw_{field}"], list):
                     dl[field] = np.array(dl[f"raw_{field}"])
-        
+
         if self._interp_field is not None:
             for field in self._interp_sub_fields:
                 dat = getattr(self._interp_field, field)(evt)
