@@ -8,7 +8,7 @@ detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
 integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm']
 # Comment: the first integrating detector will set the sub-sampling of all
 # integrating detectors.
-slow_detectors = [] # To do
+slow_detectors = []  # NOT IMPLEMENTED
 
 
 def getROIs(run):
