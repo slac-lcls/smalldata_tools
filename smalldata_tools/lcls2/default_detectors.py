@@ -83,6 +83,10 @@ def detOnceData(det, data, ts, noarch):
 
 
 class genericDetector(DefaultDetector):
+    """
+    Detector to get whatever is under the 'raw' field, minus the default
+    veto fields.
+    """
     def __init__(self, detname, run=None, name=None):
         if name is None:
             name = detname
@@ -92,10 +96,7 @@ class genericDetector(DefaultDetector):
 
     def data(self, evt):
         dl = {}
-        # raw = getattr( self.det, 'raw')
-        # vetolist = ['TypeId', 'Version', 'config']
         if self._data_field is not None:
-            #    fields = [ field for field in dir(raw) if (field[0]!='_' and field not in vetolist) ]
             for field in self._sub_fields:
                 dat = getattr(self._data_field, field)(evt)
                 if dat is None:
@@ -114,15 +115,11 @@ class ttDetector(DefaultDetector):
         if self.in_run():
             self._data_field, self._sub_fields = self.get_fields("ttfex")
             if self.saveTraces:
-                self.proj_field, self.proj__sub_fields = self.get_fields("ttproj")
+                self.proj_field, self.proj_sub_fields = self.get_fields("ttproj")
 
     def data(self, evt):
         dl = {}
-        # fex = getattr(self.det, 'ttfex')
-        # _veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
         if self._data_field is not None:
-            # fields = self.get_fields('ttfex')
-            # fields = [ field for field in dir(fex) if (field[0]!='_' and field not in _veto_fields) ]
             for field in self._sub_fields:
                 dat = getattr(self._data_field, field)(evt)
                 if dat is None:
@@ -132,11 +129,8 @@ class ttDetector(DefaultDetector):
                     dl[field] = np.array(dl[field])
 
         if self.saveTraces:
-            # fex = getattr( self.det, 'ttproj')
-            # _veto_fields = ['TypeId', 'Version', 'calib', 'image', 'raw', 'config' ]
             if self.proj_field is not None:
-                #    fields = [ field for field in dir(fex) if (field[0]!='_' and field not in _veto_fields) ]
-                for field in self.proj__sub_fields:
+                for field in self.proj_sub_fields:
                     dat = getattr(self.proj_field, field)(evt)
                     if dat is None:
                         continue
@@ -165,6 +159,40 @@ class fimfexDetector(DefaultDetector):
                 dl[field] = dat
                 if isinstance(dl[field], list):
                     dl[field] = np.array(dl[field])
+        return dl
+
+
+class interpolatedEncoder(DefaultDetector):
+    """
+    Detector for interpolated encoder.
+    """
+    def __init__(self, detname, run=None, name=None):
+        if name is None:
+            name = detname
+        super().__init__(detname, name, run)
+        if self.in_run():
+            self._raw_field, self._raw_sub_fields = self.get_fields("raw")
+            self._interp_field, self._interp_sub_fields = self.get_fields("interpolated")
+    
+    def data(self, evt):
+        dl = {}
+        if self._raw_field is not None:
+            for field in self._raw_sub_fields:
+                dat = getattr(self._raw_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[f"raw_{field}"] = dat
+                if isinstance(dl[f"raw_{field}"], list):
+                    dl[field] = np.array(dl[f"raw_{field}"])
+        
+        if self._interp_field is not None:
+            for field in self._interp_sub_fields:
+                dat = getattr(self._interp_field, field)(evt)
+                if dat is None:
+                    continue
+                dl[f"interpolated_{field}"] = dat
+                if isinstance(dl[f"interpolated_{field}"], list):
+                    dl[field] = np.array(dl[f"interpolated_{field}"])
         return dl
 
 

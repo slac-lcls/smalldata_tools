@@ -107,7 +107,6 @@ class SpectrumScan(PsplotScan):
             x = self.bins
             y = im[:-1, idx]  # cut last bin to match shape
             ys.append(y)  # lineouts at idx
-        print(y)
         lineouts = XYPlot(0, f"Spectrum Lineout", x, ys, leg_label=self._lineouts_idx)
         publish.send(f"spectrum_lineout", lineouts)
 

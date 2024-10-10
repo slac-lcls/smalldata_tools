@@ -421,10 +421,11 @@ if ds.unique_user_rank():
 ##
 ##########################################################
 if not ds.is_srv():  # srv nodes do not have access to detectors.
-    # if True:
     default_dets = defaultDetectors(hutch.lower(), thisrun)
     if ds.unique_user_rank():
-        logger.info("Default detectors loaded.")
+        logger.info("Default detectors loaded:")
+        for ddet in default_dets:
+            logger.info(f"{ddet.name}: {ddet.detname}")
 
     #
     # add stuff here to save all EPICS PVs.
