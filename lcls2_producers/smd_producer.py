@@ -402,9 +402,9 @@ if args.psplot_live_mode:
     psplot_callbacks = psplot.PsplotCallbacks()
     
     for key, item in psplot_configs.items():
-        plot_type = item.pop("callback")
+        callback_func = item.pop("callback")
         
-        psplot_callbacks.add_callback(plot_type(**item), name=key)
+        psplot_callbacks.add_callback(callback_func(**item), name=key)
     small_data = ds.smalldata(
         filename=None, batch_size=args.gather_interval, callbacks=[psplot_callbacks.run]
     )
