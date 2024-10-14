@@ -10,6 +10,7 @@ import socket
 import requests
 from requests.auth import HTTPBasicAuth
 from typing import Optional, Tuple, Dict, Union, List
+import mimetypes
 
 import h5py
 import numpy as np
@@ -67,6 +68,7 @@ def postElogMsg(
     exp: str,
     msg: str,
     *,
+    run: Optional[Union[int,str]] = None,
     tag: Optional[str] = "",
     title: Optional[str] = "",
     files: list = [],
@@ -77,6 +79,7 @@ def postElogMsg(
     ----------
     exp (str) Experiment name.
     msg (str) Body of the eLog post.
+    run (int | str) Optional. The run number to associate to the post.
     tag (str) Optional. A tag to include for the post.
     title (str) Optional. A title for the eLog post.
     files (list) Optional. Either a list of paths (str) to files (figures) to
@@ -109,6 +112,8 @@ def postElogMsg(
         post["log_tags"] = tag
     if title:
         post["log_title"] = title
+    if run:
+        post["run_num"] = int(run)
 
     http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
     base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
@@ -125,6 +130,7 @@ def postElogMsg(
 
     if not resp.json()["success"]:
         logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
+
 
 
 def postDetectorDamageMsg(

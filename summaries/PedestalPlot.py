@@ -15,7 +15,7 @@ import requests
 from pathlib import Path
 from requests.auth import HTTPBasicAuth
 import socket
-from typing import Optional
+from typing import Optional, Union
 import mimetypes
 
 try:
@@ -278,6 +278,7 @@ def postElogMsg(
     exp: str,
     msg: str,
     *,
+    run: Optional[Union[int,str]] = None,
     tag: Optional[str] = "",
     title: Optional[str] = "",
     files: list = [],
@@ -288,6 +289,7 @@ def postElogMsg(
     ----------
     exp (str) Experiment name.
     msg (str) Body of the eLog post.
+    run (int | str) Optional. The run number to associate to the post.
     tag (str) Optional. A tag to include for the post.
     title (str) Optional. A title for the eLog post.
     files (list) Optional. Either a list of paths (str) to files (figures) to
@@ -320,6 +322,8 @@ def postElogMsg(
         post["log_tags"] = tag
     if title:
         post["log_title"] = title
+    if run:
+        post["run_num"] = int(run)
 
     http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
     base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
@@ -410,7 +414,7 @@ def postBadPixMsg(
         msg: str = "No DARK runs or cannot communicate with eLog."
         logger.debug(msg)
 
-    postElogMsg(exp=exp, msg=msg, tag=tag, title=title)
+    postElogMsg(exp=exp, msg=msg, run=run, tag=tag, title=title)
 
 
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=""):
