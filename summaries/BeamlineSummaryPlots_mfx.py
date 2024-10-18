@@ -68,7 +68,7 @@ def postElogMsg(
     exp: str,
     msg: str,
     *,
-    run: Optional[Union[int,str]] = None,
+    run: Optional[Union[int, str]] = None,
     tag: Optional[str] = "",
     title: Optional[str] = "",
     files: list = [],
@@ -130,7 +130,6 @@ def postElogMsg(
 
     if not resp.json()["success"]:
         logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
-
 
 
 def postDetectorDamageMsg(
@@ -825,15 +824,11 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
         json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Done"}],
     )
 
-elogDir = f"/sdf/data/lcls/ds/{expname[:3]}/{expname}/stats/summary/BeamlineSummary/BeamlineSummary_Run{run:04d}"
-
 if save_elog:
-    import os
+    from summaries.summary_utils import prepareHtmlReport
 
-    if not os.path.isdir(elogDir):
-        os.makedirs(elogDir)
-    print("Made Directory to save data:", elogDir)
-    tabs.save(("%s/report.html" % elogDir))
+    pageTitleFormat = "BeamlineSummary/BeamlineSummary_Run{run:04d}"
+    prepareHtmlReport(tabs, expname, run, pageTitleFormat)
     postDetectorDamageMsg(
         detectors=detNames,
         exp=expname,

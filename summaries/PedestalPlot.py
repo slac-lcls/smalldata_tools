@@ -278,7 +278,7 @@ def postElogMsg(
     exp: str,
     msg: str,
     *,
-    run: Optional[Union[int,str]] = None,
+    run: Optional[Union[int, str]] = None,
     tag: Optional[str] = "",
     title: Optional[str] = "",
     files: list = [],
