@@ -356,27 +356,17 @@ if ttpos is not None:
 ## save the html file
 ##################################
 
-elogDir = (
-    Path(SIT_PSDM_DATA)
-    / expname[:3]
-    / expname
-    / f"stats/summary/BeamlineSummary/BeamlineSummary_Run{runnum:03d}"
-)
-
 if save_elog:
-    import os
+    from summaries.summary_utils import prepareHtmlReport
 
-    if not os.path.isdir(elogDir):
-        os.makedirs(elogDir)
-    print("Made Directory to save data:", elogDir)
-    # gspec.save(('%s/report.html'%elogDir))
-    tabs.save(("%s/report.html" % elogDir))
+    pageTitleFormat = "BeamlineSummary/BeamlineSummary_Run{run:04d}"
+    prepareHtmlReport(tabs, expname, run, pageTitleFormat)
 
-if int(os.environ.get("RUN_NUM", "-1")) > 0:
-    requests.post(
-        os.environ["JID_UPDATE_COUNTERS"],
-        json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Posted"}],
-    )
+    if int(os.environ.get("RUN_NUM", "-1")) > 0:
+        requests.post(
+            os.environ["JID_UPDATE_COUNTERS"],
+            json=[{"key": "<b>BeamlineSummary Plots </b>", "value": "Posted"}],
+        )
 
 if args.postStats:
     print("posting to the run tables - ipm values.")
