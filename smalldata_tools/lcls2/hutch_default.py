@@ -71,6 +71,6 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[-284
     dets.append(interpolatedEncoder("mono_encoder", run))
     dets.append(ttDetector("atmopal", run, saveTraces=False))
     dets.append(genericDetector("mono_hrencoder", run))
-    #dets.append(ttDetector("c_piranha", run, saveTraces=True))
+    # dets.append(ttDetector("c_piranha", run, saveTraces=True))
     # dets.append(epicsDetector(PVlist=[], run=run))
     return dets
