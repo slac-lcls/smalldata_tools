@@ -481,7 +481,8 @@ class Wave8Object(WaveformObject):
         try:
             self.evt.dat = np.squeeze(np.array(self.evt.dat)).astype(int)
         except:
-            print("Wave8: could not cast waveform times to array ", self.evt.dat)
+            print("Wave8: Could not cast waveform times to array, set to None ", self.evt.dat)
+            self.evt.dat = None
 
 
 class PiranhaObject(WaveformObject):
