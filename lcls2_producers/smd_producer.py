@@ -101,7 +101,7 @@ def define_dets(run, det_list):
 
                 thisROIFunc = ROIFunc(**ROI)
                 if proj_ax is not None:
-                    thsiROIFunc.addfunc(projectionFunc(axis=proj_ax))
+                    thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
                 det.addFunc(thisROIFunc)
 
         if detname in wfs_int_args:
@@ -244,6 +244,12 @@ parser.add_argument(
     help="Offset for the integrating detector batch.",
     type=int,
     default=0,
+)
+parser.add_argument(
+    "--join_kludge",
+    help="ise Vincent's join-h5 kludge, hopefully to fully be removed soon",
+    action="store_true",
+    default=False,
 )
 args = parser.parse_args()
 
@@ -466,8 +472,11 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         # print(f"This run: {thisrun}")
         dets = define_dets(int(args.run), config.detectors)
         int_dets = define_dets(int(args.run), config.integrating_detectors)
-    logger.info(f"Rank {rank} detectors: {[det._name for det in dets]}")
-    logger.info(f"Rank {rank} integrating detectors: {[det._name for det in int_dets]}")
+    if ds.unique_user_rank():
+        logger.info(f"Detectors: {[det._name for det in dets]}")
+        logger.info(f"Integrating detectors: {[det._name for det in int_dets]}")
+    logger.debug(f"Rank {rank} detectors: {[det._name for det in dets]}")
+    logger.debug(f"Rank {rank} integrating detectors: {[det._name for det in int_dets]}")
 
     det_presence = {}
     if args.full:
@@ -489,7 +498,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
                     else:
                         fullROI = ROIFunc(writeArea=True)
                         thisDet.addFunc(fullROI)
-                    print("adding detector for %s" % alias)
+                    if ds.unique_user_rank():
+                        print("adding detector for %s" % alias)
                     dets.append(thisDet)
                 except:
                     pass
@@ -500,8 +510,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     evt_num = (
         -1
     )  # set this to default until I have a useable rank for printing updates...
-    if ds.unique_user_rank() == 0:
-        print("And now the event loop....")
+    if ds.unique_user_rank():
+        print("And now the event loop user....")
 
     normdict = {}
     for det in int_dets:
@@ -646,30 +656,21 @@ for evt_num, evt in enumerate(event_iter):
         or (evt_num < 1000 and evt_num % 100 == 0)
         or (evt_num % 1000 == 0)
     ):
-        if int(os.environ.get("RUN_NUM", "-1")) > 0:
-            if not ((evt_num < 1000 and evt_num % 100 == 0) or (evt_num % 1000 == 0)):
-                continue
+        if (os.environ.get("ARP_JOB_ID", None)) is not None and ds.unique_user_rank():
             try:
-                if size == 1:
-                    requests.post(
-                        os.environ["JID_UPDATE_COUNTERS"],
-                        json=[{"key": "<b>Current Event</b>", "value": evt_num + 1}],
-                    )
-                elif size > 2 and rank == 2:
-                    requests.post(
-                        os.environ["JID_UPDATE_COUNTERS"],
-                        json=[
-                            {
-                                "key": "<b>Current Event / rank </b>",
-                                "value": evt_num + 1,
-                            }
-                        ],
-                    )
+                requests.post(
+                    os.environ["JID_UPDATE_COUNTERS"],
+                    json=[
+                        {
+                            "key": "<b>Current Event / rank </b>",
+                            "value": evt_num + 1,
+                        }
+                    ],
+                )
             except:
-                if rank == 0:
-                    print("Processed evt %d" % evt_num)
-        else:
-            if size > 2 and rank == 2:
+                print('ARP update post failed')
+                pass
+        elif ds.unique_user_rank():
                 print("Processed evt %d" % evt_num)
 
 if not ds.is_srv():
@@ -712,11 +713,11 @@ if not ds.is_srv():
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
 # are needed here.
 # Hopefully this can be removed soon.
-print(f"Smalldata type for rank {rank}: {small_data._type}")
+logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
 if ds.unique_user_rank():
     print(f"user rank: {rank}")
 
-if small_data._type == "server" and not args.psplot_live_mode:
+if small_data._type == "server" and not args.psplot_live_mode and args.join_kludge:
     print(f"Close smalldata server file on {rank}")
     # flush the data caches (in case did not hit cache_size yet)
     for dset, cache in small_data._server._cache.items():
@@ -786,9 +787,8 @@ logger.debug("rank {0} on {1} is finished".format(rank, hostname))
 #        import subprocess
 #        cmd = ['timestamp_sort_h5', h5_f_name, h5_f_name]
 
-
-if os.environ.get("ARP_JOB_ID", None) is not None and ds.unique_user_rank():
-    if size > 2 and rank == 2:
+if ds.unique_user_rank():
+    if os.environ.get("ARP_JOB_ID", None) is not None:
         requests.post(
             os.environ["JID_UPDATE_COUNTERS"],
             json=[
@@ -799,10 +799,8 @@ if os.environ.get("ARP_JOB_ID", None) is not None and ds.unique_user_rank():
             ],
         )
     else:
-        requests.post(
-            os.environ["JID_UPDATE_COUNTERS"],
-            json=[{"key": "<b>Last Event</b>", "value": evt_num}],
-        )
+        print(f"Last Event: {evt_num}")
+
 
 if args.postRuntable and ds.unique_user_rank():
     print("Posting to the run tables.")
