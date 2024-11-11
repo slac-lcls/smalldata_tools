@@ -50,6 +50,8 @@ def define_dets(run, det_list):
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
         rois_args = config.getROIs(run)
+    if "getDetImages" in dir(config):
+        dimgs_args = config.getDetImages(run)
     if "get_wf_integrate" in dir(config):
         wfs_int_args = config.get_wf_integrate(run)
     if "get_wf_hitfinder" in dir(config):
@@ -81,14 +83,17 @@ def define_dets(run, det_list):
             hsdsplit = hsdsplitFunc(writeHsd=False)
             if detname in rois_args:
                 for sdetname in rois_args[detname]:
+                    print(f"sdetname {sdetname} args: {rois_args[detname][sdetname]}")
                     funcname = "%s__%s" % (sdetname, "ROI")
+                    print(f"funcname: {funcname}")
                     RF = hsdROIFunc(
-                        name="%s__%s" % (sdetname, "ROI"),
+                        name= funcname,
                         writeArea=True,
                         ROI=ROIs[detname][sdetname],
                     )
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
+            dets.append(det)
             continue
 
         ####################################
@@ -97,6 +102,19 @@ def define_dets(run, det_list):
         if detname in rois_args:
             # ROI extraction
             for iROI, ROI in enumerate(rois_args[detname]):
+                proj_ax = ROI.pop("proj_ax", None)
+
+                thisROIFunc = ROIFunc(**ROI)
+                if proj_ax is not None:
+                    thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
+                det.addFunc(thisROIFunc)
+
+        if detname in dimgs_args:
+            dimg_func = detImageFunc(**dimgs_args[detname])
+            det.addFunc(dimg_func)
+
+            # ROI extraction
+            for iROI, ROI in enumerate(dimgs_args[detname]):
                 proj_ax = ROI.pop("proj_ax", None)
 
                 thisROIFunc = ROIFunc(**ROI)

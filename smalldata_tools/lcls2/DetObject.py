@@ -504,6 +504,10 @@ class ArchonObject(CameraObject):
         super(ArchonObject, self).__init__(det, run, **kwargs)
         self.mask = None
         self.cmask = None
+        self.common_mode = kwargs.get("common_mode", 30)  # default to calib
+        if self.common_mode is None:
+            self.common_mode = 30
+        return
 
     def getData(self, evt):
         super(ArchonObject, self).getData(evt)
