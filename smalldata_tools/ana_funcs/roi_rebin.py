@@ -332,7 +332,7 @@ class detImageFunc(DetObjectFunc):
         self._det = det.det
 
     def process(self, data):
-        #pedestal application should happen when data is produced from calib
+        # pedestal application should happen when data is produced from calib
         img = self._det.raw.image(self._run, data)
         ret_dict = {"image": img}
 
