@@ -448,8 +448,8 @@ class HsdObject(WaveformObject):
         super(HsdObject, self).getData(evt)
         datadict = self.det.raw.waveforms(evt)
         if datadict is None:
-            print('HSD data is None')
-            return # ensure that self.evt.dat is None
+            print("HSD data is None")
+            return  # ensure that self.evt.dat is None
 
         if self.wfx is None:
             self.wfxlen = np.array([datadict[k]["times"].shape[0] for k in self.cidx])
