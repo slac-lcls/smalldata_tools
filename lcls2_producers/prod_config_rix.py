@@ -29,8 +29,8 @@ def getROIs(run):
         ret_dict['c_piranha'] = [full_roi]
         
         # and the FIM waveforms
-        ret_dict['rix_fim0'] = [full_roi]
-        ret_dict['rix_fim1'] = [full_roi]
+        # ret_dict['rix_fim0'] = [full_roi]
+        # ret_dict['rix_fim1'] = [full_roi]
         # ret_dict['crix_w8'] = [full_roi]
         # ret_dict['qrix_w8'] = [full_roi]
 
@@ -56,14 +56,14 @@ def getDetImages(run):
 def get_wf_hitfinder(run):
     ret_dict = {}
 
-    if run>0:
-        andor_vls = {
-            'threshold' : 4,
-            'treshold_max' : 3500,
-            'use_rms' : True,
-            'bkg_roi' : (500, 800)
-        }
-        ret_dict['andor_vls'] = andor_vls
+    # if run>0:
+    #     andor_vls = {  # for andor_vls in 1-D mode
+    #         'threshold' : 4,
+    #         'treshold_max' : 3500,
+    #         'use_rms' : True,
+    #         'bkg_roi' : (500, 800)
+    #     }
+    #     ret_dict['andor_vls'] = andor_vls
     return ret_dict
 
 

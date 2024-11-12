@@ -548,8 +548,7 @@ for evt_num, evt in enumerate(event_iter):
     # detector data using DetObject
     userDict = {}
     for det in dets:
-        # try:
-        if True:
+        try:
             det.getData(evt)
             det.processFuncs()
             userDict[det._name] = getUserData(det)
@@ -562,10 +561,10 @@ for evt_num, evt in enumerate(event_iter):
                 pass
             det.processSums()
             # print(userDict[det._name])
-        # except Exception as e:
-        #     print(f'Failed analyzing det {det}')
-        #     print(e)
-        #     pass
+        except Exception as e:
+            print(f'Failed analyzing det {det} on evt {evt_num}')
+            print(e)
+            pass
 
     # Combine default data & user data into single dict.
     det_data.update(userDict)
@@ -607,8 +606,7 @@ for evt_num, evt in enumerate(event_iter):
                     normdict[det._name]["timestamp_min"], evt.timestamp
                 )
 
-            # try:
-            if True:
+            try:
                 det.getData(evt)
                 
                 if det.evt.dat is None:
@@ -642,9 +640,9 @@ for evt_num, evt in enumerate(event_iter):
                         )  # may not work for arrays....
                 # print(userDictInt)
                 small_data.event(evt, userDictInt)
-            # except:
-            #     print(f"Bad int_det processing on evt {evt_num}")
-            #     pass
+            except:
+                print(f"Bad int_det processing on evt {evt_num}")
+                pass
 
     # store event-based data
     # if det_data is not None:
