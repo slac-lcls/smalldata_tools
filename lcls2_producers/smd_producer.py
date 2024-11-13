@@ -110,17 +110,9 @@ def define_dets(run, det_list):
                 det.addFunc(thisROIFunc)
 
         if detname in dimgs_args:
+            # Detector image (det.raw.image())
             dimg_func = detImageFunc(**dimgs_args[detname])
             det.addFunc(dimg_func)
-
-            # ROI extraction
-            for iROI, ROI in enumerate(dimgs_args[detname]):
-                proj_ax = ROI.pop("proj_ax", None)
-
-                thisROIFunc = ROIFunc(**ROI)
-                if proj_ax is not None:
-                    thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
-                det.addFunc(thisROIFunc)
 
         if detname in wfs_int_args:
             # Waveform integration
