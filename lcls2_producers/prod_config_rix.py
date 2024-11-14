@@ -5,7 +5,7 @@ import numpy as np
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
 # integrating_detectors = []
-integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm']
+integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm', 'archon']
 # Comment: the first integrating detector will set the sub-sampling of all
 # integrating detectors.
 slow_detectors = []  # NOT IMPLEMENTED
@@ -29,23 +29,41 @@ def getROIs(run):
         ret_dict['c_piranha'] = [full_roi]
         
         # and the FIM waveforms
-        ret_dict['rix_fim0'] = [full_roi]
-        ret_dict['rix_fim1'] = [full_roi]
-        ret_dict['crix_w8'] = [full_roi]
+        # ret_dict['rix_fim0'] = [full_roi]
+        # ret_dict['rix_fim1'] = [full_roi]
+        # ret_dict['crix_w8'] = [full_roi]
+        # ret_dict['qrix_w8'] = [full_roi]
+
+        # hsd
+        # hsd_dict = {}
+        # hsd_dict['hsd_0'] = [0,-1]
+        # hsd_dict['hsd_1'] = [0,-1]
+        # hsd_dict['hsd_2'] = [0,-1]
+        # hsd_dict['hsd_3'] = [0,-1]
+        # ret_dict['hsd'] = hsd_dict
+
+    return ret_dict
+
+
+def getDetImages(run):
+    ret_dict = {}
+
+    if run>0:
+        ret_dict['archon'] = {}
     return ret_dict
 
 
 def get_wf_hitfinder(run):
     ret_dict = {}
 
-    if run>0:
-        andor_vls = {
-            'threshold' : 4,
-            'treshold_max' : 3500,
-            'use_rms' : True,
-            'bkg_roi' : (500, 800)
-        }
-        ret_dict['andor_vls'] = andor_vls
+    # if run>0:
+    #     andor_vls = {  # for andor_vls in 1-D mode
+    #         'threshold' : 4,
+    #         'treshold_max' : 3500,
+    #         'use_rms' : True,
+    #         'bkg_roi' : (500, 800)
+    #     }
+    #     ret_dict['andor_vls'] = andor_vls
     return ret_dict
 
 

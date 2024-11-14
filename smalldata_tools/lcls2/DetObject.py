@@ -436,10 +436,21 @@ class HsdObject(WaveformObject):
         self.cidx = [k for k in self.det.raw._seg_chans()]
 
     def getData(self, evt):
+        """
+        HSD data handling a bit particular.
+        Because the different channels can have different sampling and lengths, the data are
+        put in a contiguous array (i.e. 1 dimension vector) with all channels appended to
+        one-another.
+        The wfxlen variable is used to then isolated individual channel when needed.
+        The information on the x axis is gathered on the first event, and cached for the rest
+        of the run.
+        """
         super(HsdObject, self).getData(evt)
         datadict = self.det.raw.waveforms(evt)
-        # if self.channels == [-1]:
-        #    self.channels = [k for k in datadict.keys()]
+        if datadict is None:
+            print("HSD data is None")
+            return  # ensure that self.evt.dat is None
+
         if self.wfx is None:
             self.wfxlen = np.array([datadict[k]["times"].shape[0] for k in self.cidx])
             self.wfx = np.zeros(self.wfxlen.sum())
@@ -504,6 +515,10 @@ class ArchonObject(CameraObject):
         super(ArchonObject, self).__init__(det, run, **kwargs)
         self.mask = None
         self.cmask = None
+        self.common_mode = kwargs.get("common_mode", 30)  # default to calib
+        if self.common_mode is None:
+            self.common_mode = 30
+        return
 
     def getData(self, evt):
         super(ArchonObject, self).getData(evt)

@@ -50,6 +50,8 @@ def define_dets(run, det_list):
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
         rois_args = config.getROIs(run)
+    if "getDetImages" in dir(config):
+        dimgs_args = config.getDetImages(run)
     if "get_wf_integrate" in dir(config):
         wfs_int_args = config.get_wf_integrate(run)
     if "get_wf_hitfinder" in dir(config):
@@ -81,14 +83,17 @@ def define_dets(run, det_list):
             hsdsplit = hsdsplitFunc(writeHsd=False)
             if detname in rois_args:
                 for sdetname in rois_args[detname]:
+                    print(f"sdetname {sdetname} args: {rois_args[detname][sdetname]}")
                     funcname = "%s__%s" % (sdetname, "ROI")
+                    print(f"funcname: {funcname}")
                     RF = hsdROIFunc(
-                        name="%s__%s" % (sdetname, "ROI"),
+                        name= funcname,
                         writeArea=True,
                         ROI=ROIs[detname][sdetname],
                     )
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
+            dets.append(det)
             continue
 
         ####################################
@@ -103,6 +108,11 @@ def define_dets(run, det_list):
                 if proj_ax is not None:
                     thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
                 det.addFunc(thisROIFunc)
+
+        if detname in dimgs_args:
+            # Detector image (det.raw.image())
+            dimg_func = detImageFunc(**dimgs_args[detname])
+            det.addFunc(dimg_func)
 
         if detname in wfs_int_args:
             # Waveform integration
@@ -530,8 +540,7 @@ for evt_num, evt in enumerate(event_iter):
     # detector data using DetObject
     userDict = {}
     for det in dets:
-        # try:
-        if True:
+        try:
             det.getData(evt)
             det.processFuncs()
             userDict[det._name] = getUserData(det)
@@ -544,10 +553,10 @@ for evt_num, evt in enumerate(event_iter):
                 pass
             det.processSums()
             # print(userDict[det._name])
-        # except Exception as e:
-        #     print(f'Failed analyzing det {det}')
-        #     print(e)
-        #     pass
+        except Exception as e:
+            print(f'Failed analyzing det {det} on evt {evt_num}')
+            print(e)
+            pass
 
     # Combine default data & user data into single dict.
     det_data.update(userDict)
@@ -589,8 +598,7 @@ for evt_num, evt in enumerate(event_iter):
                     normdict[det._name]["timestamp_min"], evt.timestamp
                 )
 
-            # try:
-            if True:
+            try:
                 det.getData(evt)
                 
                 if det.evt.dat is None:
@@ -624,9 +632,9 @@ for evt_num, evt in enumerate(event_iter):
                         )  # may not work for arrays....
                 # print(userDictInt)
                 small_data.event(evt, userDictInt)
-            # except:
-            #     print(f"Bad int_det processing on evt {evt_num}")
-            #     pass
+            except:
+                print(f"Bad int_det processing on evt {evt_num}")
+                pass
 
     # store event-based data
     # if det_data is not None:

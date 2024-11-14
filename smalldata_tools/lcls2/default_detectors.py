@@ -227,12 +227,13 @@ class lightStatus(DefaultDetector):
         event_codes = self.det.raw.eventcodes(evt)
 
         for lOff in self.laserCodes_drop:
-            if evtCodes[lOff]:
+            laser_status = 1
+            if event_codes[lOff]:
                 laser_status = 0
         if len(self.laserCodes_req) > 0:
             laser_status = 0
-            for lOff in self.laserCodes_req and laser_status == 1:
-                if evtCodes[lOff]:
+            for lOff in self.laserCodes_req:
+                if event_codes[lOff]:
                     laser_status = 1
 
         dl = {"xray": xfel_status, "laser": laser_status}
