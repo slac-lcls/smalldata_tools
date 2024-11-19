@@ -366,9 +366,12 @@ class DetObjectClass(object):
         for key in self._storeSum.keys():
             asImg = False
             thres = -1.0e9
+            skipFirst = False
             for skey in key.split("_"):
                 if skey.find("img") >= 0:
                     asImg = True
+                elif skey.find("skip") >= 0:
+                    skipFirst = True
                 else:
                     if skey.find("thresADU") >= 0:
                         thres = float(skey.replace("thresADU", ""))
@@ -400,10 +403,18 @@ class DetObjectClass(object):
                         dat_to_be_summed = np.zeros_like(dat_to_be_summed)
 
             if self._storeSum[key] is None:
-                self._storeSum[key] = dat_to_be_summed.copy()
+                if skipFirst:
+                    self._storeSum[key] = np.zeros_like(dat_to_be_summed)
+                else:
+                    self._storeSum[key] = dat_to_be_summed.copy()
             else:
                 try:
-                    self._storeSum[key] += dat_to_be_summed
+                    if key.find("max") < 0:
+                        self._storeSum[key] += dat_to_be_summed
+                    else:
+                        #look up how to do this.
+                        self._storeSum[key] = np.maximum(self._storeSum[key], dat_to_be_summed)
+
                 except:
                     print("could not add ", dat_to_be_summed)
                     print("could not to ", self._storeSum[key])
