@@ -96,7 +96,10 @@ class azimuthalBinning(DetObjectFunc):
         if det.x is not None:
             self.x = det.x.flatten() / 1e3
             self.y = det.y.flatten() / 1e3
-            self.z = det.z.flatten() / 1e3
+            if det.z is not None:
+                self.z = det.z.flatten() / 1e3
+            else:
+                self.z = np.zeros_like(det.x.flatten())
             self.z_off = np.nanmean(self.z) - self.z
             # z_off defined such that z_off >0 is downstream
 
