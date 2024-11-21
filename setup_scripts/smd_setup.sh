@@ -101,7 +101,7 @@ mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
 LCLS1_HUTCHES=("xpp" "xcs" "mfx" "cxi" "mec")
-LCLS2_HUTCHES=("tmo" "txi" "rix")
+LCLS2_HUTCHES=("tmo" "txi" "rix" "ued")
 
 if [ $QUEUE != "0" ]; then
     if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then
