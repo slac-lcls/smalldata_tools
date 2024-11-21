@@ -277,6 +277,30 @@ class projectionFunc(DetObjectFunc):
         return retDict
 
 
+class lineoutFunc(DetObjectFunc):
+    def __init__(self, **kwargs):
+        """
+        adds the axis with the selected pixel to user data.
+        axis (def 0): the axis to return
+        idx (def None): the idx to take the lineout from. If None, will use the max pixel.
+        """
+        self.axis = kwargs.get("axis", 0)
+        self.idx = kwargs.get("idx", None)
+        super().__init__()
+
+    def process(self, data):
+        if self.idx is None:
+            idx = data.argmax()
+        else:
+            idx = self.idx
+        idx = np.unravel_index(idx, data.shape)
+        axis = np.take(data, idx[self.axis], axis=self.axis)
+        if isinstance(axis, np.ma.masked_array):
+            axis = axis.data
+        retDict = {"data": axis}
+        return retDict
+
+
 # effectitely a projection onto a non-spatial coordinate.
 # TEST ME WITH MASKED ARRAY - WAS ALEADY WRITTEN WITH MASKED ARRAY IN MIND#
 class spectrumFunc(DetObjectFunc):
