@@ -24,8 +24,6 @@ class BeamDestination(Enum):
 def defaultDetectors(hutch, run=None, env=None):
     if hutch.lower() == "det":
         dets = detDetectors()
-    elif hutch.lower() == "dia":
-        dets = diaDetectors()
     elif hutch.lower() == "tmo":
         dets = tmoDetectors(run)
     elif hutch.lower() == "rix":
@@ -74,3 +72,12 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[-284
     # dets.append(ttDetector("c_piranha", run, saveTraces=True))
     # dets.append(epicsDetector(PVlist=[], run=run))
     return dets
+
+def uedDetectors(run, beamCodes=[[162], [91]]):
+    dets = []
+    dets.append(scanDetector("scan", run))
+    dets.append(genericDetector("timing", run))
+    #dets.append(lightStatus(beamCodes, run))
+    dets.append(epicsDetector(PVlist=["MOTR_AS01_MC06_CH6"], run=run))
+    return dets
+
