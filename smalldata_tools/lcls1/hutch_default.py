@@ -247,10 +247,15 @@ def mfxDetectors(beamCodes=[[-137], [204]], env=None):
                 "atten_trans3",
                 "fee_Attenuator_transmission",
                 "lens_energy",
+                "lens_z",
                 "BeamMonitor_target",
                 "Dg1Ipm_target",
                 "lxt",
+                "lxt_fs_tgt",
+                "lxt_fast",
+                "lxt_fast_mot",
                 "txt",
+                "txt_mot",
             ]
         )
     )

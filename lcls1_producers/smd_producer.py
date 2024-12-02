@@ -40,10 +40,11 @@ def getROIs(run):
     ret_dict = {}
     if run>0:
         roi_dict = {}
-        roi_dict['ROIs'] = [ [[1,2], [157,487], [294,598]] ] # can define more than one ROI
+        roi_dict['name'] = 'ROI_0'
+        roi_dict['ROI'] = [[1,2], [157,487], [294,598]]
         roi_dict['writeArea'] = True
         roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M_alcove'] = roi_dict
+        ret_dict['jungfrau1M_alcove'] = [ roi_dict ]
     return ret_dict
 
 def isDropped(def_data):
@@ -138,11 +139,10 @@ def define_dets(run):
             # Analysis functions
             # ROIs:
             if detname in ROIs:
-                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
-                    det.addFunc(ROIFunc(name='ROI_%d'%iROI,
-                                        ROI=ROI,
-                                        writeArea=ROIs[detname]['writeArea'],
-                                        thresADU=ROIs[detname]['thresADU']))
+                if not isinstance(ROIs[detname], list):
+                    ROIs[detname] = [ ROIs[detname] ]
+                for ROI in ROIs[detname]:
+                    det.addFunc(ROIFunc(**ROI))
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
