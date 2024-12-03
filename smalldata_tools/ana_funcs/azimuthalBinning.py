@@ -129,9 +129,7 @@ class azimuthalBinning(DetObjectFunc):
         if rank == 0:
             if self._mask is not None:
                 print(
-                    "initialize azimuthal binning, mask %d pixel for azimuthal integr
-
-ation"
+                    "initialize azimuthal binning, mask %d pixel for azimuthal integration"
                     % self._mask.sum()
                 )
             else:
