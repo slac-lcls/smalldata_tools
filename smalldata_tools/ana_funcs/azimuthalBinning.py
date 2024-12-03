@@ -1,9 +1,7 @@
 import numpy as np
 import sys
-from scipy import hypot, arcsin, arccos
 import time
 import h5py
-from scipy.interpolate import griddata
 import smalldata_tools.utilities as util
 from smalldata_tools.common.detector_base import DetObjectFunc
 from mpi4py import MPI
@@ -131,7 +129,9 @@ class azimuthalBinning(DetObjectFunc):
         if rank == 0:
             if self._mask is not None:
                 print(
-                    "initialize azimuthal binning, mask %d pixel for azimuthal integration"
+                    "initialize azimuthal binning, mask %d pixel for azimuthal integr
+
+ation"
                     % self._mask.sum()
                 )
             else:
