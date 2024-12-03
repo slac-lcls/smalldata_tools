@@ -507,6 +507,10 @@ for detImgName in ana.Keys("Sums"):
                 .replace("_calib", "")
                 .replace("_dropped", "")
                 .replace("_square", "")
+                .replace("_max", "")
+                .replace("_thresADU1", "")
+                .replace("_thresADU5", "")
+                .replace("_skipFirst", "")
             )
             # detName = detImgName.replace("Sums/","").split("_")[0]
             ix = ana.fh5.get_node("/UserDataCfg/%s/ix" % detName).read()
