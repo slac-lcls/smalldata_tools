@@ -221,7 +221,7 @@ class rebinFunc(DetObjectFunc):
     def process(self, data):
         # masked array????
         newArray = rebin(data, self.shape)
-        ret_dict = {"data": newArray}
+        ret_dict = {"data": newArray.data}
         return ret_dict
 
 
