@@ -612,7 +612,7 @@ class l3tDetector(object):
 class ttRawDetector(DefaultDetector):
     def __init__(self, name="ttRaw", env=None):
         self.name = name
-        self.detname = ""
+        self.detname = "have_no_tt"
         self.kind = "stepDown"
         self.weights = None
         self.ttROI_signal = None
@@ -631,7 +631,17 @@ class ttRawDetector(DefaultDetector):
         self.subtract_sideband = False
         self.ttCalib = [0.0, 1.0]
         ttCfg = None
-        self.evrdet = psana.Detector("NoDetector.0:Evr.0")
+        evrName = None
+        ievr = 99
+        for key in env.configStore().keys():
+            if key.src().__repr__().find("Evr") > 0:
+                if int(key.src().__repr__()[-2]) < ievr:
+                    ievr = int(key.src().__repr__()[-2])
+                    evrName = (key.src().__repr__().split("(")[1])[:-1]
+        if evrName is None:
+            print("did not find EVR, cannot define ttraw detector ")
+            return None
+        self.evrdet = psana.Detector(evrName)
         if env is None:
             env = psana.Env
             # getting the env this way unfortunatly does not work. Find out how psana.DetNames() does it.
@@ -686,11 +696,6 @@ class ttRawDetector(DefaultDetector):
 
         else:
             super().__init__(self.detname, "ttRaw")
-
-    def in_run(self):
-        if self.detname == "":
-            return False
-        return super().in_run(self)
 
     def setPars(self, ttPars):
         parsList = [
