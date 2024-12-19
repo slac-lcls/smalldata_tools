@@ -725,7 +725,10 @@ end_evt_loop = time.time()
 sumDict={'Sums': {}}
 for det in dets:
     for key in det.storeSum().keys():
-        sumData=small_data.sum(det.storeSum()[key])
+        if "max" in key:
+            sumData = small_data.max(det.storeSum()[key])
+        else:
+            sumData = small_data.sum(det.storeSum()[key])
         sumDict['Sums']['%s_%s'%(det._name, key)]=sumData
 if len(sumDict['Sums'].keys())>0:
 #     print(sumDict)
