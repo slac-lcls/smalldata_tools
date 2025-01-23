@@ -20,7 +20,7 @@ class sparsifyFunc(DetObjectFunc):
     """
     Function to sparsify a passed array (2 or 3-d input)
     nData: changes the way sparse data are saved:
-            If an int is passed, make the output array rectangular of length 
+            If an int is passed, make the output array rectangular of length
             nData (fixed shape for all events).
             If None (default), store coordinate in a continuous long vector
             If 0 uses ragged array (not recommended)

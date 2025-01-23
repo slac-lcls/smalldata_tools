@@ -555,8 +555,6 @@ class ImageObject(CameraObject):
             return
         self.evt.dat = self.det.raw.image(None, dat)
         return
-        
-        
 
 
 class ArchonObject(ImageObject):
