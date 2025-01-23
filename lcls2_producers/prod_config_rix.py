@@ -4,6 +4,7 @@ import numpy as np
 # If no detector in a given category, leave the corresponding 
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
+# integrating_detectors = []
 integrating_detectors = ['archon']
 # integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm', 'archon']
 # Comment: the first integrating detector will set the sub-sampling of all
@@ -71,14 +72,6 @@ def get_droplet2photon(run):
         ret_dict['archon'] = d2p_dict
     
     return ret_dict
-
-
-# def getDetImages(run):
-#     ret_dict = {}
-
-#     if run>0:
-#         ret_dict['archon'] = {}
-#     return ret_dict
 
 
 def get_wf_hitfinder(run):
