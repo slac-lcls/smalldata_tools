@@ -599,7 +599,6 @@ for evt_num, evt in enumerate(event_iter):
     det_data.update(userDict)
 
     # Integrating detectors
-    # grp_key = 'grp_intg_'
 
     if len(int_dets) > 0:
         userDictInt = {}
