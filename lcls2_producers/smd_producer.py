@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
+import json
 import psana
 import time
 from datetime import datetime
@@ -56,6 +57,8 @@ def define_dets(run, det_list):
         wfs_int_args = config.get_wf_integrate(run)
     if "get_wf_hitfinder" in dir(config):
         wfs_hitfinder_args = config.get_wf_hitfinder(run)
+    if "get_droplet2photon" in dir(config):
+        d2p_args = config.get_droplet2photon(run)
 
     dets = []
 
@@ -109,10 +112,42 @@ def define_dets(run, det_list):
                     thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
                 det.addFunc(thisROIFunc)
 
-        if detname in dimgs_args:
-            # Detector image (det.raw.image())
-            dimg_func = detImageFunc(**dimgs_args[detname])
-            det.addFunc(dimg_func)
+        if detname in d2p_args:
+            if rank == 0:
+                print(f"\n\nSETTING UP DROPLET TO PHOTON PIPELINE FOR DETECTOR {det._name}")
+                print(json.dumps(d2p_args[detname], indent=4))
+                print("\n")
+            if 'nData' in d2p_args[detname]:  # defines how sparsifcation is saved
+                nData = d2p_args[detname].pop('nData')
+            else:
+                nData = None
+            if 'get_photon_img' in d2p_args[detname]:  # save unsparsified image or not
+                unsparsify = d2p_args[detname].pop('get_photon_img')
+            else:
+                unsparsify = False
+
+            # Make individual analysis functions
+            # (i) droplet
+            droplet_dict = d2p_args[detname]['droplet']
+            dropfunc = dropletFunc(**droplet_dict)
+            # (ii) droplet2Photon
+            d2p_dict = d2p_args[detname]['d2p']
+            drop2phot_func = droplet2Photons(**d2p_dict)
+            # (iii) sparsify
+            sparsify = sparsifyFunc(nData=nData)
+
+            # Assemble pipeline last to first
+            if unsparsify:
+                unsparsify_func = unsparsifyFunc()
+                drop2phot_func.addFunc(unsparsify_func)
+            drop2phot_func.addFunc(sparsify)
+            dropfunc.addFunc(drop2phot_func)
+            det.addFunc(dropfunc)
+
+        # if detname in dimgs_args:
+        #     # Detector image (det.raw.image())
+        #     dimg_func = detImageFunc(**dimgs_args[detname])
+        #     det.addFunc(dimg_func)
 
         if detname in wfs_int_args:
             # Waveform integration
@@ -151,7 +186,7 @@ from smalldata_tools.ana_funcs.roi_rebin import (
     projectionFunc,
     imageFunc,
 )
-from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
+from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc, unsparsifyFunc
 from smalldata_tools.ana_funcs.waveformFunc import WfIntegration, SimpleHitFinder
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.waveformFunc import (
@@ -162,6 +197,8 @@ from smalldata_tools.ana_funcs.waveformFunc import (
 )
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
+from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
+
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 
 import psplot

@@ -510,21 +510,70 @@ class PiranhaObject(WaveformObject):
         return
 
 
-class ArchonObject(CameraObject):
+class ImageObject(CameraObject):
+    def __init__(self, det, run, **kwargs):
+        """
+        Extension of CameraObject for detector that should use the psana image method instead of the
+        usual calib method.
+        For now (1/22/2025), this is only applicable to the Archon detector.
+        """
+        super().__init__(det, run, **kwargs)
+        self.params_to_img()
+        return
+
+    def params_to_img(self):
+        """
+        Convert all parameters from the calib shape to the image shape:
+        """
+        # pedestals
+        self.ped = self._to_img_shape(self.ped)
+
+        # rms
+        self.rms = self._to_img_shape(self.rms)
+
+        # gain
+        self.gain = self._to_img_shape(self.gain)
+
+        # masks
+        self.mask = self._to_img_shape(self.mask)
+        self.cmask = self._to_img_shape(self.cmask)
+        return
+
+    def _to_img_shape(self, arr):
+        if arr is None:
+            return None
+        else:
+            return self.det.raw.image(None, arr)
+
+    def getData(self, evt):
+        super().getData(evt)
+        if self.common_mode < 0:
+            dat = self.det.raw.raw(evt)
+        elif self.common_mode in [0, 30]:
+            dat = self.det.raw.calib(evt)
+        if dat is None:
+            return
+        self.evt.dat = self.det.raw.image(None, dat)
+        return
+        
+        
+
+
+class ArchonObject(ImageObject):
     def __init__(self, det, run, **kwargs):
         super(ArchonObject, self).__init__(det, run, **kwargs)
-        self.mask = None
-        self.cmask = None
+        # self.mask = None
+        # self.cmask = None
         self.common_mode = kwargs.get("common_mode", 30)  # default to calib
         if self.common_mode is None:
             self.common_mode = 30
         return
 
-    def getData(self, evt):
-        super(ArchonObject, self).getData(evt)
+    # def getData(self, evt):
+    #     super(ArchonObject, self).getData(evt)
 
-        if self.common_mode <= 0:
-            self.evt.dat = self.det.raw.raw(evt)
-        elif self.common_mode == 30:
-            self.evt.dat = self.det.raw.calib(evt)
-        return
+    #     if self.common_mode <= 0:
+    #         self.evt.dat = self.det.raw.raw(evt)
+    #     elif self.common_mode == 30:
+    #         self.evt.dat = self.det.raw.calib(evt)
+    #     return
