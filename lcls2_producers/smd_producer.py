@@ -562,10 +562,9 @@ for evt_num, evt in enumerate(event_iter):
     det_data.update(userDict)
 
     # Integrating detectors
+
     if len(int_dets) > 0:
         userDictInt = {}
-        # userDict has keys we could sum & remove!
-        # normdict['inhibit']+=det_data['timing']['inhibit'][2]
         for det in int_dets:
             normdict[det._name]["count"] += 1
 
@@ -608,7 +607,7 @@ for evt_num, evt in enumerate(event_iter):
                 userDictInt[det._name] = {}
                 tmpdict = getUserData(det)
                 for k, v in tmpdict.items():
-                    userDictInt[det._name]["unaligned_" + k] = v
+                    userDictInt[det._name][k] = v
 
                 try:
                     envData = getUserEnvData(det)
@@ -621,17 +620,17 @@ for evt_num, evt in enumerate(event_iter):
                 for k, v in normdict[det._name].items():
                     if isinstance(v, dict):
                         for kk, vv in v.items():
-                            userDictInt[det._name]["unaligned_norm_" + kk] = vv
+                            userDictInt[det._name][kk] = vv
                             normdict[det._name][k][kk] = (
                                 vv * 0
                             )  # may not work for arrays....
                     else:
-                        userDictInt[det._name]["unaligned_norm_" + k] = v
+                        userDictInt[det._name][k] = v
                         normdict[det._name][k] = (
                             v * 0
                         )  # may not work for arrays....
                 # print(userDictInt)
-                small_data.event(evt, userDictInt)
+                small_data.event(evt, userDictInt, align_group='intg')
             except:
                 print(f"Bad int_det processing on evt {evt_num}")
                 pass
@@ -725,15 +724,21 @@ logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
 if ds.unique_user_rank():
     print(f"user rank: {rank}")
 
-if small_data._type == "server" and not args.psplot_live_mode and args.join_kludge:
-    print(f"Close smalldata server file on {rank}")
-    # flush the data caches (in case did not hit cache_size yet)
-    for dset, cache in small_data._server._cache.items():
-        if cache.n_events > 0:
-            small_data._server.write_to_file(dset, cache)
-    time.sleep(1)
-    small_data._server.file_handle.close()
-    time.sleep(15)  # Long wait time needed here. Filesystem...
+"""
+TO REMOVE IF PROVEN NOT NEEDED
+"""
+# if small_data._type == "server" and not args.psplot_live_mode and args.join_kludge:
+#     print(f"Close smalldata server file on {rank}")
+#     # flush the data caches (in case did not hit cache_size yet)
+#     for dset, cache in small_data._server._cache.items():
+#         if cache.n_events > 0:
+#             small_data._server.write_to_file(dset, cache)
+#     time.sleep(1)
+#     small_data._server.file_handle.close()
+#     time.sleep(15)  # Long wait time needed here. Filesystem...
+"""
+TO REMOVE IF PROVEN NOT NEEDED
+"""
 
 print(f"smalldata.done() on rank {rank}")
 small_data.done()
