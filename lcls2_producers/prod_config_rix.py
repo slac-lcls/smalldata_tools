@@ -28,7 +28,8 @@ def getROIs(run):
         ret_dict['andor_vls'] = [full_roi]
         ret_dict['andor_norm'] = [full_roi]
         ret_dict['c_piranha'] = [full_roi]
-        
+        ret_dict['archon'] = [full_roi]
+
         # and the FIM waveforms
         # ret_dict['rix_fim0'] = [full_roi]
         # ret_dict['rix_fim1'] = [full_roi]
@@ -59,7 +60,7 @@ def get_droplet2photon(run):
             'thresADU': 0,  # discard droplet whose total ADU is below this value
             'useRms': False
         }
-        
+
         # droplet2Photons args
         d2p_dict['d2p'] = {
             'aduspphot': 400,
@@ -70,7 +71,7 @@ def get_droplet2photon(run):
         d2p_dict['get_photon_img'] = False
 
         ret_dict['archon'] = d2p_dict
-    
+
     return ret_dict
 
 
