@@ -3,7 +3,8 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding 
 # list empty.
-detectors = ['epixquad', 'andor']
+detectors = ['andor']
+#detectors = ['epixquad', 'andor']
 # integrating_detectors = []
 integrating_detectors = []
 # Comment: the first integrating detector will set the sub-sampling of all
