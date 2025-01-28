@@ -48,6 +48,12 @@ do
 			shift
 			shift
 			;;
+        -r|--run)
+            POSITIONAL+=("--run $2")
+            RUN=$2
+            shift
+            shift
+            ;;
 		-e|--experiment)
             POSITIONAL+=("--experiment $2")
             EXP=$2
@@ -74,25 +80,28 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+
 #Define cores if we don't have them
-QUEUE=${QUEUE:='psanaq'}
-#QUEUE=${QUEUE:='ffbh3q'}
+QUEUE=${QUEUE:='milano'}
+ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
+RUN="${RUN_NUM:=$RUN}" # default to the environment variable if submitted from the elog
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
 LCLS2_HUTCHES="rix, tmo, ued"
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
-    source /cds/sw/ds/ana/conda2/manage/bin/psconda.sh
+    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
     ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
     PLOT_PY=BeamlineSummaryPlots_$HUTCH
     if [[ -v PEDESTAL ]]; then
         PLOT_PY=PedestalPlot
     fi
 else
-    source /reg/g/psdm/etc/psconda.sh -py3
+    source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     #conda activate ana-4.0.16-py3
     ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
     PLOT_PY=BeamlineSummaryPlots_$HUTCH
@@ -108,5 +117,5 @@ echo calling $ABS_PATH/$PLOT_PY.py $@
 if [[ -v INTERACTIVE ]]; then
     $ABS_PATH/$PLOT_PY.py $@
 else
-    sbatch -p $QUEUE $ABS_PATH/$PLOT_PY.py $@
+    sbatch -p $QUEUE --account $ACCOUNT $ABS_PATH/$PLOT_PY.py $@
 fi

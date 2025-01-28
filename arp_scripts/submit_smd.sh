@@ -7,36 +7,40 @@ $(basename "$0"):
 	Script to launch a smalldata_tools run analysis
 	
 	OPTIONS:
-		-h|--help
-			Definition of options
-		-e|--experiment
-			Experiment name (i.e. cxilr6716)
-		-r|--run
-			Run Number
-		-d|--directory
-			Full path to directory for output file
-		-n|--nevents
-			Number of events to analyze
-		-q|--queue
-			Queue to use on SLURM
-		-c|--cores
-			Number of cores to be utilized
-		-f|--full
-			If specified, translate everything
-		-D|--default
-			If specified, translate only smalldata
-                -i|--image
-			If specified, translate everything & save area detectors as images
-		--norecorder
-			If specified, don't use recorder data
-                --nparallel
-                        Number of processes per node
-                --postTrigger
-                        Post that primary processing done to elog to seconndary jobs can start
-                --interactive
-                        Run the process live w/o batch system
-                --logdir
-                        save log-files in specified directory
+        -h|--help
+            Definition of options
+        -e|--experiment
+            Experiment name (i.e. cxilr6716)
+        -r|--run
+            Run Number
+        -d|--directory
+            Full path to directory for output file
+        -n|--nevents
+            Number of events to analyze
+        -q|--queue
+            Queue to use on SLURM
+        -c|--cores
+            Number of cores to be utilized
+        --maxnodes
+            Max number of nodes to use
+        -f|--full
+            If specified, translate everything (do not use)
+        -D|--default
+            If specified, translate only smalldata
+        -i|--image
+            If specified, translate everything & save area detectors as images (do not use)
+        --norecorder
+            If specified, don't use recorder data
+        --postTrigger
+            Post that primary processing done to elog so secondary jobs can start
+        --interactive
+            Run the process live w/o batch system
+        --logdir
+            save log-files in specified directory
+        --s3df
+            Forces to load xtc files from the S3DF location
+        --integ
+            Use integrating detector mode
 EOF
 
 }
@@ -68,8 +72,8 @@ do
         shift
         shift
         ;;
-    --nparallel)
-        TASKS_PER_NODE="$2"
+    --maxnodes)
+        MAX_NODES="$2"
         shift
         shift
         ;;
@@ -119,6 +123,10 @@ do
         FORCE_S3DF=1
         shift
         ;;
+    --integ)
+        INTEG=1
+        shift
+        ;;
     *)
         POSITIONAL+=("$1")
         shift
@@ -143,55 +151,48 @@ export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
 export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
 
-
+# Default queue and S3DF flag
 DEFQUEUE='psanaq'
 if [[ $HOSTNAME == *drp* ]]; then
     DEFQUEUE='anaq'
-elif [ -d "/sdf/data/lcls/" ]; then
-    DEFQUEUE='milano'
 fi
 
-#Define cores if we don't have them
-#Set to 1 by default
-CORES=${CORES:=1}
-QUEUE=${QUEUE:=$DEFQUEUE}
-ACCOUNT=${ACCOUNT:="lcls:$EXP"}
-RESERVATION=${RESERVATION:=''} # not implemented yet
-
-# select tasks per node to match the number of cores:
-if [[ $QUEUE == *psanaq* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
-elif [[ $QUEUE == *psfeh* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=16}
-elif [[ $QUEUE == *ffb* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=60}
-elif [[ $QUEUE == *milano* ]]; then
-    TASKS_PER_NODE=${TASKS_PER_NODE:=125}
-else
-    TASKS_PER_NODE=${TASKS_PER_NODE:=12}
-fi
-
-if [ $TASKS_PER_NODE -gt $CORES ]; then
-    TASKS_PER_NODE=$CORES 
-fi
-
-if [ -d "/sdf/data/lcls" ]; then
+if [ -d "/sdf/data/lcls/" ]; then
     ON_S3DF=true
     SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
+    DEFQUEUE='milano'
 else
     ON_S3DF=false
+fi
+
+# Define # of cores
+QUEUE=${QUEUE:=$DEFQUEUE}
+ACCOUNT=${ACCOUNT:="lcls:$EXP"}
+
+# Select number of cores and max nodes
+if [[ $QUEUE == *milano*  ]]; then
+    CORES=${CORES:=120} # a full node by default
+    MAX_NODES=${MAX_NODES:=4}
+else
+    CORES=${CORES:=1} # default to 1 outside S3DF queue
+    MAX_NODES=${MAX_NODES:=4}
 fi
 
 # Source the right LCLS-I/LCLS-2 stuff based on the experiment name
 if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     echo "This is a LCLS-II experiment"
-    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/lcls2_producers/g`
+    source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh    
     PYTHONEXE=smd2_producer.py
+    if [ -v INTEG ]; then
+        echo 'test integrating det setup'
+        PYTHONEXE=smd2int_producer.py
+    fi
     export PS_SRV_NODES=1 # 1 is plenty enough for the 120 Hz operation
 else
     echo "This is a LCLS-I experiment"
+    ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/lcls1_producers/g`
     if $ON_S3DF; then
         source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
     else
@@ -204,13 +205,15 @@ fi
 if [ -v FORCE_S3DF ]; then
     DATAPATH="/sdf/data/lcls/ds"
 else
-    DATAPATH=`python ./arp_scripts/file_location.py -e $EXP -r $RUN`
+    DATAPATH=`python $MYDIR/file_location.py -e $EXP -r $RUN`
 fi
 export SIT_PSDM_DATA=$DATAPATH
 
-echo ---- Print environment ----
-env | sort
-echo ---- Printed environment ----
+echo "SIT_PSDM_DATA: $SIT_PSDM_DATA"
+
+#echo ---- Print environment ----
+#env | sort
+#echo ---- Printed environment ----
 
 if [ -v INTERACTIVE ]; then
     # run in local terminal
@@ -219,11 +222,16 @@ if [ -v INTERACTIVE ]; then
     else
         mpirun -np $CORES python -u $ABS_PATH/$PYTHONEXE $@
     fi
-
     exit 0
 fi
 
 LOGFILE='smd_'${EXPERIMENT}'_Run'${RUN_NUM}'_%J.log'
+# Roll back when ACL and K8s issues are resolved
+#if [ ! -v LOGDIR ]; then
+#    if [ $ON_S3DF ]; then
+#        LOGDIR='/sdf/data/lcls/ds/'${EXPERIMENT:0:3}'/'${EXPERIMENT}'/scratch/logs/'
+#    fi
+#fi
 if [ -v LOGDIR ]; then
     if [ ! -d "$LOGDIR" ]; then
         mkdir -p "$LOGDIR"
@@ -231,12 +239,17 @@ if [ -v LOGDIR ]; then
     LOGFILE=$LOGDIR'/'$LOGFILE
 fi
 
-SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
-MPI_CMD="mpirun -np $CORES python -u ${ABS_PATH}/${PYTHONEXE} $*"
+#SBATCH_ARGS="-p $QUEUE --ntasks-per-node $TASKS_PER_NODE --ntasks $CORES -o $LOGFILE --exclusive"
+SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES --use-min-nodes -o $LOGFILE"
+MPI_CMD="mpirun -np $CORES python -u -m mpi4py.run ${ABS_PATH}/${PYTHONEXE} $*"
 
 
 if [[ $QUEUE == *milano* ]]; then
+    if [ -v RESERVATION ]; then
+        SBATCH_ARGS="$SBATCH_ARGS --reservation $RESERVATION"
+    fi
     if [[ $ACCOUNT == 'lcls' ]]; then
+        echo $SBATCH_ARGS --qos preemtable --account $ACCOUNT --wrap="$MPI_CMD"
 	    sbatch $SBATCH_ARGS --qos preemptable --account $ACCOUNT --wrap="$MPI_CMD"
     else
         echo ---- $ABS_PATH/$PYTHONEXE $@
