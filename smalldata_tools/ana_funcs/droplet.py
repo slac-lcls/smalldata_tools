@@ -132,6 +132,13 @@ class dropletFunc(DetObjectFunc):
         return ret_dict
 
     def process(self, data):
+        ret_dict = {}
+        if self._saveDrops is None:
+            self._saveDrops = False
+        if self._flagMasked is None:
+            self._flagMasked = False
+        if self._needProps is None:
+            self._needProps = False
         ret_dict = self.dropletize(data)
 
         subfuncResults = self.processFuncs()
