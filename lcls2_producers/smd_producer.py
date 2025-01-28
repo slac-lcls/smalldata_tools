@@ -45,7 +45,9 @@ def define_dets(run, det_list):
     # has been imported under "config"
 
     rois_args = []  # special implementation as a list to support multiple ROIs.
+    dimgs_args = {}
     wfs_int_args = {}
+    wfs_hitfinder_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -118,7 +120,7 @@ def define_dets(run, det_list):
             # Waveform integration
             wfs_int_func = WfIntegration(**wfs_int_args[detname])
             det.addFunc(wfs_int_func)
-        
+
         if detname in wfs_hitfinder_args:
             # Simple hit finder on waveform
             det.addFunc(SimpleHitFinder(**wfs_hitfinder_args[detname]))
