@@ -48,8 +48,8 @@ class sparsifyFunc(DetObjectFunc):
                 return
             ret_dict = data
 
-        #sparsify image
-        if  isinstance(data, np.ndarray):
+        # sparsify image
+        if isinstance(data, np.ndarray):
             ret_dict = {}
             photonsImg = data.copy()
             if len(photonsImg.shape) > 2:  # tiled detector!

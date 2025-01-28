@@ -255,9 +255,9 @@ class droplet2Photons(DetObjectFunc):
 
     def process(self, data):
         ret_dict = {}
-        #this will be a dictionary.
-        if (not isinstance(data, dict)) or (data.get('_imgDrop',None) is None): 
-            print('droplet2photons expects a dictionary with imgDrop and image keys!')
+        # this will be a dictionary.
+        if (not isinstance(data, dict)) or (data.get("_imgDrop", None) is None):
+            print("droplet2photons expects a dictionary with imgDrop and image keys!")
             return
         time0 = time.time()
         img = data["_image"]
@@ -326,4 +326,3 @@ class droplet2Photons(DetObjectFunc):
             for kk in subfuncResults[k]:
                 ret_dict["%s_%s" % (k, kk)] = subfuncResults[k][kk]
         return ret_dict
-

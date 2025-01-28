@@ -275,4 +275,3 @@ class dropletFunc(DetObjectFunc):
         self.dat = dat_dict
 
         return ret_dict
-
