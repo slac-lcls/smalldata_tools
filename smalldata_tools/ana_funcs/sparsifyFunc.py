@@ -19,8 +19,12 @@ from smalldata_tools.common.detector_base import DetObjectFunc
 class sparsifyFunc(DetObjectFunc):
     """
     Function to sparsify a passed array (2 or 3-d input)
-    nData: if passed, make output array rectangular (for storing in event based smlData)
-    if a dictionary w/ data, row, col is passed, only make rectangular
+    nData: changes the way sparse data are saved:
+            If an int is passed, make the output array rectangular of length
+            nData (fixed shape for all events).
+            If None (default), store coordinate in a continuous long vector
+            If 0 uses ragged array (not recommended)
+    If a dictionary w/ data, row, col is passed, only make rectangular
     """
 
     def __init__(self, **kwargs):

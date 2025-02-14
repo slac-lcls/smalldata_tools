@@ -5,7 +5,8 @@ import numpy as np
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
 # integrating_detectors = []
-integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm', 'archon']
+integrating_detectors = ['archon']
+# integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm', 'archon']
 # Comment: the first integrating detector will set the sub-sampling of all
 # integrating detectors.
 slow_detectors = []  # NOT IMPLEMENTED
@@ -27,7 +28,8 @@ def getROIs(run):
         ret_dict['andor_vls'] = [full_roi]
         ret_dict['andor_norm'] = [full_roi]
         ret_dict['c_piranha'] = [full_roi]
-        
+        ret_dict['archon'] = [full_roi]
+
         # and the FIM waveforms
         # ret_dict['rix_fim0'] = [full_roi]
         # ret_dict['rix_fim1'] = [full_roi]
@@ -45,11 +47,31 @@ def getROIs(run):
     return ret_dict
 
 
-def getDetImages(run):
+def get_droplet2photon(run):
     ret_dict = {}
 
-    if run>0:
-        ret_dict['archon'] = {}
+    if run > 0:
+        # ##### Archon setup #####
+        d2p_dict = {}
+        # droplet args
+        d2p_dict['droplet'] = {
+            'threshold': 65,
+            # 'thresholdLow': 0,
+            'thresADU': 0,  # discard droplet whose total ADU is below this value
+            'useRms': False
+        }
+
+        # droplet2Photons args
+        d2p_dict['d2p'] = {
+            'aduspphot': 400,
+            # 'roi_mask': np.load('path_to_mask.npy'),
+            'cputime': True
+        }
+        d2p_dict['nData'] = None
+        d2p_dict['get_photon_img'] = False
+
+        ret_dict['archon'] = d2p_dict
+
     return ret_dict
 
 
