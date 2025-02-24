@@ -29,44 +29,11 @@ sys.path.append(fpath)
 from smalldata_tools.lcls1.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import image_from_dxy
 from smalldata_tools.utilities import rebin
-
+from smalldata_tools.utilities import evtt2Rt
+from smalldata_tools.utilities import postRunTable
 
 def click_policy(plot, element):
     plot.state.legend.click_policy = "hide"
-
-
-## function that chops the 64 bit time integer into soemthing a bit more realistic
-def evtt2Rt(event_time):
-    evtt0 = event_time >> 32
-    evtt1 = (event_time << 32) >> 32
-    evtt_sec = evtt0.astype(float)
-    evtt_ns = evtt1.astype(float) * 1e-9
-    Rt = evtt_sec + evtt_ns
-    Rt = Rt - Rt[0]
-    return Rt
-
-
-def postRunTable(runtable_data):
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print("URL:", ws_url)
-    user = args.experiment[:3] + "opr"
-    elogPostFile = "/cds/home/opr/%s/forElogPost.txt" % user
-    hostname = socket.gethostname()
-    if hostname.find("sdf") >= 0:
-        elogPostFile = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    with open(elogPostFile, "r") as reader:
-        answer = reader.readline()
-    r = requests.post(
-        ws_url,
-        params={"run_num": args.run},
-        json=runtable_data,
-        auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
-    )
-    # we might need to use this for non=current expetiments. Currently does not work in ARP
-    # krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    # r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
-
 
 def makeRunTableData(dat):
     # xray = dat.lightStatus.xray.read()
