@@ -1152,11 +1152,9 @@ def KdeCuts(values, bandwidth="scott", percentile=[0.1, 99.9], nBins=1000):
     retDict["rightMaxDistToLine"] = [dxRight, dyRight]
     return retDict
 
+
 def postRunTable(
-        runtable_data,
-        experiment,
-        run,
-        url="https://pswww.slac.stanford.edu/ws-auth/lgbk/"
+    runtable_data, experiment, run, url="https://pswww.slac.stanford.edu/ws-auth/lgbk/"
 ):
     ws_url = url + "/run_control/{0}/ws/add_run_params".format(experiment)
     print("URL:", ws_url)
@@ -1189,6 +1187,7 @@ def evtt2Rt(event_time):
     Rt = Rt - Rt[0]
     return Rt
 
+
 def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
     """Return an authentication object for the eLog API for an opr account.
 
@@ -1214,6 +1213,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
         pw: str = f.readline()[:-1]
 
     return HTTPBasicAuth(username=opr_name, password=pw)
+
 
 def postElogMsg(
     exp: str,
@@ -1282,6 +1282,7 @@ def postElogMsg(
     if not resp.json()["success"]:
         logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
 
+
 def getRunsWithTag(
     exp: str, tag: str, http_auth: Optional[HTTPBasicAuth] = None
 ) -> list:
@@ -1308,4 +1309,3 @@ def getRunsWithTag(
         tagged_runs = resp.json()["value"]
 
     return tagged_runs
-
