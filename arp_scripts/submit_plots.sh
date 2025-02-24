@@ -98,7 +98,7 @@ if echo $LCLS2_HUTCHES | grep -iw $HUTCH > /dev/null; then
     ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
     PLOT_PY=BeamlineSummaryPlots_$HUTCH
     if [[ -v PEDESTAL ]]; then
-        PLOT_PY=PedestalPlot
+        PLOT_PY=PedestalPlot_lcls2
     fi
 else
     source $SIT_ENV_DIR/sw/conda1/manage/bin/psconda.sh
@@ -106,7 +106,7 @@ else
     ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/summaries/g`
     PLOT_PY=BeamlineSummaryPlots_$HUTCH
     if [[ -v PEDESTAL ]]; then
-        PLOT_PY=PedestalPlot
+        PLOT_PY=PedestalPlot_lcls1
     elif [[ -v BLD ]]; then
         ABS_PATH=`echo $MYDIR | sed  s/arp_scripts/producers/g`
         PLOT_PY=BldEpics
