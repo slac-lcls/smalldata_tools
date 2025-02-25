@@ -46,7 +46,10 @@ def define_dets(run, det_list):
     # has been imported under "config"
 
     rois_args = []  # special implementation as a list to support multiple ROIs.
+    dimgs_args = {}
     wfs_int_args = {}
+    wfs_hitfinder_args = {}
+    d2p_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -114,7 +117,7 @@ def define_dets(run, det_list):
 
         if detname in d2p_args:
             if rank == 0:
-                print(f"\n\nSETTING UP DROPLET TO PHOTON PIPELINE FOR DETECTOR {det._name}")
+                print(f"\n\nSETTING UP DROPLET TO PHOTON FOR {det._name}")
                 print(json.dumps(d2p_args[detname], indent=4))
                 print("\n")
             if 'nData' in d2p_args[detname]:  # defines how sparsifcation is saved
