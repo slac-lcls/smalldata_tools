@@ -384,7 +384,7 @@ class imageFunc(DetObjectFunc):
         self.correction = kwargs.get("correction", None)
         self.mask = kwargs.get("mask", None)
         if self.mask is not None:
-            self.mask = np.asarray(self.mask, dtype=np.bool).flatten()
+            self.mask = np.asarray(self.mask, dtype=bool).flatten()
 
     def setFromDet(self, det):
         super(imageFunc, self).setFromDet(det)

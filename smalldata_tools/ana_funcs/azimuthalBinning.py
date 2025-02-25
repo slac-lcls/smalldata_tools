@@ -75,7 +75,7 @@ class azimuthalBinning(DetObjectFunc):
             return None
 
         if self._mask is not None:
-            self._mask = np.asarray(self._mask, dtype=np.bool)
+            self._mask = np.asarray(self._mask, dtype=bool)
 
     def setFromDet(self, det):
         if det.mask is not None and det.cmask is not None:
