@@ -7,76 +7,20 @@ hv.extension("bokeh")
 import panel as pn
 
 pn.extension()
-import os
-import argparse
-import sys
+#import os
+#import sys
 import logging
-import requests
 from pathlib import Path
-from requests.auth import HTTPBasicAuth
-import socket
-from typing import Optional, Union
 import mimetypes
 
-try:
-    basestring
-except NameError:
-    basestring = str
-fpath = os.path.dirname(os.path.abspath(__file__))
-fpathup = "/".join(fpath.split("/")[:-1])
-try:
-    fpath = os.environ.get("MYDIR", fpathup).replace("/arp_scripts", "")
-except:
-    fpath = fpathup
-sys.path.append(fpath)
+from smalldata_tools.utilities import postElogMsg
 from smalldata_tools.utilities import rebin
-
-# logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Define Args
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--run", help="run", type=str, default=os.environ.get("RUN_NUM", "")
-)
-parser.add_argument(
-    "--experiment",
-    help="experiment name",
-    type=str,
-    default=os.environ.get("EXPERIMENT", ""),
-)
-parser.add_argument(
-    "--nopostElog",
-    help="do not post plot &status to elog",
-    action="store_true",
-    default=False,
-)
-parser.add_argument(
-    "--pedImgs", help="make images of pedestals", action="store_true", default=False
-)
-parser.add_argument(
-    "--pedDiffImgs",
-    help="make images of first 10 subtracted images ",
-    action="store_true",
-    default=False,
-)
-parser.add_argument("--url", default="https://pswww.slac.stanford.edu/ws-auth/lgbk/")
-args = parser.parse_args()
-logger.debug("Args to be used for pedestal plots: {0}".format(args))
-
-nosave_elog = args.nopostElog
-make_ped_imgs = args.pedImgs
-make_ped_data_imgs = args.pedImgs
-expname = args.experiment
-run = int(args.run)
-
-SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA"))
 
 ####
 # detector info to be used for status#s to elog
 ####
 gainSwitching = ["jungfrau", "epix10k"]
+
 statusDict = {}
 # https://confluence.slac.stanford.edu/display/PSDMInternal/Pixel+status+in+data
 statusDict["pnccd"] = {
@@ -145,278 +89,6 @@ statusDict["camera"] = {
 ####
 # helper functions
 ####
-def postRunTable(runtable_data):
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print("URL:", ws_url)
-    user = args.experiment[:3] + "opr"
-    elogPostFile = "/cds/home/opr/%s/forElogPost.txt" % user
-    hostname = socket.gethostname()
-    if hostname.find("sdf") >= 0:
-        elogPostFile = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    with open(elogPostFile, "r") as reader:
-        answer = reader.readline()
-        r = requests.post(
-            ws_url,
-            params={"run_num": args.run},
-            json=runtable_data,
-            auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
-        )
-    # we might need to use this for non=current expetiments. Currently does not work in ARP
-    # krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    # r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
-
-
-def statusStats(det_name, printme=False, request_run=None):
-    det = psana.Detector(det_name)
-    if request_run:
-        statusmask = det.mask(request_run, status=True)
-        status = det.status(request_run)
-    else:
-        statusmask = det.mask(run, status=True)
-        status = det.status(run)
-    status_type = "camera"  # see if different detector types here are different?
-    if det.is_epix10ka_any():
-        status_type = "epix10k"
-    elif det.is_jungfrau():
-        status_type = "jungfrau"
-    elif det.is_epix100a():
-        status_type = "epix100"
-    elif det.is_cspad() or det.is_cspad2x2():
-        status_type = "cspad"
-
-    status_unp = np.array(
-        [
-            (
-                np.unpackbits(tstatus.flatten().astype(np.uint8), bitorder="little")
-            ).reshape([int(tstatus.flatten().shape[0]), 8])
-            for tstatus in status
-        ]
-    )
-
-    statusStatDict = {}
-    for istatus, statusk in enumerate(statusDict[status_type]):
-        if status_type in gainSwitching:
-            statusStatDict[statusk] = int(
-                (status_unp.sum(axis=0)[:, istatus] > 0).sum()
-            )
-        else:
-            statusStatDict[statusk] = int((status_unp[:, istatus] > 0).sum())
-    statusStatDict["total_masked"] = int(
-        statusmask.flatten().shape[0] - statusmask.sum()
-    )
-    if status_type in gainSwitching:
-        print(status.shape)
-        for icycle in range(status.shape[0]):
-            statusStatDict["cycle%i" % icycle] = int((status[icycle] > 0).sum())
-
-    if printme:
-        for k, v in statusStatDict.items():
-            print(k, v)
-    return statusStatDict
-
-
-def getKerberosAuthHeaders() -> dict: ...
-
-
-def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
-    """Return an authentication object for the eLog API for an opr account.
-
-    This method will only work for active experiments. "opr" accounts are
-    removed from the authorized users list after the experiment ends.
-
-    Paramters
-    ---------
-    exp (str) Experiment name (to determine operator username).
-
-    Returns
-    -------
-    http_auth (HTTPBasicAuth) Authentication for eLog API.
-    """
-    opr_name: str = f"{exp[:3]}opr"
-    hostname: str = socket.gethostname()
-    if hostname.find("sdf") >= 0:
-        auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    else:
-        auth_path: str = f"/cds/home/opr/{opr_name}/forElogPost.txt"
-
-    with open(auth_path, "r") as f:
-        pw: str = f.readline()[:-1]
-
-    return HTTPBasicAuth(username=opr_name, password=pw)
-
-
-def getRunsWithTag(
-    exp: str, tag: str, http_auth: Optional[HTTPBasicAuth] = None
-) -> list:
-    """Return a list of runs tagged with a specific `tag`.
-
-    Parameters
-    ----------
-    exp (str) Experiment name.
-    tag (str) Tag to match against run tags.
-    http_auth (HTTPBasicAuth) Authentication for eLog API.
-
-    Returns
-    -------
-    tagged_runs (list[int]) List of runs with the specified tag. Empty if none
-        were found or there was a communication error.
-    """
-    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    tag_url: str = f"{base_url}/{exp}/ws/get_runs_with_tag?tag={tag}"
-    http_auth: HTTPBasicAuth = http_auth or getElogBasicAuth(exp)
-    resp: requests.models.Response = requests.get(tag_url, auth=http_auth)
-
-    tagged_runs: list = []
-    if resp.json()["success"]:
-        tagged_runs = resp.json()["value"]
-
-    return tagged_runs
-
-
-def postElogMsg(
-    exp: str,
-    msg: str,
-    *,
-    run: Optional[Union[int, str]] = None,
-    tag: Optional[str] = "",
-    title: Optional[str] = "",
-    files: list = [],
-) -> None:
-    """Post a new message to the eLog. Adapted from `elog` package.
-
-    Parameters
-    ----------
-    exp (str) Experiment name.
-    msg (str) Body of the eLog post.
-    run (int | str) Optional. The run number to associate to the post.
-    tag (str) Optional. A tag to include for the post.
-    title (str) Optional. A title for the eLog post.
-    files (list) Optional. Either a list of paths (str) to files (figures) to
-        include with the eLog post, OR, a list of 2-tuples of strings of the
-        form (`path`, `description`).
-    """
-    post_files: list = []
-    for f in files:
-        if isinstance(f, str):
-            desc: str = os.path.basename(f)
-            formatted_file: tuple = (
-                "files",
-                (desc, open(f, "rb")),
-                mimetypes.guess_type(f)[0],
-            )
-        elif isinstance(f, tuple) or isinstance(f, list):
-            formatted_file: tuple = (
-                "files",
-                (f[1], open(f[0], "rb")),
-                mimetypes.guess_type(f[0])[0],
-            )
-        else:
-            logger.debug(f"Can't parse file {f} for eLog attachment. Skipping.")
-            continue
-        post_files.append(formatted_file)
-
-    post: dict = {}
-    post["log_text"] = msg
-    if tag:
-        post["log_tags"] = tag
-    if title:
-        post["log_title"] = title
-    if run:
-        post["run_num"] = int(run)
-
-    http_auth: HTTPBasicAuth = getElogBasicAuth(exp)
-    base_url: str = "https://pswww.slac.stanford.edu/ws-auth/lgbk/lgbk"
-    post_url: str = f"{base_url}/{exp}/ws/new_elog_entry"
-
-    params: dict = {"url": post_url, "data": post, "auth": http_auth}
-    if post_files:
-        params.update({"files": post_files})
-
-    resp: requests.models.Response = requests.post(**params)
-
-    if resp.status_code >= 300:
-        logger.debug(f"Error when posting to eLog: HTTP status code {resp.status_code}")
-
-    if not resp.json()["success"]:
-        logger.debug(f"Error when posting to eLog: {resp.json()['error_msg']}")
-
-
-def postBadPixMsg(
-    detectors: list,
-    exp: str,
-    run: int,
-    *,
-    tag: str = "SUMMARY_BAD_PIX",
-    title: str = "Detector Bad Pixel Info",
-) -> None:
-    """Post bad pixel data for a given detector and run to the eLog.
-
-    Parameters
-    ----------
-    detectors (str) Names of detectors to pull bad pixel data for.
-    exp (str) Experiment name.
-    run (int) Run number. Pulls data for this run and all previous DARK runs.
-    tag (str) Optional. Tag for the bad pixel summary posts.
-    title (str) Optional. Title for bad pixel summary posts.
-    """
-    http_auth: HTTPBasicAuth = getElogBasicAuth(exp=exp)
-
-    dark_runs: list = getRunsWithTag(exp=exp, tag="DARK", http_auth=http_auth)
-
-    if dark_runs:
-        dark_runs = [dr for dr in dark_runs if dr <= run]
-
-        table_header: str = (
-            '<thead><tr><th colspan="3">'
-            f"<center>{title}</center>"
-            "</th></tr></thead>"
-        )
-        table_body: str = (
-            "<tbody><tr>"
-            "<td><b><center>Detector</center></b></td>"
-            "<td><b><center>Number of bad pixels</center></b></td>"
-            "<td><b><center>Difference vs previous DARK</center></b></td></tr>"
-        )
-
-        for det_name in detectors:
-            bad_pix: list = []
-            for dr in dark_runs:
-                try:
-                    stat_dict: dict = statusStats(det_name, request_run=dr)
-                    bad_pix.append(stat_dict["total_masked"])
-                except TypeError as err:
-                    # `statusStats` may throw TypeError if detector not in run
-                    logger.debug(
-                        f"Is {det_name} not present in DARK run {dr}?\n" f"ERROR: {err}"
-                    )
-                except KeyError as err:
-                    # `statusStats` may throw KeyError if detector not in run
-                    logger.debug(
-                        f"Is {det_name} not present in DARK run {dr}?\n" f"ERROR: {err}"
-                    )
-
-            # Report current DARK run bad pix and the delta vs previous DARK run
-            curr_bad_pix = bad_pix[-1]
-            if len(bad_pix) > 1:
-                diff_bad_pix = bad_pix[-1] - bad_pix[-2]
-            else:
-                diff_bad_pix = "-"
-            det_entry: str = (
-                f"<tr><td><center>{det_name}</center></td>"
-                f"<td><center>{curr_bad_pix}</center></td>"
-                f"<td><center>{diff_bad_pix}</center></td></tr>"
-            )
-            table_body += det_entry
-        table_body += "</tbody>"
-        msg: str = f'<table border="1">{table_header}{table_body}</table>'
-    else:
-        msg: str = "No DARK runs or cannot communicate with eLog."
-        logger.debug(msg)
-
-    postElogMsg(exp=exp, msg=msg, run=run, tag=tag, title=title)
-
-
 def ped_rms_histograms(nCycles, peds, noise, diff, alias=""):
     min5Ped = 1e6
     max95Ped = -1e6
@@ -576,20 +248,23 @@ def ped_rms_histograms(nCycles, peds, noise, diff, alias=""):
 
 def plotPedImgs(
     nCycles,
-    det,
     run,
     peds,
     noise,
-    peds_pre=None,
+    pedImgs,
+    noiseImgs,
+    diffPeds=None,
+    diffPedsImgs=None,
     detImgMaxSize=500,
     plotInfo=None,
-    isLCLS2=False,
 ):
-    pedImgs = []
-    rmsImgs = []
-    diffImgs = []
+    hpedImgs = []
+    hrmsImgs = []
+    hdiffImgs = []
 
     for i in range(nCycles):
+        pedImg = pedImgs[i]
+        rmsImg = noiseImgs[i]
         if nCycles > 1:
             thisPed = peds[i]
             thisNoise = noise[i]
@@ -604,9 +279,10 @@ def plotPedImgs(
                     np.nanpercentile(thisNoise, 99.9),
                 ),
             )
-            if peds_pre is not None:
+            if diffPeds is not None:
                 try:
-                    thisDiff = peds[i] - peds_pre[i]
+                    thisDiff = diffPeds[i]
+                    diffImg = diffPedsImgs[i]
                     tdiffDim = hv.Dimension(
                         ("ped_%d" % i, "delta pedestal in ADU, cycle %d" % i),
                         range=(
@@ -615,7 +291,7 @@ def plotPedImgs(
                         ),
                     )
                 except:
-                    peds_pre = None
+                    pass
         else:
             thisPed = peds
             thisNoise = noise
@@ -630,9 +306,10 @@ def plotPedImgs(
                     np.nanpercentile(thisNoise, 99.9),
                 ),
             )
-            if peds_pre is not None:
+            if diffPeds is not None:
                 try:
-                    thisDiff = peds - peds_pre
+                    thisDiff = diffPeds
+                    diffImg = diffPedsImgs
                     tdiffDim = hv.Dimension(
                         ("ped_%d" % i, "delta pedestal in ADU"),
                         range=(
@@ -641,18 +318,7 @@ def plotPedImgs(
                         ),
                     )
                 except:
-                    peds_pre = None
-
-        if not isLCLS2:
-            pedImg = det.image(run, thisPed)
-            rmsImg = det.image(run, thisNoise)
-            if peds_pre is not None:
-                diffImg = det.image(run, thisDiff)
-        else:
-            pedImg = det.raw.image(run, thisPed)
-            rmsImg = det.raw.image(run, thisNoise)
-            if peds_pre is not None:
-                diffImg = det.raw.image(run, thisDiff)
+                    pass
 
         if pedImg is None:
             pedImg = thisPed
@@ -675,7 +341,7 @@ def plotPedImgs(
                     int(rmsImg.shape[1] * rebinFactor),
                 ],
             )
-            if peds_pre is not None:
+            if diffPeds is not None:
                 diffImg = rebin(
                     diffImg,
                     [
@@ -690,7 +356,7 @@ def plotPedImgs(
             xrange = [0, pedImg.shape[0]]
         if yrange is not None:
             yrange = [0, pedImg.shape[1]]
-        pedImgs.append(
+        hpedImgs.append(
             hv.Image(
                 pedImg,
                 bounds=(xrange[0], yrange[0], xrange[1], yrange[1]),
@@ -699,7 +365,7 @@ def plotPedImgs(
                 label="Pedestal, Cycle %d" % i,
             ).options(colorbar=True, aspect="equal", cmap="rainbow")
         )
-        rmsImgs.append(
+        hrmsImgs.append(
             hv.Image(
                 rmsImg,
                 bounds=(xrange[0], yrange[0], xrange[1], yrange[1]),
@@ -708,8 +374,8 @@ def plotPedImgs(
                 label="Rms, Cycle %d" % i,
             ).options(colorbar=True, aspect="equal", cmap="rainbow")
         )
-        if peds_pre is not None:
-            diffImgs.append(
+        if diffPeds is not None:
+            hdiffImgs.append(
                 hv.Image(
                     diffImg,
                     bounds=(xrange[0], yrange[0], xrange[1], yrange[1]),
@@ -719,7 +385,7 @@ def plotPedImgs(
                 ).options(colorbar=True, aspect="equal", cmap="rainbow")
             )
 
-    return pedImgs, rmsImgs, diffImgs
+    return hpedImgs, hrmsImgs, hdiffImgs
 
 
 def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
@@ -768,243 +434,3 @@ def plotDataImgs(expname, run, det_name, nCycles, plotInfo=None):
 
     return gspecI
 
-
-def allPlots(
-    det_name,
-    run,
-    make_ped_imgs=False,
-    make_ped_data_imgs=False,
-    tabs=None,
-    detImgMaxSize=400,
-    isLCLS2=False,
-):
-    print("Working on plots for ", det_name)
-    if not isLCLS2:
-        det = psana.Detector(det_name)
-        peds = det.pedestals(run)
-        try:
-            peds_pre = det.pedestals(run - 1)
-        except:
-            peds_pre = None
-        noise = det.rms(run)
-        runnum = run
-    else:
-        det = run.Detector(det_name)
-        runnum = run.runnum
-        detrawid = det.raw._uniqueid
-        from psana.pscalib.calib.MDBWebUtils import calib_constants
-
-        peds = calib_constants(detrawid, exp=expname, ctype="pedestals", run=runnum)[0]
-        try:
-            peds_pre = calib_constants(
-                detrawid, exp=expname, ctype="pedestals", run=runnum - 1
-            )[0]
-        except:
-            peds_pre = None
-        noise = calib_constants(detrawid, exp=expname, ctype="pixel_rms", run=runnum)[0]
-
-        # snelson - debug....this call here is necessary. Not 100% sure why...
-        evt = next(run.events())
-        print("call raw image...", det.raw.image(evt, peds[0]).shape)
-        # snelson end debug
-
-    xDim = hv.Dimension(("x", "x in micron"))
-    yDim = hv.Dimension(("y", "y in micron"))
-    try:
-        xcoords, ycoords = det.coords_xy(run)
-        xrange = (np.nanmin(xcoords), np.nanmax(xcoords))
-        yrange = (np.nanmin(ycoords), np.nanmax(ycoords))
-    except:
-        if len(noise.shape) == 2:
-            xmax = noise.shape[0]
-            ymax = noise.shape[1]
-        else:
-            xmax = noise[0].shape[0]
-            ymax = noise[0].shape[1]
-        xrange = (0, xmax)
-        yrange = (0, ymax)
-        xDim = hv.Dimension(("x", "x in pixel"))
-        yDim = hv.Dimension(("y", "y in pixel"))
-
-    plotInfo = [xrange, yrange, xDim, yDim]
-
-    nCycles = 1
-    if len(peds.shape) >= 3 and det_name.find("CsPad") < 0:
-        nCycles = peds.shape[0]
-    if nCycles > 5:
-        nCycles = 5
-
-    if peds_pre is not None:
-        diffPeds = peds - peds_pre
-    else:
-        diffPeds = None
-    pedHists, noiseHists, diffHists = ped_rms_histograms(
-        nCycles, peds, noise, diffPeds, det_name
-    )
-    gspecH = pn.GridSpec(
-        sizing_mode="stretch_width", max_width=500, name="Histogram - %s" % det_name
-    )
-    gspecH[0, 0:8] = pn.Row("# Pedestals&RMS Histograms - Run %04d" % (runnum))
-    gspecH[1:4, 0:8] = pn.Column(hv.Overlay(pedHists))
-    gspecH[4:7, 0:8] = pn.Column(hv.Overlay(noiseHists))
-    if diffHists is not None:
-        gspecH[7:10, 0:8] = pn.Column(hv.Overlay(diffHists))
-    if tabs is None:
-        tabs = pn.Tabs(gspecH)
-        # this is for debugging.....
-        # return tabs
-    else:
-        tabs.append(gspecH)
-
-    if make_ped_imgs:
-        if nCycles == 1:
-            pedImgs, rmsImgs, diffImgs = plotPedImgs(
-                nCycles,
-                det,
-                runnum,
-                peds,
-                noise,
-                peds_pre,
-                detImgMaxSize=detImgMaxSize,
-                plotInfo=plotInfo,
-                isLCLS2=isLCLS2,
-            )
-        else:
-            pedImgs, rmsImgs, diffImgs = plotPedImgs(
-                nCycles,
-                det,
-                runnum,
-                peds,
-                noise,
-                detImgMaxSize=detImgMaxSize,
-                plotInfo=plotInfo,
-                isLCLS2=isLCLS2,
-            )
-
-        gspec = pn.GridSpec(
-            sizing_mode="stretch_both", max_width=1000, name="Det Imgs - %s" % det_name
-        )
-        iwidth = 3
-        iheight = 3
-        gspec[0, 0 : (iwidth * 3)] = pn.Row("# Pedestals&RMS - Run %04d" % (runnum))
-        if nCycles == 1:
-            gspec[1 : (1 * iheight) + 1, 0:iwidth] = pn.Column(pedImgs[0])
-            gspec[(1 * iheight) + 1 : (2 * iheight) + 1, 0:iwidth] = pn.Column(
-                rmsImgs[0]
-            )
-            if len(diffImgs) == len(pedImgs):
-                gspec[(2 * iheight) + 1 : (3 * iheight) + 1, 0:iwidth] = pn.Column(
-                    diffImgs[0]
-                )
-        else:
-            for i in range(nCycles):
-                gspec[
-                    (i * iheight + 1) : ((i + 1) * iheight + 1),
-                    (iwidth * 0) : (iwidth * 1),
-                ] = pn.Column(pedImgs[i])
-                gspec[
-                    (i * iheight + 1) : ((i + 1) * iheight + 1),
-                    (iwidth * 1) : (iwidth * 2),
-                ] = pn.Column(rmsImgs[i])
-                if len(diffImgs) == len(pedImgs):
-                    gspec[
-                        (i * iheight + 1) : ((i + 1) * iheight + 1),
-                        (iwidth * 2) : (iwidth * 3),
-                    ] = pn.Column(diffImgs[i])
-        tabs.append(gspec)
-
-    if make_ped_data_imgs:
-        gspecI = plotDataImgs(
-            det.env.experiment(), runnum, det.name.__str__(), nCycles, plotInfo=plotInfo
-        )
-        tabs.append(gspecI)
-
-    return tabs
-
-
-def plotPedestals(
-    expname="mfxc00118",
-    run=364,
-    nosave_elog=False,
-    make_ped_imgs=False,
-    make_ped_data_imgs=False,
-    detImgMaxSize=400,
-):
-    isLCLS2 = False
-    if expname[:3] in ["tmo", "rix", "ued"]:
-        isLCLS2 = True
-    if not isLCLS2:
-        ds_name = "exp={}:run={}:smd".format(expname, run)
-        ds = psana.DataSource(ds_name)
-
-        det_names = [
-            dn[0]
-            for dn in psana.DetNames()
-            if dn[0].find("Jungfrau") >= 0
-            or dn[0].find("Epix") >= 0
-            or dn[0].find("Cspad") >= 0
-            or dn[0].find("Uxi") >= 0
-        ]
-        aliases = [
-            dn[1]
-            for dn in psana.DetNames()
-            if dn[0].find("Jungfrau") >= 0
-            or dn[0].find("Epix") >= 0
-            or dn[0].find("Cspad") >= 0
-            or dn[0].find("Uxi") >= 0
-        ]
-        runnum = run
-    else:
-        ds = psana.DataSource(exp=expname, run=run)
-        thisrun = next(ds.runs())
-        det_names = [dn for dn in thisrun.detnames if dn.find("epix") >= 0]
-        aliases = [dn for dn in thisrun.detnames if dn.find("epix") >= 0]
-        runnum = run
-        run = thisrun
-
-    tabs = None
-    runTableData = {}
-    for det_name, alias in zip(det_names, aliases):
-        # print(det_name, alias)
-        this_det_name = alias
-        if alias == "":
-            this_det_name = det_name
-        tabs = allPlots(
-            this_det_name,
-            run,
-            make_ped_imgs=make_ped_imgs,
-            make_ped_data_imgs=make_ped_data_imgs,
-            tabs=tabs,
-            detImgMaxSize=detImgMaxSize,
-            isLCLS2=isLCLS2,
-        )
-        statusDict = statusStats(this_det_name)
-        for k, v in statusDict.items():
-            runTableData[f"Pixel Status/{this_det_name}_n_{k}"] = v
-        print("runTableData:")
-        print(runTableData)
-
-    postBadPixMsg(detectors=sorted(det_names, reverse=True), exp=expname, run=run)
-    if not nosave_elog:
-        elogDir = (
-            Path(SIT_PSDM_DATA)
-            / expname[:3]
-            / expname
-            / f"stats/summary/Pedestals/Pedestals_Run{runnum:03d}"
-        )
-
-        import os
-
-        if not os.path.isdir(elogDir):
-            os.makedirs(elogDir)
-        print("Made Directory to save data:", elogDir)
-        tabs.save(("%s/report.html" % elogDir))
-
-        postRunTable(runTableData)
-
-    return tabs
-
-
-tabs = plotPedestals(
-    expname, run, make_ped_imgs=True, make_ped_data_imgs=False, nosave_elog=nosave_elog
-)

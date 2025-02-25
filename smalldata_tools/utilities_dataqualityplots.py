@@ -43,24 +43,6 @@ def evtt2Rt(event_time):
     return Rt
 
 
-def postRunTable(runtable_data, experiment, run):
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(experiment)
-    print("URL:", ws_url)
-    user = experiment[:3] + "opr"
-    with open("/cds/home/opr/%s/forElogPost.txt" % user, "r") as reader:
-        answer = reader.readline()
-    r = requests.post(
-        ws_url,
-        params={"run_num": run},
-        json=runtable_data,
-        auth=HTTPBasicAuth(experiment[:3] + "opr", answer[:-1]),
-    )
-    # we might need to use this for non=current expetiments. Currently does not work in ARP
-    # krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    # r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
-
-
 def makeRunTableData(ana, scanName, Filter=None, varNames=[]):
     n162 = ana.getVar("evr/code_162").sum()
     ana.addCut("evr/code_162", -0.5, 0.5, "xon")
