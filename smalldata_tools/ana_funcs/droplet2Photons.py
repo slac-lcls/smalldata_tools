@@ -30,7 +30,7 @@ class droplet2Photons(DetObjectFunc):
         aduspphot: float
             Expected single photon energy
         photpts: list
-            Energy (ADU) boundaries for given number of photons (defaults to N*aduspphot - offset)
+            Energy (ADU) boundaries for given number of photons (defaults to N*aduspphot - offset, starting w/ the zero photon boundaries!)
         mask: np.ndarray (default = None)
             Pass a mask in here (array-form). If None: use mask stored in DetObject.
         one_photon_info: bool (default = False)
@@ -46,6 +46,8 @@ class droplet2Photons(DetObjectFunc):
 
         photpts = np.arange(1000000) * self.aduspphot - self.offset
         self.photpts = kwargs.get("photpts", photpts)
+        if self.aduspphot == 0:
+            self.aduspphot = np.mean(self.photpts[1:]-self.photpts[:-1])
 
         self.cputime = kwargs.get("cputime", False)
         self.one_photon_info = kwargs.get("one_photon_info", False)
@@ -285,7 +287,6 @@ class droplet2Photons(DetObjectFunc):
             twos, multpixs, multpixadus = self.multi_photon(
                 img, imgDrop.copy(), drop_ind_multi
             )
-
             # photon_list is array of [tiles, x, y]
             photonlist = loopdrops(
                 twos, multpixs, multpixadus, self.aduspphot, self.photpts
