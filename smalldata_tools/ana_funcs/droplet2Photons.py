@@ -47,7 +47,7 @@ class droplet2Photons(DetObjectFunc):
         photpts = np.arange(1000000) * self.aduspphot - self.offset
         self.photpts = kwargs.get("photpts", photpts)
         if self.aduspphot == 0:
-            self.aduspphot = np.mean(self.photpts[1:]-self.photpts[:-1])
+            self.aduspphot = np.mean(self.photpts[1:] - self.photpts[:-1])
 
         self.cputime = kwargs.get("cputime", False)
         self.one_photon_info = kwargs.get("one_photon_info", False)
