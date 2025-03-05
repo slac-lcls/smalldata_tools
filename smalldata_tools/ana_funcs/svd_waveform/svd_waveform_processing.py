@@ -49,6 +49,7 @@ def multiPulseProjector(
     singlePulseBasis, n_pulse=1, delay=None, sampling=1, method="pinv", **kwargs
 ):
     """Build the basis for a multiple waveform analysis, based on single pulse reference basis.
+    With n_pulse=1, this is a simple SVD waveform regressor.
 
     Args:
         singlePulseBasis: single pulse basis A
@@ -160,24 +161,24 @@ class WaveformRegressor(BaseEstimator, RegressorMixin):
 
     def fit(self, X, y=None):
         """y=None for sklearn compatibility reason"""
+        self.coeffs_ = np.zeros(self.A.shape[1])
         # Check validity of input X:
         if X.shape[-1] != self.A.shape[1]:
-            print("Data and projector shapes dont match.")
-            self.coeffs_ = np.zeros(self.A.shape[1])
-            return self
+            print("Data and projector shapes dont match. Return")
+            return
 
         if isinstance(self.projector, Ridge):
             ridge = self.projector.fit(self.A, X)
             coeffs = ridge.coef_
         else:
-            #             coeffs = self.projector.dot(X.T) # old way
+            # coeffs = self.projector.dot(X.T) # old way
             coeffs = X.dot(self.projector)
 
         if len(X.shape) == 1:
             self.coeffs_ = coeffs[None, :]
         else:
             self.coeffs_ = coeffs
-        return self
+        return
 
     def reconstruct(self):
         try:
@@ -185,7 +186,7 @@ class WaveformRegressor(BaseEstimator, RegressorMixin):
         except AttributeError:
             raise RuntimeError("You must fit the waveform before reconstructing it!")
 
-        #         reconstructed = self.A.dot(self.coeffs_) # old way
+        # reconstructed = self.A.dot(self.coeffs_) # old way
         reconstructed = self.coeffs_.dot(self.A)
         return reconstructed.real
 
@@ -251,69 +252,3 @@ class WaveformRegressor(BaseEstimator, RegressorMixin):
         return intensities
 
 
-""" 
-%%%%%%%%%%%%%%%%%%%%% OLD FUNCTIONS %%%%%%%%%%%%%%%%%%%%% 
-May not work properly anymore.
-Kept for potential backward compatibility on older scripts.
-"""
-
-
-def construct_2PulseProjector(
-    singlePulseBasis, delay=None, sampling=0.125, method="pinv", **kwargs
-):
-    """
-    Gives the projector onto the subspace mapped by the chosen single-pulse SVD components for a two-pulse waveform
-    Inputs:
-        singlePulseBasis: single pulse basis A
-        delay: delay between the two pulses
-        nCoeff: number of single pulse basis vectors to take
-        method: 'pinv', 'QR', 'Ridge'
-    Returns:
-        Basis matrix A and projector function
-        The projector is given by:
-            P=A.dot(projector).dot(data)
-        The coefficients projector onto the subspace A are:
-            coeffs=projector.dot(data)
-
-        Note: if method 'Ridge' is used, then a RidgeRegressor object is returned instead of a projector (matrix).
-        The function fitPulse will take care of handling this difference.
-    """
-
-    if delay is None:
-        raise ValueError("Delay is None, give it a value!")
-
-    """ (i) build the basis matrix """
-    A0 = singlePulseBasis
-    A1 = A0
-    A2 = np.roll(A0, int(delay / sampling), axis=0)
-    A = np.append(A1, A2, axis=1)
-
-    """ (ii) Construct the projector """
-    if method == "pinv":
-        projector = np.linalg.pinv(A)
-        return A, projector
-    elif method == "QR":
-        Q, R = np.linalg.qr(A)
-        projector = np.transpose(np.linalg.inv(A.transpose().dot(Q))).dot(Q)
-        return A, projector
-    elif method == "Ridge":
-        if "alpha" in kwargs:
-            alpha = kwargs.pop("alpha")
-        else:
-            alpha = 0
-        projector = Ridge(
-            alpha=alpha, fit_intercept=False
-        )  # is a RidgeRegressor instance, not a matrix
-        return A, projector
-    else:
-        raise NameError("Method not implemented")
-
-
-def construct_waveformRegressor_old(X_ref, n_components=1, n_pulse=1, **kwargs):
-    """
-    Construct waveform regressor based on a set of reference waveforms.
-    """
-    A, projector, svd = get_basis_and_projector(X_ref, n_components=n_components)
-    if n_pulse == 2:
-        A, projector = construct_2PulseProjector(A, **kwargs)
-    return WaveformRegressor(A=A, projector=projector, n_pulse=n_pulse)

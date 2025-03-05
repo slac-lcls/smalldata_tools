@@ -9,9 +9,8 @@ import h5py as h5
 import smalldata_tools.DetObject as dobj
 import smalldata_tools.ana_funcs.svd_waveform_processing as proc
 
-
 def make_basis(
-    exp_name, run, det_name, nWaveforms=500, bkg_idx=None, n_c=2, roi=None, channel=None
+    exp_name, run, det_name, nWaveforms=500, bkg_idx=None, roi=None, n_c=2, channel=None
 ):
     """Create the SVD basis for the waveform fitting. The output is saved in a h5 file stored
     in the calib directory of the relevant experiment.
@@ -23,6 +22,7 @@ def make_basis(
         nWaveforms (int): number of waveform to use to build the basis
         bkg_idx (int): background index. np.mean(waveform[:bkg_idx]) will be subtracted
         roi (list, array): two index specifying the region of interest of the waveform
+        n_c: number of component to use
         channel (int): detector channel index. Necessary if the digitizer has more than 1 channel
     """
     hutch = exp_name[:3]
