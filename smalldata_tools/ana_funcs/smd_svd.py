@@ -50,13 +50,13 @@ class SvdFit(DetObjectFunc):
                 # Automatically find the latest waveform basis file in calibDir
                 print("No basis file given, default to latest")
                 exp = det.run.ds.exp
-                
-                BASE = os.environ.get('SIT_PSDM_DATA', '/sdf/data/lcls/ds/')
-                basis_files = (Path(BASE) / f'{exp[:3]}/{exp}/hdf5/smalldata/svd_basis')
-                basis_files = basis_files.glob('wave_basis_'+det.det.alias+'*.h5')
+
+                BASE = os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/")
+                basis_files = Path(BASE) / f"{exp[:3]}/{exp}/hdf5/smalldata/svd_basis"
+                basis_files = basis_files.glob("wave_basis_" + det.det.alias + "*.h5")
                 self.basis_file = max(basis_files, key=os.path.getctime)
             except:
-                print('Unable to find a basis file. Return now')
+                print("Unable to find a basis file. Return now")
                 return
 
         if not os.path.isfile(self.basis_file):

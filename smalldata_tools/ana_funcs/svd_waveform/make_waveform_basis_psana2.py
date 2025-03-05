@@ -11,7 +11,8 @@ import smalldata_tools.lcls2.DetObject as dobj
 import smalldata_tools.ana_funcs.svd_waveform.svd_waveform_processing as proc
 
 
-BASE = os.environ.get('SIT_PSDM_DATA', '/sdf/data/lcls/ds/')
+BASE = os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/")
+
 
 def make_basis(
     exp_name, run, det_name, nWaveforms=500, bkg_idx=-1, roi=None, n_c=2, channel=None
@@ -68,13 +69,7 @@ def make_basis(
 
     """ ---------------------------- SAVE DATA ---------------------------- """
     det_name_save = det_name + "_ch" + str(channel) if channel is not None else det_name
-    fname = (
-        "wave_basis_"
-        + det_name_save
-        + "_"
-        + f"r{run:04d}"
-        + ".h5"
-    )
+    fname = "wave_basis_" + det_name_save + "_" + f"r{run:04d}" + ".h5"
     fname = savePath / fname
     print(fname)
     with h5.File(fname, "w") as f:
@@ -146,15 +141,15 @@ if __name__ == "__main__":
         # Assume 8 channels (wave8)
         for ch in range(8):
             make_basis(
-            exp_name,
-            run,
-            det_name,
-            nWaveforms=nWaveforms,
-            bkg_idx=b,
-            n_c=n_c,
-            roi=roi,
-            channel=ch,
-        )
+                exp_name,
+                run,
+                det_name,
+                nWaveforms=nWaveforms,
+                bkg_idx=b,
+                n_c=n_c,
+                roi=roi,
+                channel=ch,
+            )
     else:
         make_basis(
             exp_name,

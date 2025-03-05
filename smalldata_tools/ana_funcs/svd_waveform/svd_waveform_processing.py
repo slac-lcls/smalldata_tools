@@ -250,5 +250,3 @@ class WaveformRegressor(BaseEstimator, RegressorMixin):
         if mode == "both":
             return intensities, intensities_max
         return intensities
-
-
