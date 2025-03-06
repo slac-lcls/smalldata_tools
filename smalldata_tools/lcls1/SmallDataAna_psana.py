@@ -1560,11 +1560,11 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                 "offNbrs_fiducials_xon_nNbr%02d" % offEventsCube,
             ]
             self.sda.cubes[cubeName].addIdxVar(addVars)
-        sda_out = self.sda.makeCubeData(
-            cubeName, returnIdx=True, onoff=onoff
-        )
+        sda_out = self.sda.makeCubeData(cubeName, returnIdx=True, onoff=onoff)
         if sda_out is None:
-            print(f"Cube data for cube {cubeName} is None, abort workers and returning now.")
+            print(
+                f"Cube data for cube {cubeName} is None, abort workers and returning now."
+            )
             # Abort all workers
             for worker_id in range(size - 1):
                 # rank 0 is not a worker
