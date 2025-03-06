@@ -1552,7 +1552,6 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         dsetcnf = fout.create_dataset("cubeSelection", [1.0], dtype="f")
         dsetcnf.attrs["cubeSelection"] = selString
 
-        # back to original code.
         if offEventsCube > 0:
             self.sda.getOffVar("fiducials", "xon", nNbr=offEventsCube, mean=False)
             self.sda.getOffVar("event_time", "xon", nNbr=offEventsCube, mean=False)
@@ -1561,9 +1560,17 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                 "offNbrs_fiducials_xon_nNbr%02d" % offEventsCube,
             ]
             self.sda.cubes[cubeName].addIdxVar(addVars)
-        cubeData, eventIdxDict = self.sda.makeCubeData(
+        sda_out = self.sda.makeCubeData(
             cubeName, returnIdx=True, onoff=onoff
         )
+        if sda_out is None:
+            print(f"Cube data for cube {cubeName} is None, abort workers and returning now.")
+            # Abort all workers
+            for worker_id in range(size - 1):
+                # rank 0 is not a worker
+                comm.send("done", dest=worker_id + 1)
+            return cubeName, None, None
+        cubeData, eventIdxDict = sda_out
 
         # add small data to hdf5
         for key in cubeData.variables:
