@@ -91,6 +91,30 @@ def get_wf_integrate(run):
     return ret_dict
 
 
+def get_wf_svd(run):
+    ret_dict = {}
+
+    if run > 0:
+        det_kwargs = {}
+        # w8s = ["rix_fim0", "rix_fim1"]
+        w8s = ["rix_fim0", "rix_fim1", "crix_w8"]
+        for w8 in w8s:
+            # one basis file per channel
+            run_basis = 146
+            path = "/sdf/data/lcls/ds/rix/rixx1011723/hdf5/smalldata/svd_basis"
+            basis_files = [f"{path}/wave_basis_{w8}_ch{ch}_r{str(run_basis).zfill(4)}.h5" for ch in range(8)]
+            det_kwargs[w8] = []
+            for basis_file in basis_files:
+                kwargs = {
+                    "n_components" : 3,
+                    "mode" : 'both',
+                    "return_reconstructed" : True,
+                    "basis_file": basis_file
+                }
+                det_kwargs[w8].append(kwargs)
+    return det_kwargs
+
+    
 ##########################################################
 # run independent parameters
 ##########################################################
