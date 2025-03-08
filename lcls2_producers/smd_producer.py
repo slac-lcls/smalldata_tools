@@ -93,7 +93,7 @@ def define_dets(run, det_list):
                     RF = hsdROIFunc(
                         name= funcname,
                         writeArea=True,
-                        ROI=ROIs[detname][sdetname],
+                        ROI=rois_args[detname][sdetname],
                     )
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
