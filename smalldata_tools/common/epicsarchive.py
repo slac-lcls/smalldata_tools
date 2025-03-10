@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 from dateutil.relativedelta import relativedelta
+from dateutil import tz
 import urllib
 import asyncio
 import httpx
@@ -399,13 +400,14 @@ def list_print(data):
     return True
 
 
-def ts_to_datetime(ts):
+def ts_to_datetime(ts, timezone="UTC"):
     """
     The LCLS timestamp is using the EPICS epoch, which is
     20 years after the POSIX epoch.
     """
     sec = ts >> 32 & 0xFFFFFFFF
     nsec = nsec = ts & 0xFFFFFFFF
-    dt = datetime.datetime.fromtimestamp(sec + nsec * 1e-9)
+    timezone = tz.gettz(timezone)
+    dt = datetime.datetime.fromtimestamp(sec + nsec * 1e-9, tz=timezone)
     dt += relativedelta(years=20)
     return dt
