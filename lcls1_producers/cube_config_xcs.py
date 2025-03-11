@@ -19,12 +19,15 @@ def get_filters(run):
         filters = [
             ['lightStatus/xray',0.5,1.5,'filter1'],
             ['ipm4/sum',2e3,3e4,'filter1'],
-            ['tt/FLTPOSFWHM',50,200,'filter1']
+        #     ['tt/FLTPOSFWHM',50,200,'filter1']
         #     ['evr/code_41',0.5,1.5,'custom']
         ]
     return filters
 
 # Laser on/off
+"""
+Set to laser=True if the laser sequence is being used, set to False if the laser sequence is not being used
+"""
 laser = True
 use_tt = True
 
@@ -37,15 +40,15 @@ detDict = {'source':'epix_1',
            'thresADU':6.5,
            'common_mode':0}
 
-varList = ['ipm2/sum','ipm3/sum','diodeU/channels', detDict]
+varList = ['ipm4/sum','ipm5/sum', detDict]
 
 
 # histogram configuration. Usually does not need to be changed (not yet implemented)
 # field: destination in smd, list: [low,high,n] or [n]
 hist_list = {
-    'ipm4/sum': [],
-    'ipm5/sum': [],
-    'tt/FLTPOS_PS': [],
-    'tt/AMPL': [],
-    'tt/FLTPOSFWHM': []
+    'ipm4/sum': [0, 5e4, 70],
+    'ipm5/sum': [0, 5e3, 70],
+    #'tt/FLTPOS_PS': [],
+    #'tt/AMPL': [],
+    #'tt/FLTPOSFWHM': []
 }
