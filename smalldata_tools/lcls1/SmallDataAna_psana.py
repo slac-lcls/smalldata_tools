@@ -1552,7 +1552,6 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
         dsetcnf = fout.create_dataset("cubeSelection", [1.0], dtype="f")
         dsetcnf.attrs["cubeSelection"] = selString
 
-        # back to original code.
         if offEventsCube > 0:
             self.sda.getOffVar("fiducials", "xon", nNbr=offEventsCube, mean=False)
             self.sda.getOffVar("event_time", "xon", nNbr=offEventsCube, mean=False)
@@ -1561,9 +1560,17 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                 "offNbrs_fiducials_xon_nNbr%02d" % offEventsCube,
             ]
             self.sda.cubes[cubeName].addIdxVar(addVars)
-        cubeData, eventIdxDict = self.sda.makeCubeData(
-            cubeName, returnIdx=True, onoff=onoff
-        )
+        sda_out = self.sda.makeCubeData(cubeName, returnIdx=True, onoff=onoff)
+        if sda_out is None:
+            print(
+                f"Cube data for cube {cubeName} is None, abort workers and returning now."
+            )
+            # Abort all workers
+            for worker_id in range(size - 1):
+                # rank 0 is not a worker
+                comm.send("done", dest=worker_id + 1)
+            return cubeName, None, None
+        cubeData, eventIdxDict = sda_out
 
         # add small data to hdf5
         for key in cubeData.variables:
@@ -1623,9 +1630,12 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                         addToHdf5(grp, "rms", det.det.image(self.run, det.rms[0]))
                         addToHdf5(grp, "gain", det.det.image(self.run, det.gain[0]))
                     else:
-                        addToHdf5(grp, "ped", det.det.image(self.run, det.ped))
-                        addToHdf5(grp, "rms", det.det.image(self.run, det.rms))
-                        addToHdf5(grp, "gain", det.det.image(self.run, det.gain))
+                        try:
+                            addToHdf5(grp, "ped", det.det.image(self.run, det.ped))
+                            addToHdf5(grp, "rms", det.det.image(self.run, det.rms))
+                            addToHdf5(grp, "gain", det.det.image(self.run, det.gain))
+                        except:
+                            print("No det.ped, det.rms, or det.gain for this detector")
                     addToHdf5(grp, "mask", det.det.image(self.run, det.mask))
                     addToHdf5(grp, "calib_mask", det.det.image(self.run, det.cmask))
                     if det.x is not None:

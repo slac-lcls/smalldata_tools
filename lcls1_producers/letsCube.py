@@ -57,7 +57,7 @@ parser.add_argument('--url', default="https://pswww.slac.stanford.edu/ws-auth/lg
 parser.add_argument('--config', help='Name of the config file module to use (without .py extension)', default=None, type=str)
 parser.add_argument("--optimize_cores", help="split processing over more cores than bins", action='store_true')
 args = parser.parse_args()
-    
+
 exp = args.experiment
 run = args.run
 
@@ -65,7 +65,7 @@ if rank==0:
     from smalldata_tools.common.SmallDataAna import SmallDataAna
     from smalldata_tools.lcls1.SmallDataAna_psana import SmallDataAna_psana
     import smalldata_tools.lcls1.cube.cube_rank0_utils as utils
-    
+
     # Constants
     HUTCHES = [
         'XPP',
@@ -118,7 +118,7 @@ if rank==0:
         dirname = args.indirectory
         if dirname.find('/')<=0:
             dirname+='/'
-        
+
     ana = None
     anaps = SmallDataAna_psana(exp,run,dirname)
     if anaps and anaps.sda is not None and 'fh5' in anaps.sda.__dict__.keys():
@@ -135,7 +135,8 @@ if rank==0:
 
     ana.printRunInfo()
 
-    for filt in config.filters:
+    filters = config.get_filters(run)
+    for filt in filters:
         if rank==0: print('Filter: ',filt)
         ana.addCut(*filt)
 
@@ -145,12 +146,12 @@ if rank==0:
     # if you are interested in laser-xray delay, please select the delay of choice here!
     ####
     ana.setDelay(use_ttCorr=config.use_tt, addEnc=False, addLxt=False, reset=True)
-    
+
     cubeName='cube' #initial name
     scanName, scanValues = ana.getScanValues()
     binSteps=[]
     binName=''
-    
+
     if isinstance(scanName, list):
        scanName = scanName[0]
        scanValues = scanValues[0]
@@ -193,7 +194,7 @@ if rank==0:
 
     if int(args.nevents)>0: # not really implemented
         cubeName+='_%sEvents'%args.nevents
-    
+
     cubeName_base = cubeName
     for filterName in ana.Sels:
         if filterName!='filter1':
@@ -202,7 +203,7 @@ if rank==0:
             cubeName = cubeName_base
         ana.addCube(cubeName, binName, binSteps, filterName)
         ana.addToCube(cubeName, varList)
-            
+
     nBins = binSteps.shape[0]
     try:
         addBinVars = config.get_addBinVars(run)
@@ -214,7 +215,7 @@ if rank==0:
         for cubeName, cube in ana.cubes.items():
             cube.add_BinVar(addBinVars)
         nBins *= len(addBinVars[1])
-            
+
     #figure out how many bins & cores we have to maybe add a fake variable.
     nCores = size
     nSplit = int(nCores/nBins)
@@ -227,7 +228,7 @@ if rank==0:
             cube.add_BinVar({'random_remove': randomBins.tolist()})
 
     anaps._broadcast_xtc_dets(cubeName) # send detectors dict to workers. All cubes MUST use the same det list.
-    
+
     cube_infos = []
     for ii, cubeName in enumerate(ana.cubes):
         print('Cubing {}'.format(cubeName))
@@ -241,10 +242,11 @@ if rank==0:
                 nEvtsPerBin=args.nevents,
                 dirname=args.outdirectory
             )
-            cube_infos.append([f'{cubeName}_on', bins, nEntries])
+            if bins is not None:
+                cube_infos.append([f'{cubeName}_on', bins, nEntries])
             comm.bcast('Work!', root=0)
             time.sleep(1) # is this necessary? Just putting it here in case...
-            
+
             #request 'off' events base on input filter (switch optical laser filter, drop tt
             cubeName, bins, nEntries = anaps.makeCubeData(
                 cubeName,
@@ -252,8 +254,9 @@ if rank==0:
                 nEvtsPerBin=args.nevents,
                 dirname=args.outdirectory
             )
-            cube_infos.append([f'{cubeName}_off', bins, nEntries])
-        
+            if bins is not None:
+                cube_infos.append([f'{cubeName}_off', bins, nEntries])
+
         else:
             # no laser filters
             cubeName, bins, nEntries = anaps.makeCubeData(
@@ -262,9 +265,10 @@ if rank==0:
                 nEvtsPerBin=args.nevents,
                 dirname=args.outdirectory
             )
-            cube_infos.append([cubeName, bins, nEntries])
+            if bins is not None:
+                cube_infos.append([cubeName, bins, nEntries])
     comm.bcast('Go home!', root=0)
-            
+
     if nSplit > 1 and args.optimize_cores:
         cubedirectory= args.outdirectory
         cubeFNames = []
@@ -287,7 +291,7 @@ if rank==0:
             dat.remove_node('/bins_random_remove')
             #get all keys (not directories) & find binning variable random_remove
             h5_variables = [k for k in dir(dat.root) if k[0]!='_']
-            #get data            
+            #get data
             for var in h5_variables:
                 try:
                     org_data = getattr(dat.root,var).read()
@@ -320,14 +324,15 @@ if rank==0:
                 im = Image.fromarray(cubedata)
                 tiff_file = '%s/Run_%s_%s_filter_%s.tiff'%(tiffdir, run, detname, filterName)
                 im.save(tiff_file)
- 
+
     if os.environ.get('ARP_JOB_ID', None) is not None:
         requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Cube </b>", "value": "Done"}])
-    
+
     # Make summary plots
-    logger.info('###### MAKE REPORT #####')
-    tabs = utils.make_report(anaps, cube_infos, config.hist_list, config.filters, config.varList, exp, run)
-        
+    if cube_infos != []:
+        logger.info('###### MAKE REPORT #####')
+        tabs = utils.make_report(anaps, cube_infos, config.hist_list, filters, config.varList, exp, run)
+
 else:
     work = 1
     binWorker = mpi_fun.BinWorker(run, exp)

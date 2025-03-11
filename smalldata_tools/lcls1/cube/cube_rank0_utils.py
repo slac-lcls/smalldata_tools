@@ -21,7 +21,7 @@ def make_report(anaps, cube_infos, hist_list, filters, varList, exp, run):
     Parameters
     ----------
     anaps: SmallDataAna_psana class instance
-    bins_info: list
+    cube_info: list
         Outputs of anaps.makeCubeData
     hist_list: dict
         list of histograms and their arguments. Usually defined in the config file.
