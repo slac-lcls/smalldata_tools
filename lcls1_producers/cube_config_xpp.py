@@ -24,14 +24,19 @@ def get_addBinVars(run):
 # filters to apply to the data
 # format: list of [det (field), low, high, name]
 # 'filter1' is the standard name and will not be added to the h5 file name.
-filters = [
-    ['lightStatus/xray',0.5,1.5,'filter1'],
-    #['ipm2/sum',1e3,4.5e4,'filter1'],
-    # ['ipm3/sum',200,3e3,'filter1'],
-    #['tt/FLTPOSFWHM',60,230,'filter1'],
-    #['tt/AMPL',0.005,0.19,'filter1']
-    # ['evr/code_41',0.5,1.5,'custom']
-]
+def get_filters(run):
+    if isinstance(run,str):
+        run = int(run)
+    if run > 0:
+        filters = [
+            ['lightStatus/xray',0.5,1.5,'filter1'],
+            #['ipm2/sum',1e3,4.5e4,'filter1'],
+            # ['ipm3/sum',200,3e3,'filter1'],
+            #['tt/FLTPOSFWHM',60,230,'filter1'],
+            #['tt/AMPL',0.005,0.19,'filter1']
+            # ['evr/code_41',0.5,1.5,'custom']
+        ]
+    return filters
 
 # Laser on/off
 laser = True
