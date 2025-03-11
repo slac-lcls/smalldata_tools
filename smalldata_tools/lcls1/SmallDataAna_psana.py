@@ -1630,9 +1630,12 @@ class SmallDataAna_psana(BaseSmallDataAna_psana):
                         addToHdf5(grp, "rms", det.det.image(self.run, det.rms[0]))
                         addToHdf5(grp, "gain", det.det.image(self.run, det.gain[0]))
                     else:
-                        addToHdf5(grp, "ped", det.det.image(self.run, det.ped))
-                        addToHdf5(grp, "rms", det.det.image(self.run, det.rms))
-                        addToHdf5(grp, "gain", det.det.image(self.run, det.gain))
+                        try:
+                            addToHdf5(grp, "ped", det.det.image(self.run, det.ped))
+                            addToHdf5(grp, "rms", det.det.image(self.run, det.rms))
+                            addToHdf5(grp, "gain", det.det.image(self.run, det.gain))
+                        except:
+                            print("No det.ped, det.rms, or det.gain for this detector")
                     addToHdf5(grp, "mask", det.det.image(self.run, det.mask))
                     addToHdf5(grp, "calib_mask", det.det.image(self.run, det.cmask))
                     if det.x is not None:
