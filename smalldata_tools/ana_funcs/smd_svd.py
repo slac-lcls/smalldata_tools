@@ -3,12 +3,13 @@ import h5py as h5
 import glob
 import os
 import numpy as np
+from pathlib import Path
 
-from smalldata_tools.ana_funcs import svd_waveform_processing as proc
+from smalldata_tools.ana_funcs.svd_waveform import svd_waveform_processing as proc
 from smalldata_tools.common.detector_base import DetObjectFunc
 
 
-class svdFit(DetObjectFunc):
+class SvdFit(DetObjectFunc):
     """Performs fit of waveforms using singular value decomposition. The main utility is to get the
     intensity of multiple pulse in a single waveform, from a basis of single-pulse reference waveforms.
     Check the file make_waveform_basis.py for information on how to create the basis.
@@ -28,7 +29,7 @@ class svdFit(DetObjectFunc):
             return_reconstructed (bool): return reconstructed waveforms or not
         """
         self._name = kwargs.get("name", "svdFit")
-        super(svdFit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.n_components = kwargs.get("n_components", 2)
         self.n_pulse = kwargs.get("n_pulse", 1)
         self.delay = kwargs.get("delay", [0])
@@ -38,41 +39,43 @@ class svdFit(DetObjectFunc):
         self.basis_file = kwargs.get("basis_file", None)
         self._mode = kwargs.get("mode", "max")
         self._return_reconstructed = kwargs.get("return_reconstructed", False)
+        self.channel = None
 
     def setFromDet(self, det):
         """Load basis, projector and other useful variables from calib h5 file"""
-        super(svdFit, self).setFromDet(det)
-        calibDir = det.det.env.calibDir()
+        super().setFromDet(det)
+        # calibDir = det.det.env.calibDir()
         if self.basis_file is None:
             try:
                 # Automatically find the latest waveform basis file in calibDir
-                #                 basis_files = glob.glob('./wave_basis_'+det.det.alias+'*.h5') # dir for local test
-                #                 basis_files = (Path(det.det.env.calibDir()).parent / 'hdf5/basis').glob('wave_basis_'+det.det.alias+'*.h5')
-                basis_files = glob.glob(
-                    "/".join(det.det.env.calibDir().split("/")[:-1])
-                    + "/hdf5/basis/"
-                    + "wave_basis_"
-                    + det.det.alias
-                    + "*.h5"
-                )  # hack if pathlib not available
+                print("No basis file given, default to latest")
+                exp = det.run.ds.exp
+
+                BASE = os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/")
+                basis_files = Path(BASE) / f"{exp[:3]}/{exp}/hdf5/smalldata/svd_basis"
+                basis_files = basis_files.glob("wave_basis_" + det.det.alias + "*.h5")
                 self.basis_file = max(basis_files, key=os.path.getctime)
-                l = "/".join(det.det.env.calibDir().split("/")[:-1]) + "/hdf5"
             except:
-                pass
-        #         if not Path(self.basis_file).is_file():
+                print("Unable to find a basis file. Return now")
+                return
+
         if not os.path.isfile(self.basis_file):
             print("No basis file found. Exit")
             return
         else:
-            print("{}: basis file found at {}".format(self._name, self.basis_file))
+            print("{}: Basis file found at {}".format(self._name, self.basis_file))
 
         with h5.File(self.basis_file, "r") as f:
             components = f["components"][()]
             self.roi = f["roi"][()]
             if self.roi is None:
                 self.roi = [0, 1e6]
-            self.bkg_idx = f["background_index"][()]
-            self.channel = f["channel"][()]
+            self.bkg_idx = f["background_roi"][()]
+            if "channel" in f.keys():
+                self.channel = f["channel"][()]
+
+        if self.channel is not None:
+            self._name += f"_ch{self.channel}"
 
         projector = components[
             : self.n_components
