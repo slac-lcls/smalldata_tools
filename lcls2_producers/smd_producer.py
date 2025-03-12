@@ -48,6 +48,7 @@ def define_dets(run, det_list):
     dimgs_args = {}
     wfs_int_args = {}
     wfs_hitfinder_args = {}
+    wfs_svd_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
