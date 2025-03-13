@@ -337,38 +337,6 @@ class spectrumFunc(DetObjectFunc):
         return ret_dict
 
 
-class detImageFunc(DetObjectFunc):
-    """
-    /!\/!\/!\ Only for LCLS-II. /!\/!\/!\
-    Return the results of det.raw.image from psana.
-
-    Typically useful for special detectors like the Archon, which
-    has special pixels that are handled in the image method.
-    """
-
-    def __init__(self, **kwargs):
-        self._name = kwargs.get("name", "dimage")
-        super(detImageFunc, self).__init__(**kwargs)
-
-    def setFromDet(self, det):
-        super(detImageFunc, self).setFromDet(det)
-        self._run = det.run.runnum
-        self._det = det.det
-
-    def process(self, data):
-        # pedestal application should happen when data is produced from calib
-        img = self._det.raw.image(self._run, data)
-        ret_dict = {"image": img}
-
-        # store for further processing
-        self.dat = img
-        subfuncResults = self.processFuncs()
-        for k in subfuncResults:
-            for kk in subfuncResults[k]:
-                ret_dict["%s_%s" % (k, kk)] = subfuncResults[k][kk]
-        return ret_dict
-
-
 # DEBUG ME WITH MASKED ARRAY#
 class imageFunc(DetObjectFunc):
     """
