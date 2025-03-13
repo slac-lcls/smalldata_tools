@@ -50,6 +50,7 @@ def define_dets(run, det_list):
     wfs_int_args = {}
     wfs_hitfinder_args = {}
     d2p_args = {}
+    wfs_svd_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -62,6 +63,8 @@ def define_dets(run, det_list):
         wfs_hitfinder_args = config.get_wf_hitfinder(run)
     if "get_droplet2photon" in dir(config):
         d2p_args = config.get_droplet2photon(run)
+    if "get_wf_svd" in dir(config):
+        wfs_svd_args = config.get_wf_svd(run)
 
     dets = []
 
@@ -75,7 +78,7 @@ def define_dets(run, det_list):
             continue
 
         if detname.find("fim") >= 0 or detname.find("w8") >= 0:
-            # why different name for w8?
+            # why different name for w8? To differentiate full det from BLD
             det = DetObject(
                 detname, thisrun, common_mode=common_mode, name=f"det_{detname}"
             )
@@ -95,7 +98,7 @@ def define_dets(run, det_list):
                     RF = hsdROIFunc(
                         name= funcname,
                         writeArea=True,
-                        ROI=ROIs[detname][sdetname],
+                        ROI=rois_args[detname][sdetname],
                     )
                     hsdsplit.addFunc(RF)
             det.addFunc(hsdsplit)
@@ -156,10 +159,22 @@ def define_dets(run, det_list):
             # Waveform integration
             wfs_int_func = WfIntegration(**wfs_int_args[detname])
             det.addFunc(wfs_int_func)
-        
+
         if detname in wfs_hitfinder_args:
             # Simple hit finder on waveform
             det.addFunc(SimpleHitFinder(**wfs_hitfinder_args[detname]))
+
+        if detname in wfs_svd_args:
+            if isinstance(wfs_svd_args[detname], list):  # handle mutliple channel on the same det
+                for i_ch, ch in enumerate(wfs_svd_args[detname]):
+                    # Check that the basis file exists, skip instantiation if not
+                    if not os.path.isfile(ch["basis_file"]):
+                        logger.info(f"SVD basis file for {detname} ch{i_ch} cannot be found. Will not instantiate SvdFit for it.")
+                        continue
+                    this_func = SvdFit(**ch)
+                    det.addFunc(this_func)
+            else:
+                det.addFunc(SvdFit(**wfs_svd_args[detname]))
 
         det.storeSum(sumAlgo="calib")
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
@@ -203,6 +218,7 @@ from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.smd_svd import SvdFit
 
 import psplot
 from psmon import publish
