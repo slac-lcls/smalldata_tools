@@ -1,14 +1,16 @@
 import numpy as np
 
 # These lists are needed, do not delete them
-# If no detector in a given category, leave the corresponding 
+# If no detector in a given category, leave the corresponding
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
-# integrating_detectors = []
-integrating_detectors = ['archon']
-# integrating_detectors = ['andor_dir', 'andor_vls', 'andor_norm', 'archon']
-# Comment: the first integrating detector will set the sub-sampling of all
-# integrating detectors.
+integrating_detectors = []
+# integrating_detectors = ['archon']  # qRIXS
+# integrating_detectors = ['andor_vls', 'andor_dir', 'andor_norm'']  # chemRIXS
+"""
+Comment: the first integrating detector will set the sub-sampling of all
+integrating detectors.
+"""
 slow_detectors = []  # NOT IMPLEMENTED
 
 
@@ -22,7 +24,7 @@ def getROIs(run):
         'ROI' : None
     }
 
-    if run>0:
+    if run > 0:
         # Save the full ANDOR.
         ret_dict['andor_dir'] = [full_roi]
         ret_dict['andor_vls'] = [full_roi]
@@ -50,7 +52,7 @@ def getROIs(run):
 def get_droplet2photon(run):
     ret_dict = {}
 
-    if run > 0:
+    if run < 0:
         # ##### Archon setup #####
         d2p_dict = {}
         # droplet args
@@ -92,7 +94,7 @@ def get_wf_hitfinder(run):
 def get_wf_integrate(run):
     ret_dict = {}
 
-    if run>0:
+    if run > 0:
         ret_dict['rix_fim0'] = {
             "sig_roi" : slice(102,108),
             "bkg_roi" : slice(0,80),
@@ -136,7 +138,7 @@ def get_wf_svd(run):
                 det_kwargs[w8].append(kwargs)
     return det_kwargs
 
-    
+
 ##########################################################
 # run independent parameters
 ##########################################################
