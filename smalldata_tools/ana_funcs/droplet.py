@@ -165,10 +165,12 @@ class dropletFunc(DetObjectFunc):
                 imgDrop[img == 0] = 0
                 img_drop_relabel = ndi.label(imgDrop, structure=self.footprint)
                 imgDrop = img_drop_relabel[0]
+                nDrop = img_drop_relabel[1]
         else:
             imgDrop = img_drop[0]
+            nDrop = img_drop[1]
 
-        drop_ind = np.arange(1, img_drop[1] + 1)
+        drop_ind = np.arange(1, nDrop + 1)
         ret_dict = {
             "nDroplets_all": len(drop_ind)
         }  # number of droplets before ADU cut.
