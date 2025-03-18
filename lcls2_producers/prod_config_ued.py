@@ -3,8 +3,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding 
 # list empty.
-detectors = ['andor']
-#detectors = ['epixquad', 'andor']
+detectors = ['andor','epixquad']
 # integrating_detectors = []
 integrating_detectors = []
 # Comment: the first integrating detector will set the sub-sampling of all
@@ -23,10 +22,39 @@ def getROIs(run):
 
     if run>0:
         # Save the full ANDOR and QUAD.
-        ret_dict['epixquad'] = [full_roi]
         ret_dict['andor'] = [full_roi]
+        #ret_dict['epixquad'] = [full_roi]
     return ret_dict
 
+def get_droplet2photon(run):
+    ret_dict = {}
+
+    if run > 0:
+        # ##### epixquad (1010667 setup) #####
+        d2p_dict = {}
+        # droplet args
+        d2p_dict['droplet'] = {
+            #'threshold': 12.5,
+            'threshold': 50,
+            'thresholdLow': 12.5,
+            #'threshold': 70,
+            #'thresholdLow': 25,
+            'thresADU': 70,  # discard droplet whose total ADU is below this value
+            'useRms': False
+        }
+
+        # droplet2Photons args
+        d2p_dict['d2p'] = {
+            'aduspphot':20,
+            # 'roi_mask': np.load('path_to_mask.npy'),
+            'cputime': True
+        }
+        d2p_dict['nData'] = None
+        d2p_dict['get_photon_img'] = False
+
+        ret_dict['epixquad'] = d2p_dict
+
+    return ret_dict
 
 ##########################################################
 # run independent parameters
