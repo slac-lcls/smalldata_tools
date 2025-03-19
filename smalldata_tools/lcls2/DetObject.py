@@ -331,6 +331,7 @@ class Epix10kObject(TiledCameraObject):
             -1,
             -2,
             30,
+            83,
             84,
             85,
         ]  # calib-noCM, ped sub, raw, raw_gain, calib, calib-CMrow, calib-CMrowcol
@@ -383,6 +384,8 @@ class Epix10kObject(TiledCameraObject):
             self.evt.dat = self.det.raw.calib(evt)
         elif self.common_mode == 80:
             self.evt.dat = self.det.raw.calib(evt, cmpars=(7, 0, 100))
+        elif self.common_mode == 83:
+            self.evt.dat = self.det.raw.calib(evt, cmpars=(7, 1, 100, 10))
         elif self.common_mode == 84:
             self.evt.dat = self.det.raw.calib(evt, cmpars=(7, 2, 100, 10))
         elif self.common_mode == 85:
