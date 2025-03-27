@@ -285,6 +285,7 @@ class lineoutFunc(DetObjectFunc):
         idx (def None): the idx to take the lineout from. If None, will use the max pixel.
         """
         self.axis = kwargs.get("axis", 0)
+        self._name = kwargs.get("name", "lo_ax_%d" % abs(self.axis))
         self.idx = kwargs.get("idx", None)
         super().__init__()
 
