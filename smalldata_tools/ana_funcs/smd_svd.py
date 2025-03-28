@@ -4,9 +4,15 @@ import glob
 import os
 import numpy as np
 from pathlib import Path
+import logging
+logger = logging.getLogger(__name__)
 
 from smalldata_tools.ana_funcs.svd_waveform import svd_waveform_processing as proc
 from smalldata_tools.common.detector_base import DetObjectFunc
+from smalldata_tools.utilities import printR
+
+from mpi4py import MPI
+rank = MPI.COMM_WORLD.Get_rank()
 
 
 class SvdFit(DetObjectFunc):
@@ -48,7 +54,8 @@ class SvdFit(DetObjectFunc):
         if self.basis_file is None:
             try:
                 # Automatically find the latest waveform basis file in calibDir
-                print("No basis file given, default to latest")
+                if rank == 0:
+                    logger.info("No basis file given, default to latest")
                 exp = det.run.ds.exp
 
                 BASE = os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/")
@@ -56,14 +63,16 @@ class SvdFit(DetObjectFunc):
                 basis_files = basis_files.glob("wave_basis_" + det.det.alias + "*.h5")
                 self.basis_file = max(basis_files, key=os.path.getctime)
             except:
-                print("Unable to find a basis file. Return now")
+                logger.error("Unable to find a basis file. Return now")
                 return
 
         if not os.path.isfile(self.basis_file):
-            print("No basis file found. Exit")
+            if rank == 0:
+                logger.error("No basis file found. Exit")
             return
         else:
-            print("{}: Basis file found at {}".format(self._name, self.basis_file))
+            if rank == 0:
+                logger.info("{}: Basis file found at {}".format(self._name, self.basis_file))
 
         with h5.File(self.basis_file, "r") as f:
             components = f["components"][()]

@@ -4,6 +4,7 @@ import numpy as np
 import logging
 from psana.pscalib.calib.MDBWebUtils import calib_constants
 from smalldata_tools.common.detector_base import DetObjectFunc, Event
+from smalldata_tools.utilities import printR
 from future.utils import iteritems
 from mpi4py import MPI
 
@@ -11,19 +12,17 @@ rank = MPI.COMM_WORLD.Get_rank()
 
 import psana
 
-# from collections import Counter
-
 logger = logging.getLogger(__name__)
 
-
 def DetObject(srcName, run, **kwargs):
-    print("Getting the detector for: ", srcName)
+    if rank == 0:
+        logger.info(f"Getting the detector for: {srcName}")
     det = None
     try:
         det = run.Detector(srcName)
     except:
-        print("failed to make detector for ", srcName)
-        print(run.detnames)
+        if rank == 0:
+            logger.warning("failed to make detector for {srcName} on rank {rank}: {run.detnames}")
         return None
     det.alias = srcName
     detector_classes = {
