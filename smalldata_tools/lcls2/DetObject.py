@@ -14,6 +14,7 @@ import psana
 
 logger = logging.getLogger(__name__)
 
+
 def DetObject(srcName, run, **kwargs):
     if rank == 0:
         logger.info(f"Getting the detector for: {srcName}")
@@ -22,7 +23,9 @@ def DetObject(srcName, run, **kwargs):
         det = run.Detector(srcName)
     except:
         if rank == 0:
-            logger.warning("failed to make detector for {srcName} on rank {rank}: {run.detnames}")
+            logger.warning(
+                "failed to make detector for {srcName} on rank {rank}: {run.detnames}"
+            )
         return None
     det.alias = srcName
     detector_classes = {

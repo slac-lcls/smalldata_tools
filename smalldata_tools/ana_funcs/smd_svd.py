@@ -5,6 +5,7 @@ import os
 import numpy as np
 from pathlib import Path
 import logging
+
 logger = logging.getLogger(__name__)
 
 from smalldata_tools.ana_funcs.svd_waveform import svd_waveform_processing as proc
@@ -12,6 +13,7 @@ from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.utilities import printR
 
 from mpi4py import MPI
+
 rank = MPI.COMM_WORLD.Get_rank()
 
 
@@ -72,7 +74,9 @@ class SvdFit(DetObjectFunc):
             return
         else:
             if rank == 0:
-                logger.info("{}: Basis file found at {}".format(self._name, self.basis_file))
+                logger.info(
+                    "{}: Basis file found at {}".format(self._name, self.basis_file)
+                )
 
         with h5.File(self.basis_file, "r") as f:
             components = f["components"][()]

@@ -3,6 +3,7 @@ import psana
 import numpy as np
 from abc import ABCMeta, abstractmethod
 import logging
+
 logger = logging.getLogger(__name__)
 
 from smalldata_tools.common.detector_base import DefaultDetector_base
@@ -10,6 +11,7 @@ from smalldata_tools.utilities import printR
 
 
 from mpi4py import MPI
+
 rank = MPI.COMM_WORLD.Get_rank()
 
 
