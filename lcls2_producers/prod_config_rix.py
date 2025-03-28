@@ -4,13 +4,20 @@ import numpy as np
 # If no detector in a given category, leave the corresponding
 # list empty.
 detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
-integrating_detectors = []
-# integrating_detectors = ['archon']  # qRIXS
-# integrating_detectors = ['andor_vls', 'andor_dir', 'andor_norm'']  # chemRIXS
-"""
-Comment: the first integrating detector will set the sub-sampling of all
-integrating detectors.
-"""
+
+def get_intg(run):
+    """
+    Comment: the first integrating detector will set the sub-sampling of all
+    integrating detectors.
+    """
+    run = int(run)
+    integrating_detectors = []
+    if run > 0:
+        integrating_detectors = []
+        # integrating_detectors = ['archon']  # qRIXS (typical)
+        # integrating_detectors = ['andor_vls', 'andor_dir', 'andor_norm'']  # chemRIXS (typical)
+    return integrating_detectors
+
 slow_detectors = []  # NOT IMPLEMENTED
 
 
@@ -120,7 +127,6 @@ def get_wf_svd(run):
 
     if run > 0:
         det_kwargs = {}
-        # w8s = ["rix_fim0", "rix_fim1"]
         w8s = ["rix_fim0", "rix_fim1", "crix_w8"]
         for w8 in w8s:
             # one basis file per channel

@@ -6,7 +6,6 @@ import psana
 from smalldata_tools.BaseSmallDataAna_psana import BaseSmallDataAna_psana
 from smalldata_tools.DetObject_lcls2 import DetObject_lcls2
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

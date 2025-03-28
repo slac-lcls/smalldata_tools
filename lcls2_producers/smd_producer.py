@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.DEBUG)
 log_level = "INFO"
 # log_level = DEBUG
-log_format = "[ %(asctime)s | %(levelname)-8s | %(filename)s] %(message)s"
-logging.basicConfig(format=log_format, level=log_level)
-
+log_format = "[ %(asctime)s | %(levelname)-3s | %(filename)s] %(message)s"
+logging.basicConfig(format=log_format)
+logger.setLevel(logging.INFO)  # Set level here instead of in the basic config so other loggers are  not affected
 
 if rank == 0:
     logger.info(f"MPI size: {size}")
@@ -92,9 +92,9 @@ def define_dets(run, det_list):
             hsdsplit = hsdsplitFunc(writeHsd=False)
             if detname in rois_args:
                 for sdetname in rois_args[detname]:
-                    print(f"sdetname {sdetname} args: {rois_args[detname][sdetname]}")
                     funcname = "%s__%s" % (sdetname, "ROI")
-                    print(f"funcname: {funcname}")
+                    if rank == 0:
+                        print(f"sdetname {sdetname} args: {rois_args[detname][sdetname]}, func name: {funcname}")
                     RF = hsdROIFunc(
                         name= funcname,
                         writeArea=True,
@@ -190,7 +190,7 @@ fpath = os.path.dirname(os.path.abspath(__file__))
 fpathup = "/".join(fpath.split("/")[:-1])
 sys.path.append(fpathup)
 if rank == 0:
-    print(fpathup)
+    logger.info(fpathup)
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
@@ -347,15 +347,16 @@ def get_sd_file(write_dir, exp, hutch):
     write_dir = Path(write_dir)
     h5_f_name = write_dir / f"{exp}_Run{run.zfill(4)}.h5"
     if not write_dir.exists():
-        logger.info(f"{write_dir} does not exist, creating directory now.")
-        try:
-            write_dir.mkdir(parents=True)
-        except (PermissionError, FileNotFoundError) as e:
-            logger.error(
-                f"Unable to make directory {write_dir} for output"
-                f"exiting on error: {e}"
-            )
-            sys.exit()
+        if rank == 0:
+            logger.info(f"{write_dir} does not exist, creating directory now.")
+            try:
+                write_dir.mkdir(parents=True)
+            except (PermissionError, FileNotFoundError) as e:
+                logger.error(
+                    f"Unable to make directory {write_dir} for output"
+                    f"exiting on error: {e}"
+                )
+                sys.exit()
     if rank == 0 and not args.psplot_live_mode:
         logger.info("Will write small data file to {0}".format(h5_f_name))
     elif rank == 0 and args.psplot_live_mode:
@@ -409,14 +410,16 @@ if hostname.find("sdf") >= 0:
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
-                print(
-                    f"We have no xtc files for run {run} in {exp} in the FFB system, "
-                    "we will wait for 10 second and check again."
-                )
+                if rank == 0:
+                    print(
+                        f"We have no xtc files for run {run} in {exp} in the FFB system, "
+                        "we will wait for 10 second and check again."
+                    )
                 n_wait += 1
                 time.sleep(10)
         waitFilesEnd = datetime.now()
-        print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+        if rank == 0:
+            print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
 
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if len(xtc_files) == 0:
@@ -435,15 +438,14 @@ if useFFB:
     datasource_args["live"] = True
 
 if rank == 0:
-    print("Opening the data source:")
+    logger.info("Opening the data source:")
 if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-if len(config.integrating_detectors) > 0:
-    datasource_args["intg_det"] = config.integrating_detectors[
-        0
-    ]  # problem if we have more than 1 int det here?
+integrating_detectors = config.get_intg(run)
+if len(integrating_detectors) > 0:
+    datasource_args["intg_det"] = integrating_detectors[0]
     datasource_args["intg_delta_t"] = args.intg_delta_t
     datasource_args["batch_size"] = 1
     os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
@@ -462,20 +464,22 @@ if ds.unique_user_rank():
     print(f"PS_SMD_N_EVENTS={os.environ.get('PS_SMD_N_EVENTS')}")  # defaults to 1000
     print(f"DS batchsize: {ds.batch_size}")
     print("#### END DATASOURCE AND PSANA ENV VAR INFO ####\n")
+    logger.info(f"Unique user rank: {rank}")
 
 thisrun = next(ds.runs())
 
 # Generate smalldata object
 if ds.unique_user_rank():
-    print("Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval))
+    logger.info("Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval))
 if args.psplot_live_mode:
-    logger.info("Setting up psplot_live plots.")
+    if ds.unique_user_rank():
+        logger.info("Setting up psplot_live plots.")
     psplot_configs = config.get_psplot_configs(int(run))
     psplot_callbacks = psplot.PsplotCallbacks()
-    
+
     for key, item in psplot_configs.items():
         callback_func = item.pop("callback")
-        
+
         psplot_callbacks.add_callback(callback_func(**item), name=key)
     small_data = ds.smalldata(
         filename=None, batch_size=args.gather_interval, callbacks=[psplot_callbacks.run]
@@ -483,8 +487,7 @@ if args.psplot_live_mode:
 else:
     small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
 if ds.unique_user_rank():
-    print(f"rank: {rank}")
-    print("smalldata file has been successfully created.")
+    logger.info("smalldata file has been successfully created.")
 
 
 ##########################################################
@@ -535,9 +538,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     dets = []
     int_dets = []
     if not args.default:
-        # print(f"This run: {thisrun}")
         dets = define_dets(int(args.run), config.detectors)
-        int_dets = define_dets(int(args.run), config.integrating_detectors)
+        int_dets = define_dets(int(args.run), integrating_detectors)
     if ds.unique_user_rank():
         logger.info(f"Detectors: {[det._name for det in dets]}")
         logger.info(f"Integrating detectors: {[det._name for det in int_dets]}")
@@ -577,7 +579,7 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         -1
     )  # set this to default until I have a useable rank for printing updates...
     if ds.unique_user_rank():
-        print("And now the event loop user....")
+        logger.info("And now the event loop user....")
 
     normdict = {}
     for det in int_dets:
@@ -600,7 +602,6 @@ for evt_num, evt in enumerate(event_iter):
             det.getData(evt)
             det.processFuncs()
             userDict[det._name] = getUserData(det)
-            # print('userdata ',det)
             try:
                 envData = getUserEnvData(det)
                 if len(envData.keys()) > 0:
@@ -610,7 +611,7 @@ for evt_num, evt in enumerate(event_iter):
             det.processSums()
             # print(userDict[det._name])
         except Exception as e:
-            print(f'Failed analyzing det {det} on evt {evt_num}')
+            logger.warning(f'Failed analyzing det {det} on evt {evt_num}')
             print(e)
             pass
 
@@ -655,7 +656,7 @@ for evt_num, evt in enumerate(event_iter):
 
             try:
                 det.getData(evt)
-                
+
                 if det.evt.dat is None:
                     continue
 
@@ -777,8 +778,6 @@ if not ds.is_srv():
 # are needed here.
 # Hopefully this can be removed soon.
 logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
-if ds.unique_user_rank():
-    print(f"user rank: {rank}")
 
 """
 TO REMOVE IF PROVEN NOT NEEDED
@@ -796,7 +795,7 @@ TO REMOVE IF PROVEN NOT NEEDED
 TO REMOVE IF PROVEN NOT NEEDED
 """
 
-print(f"smalldata.done() on rank {rank}")
+logger.debug(f"smalldata.done() on rank {rank}")
 small_data.done()
 
 
@@ -840,7 +839,7 @@ if rank == h5_rank:
             continue
         data = np.asarray(data)
         dset = h5_for_arch.create_dataset(f"epics_archiver/{pv}", data=data)
-        logger.info(f"Saved {pv} from archiver data.")
+        logger.debug(f"Saved {pv} from archiver data.")
 
 
 end_prod_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")

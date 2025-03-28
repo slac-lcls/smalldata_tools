@@ -64,7 +64,6 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

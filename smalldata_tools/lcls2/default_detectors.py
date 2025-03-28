@@ -2,8 +2,17 @@
 import psana
 import numpy as np
 from abc import ABCMeta, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 from smalldata_tools.common.detector_base import DefaultDetector_base
+from smalldata_tools.utilities import printR
+
+
+from mpi4py import MPI
+
+rank = MPI.COMM_WORLD.Get_rank()
 
 
 class DefaultDetector(DefaultDetector_base, metaclass=ABCMeta):
@@ -213,7 +222,8 @@ class lightStatus(DefaultDetector):
         """
         super().__init__("timing", "lightStatus", run)
         self.destination = destination
-        print(f"Beam destination target: {destination}")
+        if rank == 0:
+            logger.info(f"Beam destination target: {destination}")
         self.laserCodes_drop = [c for c in laser_codes if c > 0]
         self.laserCodes_req = [-c for c in laser_codes if c < 0]
 

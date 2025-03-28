@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import json
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
