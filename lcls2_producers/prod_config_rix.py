@@ -7,16 +7,29 @@ detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
 
 def get_intg(run):
     """
-    Comment: the first integrating detector will set the sub-sampling of all
-    integrating detectors.
+    Returns
+    -------
+    intg_main (str):  This detector ill be passed to the psana datasource. It should be the SLOWEST of
+                all integrating detectors in the data
+    intg_addl (list of str): The detectors in this list will be analyzed as integrating detectors. It is
+                             important that the readout frequency of these detectors is commensurate and
+                             in-phase with intg_main.
     """
     run = int(run)
-    integrating_detectors = []
+    intg_main = None
+    intg_addl = []
     if run > 0:
-        integrating_detectors = []
-        # integrating_detectors = ['archon']  # qRIXS (typical)
-        # integrating_detectors = ['andor_vls', 'andor_dir', 'andor_norm'']  # chemRIXS (typical)
-    return integrating_detectors
+        intg_main = ""
+        intg_addl = []
+
+        # typical qRIXS
+        #intg_main = 'archon'
+        #intg_addl = []
+
+        # typical chemRIXS
+        #intg_main = 'andor_vls'
+        #intg_addl = ['andor_dir', 'andor_norm']
+    return intg_main, intg_addl
 
 slow_detectors = []  # NOT IMPLEMENTED
 

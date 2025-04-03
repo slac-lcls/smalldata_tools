@@ -443,27 +443,28 @@ if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-integrating_detectors = config.get_intg(run)
+intg_main, intg_addl = config.get_intg(run)
 skip_intg = False
-if integrating_detectors is not None:
-    if len(integrating_detectors) > 0:
-        ds = psana.DataSource(**datasource_args)
-        thisrun = next(ds.runs())
-        if not isinstance(thisrun, psana.psexp.null_ds.NullRun):
-            detnames = thisrun.detnames
-            if integrating_detectors[0] not in detnames:
-                skip_intg = True  # skip integrating detector setup
-                if rank == 0:
-                    logger.error("First integrating detector not found in the data.")
-                    logger.error("Skipping integrating detectors.")
-                    logger.error("Please check the integrating detector list in the config.")
-            else:
-                datasource_args["intg_det"] = integrating_detectors[0]
-                datasource_args["intg_delta_t"] = args.intg_delta_t
-                datasource_args["batch_size"] = 1
-                os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
-        ds = None
-        thisrun = None
+
+if intg_main is not None or intg_main != "":
+    ds = psana.DataSource(**datasource_args)
+    thisrun = next(ds.runs())
+    if not isinstance(thisrun, psana.psexp.null_ds.NullRun):
+        detnames = thisrun.detnames
+        if intg_main not in detnames:
+            skip_intg = True  # skip integrating detector setup
+            if rank == 0:
+                logger.error("Main integrating detector not found in the data.")
+                logger.error("Skipping integrating detectors.")
+                logger.error("Please check the integrating detector list in the config.")
+        else:
+            datasource_args["intg_det"] = intg_main
+            datasource_args["intg_delta_t"] = args.intg_delta_t
+            datasource_args["batch_size"] = 1
+            os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
+            integrating_detectors = [intg_main] + intg_addl  # for the detector instantiation
+    ds = None
+    thisrun = None
 
 if args.psplot_live_mode:
     datasource_args["psmon_publish"] = publish
