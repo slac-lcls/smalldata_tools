@@ -329,7 +329,7 @@ def get_xtc_files(base, exp, run):
     data_dir = Path(base) / exp[:3] / exp / "xtc"
     xtc_files = list(data_dir.glob(f"*{run_format}*"))
     if rank == 0:
-        logger.info(f"xtc file list: {xtc_files}")
+        logger.debug(f"xtc file list: {xtc_files}")
     return xtc_files
 
 
@@ -443,12 +443,29 @@ if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-integrating_detectors = config.get_intg(run)
-if len(integrating_detectors) > 0:
-    datasource_args["intg_det"] = integrating_detectors[0]
-    datasource_args["intg_delta_t"] = args.intg_delta_t
-    datasource_args["batch_size"] = 1
-    os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
+intg_main, intg_addl = config.get_intg(run)
+integrating_detectors = []
+skip_intg = False
+
+if intg_main is not None and intg_main != "":
+    ds = psana.DataSource(**datasource_args)
+    thisrun = next(ds.runs())
+    if not isinstance(thisrun, psana.psexp.null_ds.NullRun):
+        detnames = thisrun.detnames
+        if intg_main not in detnames:
+            skip_intg = True  # skip integrating detector setup
+            if rank == 0:
+                logger.error(f"Main integrating detector {intg_main} not found in the data.")
+                logger.error("Skipping integrating detectors.")
+                logger.error("Please check the integrating detector list in the config.")
+        else:
+            datasource_args["intg_det"] = intg_main
+            datasource_args["intg_delta_t"] = args.intg_delta_t
+            datasource_args["batch_size"] = 1
+            os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
+            integrating_detectors = [intg_main] + intg_addl  # for the detector instantiation
+    ds = None
+    thisrun = None
 
 if args.psplot_live_mode:
     datasource_args["psmon_publish"] = publish
@@ -539,7 +556,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     int_dets = []
     if not args.default:
         dets = define_dets(int(args.run), config.detectors)
-        int_dets = define_dets(int(args.run), integrating_detectors)
+        if not skip_intg:
+            int_dets = define_dets(int(args.run), integrating_detectors)
     if ds.unique_user_rank():
         logger.info(f"Detectors: {[det._name for det in dets]}")
         logger.info(f"Integrating detectors: {[det._name for det in int_dets]}")
