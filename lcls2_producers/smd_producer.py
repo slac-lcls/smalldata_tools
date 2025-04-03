@@ -444,9 +444,10 @@ if args.nevents != 0:
 
 # Setup if integrating detectors are requested.
 intg_main, intg_addl = config.get_intg(run)
+integrating_detectors = []
 skip_intg = False
 
-if intg_main is not None or intg_main != "":
+if intg_main is not None and intg_main != "":
     ds = psana.DataSource(**datasource_args)
     thisrun = next(ds.runs())
     if not isinstance(thisrun, psana.psexp.null_ds.NullRun):
@@ -454,7 +455,7 @@ if intg_main is not None or intg_main != "":
         if intg_main not in detnames:
             skip_intg = True  # skip integrating detector setup
             if rank == 0:
-                logger.error("Main integrating detector not found in the data.")
+                logger.error(f"Main integrating detector {intg_main} not found in the data.")
                 logger.error("Skipping integrating detectors.")
                 logger.error("Please check the integrating detector list in the config.")
         else:
