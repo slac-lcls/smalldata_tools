@@ -44,9 +44,9 @@ def getROIs(run):
     ret_dict = {}
     if run > 0:
         roi_dict = {}
-        roi_dict['ROIs'] = [ [[250,500],[250,500]] ]  # can define more than one ROI  
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
+        roi_dict['ROIs'] = [ [[200,500],[300,580]] ] 
+        roi_dict['writeArea'] = False
+        roi_dict['thresADU'] = 2.5 
         ret_dict[roi_detname] = roi_dict
     return ret_dict
 
@@ -58,8 +58,8 @@ def getAzIntParams(run):
 
     ret_dict = {}
     if run > 0:
-        # energy - ; Pt L3 = 11.564 keV                                                           
-        az_dict = {'eBeam': 9.8} # Photon energy in keV                                        
+                                                                   
+        az_dict = {'eBeam': 6} # Photon energy in keV                 
         az_dict['center'] = [-628.983255, -461.137890]# Position in um                
         az_dict['dis_to_sam'] = 60.0 # Position in mm                          
         az_dict['tx'] = 0 #0 # Tilt in x in degrees                                                 
@@ -85,7 +85,7 @@ def isDropped(def_data):
 #               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
 #epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsOncePV = []
-epicsPV = ['las_Counter_Readback_ns', ("SP1L0:DCCM:MMS:TH1.RBV", 'dccm_th1'), ("SP1L0:DCCM:MMS:TH2.RBV", 'dccm_th2'), ("SP1L0:DCCM:MMS:TH1", 'dccm_th1_setpoint'), ("SP1L0:DCCM:MMS:TH2", 'dccm_th2_setpoint')]
+epicsPV = ['las_Counter_Readback_ns', ("SP1L0:DCCM:MMS:TH1.RBV", 'dccm_th1'), ("SP1L0:DCCM:MMS:TH2.RBV", 'dccm_th2'), ("SP1L0:DCCM:MMS:TH1", 'dccm_th1_setpoint'), ("SP1L0:DCCM:MMS:TH2", 'dccm_th2_setpoint'),("SP1L0:DCCM:energy:OphydReadback",'dccm_E'),("SP1L0:DCCM:energy:OphydSetpoint",'dccm_E_setpoint')]
 #fix timetool calibration if necessary
 #ttCalib=[0.,2.,0.]
 ttCalib=[]
@@ -162,10 +162,17 @@ def define_dets(run):
             # Analysis functions
             # ROIs:
             if detname in ROIs:
-                if not isinstance(ROIs[detname], list):
-                    ROIs[detname] = [ ROIs[detname] ]
-                for ROI in ROIs[detname]:
-                    det.addFunc(ROIFunc(**ROI))
+                for iROI,ROI in enumerate(ROIs[detname]['ROIs']):
+                    detROIFunc = ROIFunc(name=f"ROI_{iROI}",
+                                         ROI=ROI,
+                                         writeArea=ROIs[detname]['writeArea'],
+                                         thresADU=ROIs[detname]['thresADU'])
+                #if not isinstance(ROIs[detname], list):
+                #    ROIs[detname] = [ ROIs[detname] ]
+                #for ROI in ROIs[detname]:
+                #    det.addFunc(ROIFunc(**ROI))
+
+                det.addFunc(detROIFunc)
             # Azimuthal binning
             if detname in az:
                 det.addFunc(azimuthalBinning(**az[detname]))
