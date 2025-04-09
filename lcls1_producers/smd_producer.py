@@ -17,113 +17,49 @@ from glob import glob
 from PIL import Image
 from requests.auth import HTTPBasicAuth
 from pathlib import Path
+from importlib import import_module
 
-
-##########################################################
-##
-## User Input start -->
-##
-##########################################################
-##########################################################
-# functions for run dependant parameters
-#
-# See smalldata_producer_template.py for more analysis functions
-##########################################################
-
-# 1) REGIONS OF INTEREST
-def getROIs(run):
-    """ Set parameter for ROI analysis. Set writeArea to True to write the full ROI in the h5 file.
-    See roi_rebin.py for more info
-    """
-    if isinstance(run,str):
-        run=int(run)
-    ret_dict = {}
-    if run>0:
-        roi_dict = {}
-        roi_dict['name'] = 'ROI_0'
-        roi_dict['ROI'] = [[1,2], [157,487], [294,598]]
-        roi_dict['writeArea'] = True
-        roi_dict['thresADU'] = None
-        ret_dict['jungfrau1M_alcove'] = [ roi_dict ]
-    return ret_dict
 
 def isDropped(def_data):
     if def_data['lightStatus']['xray'] == 0: 
         return True
     return False
 
-##########################################################
-# run independent parameters 
-##########################################################
-#aliases for experiment specific PVs go here
-# These lists are either PV names, aliases, or tuples with both.
-#epicsPV = ['gon_h'] 
-#epicsOncePV = [("XPP:GON:MMS:01.RBV", 'MyAlias'), 'gon_v', "XPP:GON:MMS:03.RBV",
-#               "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), 'A:B:C']
-#epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
-epicsOncePV = []
-epicsPV = []
-#fix timetool calibration if necessary
-#ttCalib=[0.,2.,0.]
-ttCalib=[]
-#ttCalib=[1.860828, -0.002950]
-#decide which analog input to save & give them nice names
-#aioParams=[[1],['laser']]
-aioParams=[]
-########################################################## 
-##
-## <-- User Input end
-##
-##########################################################
-
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
 def define_dets(run):
-    detnames = ['jungfrau1M_alcove'] # add detector here
+
+    # Load DetObjectFunc parameters (if defined)
+    # Assumes that the config file with function parameters definition
+    # has been imported under "config"
+
+    rois_args = {}  
+    mectt_args = {}
+    azintpyfai_args = {}
+    drop_args = {}
+    d2p_args = {}
+    detsum_args = {}
+    
+    # Get the functions arguments from the production config
+    if "getROIs" in dir(config):
+        roi_args = config.getROIs(run)
+    if "getmectt" in dir(config):
+        mectt_args = config.get_mectt(run)
+    if "getAzIntParams" in dir(config):
+        azint_args = config.getAzIntParams(run)
+    if "getAzIntPyFAIParams" in dir(config):
+        azintpyfai_args = config.getAzIntPyFAIParams(run)
+    if "get_droplet" in dir(config):
+        drop_args = config.get_droplet(run)
+    if "get_droplet2photon" in dir(config):
+        d2p_args = config.get_droplet2photon(run)
+    if "getDetSums" in dir(config):
+        detsum_args = config.getDetSums(run)
+
+    detnames = config.detnames
+                    
     dets = []
     
-    # Load DetObjectFunc parameters (if defined)
-    try:
-        ROIs = getROIs(run)
-    except Exception as e:
-        print(f'Can\'t instantiate ROI args: {e}')
-        ROIs = []
-    try:
-        az = getAzIntParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate azimuthalBinning args: {e}')
-        az = []
-    try:
-        az_pyfai = getAzIntPyFAIParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate AzIntPyFAI args: {e}')
-        az_pyfai = []
-    try:
-        phot = getPhotonParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate Photon args: {e}')
-        phot = []
-    try:
-        drop = getDropletParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate Droplet args: {e}')
-        drop = []
-    try:
-        drop2phot = getDroplet2Photons(run)
-    except Exception as e:
-        print(f'Can\'t instantiate Droplet2Photons args: {e}')
-        drop2phot = []
-    try:
-        auto = getAutocorrParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate Autocorrelation args: {e}')
-        auto = []
-    try:
-        svd = getSvdParams(run)
-    except Exception as e:
-        print(f'Can\'t instantiate SVD args: {e}')
-        svd = []
-        
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
@@ -138,55 +74,58 @@ def define_dets(run):
             
             # Analysis functions
             # ROIs:
-            if detname in ROIs:
-                if not isinstance(ROIs[detname], list):
-                    ROIs[detname] = [ ROIs[detname] ]
-                for ROI in ROIs[detname]:
-                    det.addFunc(ROIFunc(**ROI))
+            if detname in roi_args:
+                for ROI in roi_args[detname]:
+                    pjs = ROI.pop('pj',[])
+                    rfunc = ROIFunc(**ROI)
+                    for pj in pjs:
+                        rfunc.addFunc(projectionFunc(**pj))
+                    det.addFunc(rfunc)
             # Azimuthal binning
-            if detname in az:
-                det.addFunc(azimuthalBinning(**az[detname]))
-            if detname in az_pyfai:
-                det.addFunc(azav_pyfai(**az_pyfai[detname]))
-            # Photon count
-            if detname in phot:
-                det.addFunc(photonFunc(**phot[detname]))
+            if detname in azint_args:
+                for azint in azint_args[detname]:
+                    det.addFunc(azimuthalBinning(**azint))
+            # Azimuthal binning - PyFAI
+            if detname in azintpyfai_args:
+                for az_pyfai in azintpyfai_args[detname]:
+                    det.addFunc(azav_pyfai(**az_pyfai))
             # Droplet algo
-            if detname in drop:
-                if 'nData' in drop[detname]:
-                    nData = drop[detname].pop('nData')
-                else:
-                    nData = None
-                func = dropletFunc(**drop[detname])
-                func.addFunc(sparsifyFunc(nData=nData))
-                det.addFunc(func)
+            if detname in drop_args:
+                for tdrop in drop_args[detname]:
+                    if 'nData' in tdrop:
+                        nData = tdrop.pop('nData')
+                    else:
+                        nData = None
+                    func = dropletFunc(**tdrop)
+                    func.addFunc(sparsifyFunc(nData=nData))
+                    det.addFunc(func)
             # Droplet to photons
-            if detname in drop2phot:
-                if 'nData' in drop2phot[detname]:
-                    nData = drop2phot[detname].pop('nData')
-                else:
-                    nData = None
-                # getp droplet dict
-                droplet_dict = drop2phot[detname]['droplet']
-                #get droplet2Photon dict
-                d2p_dict = drop2phot[detname]['d2p']
-                dropfunc = dropletFunc(**droplet_dict)
-                drop2phot = droplet2Photons(**d2p_dict)
-                sparsify = sparsifyFunc(nData=nData)
-                drop2phot.addFunc(sparsify)
-                dropfunc.addFunc(drop2phot)
-                det.addFunc(dropfunc)
-            # Autocorrelation
-            if detname in auto:
-                det.addFunc(Autocorrelation(**auto[detname]))
-            # SVD waveform analysis
-            if detname in svd:
-                det.addFunc(svdFit(**svd[detname]))
+            if detname in d2p_args:
+                for td2p in d2p_args[detname]:
+                    if 'nData' in td2p:
+                        nData = td2p.pop('nData')
+                    else:
+                        nData = None
+                    # getp droplet dict
+                    droplet_dict = td2p['droplet']
+                    #get droplet2Photon dict
+                    d2p_dict = td2p['d2p']
+                    dropfunc = dropletFunc(**droplet_dict)
+                    drop2phot = droplet2Photons(**d2p_dict)
+                    sparsify = sparsifyFunc(nData=nData)
+                    drop2phot.addFunc(sparsify)
+                    dropfunc.addFunc(drop2phot)
+                    det.addFunc(dropfunc)
+            # MEC timetoolAzimuthal binning
+            if detname in mectt_args:
+                for ttt in mectt_args[detname]:
+                    print('make mectt func ')
+                    det.addFunc(mecttFunc(**ttt))
+            # summed images
+            if detname in detsum_args:
+                for thissum in detsum_args[detname]:
+                    det.storeSum(sumAlgo=thissum)
 
-            det.storeSum(sumAlgo='calib')
-            det.storeSum(sumAlgo='calib_dropped')
-            det.storeSum(sumAlgo='calib_dropped_square')
-            #det.storeSum(sumAlgo='calib_img')
             dets.append(det)
     return dets
 
@@ -231,6 +170,7 @@ from smalldata_tools.lcls1.default_detectors import xtcavDetector
 from smalldata_tools.lcls1.hutch_default import defaultDetectors
 from smalldata_tools.lcls1.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, spectrumFunc, projectionFunc, imageFunc
+from smalldata_tools.ana_funcs.mecttFunc import mecttFunc
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc
 from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
@@ -340,6 +280,10 @@ parser.add_argument("--noarch",
 parser.add_argument("--ttRaw",
                     help="add timetool projections",
                     action='store_true')
+parser.add_argument("--config",
+                    help="special configuration")
+parser.add_argument("--outfilename",
+                    help="special output filename")
 args = parser.parse_args()
 logger.debug('Args to be used for small data run: {0}'.format(args))
 
@@ -367,7 +311,11 @@ def get_sd_file(write_dir, exp, hutch):
     logger.debug(f'hdf5 directory: {write_dir}')
 
     write_dir = Path(write_dir)
-    h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
+    if args.outfilename is not None:
+        h5_f_name = write_dir / f'{args.outfilename}.h5'
+    else:
+        h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
+    
     if not write_dir.exists():
         logger.info(f'{write_dir} does not exist, creating directory now.')
         try:
@@ -396,6 +344,19 @@ hutch = exp[:3].upper()
 if hutch not in HUTCHES:
 	logger.debug('Could not find {0} in list of available hutches'.format(hutch))
 	sys.exit()	
+
+if args.config is None:
+    prod_cfg = f"prod_config_{hutch.lower()}"
+else:
+    prod_cfg = args.config
+if prod_cfg.find('/')>=0:
+    cfg = prod_cfg.split('/')[-1]
+    cfgdir = prod_cfg.replace(cfg,'')
+    sys.path.append(cfgdir)
+    prod_cfg = cfg
+#if ds.rank == 0:
+logger.info(f"Producer cfg file: <{prod_cfg}>.")
+config = import_module(prod_cfg)
 
 # Figure out where we are and where to look for data
 xtc_files = []
@@ -513,8 +474,8 @@ if args.ttRaw:
 # add stuff here to save all EPICS PVs.
 #
 # is someone has provided a list, save in epicsUser
-if len(epicsPV)>0:
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
+if len(config.epicsPV)>0:
+    default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser'))
 # make a list of all PVs in data
 logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
 if args.experiment.find('dia')>=0:
@@ -525,7 +486,7 @@ if (args.full or args.epicsAll) and len(epicsPVlist)>0:
     logger.debug('adding all epicsPVs....')
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 #save specified list of PVs once/run, not nothing has been passed, save all.
-if len(epicsOncePV)>0:
+if len(config.epicsOncePV)>0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
 elif len(epicsPVlist)>0:
     EODet = epicsDetector(PVlist=epicsPVlist, name='epicsOnce')
@@ -601,7 +562,9 @@ if args.full or args.fullSum:
                 thisDet.addFunc(fullROI)
             if args.fullSum:
                 thisDet.storeSum(sumAlgo='calib_dropped')
-                thisDet.storeSum(sumAlgo='calib_dropped_square')
+                #thisDet.storeSum(sumAlgo='calib_dropped_square')
+                thisDet.storeSum(sumAlgo='calib_thresADU1')
+                thisDet.storeSum(sumAlgo='calib_max')
 
             dets.append(thisDet)
         except:
@@ -611,9 +574,9 @@ if args.full or args.fullSum:
 # save detector config data
 userDataCfg={}
 for det in default_dets:
-    if det.name=='tt' and len(ttCalib)>0:
-        det.setPars(ttCalib)
-        logger.info(f'Using user-defined tt parameters: {ttCalib}')
+    if det.name=='tt' and len(config.ttCalib)>0:
+        det.setPars(config.ttCalib)
+        logger.info(f'Using user-defined tt parameters: {config.ttCalib}')
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     try:
