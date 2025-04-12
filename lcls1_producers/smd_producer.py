@@ -19,6 +19,20 @@ from requests.auth import HTTPBasicAuth
 from pathlib import Path
 from importlib import import_module
 
+import warnings
+import tables
+warnings.filterwarnings("ignore", category=tables.NaturalNameWarning)
+
+from mpi4py import MPI
+
+COMM = MPI.COMM_WORLD
+rank = MPI.COMM_WORLD.Get_rank()
+size = MPI.COMM_WORLD.Get_size()
+
+logger = logging.getLogger(__name__)
+log_format = "[ %(asctime)s | %(levelname)-3s | %(filename)s] %(message)s"
+logging.basicConfig(format=log_format)
+logger.setLevel(logging.INFO)  # Set level here instead of in the basic config so other loggers are  not affected
 
 def isDropped(def_data):
     if def_data['lightStatus']['xray'] == 0: 
@@ -35,6 +49,7 @@ def define_dets(run):
 
     rois_args = {}  
     mectt_args = {}
+    azint_args = {}
     azintpyfai_args = {}
     drop_args = {}
     d2p_args = {}
@@ -119,7 +134,7 @@ def define_dets(run):
             # MEC timetoolAzimuthal binning
             if detname in mectt_args:
                 for ttt in mectt_args[detname]:
-                    print('make mectt func ')
+                    logger.info('make mectt func ')
                     det.addFunc(mecttFunc(**ttt))
             # summed images
             if detname in detsum_args:
@@ -157,7 +172,7 @@ sys.excepthook = global_except_hook
 fpath=os.path.dirname(os.path.abspath(__file__))
 fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
-print(f'\n{fpathup}')
+logger.info(f'\n{fpathup}')
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.common.detector_base import getUserData, getUserEnvData
@@ -181,10 +196,6 @@ from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 # from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
-#logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Constants
 HUTCHES = [
     'AMO',
@@ -202,7 +213,8 @@ FFB_BASE = Path('/cds/data/drpsrcf/')
 PSANA_BASE = Path('/cds/data/psdm/')
 PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
 SD_EXT = Path('./hdf5/smalldata/')
-logger.info(f"PSDM_BASE={PSDM_BASE}")
+if rank == 0:
+    logger.info(f"PSDM_BASE={PSDM_BASE}")
 
 # Define Args
 parser = argparse.ArgumentParser()
@@ -294,7 +306,8 @@ def get_xtc_files(base, exp, run):
     run_format = ''.join(['r', run.zfill(4)])
     data_dir = Path(base) / exp[:3] / exp / 'xtc'
     xtc_files = list(data_dir.glob(f'*{run_format}*'))
-    logger.info(f'xtc file list: {xtc_files}')
+    if rank == 0:
+        logger.info(f'xtc file list: {xtc_files}')
     return xtc_files
 
 def get_sd_file(write_dir, exp, hutch):
@@ -307,7 +320,7 @@ def get_sd_file(write_dir, exp, hutch):
         elif onS3DF: # S3DF should now be the default
             write_dir = S3DF_BASE / hutch.lower() / exp / SD_EXT
         else:
-            print('get_sd_file problem. Please fix.')
+            logger.error('get_sd_file problem. Please fix.')
     logger.debug(f'hdf5 directory: {write_dir}')
 
     write_dir = Path(write_dir)
@@ -317,14 +330,16 @@ def get_sd_file(write_dir, exp, hutch):
         h5_f_name = write_dir / f'{exp}_Run{run.zfill(4)}.h5'
     
     if not write_dir.exists():
-        logger.info(f'{write_dir} does not exist, creating directory now.')
+        if rank == 0:
+            logger.info(f'{write_dir} does not exist, creating directory now.')
         try:
             write_dir.mkdir(parents=True)
         except (PermissionError, FileNotFoundError) as e:
             logger.info(f'Unable to make directory {write_dir} for output' \
                         f'exiting on error: {e}')
             sys.exit()
-    logger.info('Will write small data file to {0}'.format(h5_f_name))
+    if rank == 0:
+        logger.info('Will write small data file to {0}'.format(h5_f_name))
     return h5_f_name
 
 ##### START SCRIPT ########
@@ -354,8 +369,8 @@ if prod_cfg.find('/')>=0:
     cfgdir = prod_cfg.replace(cfg,'')
     sys.path.append(cfgdir)
     prod_cfg = cfg
-#if ds.rank == 0:
-logger.info(f"Producer cfg file: <{prod_cfg}>.")
+if rank == 0:
+    logger.info(f"Producer cfg file: <{prod_cfg}>.")
 config = import_module(prod_cfg)
 
 # Figure out where we are and where to look for data
@@ -380,12 +395,14 @@ if hostname.find('sdf')>=0:
             xtc_files = get_xtc_files(PSDM_BASE, exp, run)
             nFiles = len(xtc_files)
             if nFiles == 0:
-                print(f"We have no xtc files for run {run} in {exp} in the FFB system, " \
-                      "we will wait for 10 second and check again.")
+                if rank == 0 :
+                    logger.info(f"We have no xtc files for run {run} in {exp} in the FFB system, " \
+                          "we will wait for 10 second and check again.")
                 n_wait+=1
                 time.sleep(10)
         waitFilesEnd = datetime.now()
-        print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+        if rank == 0:
+            logger.info(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
 
     xtc_files = get_xtc_files(PSDM_BASE, exp, run)
     if len(xtc_files)==0:
@@ -400,15 +417,18 @@ elif hostname.find('drp')>=0:
         nFiles = len(xtc_files)
         if nFiles == 0:
             if not args.wait:
-                print("We have no xtc files for run %s in %s in the FFB system,"\
-                      "Quitting now.")
+                if rank == 0:
+                    logger.error("We have no xtc files for run %s in %s in the FFB system,"\
+                          "Quitting now.")
                 sys.exit()
             else:
-                print("We have no xtc files for run %s in %s in the FFB system," \
-                      "we will wait for 10 second and check again."%(run,exp))
+                if rank == 0:
+                    logger.info("We have no xtc files for run %s in %s in the FFB system," \
+                          "we will wait for 10 second and check again."%(run,exp))
                 time.sleep(10)
     waitFilesEnd = datetime.now()
-    print('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
+    if rank == 0:
+        logger.info('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
     useFFB = True
 
 # If not a current experiment or files in ffb, look in psdm
@@ -416,7 +436,7 @@ else:
     logger.debug('Not on FFB or S3DF, use old offline system')
     xtc_files = get_xtc_files(PSDM_BASE, hutch, run)
     if len(xtc_files)==0:
-        print('We have no xtc files for run %s in %s in the offline system'%(run,exp))
+        logger.error('We have no xtc files for run %s in %s in the offline system'%(run,exp))
         sys.exit()
 
 # Get output file, check if we can write to it
@@ -474,21 +494,21 @@ if args.ttRaw:
 # add stuff here to save all EPICS PVs.
 #
 # is someone has provided a list, save in epicsUser
-if len(config.epicsPV)>0:
+if len(config.epicsPV) > 0:
     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser'))
 # make a list of all PVs in data
 logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
-if args.experiment.find('dia')>=0:
-    epicsPVlist=ds.env().epicsStore().pvNames()
+if args.experiment.find('dia') >= 0:
+    epicsPVlist = ds.env().epicsStore().pvNames()
 else:
-    epicsPVlist=ds.env().epicsStore().aliases()
+    epicsPVlist = ds.env().epicsStore().aliases()
 if (args.full or args.epicsAll) and len(epicsPVlist)>0:
     logger.debug('adding all epicsPVs....')
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
 #save specified list of PVs once/run, not nothing has been passed, save all.
-if len(config.epicsOncePV)>0:
+if len(config.epicsOncePV) > 0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
-elif len(epicsPVlist)>0:
+elif len(epicsPVlist) > 0:
     EODet = epicsDetector(PVlist=epicsPVlist, name='epicsOnce')
 else:
     EODet = None
@@ -576,7 +596,8 @@ userDataCfg={}
 for det in default_dets:
     if det.name=='tt' and len(config.ttCalib)>0:
         det.setPars(config.ttCalib)
-        logger.info(f'Using user-defined tt parameters: {config.ttCalib}')
+        if rank == 0:
+            logger.info(f'Using user-defined tt parameters: {config.ttCalib}')
     userDataCfg[det.name] = det.params_as_dict()
 for det in dets:
     try:
@@ -696,6 +717,9 @@ for det in dets:
 if len(sumDict['Sums'].keys())>0:
 #     print(sumDict)
     small_data.save(sumDict)
+
+small_data.close()
+COMM.Barrier()
 
 # Print duration summary
 dets_time_start = (start_setup_dets-start_job)/60
