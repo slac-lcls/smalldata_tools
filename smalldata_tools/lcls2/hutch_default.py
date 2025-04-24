@@ -85,7 +85,7 @@ def uedDetectors(run, beamCodes=[[162], [91]]):
     return dets
 
 
-def mfxDetectors(run, beamCodes=[[-137], [-40]]):
+def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
