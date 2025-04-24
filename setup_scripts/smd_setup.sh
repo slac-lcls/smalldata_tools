@@ -100,8 +100,8 @@ mkdir -p $SDF_BASE/hdf5/smalldata/cube
 mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
-LCLS1_HUTCHES=("xpp" "xcs" "mfx" "cxi" "mec")
-LCLS2_HUTCHES=("tmo" "txi" "rix" "ued")
+LCLS1_HUTCHES=("xpp" "xcs" "cxi" "mec")
+LCLS2_HUTCHES=("tmo" "txi" "rix" "ued" "mfx")
 
 if [ $QUEUE != "0" ]; then
     if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then

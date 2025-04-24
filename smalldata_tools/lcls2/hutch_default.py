@@ -30,6 +30,8 @@ def defaultDetectors(hutch, run=None, env=None):
         dets = rixDetectors(run)
     elif hutch.lower() == "ued":
         dets = uedDetectors(run)
+    elif hutch.lower() == "mfx":
+        dets = mfxDetectors(run)
     else:
         dets = []
     detsInRun = [det for det in dets if det.in_run()]
@@ -80,4 +82,20 @@ def uedDetectors(run, beamCodes=[[162], [91]]):
     dets.append(genericDetector("timing", run))
     # dets.append(lightStatus(beamCodes, run))
     dets.append(epicsDetector(PVlist=["MOTR_AS01_MC06_CH6"], run=run))
+    return dets
+
+
+def mfxDetectors(run, beamCodes=[[-137], [-40]]):
+    dets = []
+    dets.append(scanDetector("scan", run))
+    dets.append(genericDetector("timing", run))
+    dets.append(genericDetector("MfxD1BmMon", run))
+    dets.append(genericDetector("MfxDg2BmMon", run))
+    dets.append(genericDetector("ebeamh", run))
+    dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("gasdet", run))
+    dets.append(genericDetector("feespec", run))
+    dets.append(ttDetector("alvium_tt", run, saveTraces=False, iocTimetool=True))
+    dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
+    dets.append(epicsDetector(PVlist=["lxt", "txt"], run=run))
     return dets
