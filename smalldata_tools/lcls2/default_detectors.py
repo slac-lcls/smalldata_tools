@@ -97,10 +97,11 @@ class genericDetector(DefaultDetector):
     veto fields.
     """
 
-    def __init__(self, detname, run=None, name=None):
+    def __init__(self, detname, run=None, name=None, var_fields=None):
         if name is None:
             name = detname
         super().__init__(detname, name, run)
+        self._var_fields = var_fields
         if self.in_run():
             self._data_field, self._sub_fields = self.get_fields("raw")
 
@@ -108,12 +109,16 @@ class genericDetector(DefaultDetector):
         dl = {}
         if self._data_field is not None:
             for field in self._sub_fields:
+                if self._var_fields is not None and field in self._var_fields:
+                    field_name = f"var_{field}"
+                else:
+                    field_name = field
                 dat = getattr(self._data_field, field)(evt)
                 if dat is None:
                     continue
-                dl[field] = dat
-                if isinstance(dl[field], list):
-                    dl[field] = np.array(dl[field])
+                dl[field_name] = dat
+                if isinstance(dl[field_name], list):
+                    dl[field_name] = np.array(dl[field_name])
         return dl
 
 

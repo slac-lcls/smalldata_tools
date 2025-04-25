@@ -94,8 +94,12 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     dets.append(genericDetector("ebeamh", run))
     dets.append(genericDetector("pcav", run))
     dets.append(genericDetector("gasdet", run))
-    dets.append(genericDetector("feespec", run))
+    # hproj can also be variable for feespec but in practice isn't...
+    dets.append(
+        genericDetector("feespec", run, var_fields=["FWHM", "peakPos", "peakHeight"])
+    )
     dets.append(ttDetector("alvium_tt", run, saveTraces=False, iocTimetool=True))
+    # dets.append(lightStatus(beam_destination, laser_codes, run))
     dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
     dets.append(epicsDetector(PVlist=["lxt", "txt"], run=run))
     return dets
