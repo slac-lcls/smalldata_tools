@@ -4,7 +4,7 @@ import numpy as np
 import logging
 from psana.pscalib.calib.MDBWebUtils import calib_constants
 from smalldata_tools.common.detector_base import DetObjectFunc, Event
-from smalldata_tools.utilities import printR
+from smalldata_tools.utilities import cm_epix
 from future.utils import iteritems
 from mpi4py import MPI
 
@@ -29,6 +29,7 @@ def DetObject(srcName, run, **kwargs):
         return None
     det.alias = srcName
     detector_classes = {
+        "epix100": Epix100Object,
         "epix10ka": Epix10kObject,
         "opal": OpalObject,
         "hsd": HsdObject,
@@ -84,6 +85,7 @@ class DetObjectClass(object):
                 if (
                     key[0] != "_"
                     and isinstance(getattr(self, key), list)
+                    and getattr(self, key)  # Check for empty list
                     and isinstance(getattr(self, key)[0], (str, int, float, np.ndarray))
                 )
             }
@@ -322,6 +324,114 @@ class TiledCameraObject(CameraObject):
 
     def getData(self, evt):
         super(TiledCameraObject, self).getData(evt)
+
+
+class Epix100Object(TiledCameraObject):
+    def __init__(self, det, run, **kwargs):
+        super().__init__(det, run, **kwargs)
+        self._common_mode_list = [
+            6,
+            36,
+            4,
+            34,
+            45,
+            46,
+            47,
+            0,
+            -1,
+            30,
+        ]  # Jacob (norm), Jacob, def, def(ami-like), mine, mine (norm), mine (norm-bank), none, raw, calib
+        self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
+        if self.common_mode not in self._common_mode_list:
+            print(
+                "Common mode %d is not an option for as Epix detector, please choose from: "
+                % self.common_mode,
+                self._common_mode_list,
+            )
+        self.pixelsize = [50e-6]
+        self.areas = None
+
+        if self.rms is None or self.rms.shape != self.ped.shape:
+            self.rms = np.ones_like(self.ped)
+        try:
+            # ok, this call does NOT work (yet) for LCLS2. Needs an event...
+            # self.imgShape=det.raw.image(run.runnum, self.ped[0]).shape
+            self.imgShape = (self.ix.max(), self.iy.max())
+        except:
+            if len(self.ped[0].squeeze().shape) == 2:
+                self.imgShape = self.ped[0].squeeze().shape
+            else:
+                self.imgShape = None
+
+        self.bankMasks = []
+        if self.common_mode == 47:
+            for i in range(0, 16):
+                bmask = np.zeros_like(self.rms)
+                bmask[
+                    (i % 2) * 352 : (i % 2 + 1) * 352,
+                    768 / 8 * (i / 2) : 768 / 8 * (i / 2 + 1),
+                ] = 1
+                self.bankMasks.append(bmask.astype(bool))
+
+    def getData(self, evt):
+        super().getData(evt)
+        mbits = 0  # do not apply mask (would set pixels to zero)
+        # mbits=1 #set bad pixels to 0
+
+        # Common Mode currently NOT working for ePix100
+        # Skip all options that pass cmpars
+        if self.common_mode % 100 == 6:
+            # Was using cmpars=[6] -> This doesn't work for psana2
+            # Some of these other kwargs may not do anything
+            # self.evt.dat = self.det.raw.calib(
+            #    evt, cmpars=(0,6,100,10), mbits=mbits, rms=self.rms, normAll=True
+            # )
+            self.evt.dat = self.det.raw.calib(
+                evt, mbits=mbits, rms=self.rms, normAll=True
+            )
+        elif self.common_mode % 100 == 36:
+            # self.evt.dat = self.det.raw.calib(evt, cmpars=[6], mbits=mbits, rms=self.rms)
+            self.evt.dat = self.det.raw.calib(evt, mbits=mbits, rms=self.rms)
+        elif self.common_mode % 100 == 34:
+            # self.evt.dat = self.det.raw.calib(evt, cmpars=(4, 6, 100, 100), mbits=mbits)
+            self.evt.dat = self.det.raw.calib(evt, mbits=mbits)
+        elif self.common_mode % 100 == 4:
+            # self.evt.dat = self.det.raw.calib(evt, cmpars=(4, 6, 30, 10), mbits=mbits)
+            self.evt.dat = self.det.raw.calib(evt, mbits=mbits)
+        elif self.common_mode % 100 == 45:
+            self.evt.dat = self.det.raw.raw(evt) - self.ped
+            self.evt.dat = cm_epix(self.evt.dat, self.rms, mask=self.statusMask)
+        elif self.common_mode % 100 == 46:
+            self.evt.dat = self.det.raw.raw(evt) - self.ped
+            self.evt.dat = cm_epix(
+                self.evt.dat, self.rms, normAll=True, mask=self.statusMask
+            )
+        elif self.common_mode % 100 == 47:
+            self.evt.dat = self.det.raw_data(evt) - self.ped
+            for _, bMask in enumerate(self.bankMasks):
+                self.evt.dat[bMask] -= np.median(self.evt.dat[bMask])
+            self.evt.dat = cm_epix(self.evt.dat, self.rms, mask=self.statusMask)
+
+        # override gain if desired
+        if (
+            self.local_gain is not None
+            and self.local_gain.shape == self.evt.dat.shape
+            and self.common_mode in [6, 36, 34, 3, 4, 45, 46, 47]
+        ):
+            self.evt.dat *= self.local_gain  # apply own gain
+        elif (
+            self.local_gain is None
+            and self.gain is not None
+            and self.gain.shape == self.evt.dat.shape
+            and self.common_mode in [45, 46, 47]
+        ):
+            self.evt.dat *= self.gain  # apply gain after own common mode correction
+
+        # correct for area of pixels.
+        if self.areas is not None:
+            self.evt.dat /= self.areas
 
 
 class Epix10kObject(TiledCameraObject):
