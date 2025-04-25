@@ -402,6 +402,7 @@ class Epix10kObject(TiledCameraObject):
         ):
             self.evt.dat *= self.local_gain  # apply own gain
 
+
 class JungfrauObject(TiledCameraObject):
     def __init__(self, det, run, **kwargs):
         super().__init__(det, run, **kwargs)
@@ -460,9 +461,9 @@ class JungfrauObject(TiledCameraObject):
             self.evt.dat *= self.local_gain  # apply own gain
 
         # correct for area of pixels.
-        #if self.areas is not None:
+        # if self.areas is not None:
         #    self.evt.dat /= self.areas
-        #self._getRawShape()
+        # self._getRawShape()
 
 
 class PVObject(CameraObject):
