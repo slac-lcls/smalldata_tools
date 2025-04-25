@@ -36,6 +36,7 @@ def DetObject(srcName, run, **kwargs):
         "pv": PVObject,
         "piranha4": PiranhaObject,
         "archon": ArchonObject,
+        "jungfrau": JungfrauObject,
     }
     cls = detector_classes[det._dettype]
     return cls(det, run, **kwargs)
@@ -400,6 +401,68 @@ class Epix10kObject(TiledCameraObject):
             and self.common_mode in [1, 5, 55, 10]
         ):
             self.evt.dat *= self.local_gain  # apply own gain
+
+class JungfrauObject(TiledCameraObject):
+    def __init__(self, det, run, **kwargs):
+        super().__init__(det, run, **kwargs)
+        self._common_mode_list = [
+            0,
+            7,
+            71,
+            72,
+            -1,
+            30,
+        ]  # none, epix-style corr on row*col, row, col, raw, calib
+        self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
+        if self.common_mode not in self._common_mode_list:
+            print(
+                "Common mode %d is not an option for Jungfrau, please choose from: "
+                % self.common_mode,
+                self._common_mode_list,
+            )
+        self.pixelsize = [75e-6]
+        self.isGainswitching = True
+
+        try:
+            self.imgShape = self.det.raw.image(run, self.ped[0]).shape
+        except:
+            pass
+        self._gainSwitching = True
+        # self._common_mode_list.append()
+
+    def getData(self, evt):
+        super(JungfrauObject, self).getData(evt)
+        mbits = 0  # do not apply mask (would set pixels to zero)
+        # mbits=1 #set bad pixels to 0
+        if self.common_mode == 0:
+            self.evt.dat = self.det.raw.calib(evt, cmpars=(7, 0, 10), mbits=mbits)
+        elif self.common_mode % 100 == 71:
+            self.evt.dat = self.det.raw.calib(
+                evt, cmpars=(7, 1, 10, 10), mbits=mbits
+            )  # correction in rows
+        elif self.common_mode % 100 == 72:
+            self.evt.dat = self.det.raw.calib(
+                evt, cmpars=(7, 2, 10, 10), mbits=mbits
+            )  # correction in columns
+        elif self.common_mode % 100 == 7:
+            self.evt.dat = self.det.raw.calib(
+                evt, cmpars=(7, 3, 10, 10), mbits=mbits
+            )  # correction in rows&columns
+
+        # override gain if desired
+        if (
+            self.local_gain is not None
+            and self.local_gain.shape == self.evt.dat.shape
+            and self.common_mode in [7, 71, 72, 0]
+        ):
+            self.evt.dat *= self.local_gain  # apply own gain
+
+        # correct for area of pixels.
+        #if self.areas is not None:
+        #    self.evt.dat /= self.areas
+        #self._getRawShape()
 
 
 class PVObject(CameraObject):
