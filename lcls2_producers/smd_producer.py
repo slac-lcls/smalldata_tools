@@ -30,7 +30,9 @@ log_level = "INFO"
 # log_level = DEBUG
 log_format = "[ %(asctime)s | %(levelname)-3s | %(filename)s] %(message)s"
 logging.basicConfig(format=log_format)
-logger.setLevel(logging.INFO)  # Set level here instead of in the basic config so other loggers are  not affected
+logger.setLevel(
+    logging.INFO
+)  # Set level here instead of in the basic config so other loggers are  not affected
 
 if rank == 0:
     logger.info(f"MPI size: {size}")
@@ -94,9 +96,11 @@ def define_dets(run, det_list):
                 for sdetname in rois_args[detname]:
                     funcname = "%s__%s" % (sdetname, "ROI")
                     if rank == 0:
-                        print(f"sdetname {sdetname} args: {rois_args[detname][sdetname]}, func name: {funcname}")
+                        print(
+                            f"sdetname {sdetname} args: {rois_args[detname][sdetname]}, func name: {funcname}"
+                        )
                     RF = hsdROIFunc(
-                        name= funcname,
+                        name=funcname,
                         writeArea=True,
                         ROI=rois_args[detname][sdetname],
                     )
@@ -123,21 +127,21 @@ def define_dets(run, det_list):
                 print(f"\n\nSETTING UP DROPLET TO PHOTON FOR {det._name}")
                 print(json.dumps(d2p_args[detname], indent=4))
                 print("\n")
-            if 'nData' in d2p_args[detname]:  # defines how sparsifcation is saved
-                nData = d2p_args[detname].pop('nData')
+            if "nData" in d2p_args[detname]:  # defines how sparsifcation is saved
+                nData = d2p_args[detname].pop("nData")
             else:
                 nData = None
-            if 'get_photon_img' in d2p_args[detname]:  # save unsparsified image or not
-                unsparsify = d2p_args[detname].pop('get_photon_img')
+            if "get_photon_img" in d2p_args[detname]:  # save unsparsified image or not
+                unsparsify = d2p_args[detname].pop("get_photon_img")
             else:
                 unsparsify = False
 
             # Make individual analysis functions
             # (i) droplet
-            droplet_dict = d2p_args[detname]['droplet']
+            droplet_dict = d2p_args[detname]["droplet"]
             dropfunc = dropletFunc(**droplet_dict)
             # (ii) droplet2Photon
-            d2p_dict = d2p_args[detname]['d2p']
+            d2p_dict = d2p_args[detname]["d2p"]
             drop2phot_func = droplet2Photons(**d2p_dict)
             # (iii) sparsify
             sparsify = sparsifyFunc(nData=nData)
@@ -165,11 +169,15 @@ def define_dets(run, det_list):
             det.addFunc(SimpleHitFinder(**wfs_hitfinder_args[detname]))
 
         if detname in wfs_svd_args:
-            if isinstance(wfs_svd_args[detname], list):  # handle mutliple channel on the same det
+            if isinstance(
+                wfs_svd_args[detname], list
+            ):  # handle mutliple channel on the same det
                 for i_ch, ch in enumerate(wfs_svd_args[detname]):
                     # Check that the basis file exists, skip instantiation if not
                     if not os.path.isfile(ch["basis_file"]):
-                        logger.info(f"SVD basis file for {detname} ch{i_ch} cannot be found. Will not instantiate SvdFit for it.")
+                        logger.info(
+                            f"SVD basis file for {detname} ch{i_ch} cannot be found. Will not instantiate SvdFit for it."
+                        )
                         continue
                     this_func = SvdFit(**ch)
                     det.addFunc(this_func)
@@ -194,7 +202,11 @@ if rank == 0:
 
 from smalldata_tools.utilities import printMsg, checkDet
 from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
-from smalldata_tools.lcls2.default_detectors import detOnceData, epicsDetector, genericDetector
+from smalldata_tools.lcls2.default_detectors import (
+    detOnceData,
+    epicsDetector,
+    genericDetector,
+)
 from smalldata_tools.lcls2.hutch_default import defaultDetectors
 from smalldata_tools.lcls2.DetObject import DetObject
 
@@ -211,7 +223,7 @@ from smalldata_tools.ana_funcs.waveformFunc import (
     hsdsplitFunc,
     hsdBaselineCorrectFunc,
     hitFinderCFDFunc,
-    hsdROIFunc
+    hsdROIFunc,
 )
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
@@ -225,7 +237,7 @@ from psmon import publish
 
 
 # Constants
-HUTCHES = ["TMO", "RIX", "UED"]
+HUTCHES = ["TMO", "RIX", "UED", "MFX"]
 
 S3DF_BASE = Path("/sdf/data/lcls/ds/")
 FFB_BASE = Path("/cds/data/drpsrcf/")
@@ -455,15 +467,23 @@ if intg_main is not None and intg_main != "":
         if intg_main not in detnames:
             skip_intg = True  # skip integrating detector setup
             if rank == 0:
-                logger.error(f"Main integrating detector {intg_main} not found in the data.")
+                logger.error(
+                    f"Main integrating detector {intg_main} not found in the data."
+                )
                 logger.error("Skipping integrating detectors.")
-                logger.error("Please check the integrating detector list in the config.")
+                logger.error(
+                    "Please check the integrating detector list in the config."
+                )
         else:
             datasource_args["intg_det"] = intg_main
             datasource_args["intg_delta_t"] = args.intg_delta_t
             datasource_args["batch_size"] = 1
-            os.environ["PS_SMD_N_EVENTS"] = "1"  # must be 1 for any non-zero value of delta_t
-            integrating_detectors = [intg_main] + intg_addl  # for the detector instantiation
+            os.environ["PS_SMD_N_EVENTS"] = (
+                "1"  # must be 1 for any non-zero value of delta_t
+            )
+            integrating_detectors = [
+                intg_main
+            ] + intg_addl  # for the detector instantiation
     ds = None
     thisrun = None
 
@@ -487,7 +507,9 @@ thisrun = next(ds.runs())
 
 # Generate smalldata object
 if ds.unique_user_rank():
-    logger.info("Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval))
+    logger.info(
+        "Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval)
+    )
 if args.psplot_live_mode:
     if ds.unique_user_rank():
         logger.info("Setting up psplot_live plots.")
@@ -562,7 +584,9 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         logger.info(f"Detectors: {[det._name for det in dets]}")
         logger.info(f"Integrating detectors: {[det._name for det in int_dets]}")
     logger.debug(f"Rank {rank} detectors: {[det._name for det in dets]}")
-    logger.debug(f"Rank {rank} integrating detectors: {[det._name for det in int_dets]}")
+    logger.debug(
+        f"Rank {rank} integrating detectors: {[det._name for det in int_dets]}"
+    )
 
     det_presence = {}
     if args.full:
@@ -629,7 +653,7 @@ for evt_num, evt in enumerate(event_iter):
             det.processSums()
             # print(userDict[det._name])
         except Exception as e:
-            logger.warning(f'Failed analyzing det {det} on evt {evt_num}')
+            logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
             print(e)
             pass
 
@@ -701,11 +725,9 @@ for evt_num, evt in enumerate(event_iter):
                             )  # may not work for arrays....
                     else:
                         userDictInt[det._name][k] = v
-                        normdict[det._name][k] = (
-                            v * 0
-                        )  # may not work for arrays....
+                        normdict[det._name][k] = v * 0  # may not work for arrays....
                 # print(userDictInt)
-                small_data.event(evt, userDictInt, align_group='intg')
+                small_data.event(evt, userDictInt, align_group="intg")
             except:
                 print(f"Bad int_det processing on evt {evt_num}")
                 pass
@@ -750,10 +772,10 @@ for evt_num, evt in enumerate(event_iter):
                     ],
                 )
             except:
-                print('ARP update post failed')
+                print("ARP update post failed")
                 pass
         elif ds.unique_user_rank():
-                print("Processed evt %d" % evt_num)
+            print("Processed evt %d" % evt_num)
 
 if not ds.is_srv():
     sumDict = {"Sums": {}}
