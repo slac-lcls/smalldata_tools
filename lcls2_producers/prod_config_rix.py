@@ -48,23 +48,23 @@ def getROIs(run):
         # Save the full ANDOR.
         ret_dict['andor_dir'] = [full_roi]
         ret_dict['andor_vls'] = [full_roi]
-        ret_dict['andor_norm'] = [full_roi]
+        #ret_dict['andor_norm'] = [full_roi]
         ret_dict['c_piranha'] = [full_roi]
         ret_dict['archon'] = [full_roi]
 
         # and the FIM waveforms
-        # ret_dict['rix_fim0'] = [full_roi]
-        # ret_dict['rix_fim1'] = [full_roi]
-        # ret_dict['crix_w8'] = [full_roi]
+        ret_dict['rix_fim0'] = [full_roi]
+        ret_dict['rix_fim1'] = [full_roi]
+        ret_dict['crix_w8'] = [full_roi]
         # ret_dict['qrix_w8'] = [full_roi]
 
         # hsd
-        # hsd_dict = {}
-        # hsd_dict['hsd_0'] = [0,-1]
-        # hsd_dict['hsd_1'] = [0,-1]
-        # hsd_dict['hsd_2'] = [0,-1]
-        # hsd_dict['hsd_3'] = [0,-1]
-        # ret_dict['hsd'] = hsd_dict
+        hsd_dict = {}
+        #hsd_dict['hsd_0'] = [0,1]
+        hsd_dict['hsd_1'] = [3000,8000]
+        #hsd_dict['hsd_2'] = [0,1]
+        #hsd_dict['hsd_3'] = [0,1]
+        ret_dict['hsd'] = hsd_dict
 
     return ret_dict
 
@@ -116,19 +116,19 @@ def get_wf_integrate(run):
 
     if run > 0:
         ret_dict['rix_fim0'] = {
-            "sig_roi" : slice(102,108),
+            "sig_roi" : slice(104, 112),
             "bkg_roi" : slice(0,80),
             "negative_signal" : True
         }
 
         ret_dict['rix_fim1'] = {
-            "sig_roi" : slice(116,122),
+            "sig_roi" : slice(120, 127),
             "bkg_roi" : slice(0,80),
             "negative_signal" : True
         }
 
         ret_dict['crix_w8'] = {
-            "sig_roi" : slice(69,76),
+            "sig_roi" : slice(76, 95),
             "bkg_roi" : slice(0,50),
             "negative_signal" : True
         }
@@ -172,6 +172,19 @@ epicsPV = [
     "EM2K0:XGMD:ETM:02:Reading",
     "EM2K0:XGMD:HPS:milliJoulesPerPulse",
     "EM2K0:XGMD:HPS:AvgPulseIntensityy",
+    "CRIX:VLS:CAM:MMS:PITCH.RBV",
+    "CRIX:VLS:MMS:MP.RBV",
+    "CRIX:VLS:MMS:GP.RBV",
+    "SP1K1:MONO:MMS:M_PI.RBV",
+    "SP1K1:MONO:MMS:G_PI.RBV",
+    "SP1K1:MONO:CALC:ENERGY",
+    "SP1K1:MONO:CALC:BANDWIDTH",
+    "SP1K1:MONO:CALC:CFF",
+    "LM2K2:COM_MP2_DLY1.RBV",
+    "CRIX:CRYO:MMS:X.RBV",
+    "CRIX:CRYO:MMS:Y.RBV",
+    "CRIX:CRYO:MMS:Z.RBV",
+    "CRIX:CRYO:MMS:RY.RBV"  
 ]
 epicsOncePV = []
 
