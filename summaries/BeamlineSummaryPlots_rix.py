@@ -14,11 +14,13 @@ import numpy as np
 from requests.auth import HTTPBasicAuth
 import holoviews as hv
 from holoviews import dim
+from holoviews import opts
 
 hv.extension("bokeh")
 pn.extension()
 import sys
-
+#sys.path.append('/sdf/home/d/dgarratt/chemRIXS/Pyrazine_Dev/Modules')
+#from chemRIXSAnalysis_V3 import *
 fpath = os.path.dirname(os.path.abspath(__file__))
 fpathup = "/".join(fpath.split("/")[:-1])
 try:
@@ -26,7 +28,6 @@ try:
 except:
     fpath = fpathup
 sys.path.append(fpath)
-from smalldata_tools.lcls2.SmallDataAna_psana import SmallDataAna_psana as sdaps
 from smalldata_tools.utilities import rebin
 from smalldata_tools.utilities import evtt2Rt
 from smalldata_tools.utilities import postRunTable
@@ -51,6 +52,195 @@ def makeRunTableData(dat):
     }
 
     return runtable_data
+
+def process_ANDOR_Basic(andor, bg_roi_x = [0,100],bg_roi_y=[0,100],\
+                        absolute_theshold = False,threshold = False,photon_count = False,\
+                        threshold_min=4, threshold_max=4000):
+    # 1D processing
+    if len(andor.shape) ==2:
+        andor_nbg = subtract_bg(andor,bg_roi_x)
+        andor_proc = andor_nbg.copy()
+        if threshold:
+            astd,amean = andor_nbg[:,bg_roi_x[0]:bg_roi_x[1]].std(),andor_nbg[:,bg_roi_x[0]:bg_roi_x[1]].mean()
+            andor_proc[andor_proc>threshold_max] = 0
+            if absolute_threshold:
+                andor_proc[andor_proc<(threshold_min)] = 0
+            else:
+                andor_proc[andor_proc<(threshold_min*astd)] = 0
+            if photon_count:
+                andor_proc[andor_proc>threshold_min] = 1
+    elif len(andor.shape)==3:
+        # Shape of full image is (2048 x 512)
+        bgs = andor[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].mean(axis = (1,2))
+        andor_nbg = andor - bgs[:,np.newaxis,np.newaxis]
+        andor_proc = andor_nbg.copy()
+        if threshold:
+            astd = andor_nbg[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].std()
+            amean = andor_nbg[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].mean()
+            andor_proc[andor_proc>threshold_max] = 0
+            if absolute_threshold:
+                andor_proc[andor_proc<(threshold_min)] = 0
+            else:
+                andor_proc[andor_proc<(threshold_min*astd)] = 0
+            if photon_count:
+                andor_proc[andor_proc>threshold_min] = 1
+    return andor_proc
+def sum_ANDOR(andor_ims):
+    if len(andor_ims.shape) ==2:
+        return np.sum(andor_ims,axis = 1)
+    elif len(andor_ims.shape) ==3:
+        return np.sum(andor_ims,axis = (1,2))
+
+
+# Data loading
+def load_int_data(run,fh,prefix = '', load_ttfex = True, evc_laser = 272,int_detector_key = 'intg/andor_vls',roll = True):
+    keys_andor = [('intg/andor_dir',f'{prefix}full_area','dir'),
+            ('intg/andor_vls',f'{prefix}full_area','vls'),
+            ('intg/andor_vls',f'{prefix}hitfinder','vls_hitfound'),
+            ('intg/andor_norm',f'{prefix}full_area','norm'),
+           ]
+    keys_int = [(int_detector_key ,f'{prefix}det_rix_fim1_sum_full_area','fim1_wf'),
+            (int_detector_key ,f'{prefix}det_rix_fim0_sum_full_area','fim0_wf'),
+            (int_detector_key ,f'{prefix}det_crix_w8_sum_full_area','apd_wf'),
+           # (int_detector_key ,f'{prefix}hsd_sum_full_hsd_1__ROI_wf','hsd1_wf'),
+            (int_detector_key ,f'{prefix}det_rix_fim1_sum_wfintegrate','fim1_sum'),
+            (int_detector_key ,f'{prefix}det_rix_fim0_sum_wfintegrate','fim0_sum'),
+            (int_detector_key ,f'{prefix}det_crix_w8_sum_wfintegrate','apd_sum'),
+            (int_detector_key ,f'{prefix}mono_encoder_sum_interpolated_value','mono_encoder'),
+            (int_detector_key ,f'{prefix}mono_encoder_sum_raw_value','mono_encoder_lowrate'),
+            (int_detector_key ,f'{prefix}mono_hrencoder_sum_value','mono_hrencoder'),
+            (int_detector_key ,f'{prefix}c_piranha_sum_full_area','pir'),
+            (int_detector_key ,f'{prefix}timing_sum_eventcodes','evc'),
+            (int_detector_key ,f'{prefix}timing_sum_destination','dest')
+               ]
+    # These should not be normalized to count
+    keys_ts = [(int_detector_key ,f'{prefix}timestamp_min','timestamp_min'),
+            (int_detector_key ,f'{prefix}timestamp_max','timestamp_max'),
+            (int_detector_key ,f'{prefix}timing_sum_timestamp','timestamp_norm')
+               ]
+    if load_ttfex:
+        keys_int = keys_int + [(int_detector_key ,f'{prefix}tt_sum_fltpos','pos'),
+            (int_detector_key ,f'{prefix}tt_sum_fltposfwhm','fwhm'),
+            (int_detector_key ,f'{prefix}tt_sum_ampl','amp')
+           ]
+    
+    data = {}
+    # Load timestamps 
+    data['timestamp'] = np.array(fh['intg/timestamp'])
+    # summed timestamps
+    for key in keys_ts:
+        #data[key[2]] = np.array(fh[key[0]][key[1]])
+        try:
+            data[key[2]] = np.array(fh[key[0]][key[1]]) 
+        except:
+            print('missing key {0}'.format(key))
+    
+    # Load andor images
+    for key in keys_andor:
+        try:
+            data[key[2]] = np.array(fh[key[0]][key[1]]) 
+        except:
+                print('missing key {0}'.format(key))
+
+    # Normalize these parameters to the number of single shots per image
+    data['count'] = np.array(fh[int_detector_key][f'{prefix}count'])
+    for key in keys_int:
+        #data[key[2]] = np.array(fh[key[0]][key[1]], chunks=chunks) 
+        try:
+            data[key[2]] = np.array(fh[key[0]][key[1]])  
+            # print('Key: {0} shape: %s'.format(key) %(data[key[2]].shape))
+            if len(data[key[2]].shape)==1:
+                data[key[2]] = data[key[2]]/data['count']
+    
+            elif len(data[key[2]].shape)==2:
+                data[key[2]] = data[key[2]]/data['count'][:,np.newaxis]
+            elif len(data[key[2]].shape)==3:
+                data[key[2]] = data[key[2]]/data['count'][:,np.newaxis,np.newaxis]
+        except:
+            print('missing key {0}'.format(key))
+
+    try:
+        scan_key = list(fh['scan'].keys())[0]
+        data['scan_key'] = scan_key
+        data['step'] = np.squeeze(np.array(fh[int_detector_key][f'{prefix}scan_sum_step_value']))/data['count']
+        data['x'] = np.squeeze(np.array(fh[int_detector_key][f'{prefix}scan_sum_{scan_key}']))/data['count']
+    except:
+        print('Error loading integrated scan variables')
+
+    # Generate a xray on and laser on 
+    data['laser_on'] = data['evc'][:,evc_laser]>0.5
+    data['xray_on'] = data['dest']==4
+    data['dest'] = data['dest']
+
+    idx = np.argsort(data['timestamp'])
+    # Sort data by timestamp
+    for k in data.keys():
+        if k != 'scan_key':
+            data[k] = data[k][idx]
+    # Roll the andor images to account for andor trigger delay
+    if roll:
+        for key in keys_andor:
+            try:
+                data[key[2]] = np.roll(data[key[2]],1,axis = 0)
+            except:
+                print('missing key {0}'.format(key))
+        # cropp all data 
+        for key, value in data.items():
+            #print(value.shape)
+            data[key] = value[1:]
+            #print(data[key].shape)
+            
+
+    # Load epics_archiver variables
+    epics_data = load_epics(fh)
+    for k in epics_data.keys():
+        data[f'epics_{k}']=epics_data[k]
+    
+    return data
+
+def load_epics(fh):
+    '''Loads the epics archiver variables from h5 file.
+    Note the shape varies
+    '''
+    epics_keys = [('epics_archiver', 'CRIX_VLS_CAM_MMS_PITCH.RBV', 'VLS_camera_pitch'),
+                  ('epics_archiver', 'CRIX_VLS_MMS_GP.RBV', 'VLS_grating_pitch_mm'),
+                  ('epics_archiver', 'CRIX_VLS_MMS_MP.RBV', 'VLS_mirror_pitch_mm'),
+                  ('epics_archiver', 'LM2K2_COM_MP2_DLY1.RBV', 'ATM_stage_mm'),
+                  ('epics_archiver', 'SP1K1_MONO_MMS_G_PI.RBV', 'MONO_grating_pitch'),
+                  ('epics_archiver', 'SP1K1_MONO_MMS_M_PI.RBV', 'MONO_premirror_pitch')
+           ]
+    dat = {}
+    for i, k in enumerate(epics_keys):
+        try:
+            dat[k[2]] = fh[k[0]][k[1]][...][:,1]
+        except: print(f'Missing epics key {k[1]}')
+    return dat
+
+def load_smd_ROIS(fh):
+    roi_dict = {}
+    keys = [
+        ('det_crix_w8','wfintegrate__wfintegrate_bkg_roi','apd_bg'),
+        ('det_crix_w8','wfintegrate__wfintegrate_sig_roi','apd_sig'),
+        ('det_rix_fim0','wfintegrate__wfintegrate_bkg_roi','fim0_bg'),
+        ('det_rix_fim0','wfintegrate__wfintegrate_sig_roi','fim0_sig'),
+        ('det_rix_fim1','wfintegrate__wfintegrate_bkg_roi','fim1_bg'),
+        ('det_rix_fim1','wfintegrate__wfintegrate_sig_roi','fim1_sig')
+    ]
+    for k in keys:
+        try:
+            roi_dict[k[2]] = fh['UserDataCfg'][k[0]][k[1]][...]
+        except:
+            print(f'Missing key {k}')
+    return roi_dict
+
+def subtract_bg(wf,bg_roi=[0,50],invert = False):
+    bg = np.mean(wf[...,bg_roi[0]:bg_roi[1]],axis= -1)
+    shape = wf.shape
+    if invert:
+        wf_nbg = -(wf - bg[...,np.newaxis])
+    else:
+        wf_nbg = wf - bg[...,np.newaxis]
+    return wf_nbg
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -105,220 +295,319 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
 ######################################
 ### load data for the chosen run  ####
 ######################################
-dat = tables.open_file(
-    "/reg/d/psdm/%s/%s/hdf5/smalldata/%s_Run%04d.h5"
-    % (expname[:3], expname, expname, run)
-).root
+dir_roi_x = [0,-1]
+dir_roi_y = [0,-1]
+dir_bg_roi_x = [50,100]
+dir_bg_roi_y = [50,100]
 
-xray = dat.lightStatus.xray.read()
-laser = dat.lightStatus.laser.read()
-xoff = ~xray.astype(bool)
-on = xray.astype(bool) & laser.astype(bool)
-off = xray.astype(bool) & ~laser.astype(bool)
-# iniFilter='initial'
-# ana.addCut('lightStatus/xray',0.5,1.5,iniFilter)
-# ana.addCut('lightStatus/laser',0.5,1.5,iniFilter)
+# x is 2048 pixel axis 
+vls_roi_x = [0,-1]
+vls_roi_y = [0,-1]
+vls_bg_roi_x = [50,100]
+vls_bg_roi_y = [50,100]
+vls_threshold = 10
+absolute_threshold = True
+vls_threshold_max = 500
 
-andor_roi = slice(1050, 1150)
-andor_bg_roi = slice(400, 700)
-fim_roi = slice(102, 120)
-fim_bg_roi = slice(0, 50)
-fim2_roi = slice(55, 70)
-fim2_bg_roi = slice(0, 20)
-# rawfims = [d for d in dir(dat.rix_fim0_raw) if d[0]!='_']
+fim_bg_roi = np.array([0,80])
+fim0_roi = [100,113]
+fim1_roi = [122,128]
+neig_fim = 2
+idx_fim1 = np.array([4,5,6,7])
+idx_fim0 = np.array([4,5,6,7])
 
-fimDim = hv.Dimension(("fim0", "fim"))
+apd_bg_roi = np.array([0,30])
+apd_roi = [72,95]
+neig_apd = 2
+idx_apd = np.array([5,6,7])
+
+hsd_roi = [1700,2100]
+hsd_bg_roi = [0,1000]
+
+key_norm = 'i0_fim'
+# Shot Filtering
+i0_thresh = 500
+# Time tool parameters
+px0 = 150
+
+# Shot Filtering
+i0_thresh = 500
+
+# Time tool parameters
+px0 = 150
+b = 50
+
+fname = f'/sdf/data/lcls/ds/{expname[:3]}/{expname}/hdf5/smalldata/{expname}_Run{run:04d}.h5'
+fh = h5py.File(fname, 'r')
+dat = load_int_data(run, fh,int_detector_key='intg/andor_vls',roll=True)
+rois = load_smd_ROIS(fh)
+###################################################################################################################################################
+###################################################################################################################################################
+print('Processing detectors')
+# Process VLS 
+if 'vls' in dat.keys():
+    dat['vls_proc'] = process_ANDOR_Basic(dat['vls'],[vls_bg_roi_x[0],vls_bg_roi_x[1]],[vls_bg_roi_y[0],vls_bg_roi_y[1]],\
+                                          threshold_min = vls_threshold,threshold_max=vls_threshold_max)
+    dat['vls_nbg'] = process_ANDOR_Basic(dat['vls'],[vls_bg_roi_x[0],vls_bg_roi_x[1]],[vls_bg_roi_y[0],vls_bg_roi_y[1]],\
+                                         threshold = False)
+    if len(dat['vls'].shape)==3:
+        dat['vls_lineout'] = np.sum(dat['vls_proc'],axis = -1)
+    else:
+        dat['vls_lineout'] = dat['vls_proc']
+
+    dat['pfy'] = sum_ANDOR(dat['vls_lineout'][:,vls_roi_x[0]:vls_roi_x[1]])
+    vls_av = np.nanmean(dat['vls_proc'],axis = 0)
+    
+if 'dir' in dat.keys():
+    # Process direct andor
+    dat['dir_proc'] = process_ANDOR_Basic(dat['dir'],[dir_bg_roi_x[0],dir_bg_roi_x[1]],[dir_bg_roi_y[0],dir_bg_roi_y[1]])
+    dat['iT'] = sum_ANDOR(dat['dir_proc'])
+    dir_av = np.nanmean(dat['dir_proc'],axis = 0)
+    
+# Subtract background and invert FIM traces
+dat['fim0_wf_proc'] = subtract_bg(dat['fim0_wf'],fim_bg_roi,invert = True)
+dat['fim1_wf_proc'] = subtract_bg(dat['fim1_wf'],fim_bg_roi,invert = True)
+fims_concat = np.concatenate((dat['fim0_wf_proc'][:,4:,:],dat['fim1_wf_proc'][:,4:,:]),axis = 1)
+# Combine fim detectors
+# Subtract background and invert FIM traces
+dat['i0_fim0'] = np.sum(dat['fim0_wf_proc'][:,idx_fim0,fim0_roi[0]:fim0_roi[1]],axis = (1,2))
+dat['i0_fim1'] = np.sum(dat['fim1_wf_proc'][:,idx_fim1,fim1_roi[0]:fim1_roi[1]],axis = (1,2))
+dat['i0_fim'] = dat['i0_fim0'] + dat['i0_fim1']
+# APD processing
+dat['apd_wf_proc'] = subtract_bg(dat['apd_wf'],apd_bg_roi,invert = True)
+dat['iF_sum'] = np.sum(dat['apd_wf_proc'][:,idx_apd,apd_roi[0]:apd_roi[1]],axis = (1,2))
+#dat['iF_SVD_all'] = process_FIM_SVD(dat['apd_wf_proc'][:,idx_apd,:],neig_apd)
+#dat['iF_SVD'] = np.nanmean(dat['iF_SVD_all'],axis = 1)
+#
+if 'hsd1_wf' in dat.keys():
+    dat['hsd_wf_proc'] = subtract_bg(dat['hsd1_wf'],hsd_bg_roi,invert = True)
+    dat['iF_sum_hsd'] =   np.sum(dat['hsd_wf_proc'][:,hsd_roi[0]:hsd_roi[1]],axis = (1))
+#    dat['iF_SVD_hsd'] =  np.nanmean(process_FIM_SVD(dat['hsd_wf_proc'][:,np.newaxis,hsd_roi[0]:hsd_roi[1]],neig_apd),axis = 1)
+    hsd_av = np.nanmean(dat['hsd_wf_proc'],axis = 0)
+
+fim0_av = np.nanmean(dat['fim0_wf_proc'],axis = 0) 
+fim1_av = np.nanmean(dat['fim1_wf_proc'],axis = 0) 
+apd_av = np.nanmean(dat['apd_wf_proc'],axis = 0)
+
+count, ncount = np.unique(dat['count'],return_counts = True)
+expected_count = count[np.argmax(ncount)]
+print(count[ncount>2],ncount[ncount>2],f'Expected count {expected_count}')
+count_msk = dat['count']==expected_count
+# Single shot normalization 
+if 'vls' in dat.keys():
+    dat['vls_lineout_norm'] = dat['vls_lineout']/dat[key_norm][:,np.newaxis]
+    dat['pfy_norm'] = dat['pfy']/dat[key_norm][:]
+if 'dir' in dat.keys():
+    dat['iT_norm'] = dat['iT']/dat[key_norm][:]
+dat['iF_sum_norm'] = dat['iF_sum']/dat[key_norm][:]
+#dat['iF_SVD_norm'] = dat['iF_SVD']/dat[key_norm][:]
+if 'hsd1_wf' in dat.keys():
+    dat['iF_sum_hsd_norm'] = dat['iF_sum_hsd']/dat[key_norm][:]
+#    dat['iF_SVD_hsd_norm'] = dat['iF_SVD_hsd']/dat[key_norm][:]
+###################################################################################################################################################
+def click_policy(plot, element):
+    plot.state.legend.click_policy = "hide"
+######################################
+### load data for the chosen run  ####
+######################################
+fname = f'/sdf/data/lcls/ds/{expname[:3]}/{expname}/hdf5/smalldata/{expname}_Run{run:04d}.h5'
+
+laser = dat['laser_on']
+on = laser.astype(bool)
+off = ~laser.astype(bool)
+
+
+fim0Dim = hv.Dimension(("fim0", "fim0"))
 fim1Dim = hv.Dimension(("fim1", "fim1"))
-fim2Dim = hv.Dimension(("fim2", "fim2"))
-scatterDim = hv.Dimension(("andor", "andor intensity"))
+apdDim = hv.Dimension(("apd", "apd"))
+fimDim = hv.Dimension(("i0", "i0"))
+apdPx =  hv.Dimension(("w8", "px"))
+FIMPx =  hv.Dimension(("w8", "px"))
+laserDim = hv.Dimension(("laser_on", "laser_on"))
+xrayDim = hv.Dimension(("Destination", "Average beam dest"))
+pixelDim = hv.Dimension(("pixel", "pixel"))
+
+dirDim = hv.Dimension(("DIR", "andor dir"))
+vlsDim = hv.Dimension(("VLS", "andor VLS"))
+pfyDim = hv.Dimension(("DIR sum", "pfy"))
+iTDim = hv.Dimension(("VLS sum", "iT"))
+iFDim = hv.Dimension(("APD sum", "iF"))
 eventTimeDim = hv.Dimension(("eventTimeR", "relative event time"))
-l3eDim = hv.Dimension(("l3e", "L3 Energy"))
 ttposDim = hv.Dimension(("ttpos", "tt fitted position"), range=(0, 1000))
 ttamplDim = hv.Dimension(("ttampl", "tt amplitude"))
-
 # fim0All = -1.*dat.det_rix_fim0.full_fimSum_fimSum.read().sum(axis=1)
-fim0 = -1.0 * dat.det_rix_fim0.full_sigbkg_sum.read()[:, 4:].sum(axis=1)
-fim1 = -1.0 * dat.det_rix_fim1.full_sigbkg_sum.read()[:, 5]
 
-eventTimeRaw = dat.timestamp.read()
+i0Var = dat['i0_fim']
+i0Dim = fimDim
+
+eventTimeRaw = dat['timestamp']
 eventTime = (eventTimeRaw >> 32).astype(float) + ((eventTimeRaw << 32) >> 32).astype(
     float
 ) * 1e-9
 eventTimeR = eventTime - eventTime[0]
 
-l3eVar = dat.ebeam.ebeamL3Energy.read()
-
-i0Var = fim0
-i0Dim = fimDim
-
-eventTimeRMed = [
-    np.nanmedian(eventTimeR[i * 120 : i * 120 + 120])
-    for i in range(int(eventTimeR.shape[0] / 120))
-]
-i0Med = [
-    np.nanmedian(i0Var[i * 120 : i * 120 + 120])
-    for i in range(int(eventTimeR.shape[0] / 120))
-]
-
-# this should be the andor when present
-# scatterVar = dat.gmd.avgIntensity.read()
-try:
-    scatterVar = (
-        dat.andor_dir.ROI_sig_sum.read() - dat.andor_dir.ROI_bkg_sum.read() / 550 * 400
-    )
-except:
-    scatterVar = None
-
-i0Time = hv.HexTiles(
-    (
-        eventTimeR[i0Var < np.nanpercentile(i0Var, 99)],
-        i0Var[i0Var < np.nanpercentile(i0Var, 99)],
-    ),
-    kdims=[eventTimeDim, i0Dim],
-).opts(cmap="Blues")
-i0TimeMed = hv.Points(
-    (eventTimeRMed, i0Med), kdims=[eventTimeDim, i0Dim], label=i0Dim.label
-).options(color="r")
-
-ipmTimeLayout = i0Time * i0TimeMed
-
-treeSel = l3eVar > np.nanpercentile(l3eVar, 1)
-treePlot = hv.HexTiles((l3eVar[treeSel], i0Var[treeSel]), kdims=[l3eDim, i0Dim])
-
-try:
-    andor_trace = np.nanmean(dat.andor_dir.full_area, axis=0)
-    andorDim = hv.Dimension(("andor_dir", "AndOR dir"))
-    pixelDim = hv.Dimension(("pixel", "pixel"))
-    andorPlot = hv.Curve(
-        (np.arange(andor_trace.shape[0]), andor_trace),
-        kdims=[pixelDim],
-        vdims=[andorDim],
-    )
-except:
-    andorPlot = None
-
-ipmPlot = hv.HexTiles((fim0, fim1), kdims=[fimDim, fim1Dim])
-ipmLayout = ipmPlot.hist(dimension=[fimDim.name, fim1Dim.name])
-if scatterVar is not None:
-    ipmscatterPlot = hv.HexTiles((scatterVar, i0Var), kdims=[scatterDim, i0Dim])
-fim1Plot = None
-if (fim1 is not None) and (scatterVar is not None):
-    fim1Plot = hv.HexTiles((scatterVar, fim1), kdims=[scatterDim, fim1Dim])
-
-try:
-    ttpos = dat.tt.fltpos.read()
-    ttampl = dat.tt.ampl.read()
-    if eventTimeR[on].shape[0] < 5000:
-        ttposPlot = hv.Scatter(
-            (eventTimeR[on], ttpos[on]), kdims=[eventTimeDim, ttposDim]
-        )
-        ttamplPlot = hv.Scatter((ttampl[on], i0Var[on]), kdims=[ttamplDim, i0Dim])
-        ttamplposPlot = hv.Scatter((ttpos[on], ttampl[on]), kdims=[ttposDim, ttamplDim])
-    else:
-        ttposPlot = hv.HexTiles(
-            (eventTimeR[on], ttpos[on]), kdims=[eventTimeDim, ttposDim]
-        )
-        ttamplPlot = hv.HexTiles((ttampl[on], i0Var[on]), kdims=[ttamplDim, i0Dim])
-        ttamplposPlot = hv.HexTiles(
-            (ttpos[on], ttampl[on]), kdims=[ttposDim, ttamplDim]
-        )
-except:
-    ttpos = None
-
-fimDims = {
-    "ch%d" % i: hv.Dimension(("fim_ch%d" % i, "channel %d" % i))
-    for i in np.arange(dat.det_rix_fim0.full_area.shape[1])
-}
-fimDims["legend"] = hv.Dimension(("fim_legend", "legend"))
-fimTimeDim = hv.Dimension(("fim_time", "fim points"))
-fimsums = {
-    "fim%d" % ifim: getattr(dat, "det_rix_fim%d" % ifim).full_area.read().sum(axis=0)
-    for ifim in np.arange(3)
-}
-
-
-fimCurves = {
-    "channel_%d"
-    % i: hv.NdOverlay(
-        {
-            fn: hv.Curve(
-                (np.arange(256), fimsums[fn][i]),
-                kdims=[fimTimeDim],
-                vdims=[fimDims["ch%d" % i]],
-            ).opts(show_legend=False)
-            for fn in fimsums
-        }
-    )
-    for i in np.arange(fimsums["fim0"].shape[0])
-}
-fimCurves["legend"] = hv.NdOverlay(
-    {
-        fn: hv.Curve(
-            (np.arange(256), np.zeros(256)),
-            kdims=[fimTimeDim],
-            vdims=[fimDims["legend"]],
-        ).opts(hooks=[click_policy])
-        for fn in fimsums
-    }
-)
-
-gspecFim = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Summed FIM traces - Run %d" % run
-)
-for k, plot in fimCurves.items():
-    try:
-        irow = int(int(k[-1]) / 3)
-        icol = int(k[-1]) % 3
-    except:
-        irow = 2
-        icol = 2
-    gspecFim[irow * 3 : (irow + 1) * 3, icol * 3 : (icol + 1) * 3] = pn.Column(
-        plot.opts(legend_position="bottom_right")
-    )
-
-gspec = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Data Quality - Run %d" % run
-)
-# gspec[0,0:8] = pn.Row('# Data Quality Plot - Run %04d'%run)
-gspec[0:2, 0:8] = pn.Column(ipmTimeLayout)
-gspec[2:6, 0:4] = pn.Column(ipmLayout)
-gspec[2:6, 4:8] = pn.Column(treePlot)
+# X-ray parameters
+i0Time = hv.Points((eventTimeR, i0Var), kdims=[eventTimeDim, fimDim], label=fimDim.label).options(color="r")
+laserTime = hv.Curve((eventTimeR, laser), kdims=[eventTimeDim, laserDim], label=laserDim.label).options(color="r")
+xrayTime = hv.Curve((eventTimeR, dat['dest']), kdims=[eventTimeDim, xrayDim], label=xrayDim.label).options(color="r")
 
 gspecS = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Andor, Scan&Scatter"
+    sizing_mode="stretch_both", max_width=700, name="X-ray Summary "
 )
-# gspec[0,0:8] = pn.Row('# Data Quality Plot - Run %04d'%run)
-maxRow = 0
-if andorPlot is not None:
-    gspecS[0:2, 0:8] = pn.Column(andorPlot)
-    maxRow += 2
-if scatterVar is not None:
-    gspecS[maxRow : maxRow + 4, 0:8] = pn.Column(ipmscatterPlot)
-    maxRow += 4
-if fim1Plot is not None:
-    # gspecS[maxRow,0:8] = pn.Row('## Scan Variable')
-    gspecS[maxRow : maxRow + 4, 0:8] = pn.Column(fim1Plot)
-    maxRow += 4
-# if stepPlot is not None:
-#    gspecS[maxRow,0:8] = pn.Row('## Scan Variable')
-#    gspecS[maxRow+1:maxRow+3,0:8] = pn.Column(stepPlot)
-#    maxRow=7
-# if lxtPlot is not None:
-#    gspecS[maxRow,0:8] = pn.Row('## Laser - xray Timing')
-#    gspecS[maxRow+1:maxRow+3,0:8] = pn.Column(lxtPlot)
+gspecS[0:2, 0:8] = pn.Column(i0Time)
+gspecS[2:4, 0:8] = pn.Column(laserTime)
+gspecS[4:6, 0:8] = pn.Column(xrayTime)
+gspecS
+###################################################################################################################################################
+pixelDim = hv.Dimension(("pixel", "pixel"))
 
-tabs = pn.Tabs(gspec)
-tabs.append(gspecFim)
-# if maxRow>0:
-#    tabs.append(gspecS)
+# DIR Processing
+if 'dir' in dat.keys():
+    dir_proc_mean = np.mean(dat['dir_proc'], axis=0)
+    vl_dir = hv.VLines(dir_roi_x)
+    if dir_proc_mean.ndim == 2:
+        dir_heatmap = hv.Image(dir_proc_mean).opts(
+            cmap='viridis', colorbar=True, width=400, height=400, title='DIR Full Mean'
+        )
+        dir_lineout = (hv.Curve(np.nanmean(dat['dir_proc'], axis=(0, 2)),pixelDim,dirDim)*vl_dir).opts(
+            opts.Curve(xlabel='Pixel', ylabel='Value', title='VLS Lineout', width=400, height=400),
+            opts.VLines(color = 'red'))
+    else:
+        dir_lineout = (hv.Curve(dir_proc_mean,pixelDim,dirDim)*vl_dir).opts(
+            opts.Curve(xlabel='Pixel', ylabel='Value', title='DIR Lineout', width=400, height=400),
+            opts.VLines(color = 'red'))
+        dir_heatmap = None
+        
+    dirCorr = hv.HexTiles((i0Var,dat['iT']), kdims=[i0Dim,iTDim]).opts(title = 'I0 DIR correlation')
+    iTTime = hv.Points((eventTimeR, dat['iT']), kdims=[eventTimeDim, iTDim], label='DIR Sum vs time').options(color="r")
 
-if ttpos is not None:
-    gspecT = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="Timetool")
-    gspecT[0:4, 0:8] = pn.Column(ttposPlot)
-    gspecT[4:8, 0:4] = pn.Column(ttamplposPlot)
-    gspecT[4:8, 4:8] = pn.Column(ttamplPlot)
-    tabs.append(gspecT)
-# for detGrid in detGrids:
+    gspecDIR = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="Transmission Summary ")
+    gspecDIR[0:2, 0:2] = pn.Column(dir_lineout)
+    gspecDIR[0:2, 2:4] = pn.Column(dirCorr)
+    gspecDIR[2:4, 0:2] = pn.Column(iTTime)
+    if dir_heatmap is not None:
+        gspecDIR[2:4, 2:4] = pn.Column(dir_heatmap)
+else:
+    gspecDIR = None
+    
+###################################################################################################################################################
+# VLS Processing
+if 'vls' in dat.keys():
+    vls_proc_mean = np.mean(dat['vls_proc'], axis=0)
+    vl_vls = hv.VLines(vls_roi_x)
+    if vls_proc_mean.ndim == 2:
+        vls_heatmap = hv.Image(vls_proc_mean).opts(
+            cmap='viridis', colorbar=True, width=400, height=400, title='VLS Full Mean'
+        )
+        vls_lineout = (hv.Curve((np.nanmean(dat['vls_proc'], axis=(0, 2))),pixelDim,vlsDim)*vl_vls).opts(
+            opts.Curve(xlabel='Pixel', ylabel='Value', title='VLS Lineout', width=400, height=400),
+            opts.VLines(color = 'red'))
+        
+    else:
+        vls_lineout = (hv.Curve(vls_proc_mean,pixelDim,vlsDim)*vl_vls).opts(
+            opts.Curve(xlabel='Pixel', ylabel='Value', title='VLS Lineout', width=400, height=400),
+            opts.VLines(color = 'red'))
+        
+        vls_heatmap = None
+
+    vlsCorr = hv.HexTiles((i0Var,dat['pfy']), kdims=[i0Dim,vlsDim]).opts(title = 'I0 VLS correlation')
+    
+    vls_count_bins = np.arange(0,100)
+    # Histograms
+    vls_hist_data, vls_hist_edges = np.histogram(dat['vls_proc'].flatten(), bins=vls_count_bins)
+    vls_nbg_hist_data, vls_nbg_hist_edges = np.histogram(dat['vls_nbg'].flatten(), bins=vls_count_bins)
+    vls_hist_centers = (vls_hist_edges[:-1] + vls_hist_edges[1:]) / 2
+    vls_nbg_hist_centers = (vls_nbg_hist_edges[:-1] + vls_nbg_hist_edges[1:]) / 2
+    vlsCountDim = hv.Dimension(("VLS Counts", "VLS Counts"))
+    countDim = hv.Dimension(("Counts", "Counts"))
+    vls_hist1 = hv.Curve((vls_hist_centers, vls_hist_data), kdims=[vlsCountDim,countDim]).opts(color='blue', title="Processed Histogram",alpha = 0.5,logy=True)
+    vls_hist2 = hv.Curve((vls_nbg_hist_centers, vls_nbg_hist_data), kdims=[vlsCountDim,countDim]).opts(color='blue', title="Raw Histogram",alpha = 0.5,logy=True)
+    vls_hist = (vls_hist1 * vls_hist2).opts(title="VLS Histograms", legend_position='left')
+
+    pfyTime = hv.Points((eventTimeR, dat['pfy']), kdims=[eventTimeDim, pfyDim], label='VLS sum Vs Time').options(color="r")
+
+    gspecVLS = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="VLS Summary ")
+    
+    maxRow = 0
+    gspecVLS[0:2, 0:2] = pn.Column(vls_lineout)
+    gspecVLS[0:2, 2:4] = pn.Column(vlsCorr)
+    gspecVLS[2:4, 0:2] = pn.Column(vls_hist)
+    gspecVLS[2:4, 2:4] = pn.Column(pfyTime)
+    if vls_heatmap is not None:
+        gspecVLS[4:6, 0:4] = pn.Column(vls_heatmap)
+else:
+    gspecVLS = None
+
+
+###################################################################################################################################################
+
+apd_curves = [hv.Curve(wf, label=f'Channel {idx_apd[i]}') for i, wf in enumerate(apd_av[idx_apd,:])]
+apd_plot = hv.Overlay(apd_curves,kdims=[apdPx, apdDim]).opts(title="APD", width=400, height=400)
+
+
+apdCorr = hv.HexTiles((i0Var,dat['iF_sum']), kdims=[i0Dim,iFDim]).opts(title = 'I0 APD correlation')
+iFTime = hv.Points((eventTimeR, dat['iF_sum']), kdims=[eventTimeDim, iFDim], label=apdDim.label).options(color="r")
+
+gspecAPD = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="TFY Summary ")
+gspecAPD[0:2, 0:4] = pn.Column(apd_plot)
+gspecAPD[2:4, 0:2] = pn.Column(apdCorr)
+gspecAPD[2:4, 2:4] = pn.Column(iFTime)
+
+###################################################################################################################################################
+# FIM0 Curves
+fim0_curves = [hv.Curve(wf, FIMPx,fim0Dim, label=f'Channel {i}') for i, wf in enumerate(fim0_av[:])]
+
+gspecFim0 = pn.GridSpec(
+    sizing_mode="stretch_both", max_width=700, name="Summed FIM traces - Run %d" % run
+)
+
+for k, plot in enumerate(fim0_curves):
+    irow = int(int(k) / 3)
+    icol = int(k) % 3
+    print(irow,icol)
+    gspecFim0[irow * 3 : (irow + 1) * 3, icol * 3 : (icol + 1) * 3] = pn.Column(
+        plot
+    )
+gspecFim0
+
+# FIM1 Curves
+fim1_curves = [hv.Curve(wf, label=f'Channel {i}') for i, wf in enumerate(fim1_av[:])]
+
+gspecFim1 = pn.GridSpec(
+    sizing_mode="stretch_both", max_width=700, name="Summed FIM traces - Run %d" % run
+)
+
+for k, plot in enumerate(fim1_curves):
+    irow = int(int(k) / 3)
+    icol = int(k) % 3
+    print(irow,icol)
+    gspecFim1[irow * 3 : (irow + 1) * 3, icol * 3 : (icol + 1) * 3] = pn.Column(
+        plot
+    )
+
+# APD Curves
+apd_curves = [hv.Curve(wf,apdPx,apdDim, label=f'Channel {i}') for i, wf in enumerate(apd_av[:])]
+
+gspecW8 = pn.GridSpec(
+    sizing_mode="stretch_both", max_width=700, name="Summed APD traces - Run %d" % run
+)
+
+for k, plot in enumerate(apd_curves):
+    irow = int(int(k) / 3)
+    icol = int(k) % 3
+    print(irow,icol)
+    gspecW8[irow * 3 : (irow + 1) * 3, icol * 3 : (icol + 1) * 3] = pn.Column(
+        plot
+    )
+tabs = pn.Tabs(gspecS)
+if gspecDIR is not None:
+    tabs.append(gspecDIR)
+if gspecVLS is not None:
+    tabs.append(gspecVLS)# if maxRow>0:
+tabs.append(gspecAPD)
+tabs.append(gspecW8)
+tabs.append(gspecFim0)
+tabs.append(gspecFim1)
 
 ##################################
 ## save the html file
