@@ -3,7 +3,6 @@ import psana
 
 from . import event_screener as screener
 
-# sys.path.append('/sdf/home/e/espov/dev/smalldata_tools')
 from smalldata_tools.lcls2 import default_detectors, hutch_default
 from smalldata_tools.lcls2.DetObject import DetObject
 
@@ -14,79 +13,59 @@ from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
 def qrix_detectors(run: psana.psexp.run.Run):
     dets = []
 
-    full_roi = {
-        'thresADU' : None,
-        'writeArea' : True,
-        'calcPars' : False,
-        'ROI' : None
-    }
+    full_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
 
     # FIMs
-    fim0 = DetObject('rix_fim0', run)
+    fim0 = DetObject("rix_fim0", run)
     func = ROIFunc(**full_roi)
     fim0.addFunc(func)
-    
-    fim1 = DetObject('rix_fim1', run)
+
+    fim1 = DetObject("rix_fim1", run)
     func = ROIFunc(**full_roi)
     fim1.addFunc(func)
 
     # HSD
-    hsd = run.Detector('hsd')
+    hsd = run.Detector("hsd")
 
     # Archon
-    archon_roi = {
-        'thresADU' : 70,
-        'writeArea' : True,
-        'calcPars' : False,
-        'ROI' : None
-    }
-    archon = DetObject('archon', run)
+    archon_roi = {"thresADU": 70, "writeArea": True, "calcPars": False, "ROI": None}
+    archon = DetObject("archon", run)
     func = ROIFunc(**archon_roi)
     archon.addFunc(func)
-    
+
     dets = [fim0, fim1, archon]
     return dets
+
 
 def qrix_screener(run):
     ddets = hutch_default.rixDetectors(run)
     lightstatus_det = [d for d in ddets if d.name == "lightStatus"][0]
-    
+
     # Individual filters
     laser_on = screener.BoolFilter(
-        lightstatus_det,
-        'laser',
-        expected_state = True,
-        label = 'laser_on'
+        lightstatus_det, "laser", expected_state=True, label="laser_on"
     )
 
     laser_off = screener.BoolFilter(
-        lightstatus_det,
-        'laser',
-        expected_state = False,
-        label = 'laser_off'
+        lightstatus_det, "laser", expected_state=False, label="laser_off"
     )
 
     xray_on = screener.BoolFilter(
         lightstatus_det,
-        'xray',
-        expected_state = 1,
+        "xray",
+        expected_state=1,
     )
 
     xray_off = screener.BoolFilter(
-        lightstatus_det,
-        'xray',
-        expected_state = 0,
-        label = 'dropped_shots'
+        lightstatus_det, "xray", expected_state=0, label="dropped_shots"
     )
 
     # Combine individual filters into composite filters for different states
     screener_on = screener.CompositeFilter([laser_on, xray_on])
     screener_off = screener.CompositeFilter([laser_off, xray_on])
-    
+
     # Combine all screeners into an OR screener to be run by the cube
     event_screener = screener.CompositeFilter(
-        [screener_on, screener_off, xray_off],
-        require_all=False
+        [screener_on, screener_off, xray_off], require_all=False
     )
     return event_screener
-    # return xray_on

@@ -71,6 +71,7 @@ do
         ;;
     esac
 done
+set -- "${POSITIONAL[@]}" # restore positional parameters
 
 # (2mio events)
 EXP="rixx1017523"

@@ -27,10 +27,10 @@ try:
             return {}
         det.processFuncs()
         data = getUserData(det)
-        data.update({'count' : 1})  # to keep track of event count when combining in cube
-        data = {det._name : data}
+        data.update({"count": 1})  # to keep track of event count when combining in cube
+        data = {det._name: data}
         return data
-    
+
     def smd_default_detectors_engine(evt, det):
         return det.data(evt)
 

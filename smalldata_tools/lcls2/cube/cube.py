@@ -17,14 +17,15 @@ from . import event_screener
 logger = logging.getLogger(__name__)
 
 
-
 class Cube(metaclass=ABCMeta):
-    def __init__(self,
-                 run: psana.psexp.run.Run,
-                 engine: callable = event_engine.smalldata_tools_engine,
-                 processors: list = None,
-                 event_screener: event_screener.EventScreener = None,
-                 **kwargs: dict):
+    def __init__(
+        self,
+        run: psana.psexp.run.Run,
+        engine: callable = event_engine.smalldata_tools_engine,
+        processors: list = None,
+        event_screener: event_screener.EventScreener = None,
+        **kwargs: dict,
+    ):
         """
         Initialize a Cube instance for event processing.
         This class handles event processing for LCLS2 data using a specified processing engine
@@ -50,25 +51,25 @@ class Cube(metaclass=ABCMeta):
         self.engine = engine
         self.processors = processors if processors is not None else []
         self.event_screener = event_screener
-        self.bin_processors = kwargs.get('bin_processors', [])
+        self.bin_processors = kwargs.get("bin_processors", [])
         # Reduction passed to utils.reduce_by_key to combine bins from different
         # workers (simple sum):
         self.reduction_func = lambda x, y: x + y
-    
+
     def add_processors(self, processors):
         """
         Add one or more processors to the cube's list of processors to run on each event.
         This method extends the existing list of processors by adding new processor(s).
-        
+
         Parameters
         ----------
         processors : object or list
             A single processor object or a list of processor objects to be added
-        
+
         Returns
         -------
         None
-        
+
         Examples
         --------
         >>> cube.add_processors(my_processor)
@@ -78,24 +79,24 @@ class Cube(metaclass=ABCMeta):
         if not isinstance(processors, list):
             processors = [processors]
         self.processors.extend(processors)
-    
+
     def set_event_screener(self, screener: event_screener.EventScreener):
         self.event_screener = screener
-    
+
     def add_bin_processors(self, processors):
         """
         Add one or more processors to the cube's list of processors at the end of each bin.
         This method extends the existing list of processors by adding new processor(s).
-        
+
         Parameters
         ----------
         processors : object or list
             A single processor object or a list of processor objects to be added
-        
+
         Returns
         -------
         None
-        
+
         Examples
         --------
         >>> cube.add_processors(my_processor)
@@ -113,21 +114,21 @@ class Cube(metaclass=ABCMeta):
             proc_data = self.engine(evt, proc)
             evt_data.update(proc_data)
         return evt_data
-    
+
     def reduce_bin_data(self, binned_data, new_data):
         """
         Reduce cube data by applying a reduction function recursively based on binned data structure.
-        
+
         Parameters
         ----------
         data : dict
             The input data to be reduced according to the cube's binning structure.
-        
+
         Returns
         -------
         array-like
             The reduced data following the cube's binning structure and reduction function.
-        
+
         Notes
         -----
         This method uses the cube's pre-defined binned_data structure and reduction_func
@@ -135,20 +136,20 @@ class Cube(metaclass=ABCMeta):
         level of the binned data hierarchy.
         """
         return reduce_by_key(binned_data, new_data, self.reduction_func)
-    
-    def send_bin(self, binned_data: dict, dest: int = size-1) -> None:
+
+    def send_bin(self, binned_data: dict, dest: int = size - 1) -> None:
         """
         Send the binned data to the server node.
-        
+
         Parameters
         ----------
         binned_data : dict
             The binned data to be sent to the server node.
-        
+
         Returns
         -------
         None
-        
+
         Notes
         -----
         This method is intended to be called on the backend nodes (BD) to send the
@@ -156,12 +157,10 @@ class Cube(metaclass=ABCMeta):
         """
         if COMM != MPI.COMM_NULL:
             msg = SrvCubeMessage(
-                msg_type = SrvMsgType.NEW_BIN,
-                sender = rank,
-                payload = binned_data
+                msg_type=SrvMsgType.NEW_BIN, sender=rank, payload=binned_data
             )
             COMM.send(msg, dest=dest)  # The last rank is the srv node
-    
+
     @abstractmethod
     def run(self):
         """
@@ -176,19 +175,22 @@ class CubeFlyScan(Cube):
     def run(self):
         for nevt, evt in enumerate(self._run.events()):
             if nevt % 500 == 0:
-                print(f'rank {rank}: {nevt}')
+                print(f"rank {rank}: {nevt}")
             evt_data = {}
             evt_data = self.process_event(evt)
 
 
 class CubeStepScan(Cube):
-    def __init__(self, run: psana.psexp.run.Run,
-                 engine: callable = event_engine.smalldata_tools_engine,
-                 processors: list = None):
+    def __init__(
+        self,
+        run: psana.psexp.run.Run,
+        engine: callable = event_engine.smalldata_tools_engine,
+        processors: list = None,
+    ):
         super().__init__(run, engine, processors)
         self.step = None
         self.step_data = {}
-    
+
     def get_scan_detector(self) -> dict:
         """
         Get the step detector from the run object.
@@ -214,11 +216,11 @@ class CubeStepScan(Cube):
 
             logger.debug(f"Step values: {step_data}")
             binned_data = {}
-            
+
             # Loop over events in the step
             for nevt, evt in enumerate(step.events()):
                 if nevt % 2500 == 0:
-                    print(f'rank {rank}: {nevt}')
+                    print(f"rank {rank}: {nevt}")
 
                 # Check if event passes filters and get potential cube label
                 cube_label = None
@@ -226,7 +228,7 @@ class CubeStepScan(Cube):
                     passes, cube_label = self.event_screener.apply(evt)
                     if not passes:
                         continue
-                
+
                 # Get and process the event data
                 evt_data = {}
                 evt_data = self.process_event(evt)
@@ -237,24 +239,23 @@ class CubeStepScan(Cube):
                 if cube_label not in binned_data:
                     binned_data[cube_label] = {}
                 binned_data[cube_label] = self.reduce_bin_data(
-                    binned_data[cube_label],
-                    evt_data
+                    binned_data[cube_label], evt_data
                 )
-                
+
             # Format and send the binned data to the srv node. Each label is sent
             # separately.
             for label, binned_dict in binned_data.items():
                 logger.debug(f"Formatting binned data for label {label}")
                 bin_data = BinData(
-                    cube_label = label,
-                    bin_index = step_data['step_value'] - 1,  # step value starts at 1
-                    bin_info = step_data,
-                    data = binned_dict
+                    cube_label=label,
+                    bin_index=step_data["step_value"] - 1,  # step value starts at 1
+                    bin_info=step_data,
+                    data=binned_dict,
                 )
-                self.send_bin(bin_data, dest=size-1)
-            
+                self.send_bin(bin_data, dest=size - 1)
+
         msg = SrvCubeMessage(msg_type=SrvMsgType.DONE, sender=rank)
-        COMM.send(msg, dest=size-1)
+        COMM.send(msg, dest=size - 1)
         logger.debug(f"Rank {rank}: Done with {nstep} steps.")
 
 
@@ -266,14 +267,14 @@ def get_cube(
     Factory function to create a Cube object based on run type.
     This function determines whether the input run is a step scan or fly scan and
     returns the appropriate Cube object instance.
-    
+
     Parameters
     ----------
     run : psana.psexp.run.Run
         The psana run object to create a cube from
     engine : callable, optional
         The engine to use for processing events, defaults to smalldata_tools_engine
-    
+
     Returns
     -------
     Cube

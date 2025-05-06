@@ -1,4 +1,4 @@
-from enum import Enum  #, StrEnum py3.11)
+from enum import Enum  # , StrEnum py3.11)
 import logging
 import time
 
@@ -7,16 +7,17 @@ logger = logging.getLogger(__name__)
 
 
 class PsanaNode(str, Enum):
-    SMD0 = 'SMD0'
-    EB = 'EB'
-    BD = 'BD'
-    SRV = 'SRV'
+    SMD0 = "SMD0"
+    EB = "EB"
+    BD = "BD"
+    SRV = "SRV"
 
 
 def reduce_by_key(reduced: dict, new_data: dict, reduction_func: callable) -> dict:
     """
-    Recursively reduce the new data by the keys of the reduced data using the provided reduction function.
-    
+    Recursively reduce the new data by the keys of the reduced data using the provided
+    reduction function.
+
     Parameters
     ----------
     reduced : dict
@@ -24,8 +25,9 @@ def reduce_by_key(reduced: dict, new_data: dict, reduction_func: callable) -> di
     new_data : dict
         The new data to be added to the reduced dictionary.
     reduction_func : callable
-        The function to reduce the data. It should take two arguments: the existing value and the new value.
-    
+        The function to reduce the data. It should take two arguments: the existing
+        value and the new value.
+
     Returns
     -------
     dict
@@ -55,13 +57,16 @@ def append_reduction(reduced, new):
 
 def timing_decorator(func):
     """Decorator to measure execution time of methods."""
+
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         end = time.perf_counter()
         logger.debug(f"{func.__name__} took {(end-start)*1000:.2f} ms")
         return result
+
     return wrapper
+
 
 # Add @timing_decorator above any method you want to time, for example:
 # @timing_decorator

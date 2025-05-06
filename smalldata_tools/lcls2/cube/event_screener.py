@@ -38,7 +38,6 @@ Examples 2
 - Composite filters can combine multiple conditions using AND/OR logic
 """
 
-
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -57,7 +56,7 @@ class EventScreener(ABC):
     The EventScreener provides a common interface for implementing various event filtering
     criteria. Each concrete implementation should define specific logic for determining
     whether an event passes certain conditions.
-    
+
     Examples
     --------
     >>> class ThresholdScreener(EventScreener):
@@ -65,7 +64,7 @@ class EventScreener(ABC):
     ...         return self.get_scalar_value(evt) > threshold
     >>> screener = ThresholdScreener(detector, 'value', label='above_threshold')
     >>> passes, label = screener.apply(event)
-    
+
     Notes
     -----
     Concrete implementations must override the `passes` method to define specific
@@ -73,11 +72,7 @@ class EventScreener(ABC):
     filter application across all implementations.
     """
 
-    def __init__(
-        self, detector: Any,
-        data_key: str,
-        label: Optional[str] = None
-    ):
+    def __init__(self, detector: Any, data_key: str, label: Optional[str] = None):
         """
         Parameters
         ----------
@@ -91,17 +86,17 @@ class EventScreener(ABC):
         self.detector = detector
         self.data_key = data_key
         self.label = label
-    
+
     @abstractmethod
     def passes(self, value: Union[float, int, bool]) -> bool:
         """
         Check if the event passes this filter.
-        
+
         Parameters
         ----------
         value : Union[float, int, bool]
             The value to be checked against the filter criteria
-            
+
         Returns
         -------
         bool
@@ -112,12 +107,12 @@ class EventScreener(ABC):
     def apply(self, evt: psana.event.Event) -> Tuple[bool, Optional[str]]:
         """
         Apply the filter and return result and label if passed.
-        
+
         Parameters
         ----------
         evt : psana.event.Event
             The event to be screened
-            
+
         Returns
         -------
         Tuple[bool, Optional[str]]
@@ -131,7 +126,7 @@ class EventScreener(ABC):
         if result and self.label:
             return True, self.label
         return result, None
-    
+
     def get_scalar_value(self, evt: psana.event.Event) -> Union[float, int, bool]:
         """
         Return the scalar value from the detector data. It is assumed that the
@@ -139,7 +134,7 @@ class EventScreener(ABC):
 
         If the detector does not return a scalar natively, this method must be
         overridden in the subclass to provide the appropriate logic.
-        
+
         Parameters
         ----------
         evt : psana.event.Event
@@ -148,18 +143,18 @@ class EventScreener(ABC):
         return data[self.data_key] if isinstance(data, dict) else data
 
 
-class ThresholdFilter(EventScreener):    
+class ThresholdFilter(EventScreener):
     def __init__(
         self,
         detector: Any,
         data_key: str,
         threshold: float,
         greater_than: bool = True,
-        label: Optional[str] = None
+        label: Optional[str] = None,
     ):
         """
         Filter that checks if a detector's value is above/below a threshold.
-        
+
         Parameters
         ----------
         detector : Any
@@ -172,23 +167,23 @@ class ThresholdFilter(EventScreener):
             If True, passes events where detector value > threshold
             If False, passes events where detector value < threshold
             Default is True
-        label : str, optional 
+        label : str, optional
             Optional label for the cube.
             Default is None
         """
         super().__init__(detector_name, data_key, label=label)
         self.threshold = threshold
         self.greater_than = greater_than
-    
-    def passes(self, value) -> bool:        
+
+    def passes(self, value) -> bool:
         if value is None:
             return False
-        
+
         if self.greater_than:
             return value > self.threshold
         else:
             return value < self.threshold
-    
+
     def __str__(self) -> str:
         operator = ">" if self.greater_than else "<"
         label_str = f" [{self.label}]" if self.label else ""
@@ -196,14 +191,15 @@ class ThresholdFilter(EventScreener):
 
 
 class RangeFilter(EventScreener):
-    """ Filter that checks if a detector's value is within a specified range."""
+    """Filter that checks if a detector's value is within a specified range."""
+
     def __init__(
         self,
         detector: Any,
         data_key: str,
         min_value: float,
         max_value: float,
-        label: Optional[str] = None
+        label: Optional[str] = None,
     ):
         """
         Parameters
@@ -220,12 +216,12 @@ class RangeFilter(EventScreener):
         super().__init__(detector, data_key, label=label)
         self.min_value = min_value
         self.max_value = max_value
-    
+
     def passes(self, value) -> bool:
         if value is None:
             return False
         return self.min_value <= value <= self.max_value
-    
+
     def __str__(self) -> str:
         brackets = "[]"
         label_str = f" [{self.label}]" if self.label else ""
@@ -233,13 +229,14 @@ class RangeFilter(EventScreener):
 
 
 class BoolFilter(EventScreener):
-    """ Filter that checks if a detector's boolean value matches the expected state."""
+    """Filter that checks if a detector's boolean value matches the expected state."""
+
     def __init__(
         self,
         detector,
         data_key: str,
         expected_state: bool = True,
-        label: Optional[str] = None
+        label: Optional[str] = None,
     ):
         """
         Parameters
@@ -256,11 +253,11 @@ class BoolFilter(EventScreener):
         """
         super().__init__(detector, data_key, label=label)
         self.expected_state = expected_state
-    
+
     def passes(self, value) -> bool:
         if value is None:
             return False
-        
+
         # Convert value to boolean if it's not already
         if not isinstance(value, bool):
             # For scalar values, treat non-zero as True
@@ -268,22 +265,20 @@ class BoolFilter(EventScreener):
                 value = bool(value)
             except (ValueError, TypeError):
                 return False
-        
+
         return value == self.expected_state
-    
+
     def __str__(self) -> str:
         state_str = "True" if self.expected_state else "False"
         label_str = f" [{self.label}]" if self.label else ""
         return f"{self.detector.name} is {state_str}{label_str}"
 
 
-
-
 class CompositeFilter(EventScreener):
     """
     Filter that combines multiple filters using logical operations.
     """
-    
+
     def __init__(
         self,
         filters: List[EventScreener],
@@ -292,7 +287,7 @@ class CompositeFilter(EventScreener):
     ):
         """
         Initialize a composite event screener.
-        
+
         Parameters
         ----------
         filters : List[EventScreener]
@@ -306,30 +301,30 @@ class CompositeFilter(EventScreener):
             labels of the underlying filters that passes.
         """
         # Use a dummy key for the base class
-        super().__init__(None, 'composite', label=label)
+        super().__init__(None, "composite", label=label)
         self.filters = filters
         self.require_all = require_all
-    
+
     def get_scalar_value(self, evt: psana.event.Event) -> None:
         """Override to prevent using the base class implementation."""
         return None
-    
+
     def passes(self, value: Any) -> bool:
         """
         This is a placeholder to satisfy the abstract method requirement.
         The actual logic is in apply().
         """
         return False  # Never called directly
-    
+
     def apply(self, evt: psana.event.Event) -> Tuple[bool, Optional[str]]:
         """
         Apply the filter and determine the appropriate label.
-        
+
         Parameters
         ----------
         evt : psana.event.Event
             The event to filter
-            
+
         Returns
         -------
         Tuple[bool, Optional[str]]
@@ -355,20 +350,20 @@ class CompositeFilter(EventScreener):
                     any_pass = True
                     if label:
                         passing_labels.append(label)
-            
+
             if not any_pass:
                 return False, None
-        
+
         # If this composite has a label, use it
         if self.label:
             return True, self.label
-        
-        # Otherwise, concatenate labels from passing filters        
+
+        # Otherwise, concatenate labels from passing filters
         if passing_labels:
-            return True, '_'.join(passing_labels)
+            return True, "_".join(passing_labels)
         else:
             return True, None
-    
+
     def __str__(self) -> str:
         """Return a string representation of the composite filter."""
         operation = "AND" if self.require_all else "OR"
