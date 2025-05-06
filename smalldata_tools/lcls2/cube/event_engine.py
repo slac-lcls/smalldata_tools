@@ -7,7 +7,7 @@ The engine must return data in a nested dictionary format, where the key is the 
 name or detector identifier, and the value is the corresponding data, in an int, float, array,
 list or dictionary format.
 If in a dictionary form, it is recommended to add a count key to keep track of
-the number of events processed for that processor just before returning the data: 
+the number of events processed for that processor just before returning the data:
 data.update['count'] = 1
 """
 
