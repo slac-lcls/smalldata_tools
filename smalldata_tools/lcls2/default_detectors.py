@@ -97,10 +97,11 @@ class genericDetector(DefaultDetector):
     veto fields.
     """
 
-    def __init__(self, detname, run=None, name=None):
+    def __init__(self, detname, run=None, name=None, var_fields=None):
         if name is None:
             name = detname
         super().__init__(detname, name, run)
+        self._var_fields = var_fields
         if self.in_run():
             self._data_field, self._sub_fields = self.get_fields("raw")
 
@@ -108,23 +109,32 @@ class genericDetector(DefaultDetector):
         dl = {}
         if self._data_field is not None:
             for field in self._sub_fields:
+                if self._var_fields is not None and field in self._var_fields:
+                    field_name = f"var_{field}"
+                else:
+                    field_name = field
                 dat = getattr(self._data_field, field)(evt)
                 if dat is None:
                     continue
-                dl[field] = dat
-                if isinstance(dl[field], list):
-                    dl[field] = np.array(dl[field])
+                dl[field_name] = dat
+                if isinstance(dl[field_name], list):
+                    dl[field_name] = np.array(dl[field_name])
         return dl
 
 
 class ttDetector(DefaultDetector):
-    def __init__(self, detname, run=None, saveTraces=False):
+    def __init__(self, detname, run=None, saveTraces=False, iocTimetool=False):
         self._veto_fields = ["TypeId", "Version", "calib", "image", "raw", "config"]
         super().__init__(detname, "tt", run)
         self.saveTraces = saveTraces
+        self.iocTimetool = iocTimetool
         if self.in_run():
-            self._data_field, self._sub_fields = self.get_fields("ttfex")
-            if self.saveTraces:
+            if iocTimetool:
+                fields_name = "raw"
+            else:
+                fields_name = "ttfex"
+            self._data_field, self._sub_fields = self.get_fields(fields_name)
+            if self.saveTraces and not self.iocTimetool:
                 self.proj_field, self.proj_sub_fields = self.get_fields("ttproj")
 
     def data(self, evt):
@@ -134,6 +144,17 @@ class ttDetector(DefaultDetector):
                 dat = getattr(self._data_field, field)(evt)
                 if dat is None:
                     continue
+                if self.iocTimetool:
+                    if field == "value":
+                        dl["fltpos"] = dat[0]
+                        dl["fltpos_ps"] = dat[1]
+                        dl["fltposfwhm"] = dat[2]
+                        dl["ampl"] = dat[3]
+                        dl["amplnxt"] = dat[4]
+                        dl["refampl"] = dat[5]
+                        return dl
+                    else:
+                        continue
                 dl[field] = dat
                 if isinstance(dl[field], list):
                     dl[field] = np.array(dl[field])
@@ -245,6 +266,58 @@ class lightStatus(DefaultDetector):
             for lOff in self.laserCodes_req:
                 if event_codes[lOff]:
                     laser_status = 1
+
+        dl = {"xray": xfel_status, "laser": laser_status}
+        return dl
+
+
+class lightStatusLcls1Timing(DefaultDetector):
+    def __init__(self, beam_las_codes, run):
+        """
+        Parameters
+        ----------
+        destination : <enum 'BeamDestination'>
+            X-ray beam destination. See enum definition in hutch_default.py
+        beam_las_codes : list of list of int
+            First list is for x-ray codes, second list is for laser codes.
+            Positive values are event codes marking dropped shots
+            Negative values are event codes marking requested shots
+        """
+        super().__init__("timing", "lightStatus", run)
+
+        beam_codes = beam_las_codes[0]
+        laser_codes = beam_las_codes[1]
+
+        self.laserCodes_drop = [c for c in laser_codes if c > 0]
+        self.laserCodes_req = [-c for c in laser_codes if c < 0]
+
+        self.beamCodes_drop = [c for c in beam_codes if c > 0]
+        self.beamCodes_req = [-c for c in beam_codes if c < 0]
+
+    def data(self, evt):
+        xfel_status, laser_status = (0, 1)  # Can we make laser default to 0 as well?
+        # laser
+        event_codes = self.det.raw.eventcodes(evt)
+
+        for lOff in self.laserCodes_drop:
+            laser_status = 1
+            if event_codes[lOff]:
+                laser_status = 0
+        if len(self.laserCodes_req) > 0:
+            laser_status = 0
+            for lOn in self.laserCodes_req:
+                if event_codes[lOn]:
+                    laser_status = 1
+
+        for bOff in self.beamCodes_drop:
+            xfel_status = 1
+            if event_codes[bOff]:
+                xfel_status = 0
+        if len(self.beamCodes_req) > 0:
+            xfel_status = 0
+            for bOn in self.beamCodes_req:
+                if event_codes[bOn]:
+                    xfel_status = 1
 
         dl = {"xray": xfel_status, "laser": laser_status}
         return dl
