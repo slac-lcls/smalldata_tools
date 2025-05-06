@@ -4,10 +4,65 @@ import logging
 
 from psmon import publish
 from psmon.plots import Image, XYPlot, MultiPlot
+from scipy.ndimage import rotate 
 
 
 logger = logging.getLogger(__name__)
 
+def process_VLS_2D(vls, bg_roi = [[120,-1],[20,100]],threshold_min=20,threshold_max=4000,photon_count = False,rotate = False):
+    #bgs = vls[bg_roi[0][0]:bg_roi[0][1],bg_roi[1][0]:bg_roi[1][1]].mean(axis = (1,2))
+    #im_nbg = vls - bgs[:,np.newaxis,np.newaxis]
+    #astd,amean = im_nbg[bg_roi[0][0]:bg_roi[0][1],bg_roi[1][0]:bg_roi[1][1]].std(),im_nbg[bg_roi[0][0]:bg_roi[0][1],bg_roi[1][0]:bg_roi[1][1]].mean()
+    im_nbg = vls-717
+    im_proc = im_nbg.copy()
+    im_proc[im_proc>threshold_max] = 0
+    im_proc[im_proc<threshold_min] = 0
+    if photon_count:
+        im_proc[im_proc>threshold_min] = 1
+    if rotate:
+        # Rotate the frames by X degrees. The second input is the angle in degrees. 
+        im_proc = rot(im_proc,4.5,axes=(2,1))
+        im_proc = im_proc[:,12:127,:]
+    return im_proc
+
+    
+def process_ANDOR_Basic(andor, bg_roi_x = [0,100],bg_roi_y=[0,100],\
+                        absolute_theshold = False,threshold = False,photon_count = False,\
+                        threshold_min=4, threshold_max=4000):
+    # 1D processing
+    if len(andor.shape) ==2:
+        andor_nbg = subtract_bg(andor,bg_roi_x)
+        andor_proc = andor_nbg.copy()
+        if threshold:
+            astd,amean = andor_nbg[:,bg_roi_x[0]:bg_roi_x[1]].std(),andor_nbg[:,bg_roi_x[0]:bg_roi_x[1]].mean()
+            andor_proc[andor_proc>threshold_max] = 0
+            if absolute_threshold:
+                andor_proc[andor_proc<(threshold_min)] = 0
+            else:
+                andor_proc[andor_proc<(threshold_min*astd)] = 0
+            if photon_count:
+                andor_proc[andor_proc>threshold_min] = 1
+    elif len(andor.shape)==3:
+        # Shape of full image is (2048 x 512)
+        bgs = andor[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].mean(axis = (1,2))
+        andor_nbg = andor - bgs[:,np.newaxis,np.newaxis]
+        andor_proc = andor_nbg.copy()
+        if threshold:
+            astd = andor_nbg[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].std()
+            amean = andor_nbg[:,bg_roi_y[0]:bg_roi_y[1],bg_roi_x[0]:bg_roi_x[1]].mean()
+            andor_proc[andor_proc>threshold_max] = 0
+            if absolute_threshold:
+                andor_proc[andor_proc<(threshold_min)] = 0
+            else:
+                andor_proc[andor_proc<(threshold_min*astd)] = 0
+            if photon_count:
+                andor_proc[andor_proc>threshold_min] = 1
+    return andor_proc
+def sum_ANDOR(andor_ims):
+    if len(andor_ims.shape) ==2:
+        return np.sum(andor_ims,axis = 1)
+    elif len(andor_ims.shape) ==3:
+        return np.sum(andor_ims,axis = (1,2))
 
 class PsplotCallbacks:
     def __init__(self):
@@ -45,6 +100,8 @@ class PsplotCallback(metaclass=ABCMeta):
         for key, val in self.data_fields.items():
             if isinstance(val, str):
                 needed.append(val)
+            elif isinstance(val, list):
+                [needed.append(v) for v in val]
         return needed
 
 
@@ -58,7 +115,10 @@ class PsplotScan(PsplotCallback, metaclass=ABCMeta):
         self.i0_binned = None
         self.counts = None
         self.bins = bins
-        self.nbins = self.bins.size + 1
+        if isinstance(self.bins, list):
+            self.nbins = [b.size+1 for b in self.bins]
+        else:
+            self.nbins = self.bins.size + 1
         return
 
     @abstractmethod
@@ -71,45 +131,128 @@ class SpectrumScan(PsplotScan):
         print(f"kwargs: {kwargs}")
         self._range = kwargs.pop("spectrum_range", None)
         self._lineouts_idx = kwargs.pop("lineouts_idx", None)
+        self._labels = kwargs.pop('labels', None)
         super().__init__(bins=bins, **kwargs)
         return
 
     def process(self, data_dict):
-        det_dat = data_dict[self.data_fields["data"]]
+        evc_laser_off = 273
+        evc_laser_on = 273
+
+        # VLS processing 
+        im = data_dict[self.data_fields["data"]]
+        #vls_bg = np.nanmean(im[480:510,20:80],axis = (0,1))
+        #vls_background_subtracted = im - vls_bg[np.newaxis,np.newaxis]
+        #vls_rotated = rotate(vls_background_subtracted,4.5,order=3,axes = (1,0),cval=0)
+        #vls_cropped = vls_rotated[11:510,:]
+        det_dat =process_ANDOR_Basic(im)
+
+
+        
         i0_dat = data_dict[self.data_fields["norm"]]
         count = data_dict[self.data_fields["count"]]
-        scan_var = data_dict[self.data_fields["scan"]] / count
+        scan_vars = [data_dict[ss]/count for ss in self.data_fields["scan_var"]]
+        evc = data_dict[self.data_fields["evc"]]
 
+        # Processing of the detectors
         if self._range is not None:
             det_dat = det_dat[self._range[0] : self._range[1]]
-        i0_dat = np.nansum(i0_dat)
+        i0_dat = np.nansum(i0_dat[4:])
 
         if self.det_binned is None:
-            self.det_binned = np.zeros((self.nbins, *det_dat.shape))
-            self.i0_binned = np.zeros((self.nbins))[:, np.newaxis]
-            self.counts = np.zeros((self.nbins))[:, np.newaxis]
-            print(f"SHAPE: {self.det_binned.shape}")
+            self.det_binned = [np.zeros((nb, *det_dat.shape)) for nb in self.nbins]
+            self.i0_binned = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
+            self.counts = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
 
-        bin_idx = np.digitize(scan_var, self.bins)
-        self.det_binned[bin_idx] += det_dat
-        self.i0_binned[bin_idx, :] += i0_dat
-        self.counts[bin_idx, :] += count
+            self.det_binned_on = [np.zeros((nb, *det_dat.shape)) for nb in self.nbins]
+            self.i0_binned_on = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
+            self.counts_on = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
 
-        im = self.det_binned / self.i0_binned
-        im /= np.nanmean(im)  # make it a nicer range to work with in the plot
-        im[np.where(im == 0)] = np.nan
+            self.det_binned_off = [np.zeros((nb, *det_dat.shape)) for nb in self.nbins]
+            self.i0_binned_off = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
+            self.counts_off = [np.zeros((nb))[:, np.newaxis] for nb in self.nbins]
+            print([f"SHAPE: {db.shape}" for db in self.det_binned])
 
-        scan_plot = Image(0, "Spectrum Scan", im, aspect_lock=False)
-        publish.send("spectrum_scan", scan_plot)
+            self.det_binned_diff = [np.zeros((nb, *det_dat.shape)) for nb in self.nbins]
 
-        ys = []
-        for ii, idx in enumerate(self._lineouts_idx):
-            x = self.bins
-            y = im[:-1, idx]  # cut last bin to match shape
-            ys.append(y)  # lineouts at idx
-        lineouts = XYPlot(0, f"Spectrum Lineout", x, ys, leg_label=self._lineouts_idx)
-        publish.send(f"spectrum_lineout", lineouts)
+        for ii, (scan_var, bins, nbs) in enumerate(zip(scan_vars, self.bins, self.nbins)):
+            print(scan_var,bins,np.digitize(scan_var, bins))
+            bin_idx = np.digitize(scan_var, bins)
 
+            self.det_binned[ii][bin_idx] += det_dat
+            self.i0_binned[ii][bin_idx, :] += i0_dat
+            self.counts[ii][bin_idx, :] += count
+            im = self.det_binned[ii] / self.i0_binned[ii]
+            im /= np.nanmean(im)  # make it a nicer range to work with in the plot
+            im[np.where(im == 0)] = np.nan
+            scan_plot = Image(0, f"{self._labels[ii]}", im, aspect_lock=False)
+            publish.send(f"{self._labels[ii]}_scan_all", scan_plot)
+            y = np.nanmean(im[:-1,self._lineouts_idx[0]:self._lineouts_idx[1]],axis = 1)
+            x = bins
+            pfy_all = XYPlot(0, f"{self._labels[ii]} Lineout", x, y)
+            publish.send(f"{self._labels[ii]}_scan_pfy_all", pfy_all)
+
+
+            if (evc[evc_laser_off]/count)<0.5:
+                # Pumped analysis
+                self.det_binned_on[ii][bin_idx] += det_dat
+                self.i0_binned_on[ii][bin_idx, :] += i0_dat
+                self.counts_on[ii][bin_idx, :] += count
+
+                #scan_plot_on = Image(0, f"{self._labels[ii]}", im_on, aspect_lock=False)
+
+            else:
+                # Unumped analysis
+                self.det_binned_off[ii][bin_idx] += det_dat
+                self.i0_binned_off[ii][bin_idx, :] += i0_dat
+                self.counts_off[ii][bin_idx, :] += count
+                
+                #scan_plot_off = Image(0, f"{self._labels[ii]}", im_off, aspect_lock=False)
+
+            # Calculate things to plot
+            im_on = self.det_binned_on[ii] / self.i0_binned_on[ii]
+            im_on /= np.nanmean(im_on)  # make it a nicer range to work with in the plot
+            im_on[np.where(im_on == 0)] = np.nan
+            pfy_on = np.nanmean(im_on[:-1,self._lineouts_idx[0]:self._lineouts_idx[1]],axis = 1)
+            em_on = np.nanmean(im_on,axis = 0)
+
+            im_off = self.det_binned_off[ii] / self.i0_binned_off[ii]
+            im_off /= np.nanmean(im_off)  # make it a nicer range to work with in the plot
+            im_off[np.where(im_off == 0)] = np.nan
+            pfy_off = np.nanmean(im_off[:-1,self._lineouts_idx[0]:self._lineouts_idx[1]],axis = 1)
+            em_off = np.nanmean(im_off,axis = 0)
+
+            self.det_binned_diff[ii] = (self.det_binned_on[ii] / self.i0_binned_on[ii]) - (self.det_binned_off[ii] / self.i0_binned_off[ii])
+            im_diff = self.det_binned_diff[ii]
+            im_diff /= np.nanmean(im_diff)
+            pfy_diff = np.nanmean(im_diff[:-1,self._lineouts_idx[0]:self._lineouts_idx[1]],axis = 1)
+            em_diff = np.nanmean(im_diff,axis = 0)
+
+            scan_plot_on = Image(0, f"{self._labels[ii]} scan pumped", im_on, aspect_lock=False)
+            scan_plot_off = Image(0, f"{self._labels[ii]} scan unpumped", im_off, aspect_lock=False)
+            scan_plot_diff = Image(0, f"{self._labels[ii]} scan difference", im_diff, aspect_lock=False)
+            publish.send(f"{self._labels[ii]}_scan_diff", scan_plot_diff)
+            
+            multiplot_RIXS = MultiPlot(0,'RIXS',ncols = 2)
+            multiplot_RIXS.add(scan_plot_on)
+            multiplot_RIXS.add(scan_plot_off) 
+            publish.send(f"{self._labels[ii]}_scan_onoff",multiplot_RIXS)
+            
+            pfy_diff_plot = XYPlot(0, f"{self._labels[ii]} scan PFY difference", x, pfy_diff)
+            pfy_on_off_plot = XYPlot(0, f"{self._labels[ii]}  scan PFY", [x,x], [pfy_on,pfy_off],formats = ['.-','x-'],leg_label = ['Pumped','Unpumped'])
+            multiplot_PFY = MultiPlot(0,'PFY difference',ncols = 2)
+            multiplot_PFY.add(pfy_on_off_plot)
+            multiplot_PFY.add(pfy_diff_plot)
+            publish.send(f"{self._labels[ii]}_scan_pfy_diff",multiplot_PFY)
+
+            em_diff_plot = XYPlot(0, f"{self._labels[ii]} scan emission difference", x, em_diff)
+            em_on_off_plot = XYPlot(0, f"{self._labels[ii]}  scan emission", [x,x], [em_on,em_off],formats = ['.-','x-'],leg_label = ['Pumped','Unpumped'])
+            multiplot_em = MultiPlot(0,'Emission difference',ncols = 2)
+            multiplot_em.add(em_on_off_plot)
+            multiplot_em.add(em_diff_plot)
+            publish.send(f"{self._labels[ii]}_scan_emission",multiplot_em)
+
+            
 
 # DOCUMENTATION
 # XYPlot(

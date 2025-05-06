@@ -202,14 +202,17 @@ def get_psplot_configs(run):
         andor_vls = {
             'callback' : psplot.SpectrumScan,
             'data_fields' : {
-                'data' : 'andor_vls/unaligned_hitfinder',
-                'norm' : 'andor_vls/unaligned_norm_det_rix_fim1_sum_wfintegrate',
-                'count' : 'andor_vls/unaligned_norm_count',
-                'scan' : 'andor_vls/unaligned_norm_scan_sum_mono_ev',
+                'data' : 'andor_vls/grp_intg_full_area',
+                'norm' : 'andor_vls/grp_intg_norm_det_rix_fim1_sum_wfintegrate',
+                'count' : 'andor_vls/grp_intg_norm_count',
+                'evc': 'andor_vls/grp_intg_norm_timing_sum_eventcodes',
+                'scan_var' : ['andor_vls/grp_intg_norm_scan_sum_mono_ev', 'andor_vls/grp_intg_norm_scan_sum_step_value']
             },
-            'bins' : np.linspace(520, 540, 30),
-            'spectrum_range' : (900, 1050),
-            'lineouts_idx' : (50, 70, 100)
+            #'bins' : [np.arange(387.9,410.2,0.2), np.arange(-0.5,50.5,1)],
+            'bins' : [np.arange(519.9,535,0.2), np.arange(-0.5,50.5,1)],
+            'spectrum_range' : (0, 512),
+            'lineouts_idx' : (0, -1),
+            'labels': ['Energy','Step']
         }
         configs['andor_vls'] = andor_vls
     return configs
