@@ -1,0 +1,7 @@
+- Fly scan:
+    - Add to specific index in h5
+    - datasource callback for destination (kinda done during testing)
+- Add detector metadata to h5 (ped, gain, pixel coord, etc)
+- Add processing pipeline on the binned data
+- Speed-up event screening
+- Processor file for each hutch / experiment type?

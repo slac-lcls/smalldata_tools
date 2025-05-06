@@ -1,0 +1,156 @@
+import os
+import sys
+import time
+import numpy as np
+import psana
+from mpi4py import MPI
+
+COMM = MPI.COMM_WORLD
+rank = COMM.Get_rank()
+size = COMM.Get_size()
+
+import logging
+
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import smalldata_tools
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+log_format = smalldata_tools.LogConfig.FullFormat
+
+handler = logging.StreamHandler()
+formatter = logging.Formatter(log_format)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+from smalldata_tools.lcls2.cube.utils import PsanaNode
+
+
+def parse_args():  # move to another file?
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Arguments for LCLS2 cube processing.")
+    parser.add_argument(
+        "-r", "--run",
+        type=int,
+        default=int(os.environ.get("RUN_NUM", "")), 
+        help="Run number to process"
+    )
+    parser.add_argument(
+        "-e", "--exp",
+        type=str,
+        default=os.environ.get("EXPERIMENT", ""),
+        help="Experiment name"
+    )
+    parser.add_argument(
+        "--batchsize", type=int, default=1024, help="Batch size for processing"
+    )
+    parser.add_argument("--nevents", help="number of events", type=int, default=-1)
+    partser.add_argument("--directory", help="directory to save the output", type=str, default=None)
+    return parser.parse_args()
+
+
+start_time = time.time()
+
+args = parse_args()
+exp = args.exp
+run = args.run
+
+# Setup datasource
+run = 520
+exp = 'rixx1017523'
+
+os.environ["PS_SMD_N_EVENTS"] = f"{args.batchsize}"  # SMD0 to EB batches
+
+datasource_args = {"exp": exp, "run": run}
+datasource_args['batch_size'] = args.batchsize  # EB to DB batches
+if args.nevents != -1:
+    datasource_args["max_events"] = args.nevents
+    datasource_args['max_events'] = int(10000e3)
+# datasource_args['smd_callback'] = binning_obj.smd_callback
+# datasource_args['smd_callback'] = callbacks.simple_callback
+# datasource_args['small_xtc'] = ['xgmd']
+
+ds = psana.DataSource(**datasource_args)
+myrun = next(ds.runs())
+
+if ds.unique_user_rank():
+    print("\n#### DATASOURCE AND PSANA ENV VAR INFO ####")
+    print(f"Instantiated data source with arguments: {datasource_args}")
+    print(f"MPI size: {size}")
+    print(f"PS_EB_NODES={os.environ.get('PS_EB_NODES')}")
+    print(f"PS_SRV_NODES={os.environ.get('PS_SRV_NODES')}")
+    print(f"PS_SMD_N_EVENTS={os.environ.get('PS_SMD_N_EVENTS')}")  # defaults to 1000
+    print(f"DS batchsize: {ds.batch_size}")
+    print("#### END DATASOURCE AND PSANA ENV VAR INFO ####\n")
+
+
+# Get comms and print ranks details
+psana_node = PsanaNode.SMD0 if rank == 0 else None
+
+if not ds.is_srv():
+    comms = ds.comms
+    
+    psana_comm = comms.psana_comm
+    psana_size = psana_comm.Get_size()
+    psana_rank = psana_comm.Get_rank()
+
+    bd_comm = comms.bd_comm
+    if bd_comm is not None:       
+        bd_size = bd_comm.Get_size()
+        bd_rank = bd_comm.Get_rank()
+    else:
+        bd_rank = MPI.UNDEFINED
+    
+    if bd_rank == 0:
+        psana_node = PsanaNode.EB
+    elif bd_rank > 0:
+        psana_node = PsanaNode.BD
+
+    if ds.unique_user_rank():
+        print(f"MPI COMM sizes:\tWorld: {size},\tpsana: {psana_size},\tbd: {bd_size}\n")
+        n_eb = int(os.environ.get('PS_EB_NODES'))
+        n_srv = int(os.environ.get('PS_SRV_NODES'))
+        n_bd = size - n_eb - n_srv - 1
+        print(
+            f"Callback setup: # EB nodes (total): {n_eb}, # BD nodes (total): {n_bd}, "
+            f"# BD nodes per EB: {n_bd / n_eb}\n\n"
+        )
+else:
+    print(f"SRV World Rank: {rank}")
+    psana_node = PsanaNode.SRV
+    psana_comm = MPI.COMM_NULL
+    psana_rank = MPI.UNDEFINED
+    bd_rank = MPI.UNDEFINED
+
+
+""" Main processing """
+if psana_node == PsanaNode.SRV:
+    from smalldata_tools.lcls2.cube.srv import CubeSrv
+
+    cube_srv = CubeSrv(myrun)
+    cube_srv.set_file_handle(
+        exp = exp,
+        run_num = run,
+        filepath = args.directory,
+    )
+    cube_srv.run()
+
+else:
+    import smalldata_tools.lcls2.cube as cube
+    import smalldata_tools.lcls2.cube.event_engine as event_engine
+    from smalldata_tools.lcls2.cube.processors import qrix_detectors, qrix_screener
+    
+    cube_obj = cube.cube.get_cube(myrun, engine = event_engine.smalldata_tools_engine)
+    processors = qrix_detectors(myrun)
+    cube_obj.add_processors(processors)
+    screener = qrix_screener(myrun)
+    cube_obj.set_event_screener(screener)
+    
+    cube_obj.run()
+
+
+COMM.Barrier()
+if ds.unique_user_rank():
+    print(f"### Job done; total time = {(time.time() - start_time)/60:.2f} minutes.")

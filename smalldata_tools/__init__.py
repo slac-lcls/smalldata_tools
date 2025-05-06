@@ -4,8 +4,9 @@ import logging
 class LogConfig:
     BasicFormat = "%(message)s"
     Format = "[ %(asctime)s | %(levelname)-3s] %(message)s"
-    FullFormat = "[ %(asctime)s | %(name)-13s | %(levelname)-8s] %(message)s"
+    FullFormat = "[ %(asctime)s | %(levelname)-3s | %(filename)s] %(message)s"
     Level = logging.INFO
+    # Level = logging.DEBUG
 
     @staticmethod
     def get_package_name(name):
@@ -14,3 +15,7 @@ class LogConfig:
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LogConfig.Level)
+handler = logging.StreamHandler()
+formatter = logging.Formatter(LogConfig.FullFormat)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
