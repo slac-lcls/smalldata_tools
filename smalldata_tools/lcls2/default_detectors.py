@@ -238,7 +238,7 @@ class lightStatus(DefaultDetector):
         destination : <enum 'BeamDestination'>
             X-ray beam destination. See enum definition in hutch_default.py
         laser_codes : list of int
-            Positive values are event codes marking dropped shots
+            Positive values are event codes marking dropped or goose shots
             Negative values are event codes marking requested shots
         """
         super().__init__("timing", "lightStatus", run)
