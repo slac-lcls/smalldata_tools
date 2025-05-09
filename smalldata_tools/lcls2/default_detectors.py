@@ -252,7 +252,7 @@ class usbEncoder(DefaultDetector):
             if data is not None:
                 for i in range(4):
                     if (desc := channel_descriptions[i]) != "":
-                        dl[desc] = data[desc]
+                        dl[desc] = data[i]
         return dl
 
 
