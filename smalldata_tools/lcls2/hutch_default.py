@@ -89,11 +89,13 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
-    dets.append(genericDetector("MfxD1BmMon", run))
+    dets.append(genericDetector("MfxDg1BmMon", run))
     dets.append(genericDetector("MfxDg2BmMon", run))
     dets.append(genericDetector("ebeamh", run))
     dets.append(genericDetector("pcav", run))
     dets.append(genericDetector("gasdet", run))
+    dets.append(genericDetector("qadc_ch0", run))
+    dets.append(genericDetector("qadc_ch1", run))
     # hproj can also be variable for feespec but in practice isn't...
     dets.append(
         genericDetector("feespec", run, var_fields=["FWHM", "peakPos", "peakHeight"])
@@ -102,4 +104,6 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     # dets.append(lightStatus(beam_destination, laser_codes, run))
     dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
     dets.append(epicsDetector(PVlist=["lxt", "txt"], run=run))
+    dets.append(damageDetector(run=run))
+    dets.append(usbEncoder(detname="MfxUsbEncoder01", run=run))
     return dets

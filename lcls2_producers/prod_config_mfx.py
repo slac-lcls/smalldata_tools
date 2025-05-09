@@ -4,7 +4,8 @@ import numpy as np
 # If no detector in a given category, leave the corresponding
 # list empty.
 # detectors = ['jungfrau','epix100']
-detectors = []
+detectors = ['epix100', 'alvium', 'jungfrau'] # , 'qadc1']
+#detectors = []
 integrating_detectors = []
 
 
@@ -35,11 +36,19 @@ def getROIs(run):
     ret_dict = {}
 
     jungfrau_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
-    epix100_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
+    alv_roi = {"writeArea": True, "calcPars": False, "ROI": None, "thresADU": None}
+
+    epix100_roi = {
+        "thresADU": None,
+        "writeArea": True,
+        "calcPars": False,
+        "ROI": [[0,710],[119,197]]
+    }
 
     if run > 0:
         # ret_dict['jungfrau'] = [jungfrau_roi]
-        # ret_dict['epix100'] = [epix100_roi]
+        ret_dict['epix100'] = [epix100_roi]
+        ret_dict['alvium'] = [alv_roi]
         ...
     return ret_dict
 
@@ -70,10 +79,35 @@ def get_droplet2photon(run):
         d2p_dict["nData"] = None
         d2p_dict["get_photon_img"] = False
 
-        ret_dict["epix100"] = d2p_dict
+        #ret_dict["epix100"] = d2p_dict
 
     return ret_dict
 
+def get_droplet(run):
+    ret_dict = {}
+    if run > 0:
+        dfunc_dict = {}
+        dfunc_dict["threshold"] = 110.0 / 32
+        # dfunc_dict['thresholdLow'] = 10./8
+        dfunc_dict["thresADU"] = 20.0  # 4.
+        dfunc_dict["useRms"] = False
+        ret_dict["epix100"] = dfunc_dict
+    return ret_dict
+
+def get_azav(run):
+    ret_dict = {}
+    if run > 0:
+        az_dict = {"eBeam": 9.8}  # Photon energy in keV
+        az_dict["center"] = [-1107, 918]  # Position in um
+        az_dict["dis_to_sam"] = 92.51  # try to overwrite dis_to_sam
+        az_dict["tx"] = 0  # Tilt in x in degrees
+        az_dict["ty"] = 0  # Tilt in y in degrees
+        az_dict["phiBins"] = 11  # Number of phi bins for azint
+        az_dict["qbin"] = 0.025  # Bin width in q for az int
+        az_dict["userMask"] = None
+        #ret_dict["jungfrau"] = az_dict
+
+    return ret_dict
 
 ##########################################################
 # run independent parameters
