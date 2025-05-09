@@ -39,6 +39,10 @@ def DetObject(srcName, run, **kwargs):
         "archon": ArchonObject,
         "jungfrau": JungfrauObject,
     }
+    if "alvium" in srcName:
+        cls = PVObject
+    else:
+        cls = detector_classes[det._dettype]
     cls = detector_classes[det._dettype]
     return cls(det, run, **kwargs)
 

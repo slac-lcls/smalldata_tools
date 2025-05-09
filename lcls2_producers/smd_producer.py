@@ -53,6 +53,8 @@ def define_dets(run, det_list):
     wfs_hitfinder_args = {}
     d2p_args = {}
     wfs_svd_args = {}
+    droplet_args = {}
+    azav_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -67,6 +69,10 @@ def define_dets(run, det_list):
         d2p_args = config.get_droplet2photon(run)
     if "get_wf_svd" in dir(config):
         wfs_svd_args = config.get_wf_svd(run)
+    if "get_droplet" in dir(config):
+        droplet_args = config.get_droplet(run)
+    if "get_azav" in dir(config):
+        azav_args = config.get_azav(run)
 
     dets = []
 
@@ -112,6 +118,9 @@ def define_dets(run, det_list):
         ####################################
         ######## Standard detectors ########
         ####################################
+        if detname in azav_args:
+            det.addFunc(azimuthalBinning(**azav_args[detname]))
+
         if detname in rois_args:
             # ROI extraction
             for iROI, ROI in enumerate(rois_args[detname]):
@@ -183,6 +192,15 @@ def define_dets(run, det_list):
                     det.addFunc(this_func)
             else:
                 det.addFunc(SvdFit(**wfs_svd_args[detname]))
+
+        if detname in droplet_args:
+            if "nData" in droplet_args[detname].keys():
+                nData = droplet_args[detname].pop("nData")
+            else:
+                nData = None
+            dFunc = dropletFunc(**droplet_args[detname])
+            dFunc.addFunc(sparsifyFunc(nData=nData))
+            det.addFunc(dFunc)
 
         det.storeSum(sumAlgo="calib")
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
@@ -792,7 +810,7 @@ if not ds.is_srv():
     userDataCfg = {}
     for det in default_dets:
         # Make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
-        noConfigSave = ["scan"]
+        noConfigSave = ["scan", "damage"]
         if det.name not in noConfigSave:
             userDataCfg[det.name] = det.params_as_dict()
     for det in dets:
@@ -940,13 +958,13 @@ if args.postRuntable and ds.unique_user_rank():
         with open("/sdf/group/lcls/ds/tools/forElogPost.txt") as reader:
             answer = reader.readline()
 
-    r = requests.post(
-        ws_url,
-        params={"run_num": args.run},
-        json=runtable_data,
-        auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
-    )
-    logger.debug(r)
+        r = requests.post(
+            ws_url,
+            params={"run_num": args.run},
+            json=runtable_data,
+            auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
+        )
+        logger.debug(r)
     if det_presence != {}:
         rp = requests.post(
             ws_url,
