@@ -404,6 +404,18 @@ dat['iF_sum_norm'] = dat['iF_sum']/dat[key_norm][:]
 if 'hsd1_wf' in dat.keys():
     dat['iF_sum_hsd_norm'] = dat['iF_sum_hsd']/dat[key_norm][:]
 #    dat['iF_SVD_hsd_norm'] = dat['iF_SVD_hsd']/dat[key_norm][:]
+
+if 'pir' in dat.keys():
+    # Extract PIR array
+    pir = dat['pir'][count_msk]
+    pir_norm = dat['pir'][count_msk]
+    lon = dat['laser_on'][count_msk].astype('bool')
+    nshot = np.min([len(lon[lon]),len(lon[~lon])])
+    pir_diff = pir_norm[lon][:nshot]-pir_norm[~lon][:nshot]
+    px_pir = np.arange(pir.shape[1])
+    pir_av_on = np.nanmean(pir[lon],axis = 0)
+    pir_av_off = np.nanmean(pir[~lon],axis = 0)
+    pir_av_diff = np.nanmean(pir_diff,axis = 0)
 ###################################################################################################################################################
 def click_policy(plot, element):
     plot.state.legend.click_policy = "hide"
@@ -481,7 +493,7 @@ if 'dir' in dat.keys():
     dirCorr = hv.HexTiles((i0Var,dat['iT']), kdims=[i0Dim,iTDim]).opts(title = 'I0 DIR correlation')
     iTTime = hv.Points((eventTimeR, dat['iT']), kdims=[eventTimeDim, iTDim], label='DIR Sum vs time').options(color="r")
 
-    gspecDIR = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="Transmission Summary ")
+    gspecDIR = pn.GridSpec(sizing_mode="stretch_both", max_width=1500, name="Transmission Summary ")
     gspecDIR[0:2, 0:2] = pn.Column(dir_lineout)
     gspecDIR[0:2, 2:4] = pn.Column(dirCorr)
     gspecDIR[2:4, 0:2] = pn.Column(iTTime)
@@ -526,7 +538,7 @@ if 'vls' in dat.keys():
 
     pfyTime = hv.Points((eventTimeR, dat['pfy']), kdims=[eventTimeDim, pfyDim], label='VLS sum Vs Time').options(color="r")
 
-    gspecVLS = pn.GridSpec(sizing_mode="stretch_both", max_width=700, name="VLS Summary ")
+    gspecVLS = pn.GridSpec(sizing_mode="stretch_both", max_width=1500, name="VLS Summary ")
     
     maxRow = 0
     gspecVLS[0:2, 0:2] = pn.Column(vls_lineout)
@@ -558,7 +570,7 @@ gspecAPD[2:4, 2:4] = pn.Column(iFTime)
 fim0_curves = [hv.Curve(wf, FIMPx,fim0Dim, label=f'Channel {i}') for i, wf in enumerate(fim0_av[:])]
 
 gspecFim0 = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Summed FIM traces - Run %d" % run
+    sizing_mode="stretch_both", max_width=1500, name="Summed FIM traces - Run %d" % run
 )
 
 for k, plot in enumerate(fim0_curves):
@@ -574,7 +586,7 @@ gspecFim0
 fim1_curves = [hv.Curve(wf, label=f'Channel {i}') for i, wf in enumerate(fim1_av[:])]
 
 gspecFim1 = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Summed FIM traces - Run %d" % run
+    sizing_mode="stretch_both", max_width=1500, name="Summed FIM traces - Run %d" % run
 )
 
 for k, plot in enumerate(fim1_curves):
@@ -589,7 +601,7 @@ for k, plot in enumerate(fim1_curves):
 apd_curves = [hv.Curve(wf,apdPx,apdDim, label=f'Channel {i}') for i, wf in enumerate(apd_av[:])]
 
 gspecW8 = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Summed APD traces - Run %d" % run
+    sizing_mode="stretch_both", max_width=1500, name="Summed APD traces - Run %d" % run
 )
 
 for k, plot in enumerate(apd_curves):
@@ -599,14 +611,72 @@ for k, plot in enumerate(apd_curves):
     gspecW8[irow * 3 : (irow + 1) * 3, icol * 3 : (icol + 1) * 3] = pn.Column(
         plot
     )
+
+# Piranha curves
+if 'pir' in dat.keys():
+    nplot = 200
+    downsample = int(pir.shape[0]/nplot)
+    
+    pir_raw_plot = hv.QuadMesh((px_pir, eventTimeR[count_msk][::downsample], pir[::downsample,:])).redim(
+        x=hv.Dimension('Pixel'),
+        y=hv.Dimension('Shot')
+    ).opts(
+        cmap='bwr',
+        colorbar=True,
+        xlabel='Pixel',
+        ylabel='Shot',
+        invert_yaxis=True,
+        title="Piranha raw"
+    )
+    
+    downsample = int(nshot/nplot)
+    if downsample == 0:
+        downsample = 1
+    
+    # Create the QuadMesh using proper tuple
+    pir_diff_plot = hv.QuadMesh((px_pir, eventTimeR[count_msk][:nshot][::downsample], pir_diff[::downsample,:])).redim(
+        x=hv.Dimension('Pixel'),
+        y=hv.Dimension('Shot')
+    ).opts(
+        cmap='bwr',
+        colorbar=True,
+        xlabel='Pixel',
+        ylabel='Shot',
+        invert_yaxis=True,
+        title="Piranha difference"
+    )
+    
+    pir_av_diff_plot = (hv.Curve(pir_av_diff,hv.Dimension('Pixel'),hv.Dimension('Difference'))).opts(
+                opts.Curve(xlabel='Pixel', ylabel='Value', title='Piranha difference', width=400, height=400),
+                opts.VLines(color = 'red'))
+    
+    pir_av_on_plot = (hv.Curve(pir_av_on,hv.Dimension('Pixel'),hv.Dimension('Intensity'))).opts(
+                opts.Curve(xlabel='Pixel', ylabel='Value', title='On', width=400, height=400),
+                opts.VLines(color = 'red'))
+    pir_av_off_plot = (hv.Curve(pir_av_off,hv.Dimension('Pixel'),hv.Dimension('Intensity'))).opts(
+                opts.Curve(xlabel='Pixel', ylabel='Value', title='Off', width=400, height=400),
+                opts.VLines(color = 'black'))
+    pir_av_plot =hv.Overlay([pir_av_on_plot,pir_av_off_plot]).opts(title="Raw piranha", width=400, height=400)
+    
+    gspecPIR = pn.GridSpec(sizing_mode="stretch_both", max_width=1500, name="Time Tool")
+    gspecPIR[0:2, 0:2] = pn.Column(pir_diff_plot)
+    gspecPIR[0:2, 2:4] = pn.Column(pir_raw_plot)
+    gspecPIR[2:4, 0:2] = pn.Column(pir_av_diff_plot)
+    gspecPIR[2:4, 2:4] = pn.Column(pir_av_plot)
+else:
+    gspecPIR = None
+
 tabs = pn.Tabs(gspecS)
 if gspecDIR is not None:
     tabs.append(gspecDIR)
 if gspecVLS is not None:
     tabs.append(gspecVLS)# if maxRow>0:
+if gspecPIR is not None:
+    tabs.append(gspecPIR)
 tabs.append(gspecAPD)
 tabs.append(gspecW8)
 tabs.append(gspecFim0)
+tabs.append(gspecFim1)
 tabs.append(gspecFim1)
 
 ##################################
