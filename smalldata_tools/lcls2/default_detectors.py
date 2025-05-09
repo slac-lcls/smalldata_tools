@@ -256,7 +256,6 @@ class usbEncoder(DefaultDetector):
         return dl
 
 
-
 class interpolatedEncoder(DefaultDetector):
     """
     Detector for interpolated encoder.
