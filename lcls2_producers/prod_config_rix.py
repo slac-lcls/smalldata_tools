@@ -56,14 +56,14 @@ def getROIs(run):
         ret_dict['rix_fim0'] = [full_roi]
         ret_dict['rix_fim1'] = [full_roi]
         ret_dict['crix_w8'] = [full_roi]
-        # ret_dict['qrix_w8'] = [full_roi]
+        ret_dict['qrix_w8'] = [full_roi]
 
         # hsd
         hsd_dict = {}
-        #hsd_dict['hsd_0'] = [0,1]
+        hsd_dict['hsd_0'] = [0,1]
         hsd_dict['hsd_1'] = [3000,8000]
-        #hsd_dict['hsd_2'] = [0,1]
-        #hsd_dict['hsd_3'] = [0,1]
+        hsd_dict['hsd_2'] = [0,1]
+        hsd_dict['hsd_3'] = [0,1]
         ret_dict['hsd'] = hsd_dict
 
     return ret_dict
