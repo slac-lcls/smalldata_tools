@@ -3,7 +3,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha']
+detectors = ['hsd', 'rix_fim0', 'rix_fim1', 'crix_w8', 'c_piranha','c_atmopal']
 
 def get_intg(run):
     """
@@ -27,8 +27,8 @@ def get_intg(run):
         #intg_addl = []
 
         # typical chemRIXS
-        #intg_main = 'andor_vls'
-        #intg_addl = ['andor_dir', 'andor_norm']
+        #intg_main = 'axis_svls'
+        #intg_addl = ['andor_vls', 'andor_dir']
     return intg_main, intg_addl
 
 slow_detectors = []  # NOT IMPLEMENTED
@@ -48,21 +48,20 @@ def getROIs(run):
         # Save the full ANDOR.
         ret_dict['andor_dir'] = [full_roi]
         ret_dict['andor_vls'] = [full_roi]
-        ret_dict['andor_norm'] = [full_roi]
         ret_dict['c_piranha'] = [full_roi]
-        ret_dict['archon'] = [full_roi]
+        ret_dict['axis_svls'] = [full_roi]
 
         # and the FIM waveforms
-        # ret_dict['rix_fim0'] = [full_roi]
-        # ret_dict['rix_fim1'] = [full_roi]
-        # ret_dict['crix_w8'] = [full_roi]
+        ret_dict['rix_fim0'] = [full_roi]
+        ret_dict['rix_fim1'] = [full_roi]
+        ret_dict['crix_w8'] = [full_roi]
         # ret_dict['qrix_w8'] = [full_roi]
 
-        # hsd
-        # hsd_dict = {}
+        # hsd channels used by chemRIXS
+        hsd_dict = {}
         # hsd_dict['hsd_0'] = [0,-1]
-        # hsd_dict['hsd_1'] = [0,-1]
-        # hsd_dict['hsd_2'] = [0,-1]
+        hsd_dict['hsd_1'] = [3000,8000]
+        hsd_dict['hsd_2'] = [3000,8000]
         # hsd_dict['hsd_3'] = [0,-1]
         # ret_dict['hsd'] = hsd_dict
 
@@ -116,19 +115,19 @@ def get_wf_integrate(run):
 
     if run > 0:
         ret_dict['rix_fim0'] = {
-            "sig_roi" : slice(102,108),
+            "sig_roi" : slice(104, 112),
             "bkg_roi" : slice(0,80),
             "negative_signal" : True
         }
 
         ret_dict['rix_fim1'] = {
-            "sig_roi" : slice(116,122),
+            "sig_roi" : slice(120, 127),
             "bkg_roi" : slice(0,80),
             "negative_signal" : True
         }
 
         ret_dict['crix_w8'] = {
-            "sig_roi" : slice(69,76),
+            "sig_roi" : slice(76, 95),
             "bkg_roi" : slice(0,50),
             "negative_signal" : True
         }
@@ -172,6 +171,42 @@ epicsPV = [
     "EM2K0:XGMD:ETM:02:Reading",
     "EM2K0:XGMD:HPS:milliJoulesPerPulse",
     "EM2K0:XGMD:HPS:AvgPulseIntensityy",
+    # VLS 
+    "CRIX:VLS:CAM:MMS:PITCH.RBV",
+    "CRIX:VLS:MMS:MP.RBV",
+    "CRIX:VLS:MMS:GP.RBV",
+    # SVLS 
+    "CRIXS:SVLS:GRA:MMS:Y.RBV",
+    "CRIXS:SVLS:DET:MMS:Y_Angle.RBV",
+    "CRIXS:SVLS:DET:MMS:Z.RBV",
+    # Mono
+    "SP1K1:MONO:MMS:M_PI.RBV",
+    "SP1K1:MONO:MMS:G_PI.RBV",
+    "SP1K1:MONO:CALC:ENERGY",
+    "SP1K1:MONO:CALC:BANDWIDTH",
+    "SP1K1:MONO:CALC:CFF",
+    # Jet
+    "CRIX:RCC:MMS:X.RBV",
+    "CRIX:RCC:MMS:Y.RBV",
+    "CRIX:RCC:MMS:Z.RBV",
+    "CRIX:SDS:MMS:X.RBV",
+    "CRIX:SDS:MMS:Y.RBV",
+    "CRIX:SDS:MMS:Z.RBV",
+    "CRIX:SDS:MMS:ZENCODER.RBV",
+    # APD
+    "CRIX:PDET:MMS:THETA.RBV",
+    "CRIX:PDET:MMS:Y.RBV",
+    # Solid sample 
+    "CRIX:CRYO:MMS:X.RBV",
+    "CRIX:CRYO:MMS:Y.RBV",
+    "CRIX:CRYO:MMS:Z.RBV",
+    "CRIX:CRYO:MMS:RY.RBV",
+    # Laser
+    "LM2K2:COM_MP2_DLY1.RBV",
+    "LAS:LHN:LLG2:02:PHASCTL:DELAY_SE",
+    "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET",
+    "LM2K2:INJ_MP1_ATT1_WP1",
+    "LM2K2:INJ_MP1_ATT1_WP2"
 ]
 epicsOncePV = []
 
