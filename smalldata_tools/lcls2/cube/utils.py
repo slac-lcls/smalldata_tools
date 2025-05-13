@@ -57,8 +57,8 @@ def append_reduction(reduced, new):
 
 def timing_decorator(func):
     """
-    Decorator to measure execution time of methods. 
-    
+    Decorator to measure execution time of methods.
+
     Example:
     --------
         @timing_decorator

@@ -253,7 +253,12 @@ class CubeStepScan(Cube):
                 self.send_bin(bin_data, dest=size - 1)
             # Send the step done flag to the server node:
             logger.debug(f"Rank {rank}: number of events in step {nstep}: {nevt}")
-            COMM.send(SrvCubeMessage(msg_type=SrvMsgType.STEP_DONE, sender=rank, payload=step_data), dest=size - 1)
+            COMM.send(
+                SrvCubeMessage(
+                    msg_type=SrvMsgType.STEP_DONE, sender=rank, payload=step_data
+                ),
+                dest=size - 1,
+            )
 
         msg = SrvCubeMessage(msg_type=SrvMsgType.DONE, sender=rank)
         COMM.send(msg, dest=size - 1)

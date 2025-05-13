@@ -173,7 +173,9 @@ class CubeSrv:
     def run(self):
         # Dictionary to store partially combined data
         bin_cache: Dict[Tuple[str, int], BinData] = {}
-        bin_count: Dict[Tuple[str, int], int] = {}  # keep track of how many BD contributed to a bin
+        bin_count: Dict[Tuple[str, int], int] = (
+            {}
+        )  # keep track of how many BD contributed to a bin
         step_done: Dict[int, int] = {}  # keep track of bd who finished a step
 
         # for bin_data in self.yield_from_bd():
@@ -204,7 +206,7 @@ class CubeSrv:
                 logger.debug(f"key: {key}, count: {bin_count[key]}")
                 if key[1] in step_done:
                     if step_done[key[1]] == self.n_bd:
-                        """ 
+                        """
                         Note: we cannot rely on the bin_count here, because in some cases, not all
                         BD will send data for a given bin. This is the case for example when there
                         are more bd than there are batches of events in a step. In this case, the
