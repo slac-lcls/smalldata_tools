@@ -13,7 +13,7 @@ $(basename "$0"):
             Experiment name (i.e. cxilr6716)
         -q
             Queue. Jobs are not setup if a queue is not given
-        -c|--config
+        -C|--config
             Config to use without the prod_config prefix. Default: hutch config
         --cube
             Make cube job
@@ -37,7 +37,7 @@ do
         QUEUE="$2"
         shift 2
         ;;
-    -c|--config)
+    -C|--config)
         CONFIG="$2"
         shift 2
         ;;
