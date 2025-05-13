@@ -18,7 +18,7 @@ jobs:
         uses: psf/black@stable
         with:
           options: "--verbose --color"
-          src: "./smalldata_tools"
+          src: "./smalldata_tools ./setup_scripts ./lcls2_producers"
       
       - name: commit-black
         uses: stefanzweifel/git-auto-commit-action@v5

@@ -342,10 +342,7 @@ parser.add_argument(
     default=0,
 )
 parser.add_argument(
-    "--join_kludge",
-    help="ise Vincent's join-h5 kludge, hopefully to fully be removed soon",
-    action="store_true",
-    default=False,
+    "--config", help="Producer config file to use", default=None, type=str
 )
 args = parser.parse_args()
 
@@ -410,7 +407,25 @@ if hutch not in HUTCHES:
     logger.error("Could not find {0} in list of available hutches".format(hutch))
     sys.exit()
 
-prod_cfg = f"prod_config_{hutch.lower()}"
+
+# Get config file
+def get_config_file(name, folder_path=Path(fpathup) / "lcls2_producers"):
+    """Find config file using pathlib"""
+    folder = Path(folder_path)
+    target_file = folder / f"prod_config_{name}.py"
+
+    if target_file.exists():
+        return target_file.stem  # return the file name without extension
+    else:
+        if rank == 0:
+            logger.error(f"Config file {target_file} not found.")
+        sys.exit(1)
+
+
+if args.config is None:
+    prod_cfg = f"prod_config_{hutch.lower()}"
+else:
+    prod_cfg = get_config_file(args.config)
 if rank == 0:
     logger.info(f"Producer cfg file: <{prod_cfg}>.")
 config = import_module(prod_cfg)
@@ -836,22 +851,6 @@ if not ds.is_srv():
 # are needed here.
 # Hopefully this can be removed soon.
 logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
-
-"""
-TO REMOVE IF PROVEN NOT NEEDED
-"""
-# if small_data._type == "server" and not args.psplot_live_mode and args.join_kludge:
-#     print(f"Close smalldata server file on {rank}")
-#     # flush the data caches (in case did not hit cache_size yet)
-#     for dset, cache in small_data._server._cache.items():
-#         if cache.n_events > 0:
-#             small_data._server.write_to_file(dset, cache)
-#     time.sleep(1)
-#     small_data._server.file_handle.close()
-#     time.sleep(15)  # Long wait time needed here. Filesystem...
-"""
-TO REMOVE IF PROVEN NOT NEEDED
-"""
 
 logger.debug(f"smalldata.done() on rank {rank}")
 small_data.done()

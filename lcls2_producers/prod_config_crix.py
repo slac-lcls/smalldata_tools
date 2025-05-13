@@ -23,10 +23,6 @@ def get_intg(run):
         intg_main = ""
         intg_addl = []
 
-        # typical qRIXS
-        # intg_main = 'archon'
-        # intg_addl = []
-
         # typical chemRIXS
         # intg_main = 'axis_svls'
         # intg_addl = ['andor_vls', 'andor_dir']
@@ -52,15 +48,13 @@ def getROIs(run):
         ret_dict["rix_fim0"] = [full_roi]
         ret_dict["rix_fim1"] = [full_roi]
         ret_dict["crix_w8"] = [full_roi]
-        # ret_dict['qrix_w8'] = [full_roi]
-
-        # hsd channels used by chemRIXS
+        # Currently chemRIXS uses channels 1 and 2
         hsd_dict = {}
         # hsd_dict['hsd_0'] = [0,-1]
         hsd_dict["hsd_1"] = [3000, 8000]
         hsd_dict["hsd_2"] = [3000, 8000]
         # hsd_dict['hsd_3'] = [0,-1]
-        # ret_dict['hsd'] = hsd_dict
+        ret_dict["hsd"] = hsd_dict
 
     return ret_dict
 
@@ -69,11 +63,11 @@ def get_droplet2photon(run):
     ret_dict = {}
 
     if run < 0:
-        # ##### Archon setup #####
+        # ##### Axis setup #####
         d2p_dict = {}
         # droplet args
         d2p_dict["droplet"] = {
-            "threshold": 65,
+            "threshold": 50,
             # 'thresholdLow': 0,
             "thresADU": 0,  # discard droplet whose total ADU is below this value
             "useRms": False,
@@ -81,21 +75,20 @@ def get_droplet2photon(run):
 
         # droplet2Photons args
         d2p_dict["d2p"] = {
-            "aduspphot": 400,
+            "aduspphot": 200,
             # 'roi_mask': np.load('path_to_mask.npy'),
             "cputime": True,
         }
         d2p_dict["nData"] = None
         d2p_dict["get_photon_img"] = False
 
-        ret_dict["archon"] = d2p_dict
+        ret_dict["axis_svls"] = d2p_dict
 
     return ret_dict
 
 
 def get_wf_hitfinder(run):
     ret_dict = {}
-
     # if run>0:
     #     andor_vls = {  # for andor_vls in 1-D mode
     #         'threshold' : 4,
@@ -112,7 +105,7 @@ def get_wf_integrate(run):
 
     if run > 0:
         ret_dict["rix_fim0"] = {
-            "sig_roi": slice(104, 112),
+            "sig_roi": slice(104, 113),
             "bkg_roi": slice(0, 80),
             "negative_signal": True,
         }
@@ -167,46 +160,18 @@ def get_wf_svd(run):
 # epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
 epicsPV = [
-    "EM2K0:XGMD:ETM:01:Reading",
-    "EM2K0:XGMD:ETM:02:Reading",
-    "EM2K0:XGMD:HPS:milliJoulesPerPulse",
-    "EM2K0:XGMD:HPS:AvgPulseIntensityy",
-    # VLS
-    "CRIX:VLS:CAM:MMS:PITCH.RBV",
-    "CRIX:VLS:MMS:MP.RBV",
-    "CRIX:VLS:MMS:GP.RBV",
-    # SVLS
-    "CRIXS:SVLS:GRA:MMS:Y.RBV",
-    "CRIXS:SVLS:DET:MMS:Y_Angle.RBV",
-    "CRIXS:SVLS:DET:MMS:Z.RBV",
     # Mono
-    "SP1K1:MONO:MMS:M_PI.RBV",
-    "SP1K1:MONO:MMS:G_PI.RBV",
     "SP1K1:MONO:CALC:ENERGY",
     "SP1K1:MONO:CALC:BANDWIDTH",
-    "SP1K1:MONO:CALC:CFF",
-    # Jet
-    "CRIX:RCC:MMS:X.RBV",
-    "CRIX:RCC:MMS:Y.RBV",
-    "CRIX:RCC:MMS:Z.RBV",
-    "CRIX:SDS:MMS:X.RBV",
-    "CRIX:SDS:MMS:Y.RBV",
-    "CRIX:SDS:MMS:Z.RBV",
-    "CRIX:SDS:MMS:ZENCODER.RBV",
-    # APD
-    "CRIX:PDET:MMS:THETA.RBV",
-    "CRIX:PDET:MMS:Y.RBV",
-    # Solid sample
+    # Solid manipulator
     "CRIX:CRYO:MMS:X.RBV",
     "CRIX:CRYO:MMS:Y.RBV",
     "CRIX:CRYO:MMS:Z.RBV",
-    "CRIX:CRYO:MMS:RY.RBV",
     # Laser
+    # ATM stage
     "LM2K2:COM_MP2_DLY1.RBV",
-    "LAS:LHN:LLG2:02:PHASCTL:DELAY_SE",
+    "LAS:LHN:LLG2:02:PHASCTL:DELAY_SET",
     "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET",
-    "LM2K2:INJ_MP1_ATT1_WP1",
-    "LM2K2:INJ_MP1_ATT1_WP2",
 ]
 epicsOncePV = []
 

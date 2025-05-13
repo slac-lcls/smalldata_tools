@@ -13,6 +13,8 @@ $(basename "$0"):
             Experiment name (i.e. cxilr6716)
         -q
             Queue. Jobs are not setup if a queue is not given
+        -C|--config
+            Config to use without the prod_config prefix. Default: hutch config
         --cube
             Make cube job
 EOF
@@ -33,6 +35,10 @@ do
         ;;
     -q|--queue)
         QUEUE="$2"
+        shift 2
+        ;;
+    -C|--config)
+        CONFIG="$2"
         shift 2
         ;;
     --cube)
@@ -100,15 +106,16 @@ mkdir -p $SDF_BASE/hdf5/smalldata/cube
 mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
+echo "Now making ARP jobs"
 LCLS1_HUTCHES=("xpp" "xcs" "cxi" "mec")
 LCLS2_HUTCHES=("tmo" "txi" "rix" "ued" "mfx")
 
 if [ $QUEUE != "0" ]; then
     if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then
         source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
-        python $MYDIR/make_arp_jobs_lcls1.py --experiment $EXP --queue $QUEUE --cube $CUBE
+        python $MYDIR/make_arp_jobs_lcls1.py --experiment $EXP --queue $QUEUE --cube $CUBE --config $CONFIG
     elif [[ ${LCLS2_HUTCHES[@]} =~ $HUTCH ]]; then
         source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/psconda.sh
-        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE
+        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE --config $CONFIG
     fi
 fi
