@@ -173,10 +173,10 @@ class CubeSrv:
     def run(self):
         # Dictionary to store partially combined data
         bin_cache: Dict[Tuple[str, int], BinData] = {}
-        bin_count: Dict[Tuple[str, int], int] = (
-            {}
-        )  # keep track of how many BD contributed to a bin
-        step_done: Dict[int, int] = {}  # keep track of bd who finished a step
+        # keep track of how many BD contributed to a bin:
+        bin_count: Dict[Tuple[str, int], int] = {}
+        # keep track of bd who finished a step:
+        step_done: Dict[int, int] = {}
 
         # for bin_data in self.yield_from_bd():
         for msg in self.yield_from_bd():
