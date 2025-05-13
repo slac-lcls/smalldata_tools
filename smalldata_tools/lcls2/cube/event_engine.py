@@ -36,3 +36,4 @@ try:
 
 except ImportError:
     logger.error("Could not import smalldata_tools engine.")
+    sys.exit(1)

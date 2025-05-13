@@ -42,7 +42,7 @@ def parse_args():  # move to another file?
     )
     parser.add_argument(
         "-e",
-        "--exp",
+        "--experiment",
         type=str,
         default=os.environ.get("EXPERIMENT", ""),
         help="Experiment name",
@@ -60,13 +60,10 @@ def parse_args():  # move to another file?
 start_time = time.time()
 
 args = parse_args()
-exp = args.exp
+exp = args.experiment
 run = args.run
 
 # Setup datasource
-run = 520
-exp = "rixx1017523"
-
 os.environ["PS_SMD_N_EVENTS"] = f"{args.batchsize}"  # SMD0 to EB batches
 
 datasource_args = {"exp": exp, "run": run}
@@ -119,7 +116,7 @@ if not ds.is_srv():
         n_srv = int(os.environ.get("PS_SRV_NODES"))
         n_bd = size - n_eb - n_srv - 1
         print(
-            f"Callback setup: # EB nodes (total): {n_eb}, # BD nodes (total): {n_bd}, "
+            f"PSANA nodes: # EB nodes (total): {n_eb}, # BD nodes (total): {n_bd}, "
             f"# BD nodes per EB: {n_bd / n_eb}\n\n"
         )
 else:

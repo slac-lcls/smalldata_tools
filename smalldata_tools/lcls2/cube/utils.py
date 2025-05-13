@@ -56,7 +56,15 @@ def append_reduction(reduced, new):
 
 
 def timing_decorator(func):
-    """Decorator to measure execution time of methods."""
+    """
+    Decorator to measure execution time of methods. 
+    
+    Example:
+    --------
+        @timing_decorator
+        def apply(self, evt):
+            ...
+    """
 
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
@@ -66,8 +74,3 @@ def timing_decorator(func):
         return result
 
     return wrapper
-
-
-# Add @timing_decorator above any method you want to time, for example:
-# @timing_decorator
-# def apply(self, evt):

@@ -52,8 +52,8 @@ class Cube(metaclass=ABCMeta):
         self.processors = processors if processors is not None else []
         self.event_screener = event_screener
         self.bin_processors = kwargs.get("bin_processors", [])
-        # Reduction passed to utils.reduce_by_key to combine bins from different
-        # workers (simple sum):
+        # Reduction passed to utils.reduce_by_key to combine a bin from different
+        # BD (simple sum):
         self.reduction_func = lambda x, y: x + y
 
     def add_processors(self, processors):
@@ -218,10 +218,8 @@ class CubeStepScan(Cube):
             binned_data = {}
 
             # Loop over events in the step
+            nevt = -1
             for nevt, evt in enumerate(step.events()):
-                if nevt % 2500 == 0:
-                    print(f"rank {rank}: {nevt}")
-
                 # Check if event passes filters and get potential cube label
                 cube_label = None
                 if self.event_screener:
@@ -253,6 +251,9 @@ class CubeStepScan(Cube):
                     data=binned_dict,
                 )
                 self.send_bin(bin_data, dest=size - 1)
+            # Send the step done flag to the server node:
+            logger.debug(f"Rank {rank}: number of events in step {nstep}: {nevt}")
+            COMM.send(SrvCubeMessage(msg_type=SrvMsgType.STEP_DONE, sender=rank, payload=step_data), dest=size - 1)
 
         msg = SrvCubeMessage(msg_type=SrvMsgType.DONE, sender=rank)
         COMM.send(msg, dest=size - 1)

@@ -132,8 +132,9 @@ class EventScreener(ABC):
         Return the scalar value from the detector data. It is assumed that the
         detector data is either a scalar or a dictionary with the data field as a key.
 
-        If the detector does not return a scalar natively, this method must be
-        overridden in the subclass to provide the appropriate logic.
+        If the detector does not return a scalar natively or requires custom analysis,
+        this method must be overridden in the subclass to provide the appropriate
+        logic.
 
         Parameters
         ----------
@@ -336,7 +337,7 @@ class CompositeFilter(EventScreener):
             # AND logic: all filters must pass
             for f in self.filters:
                 passes, label = f.apply(evt)
-                logger.debug(f"Filter: {f}, passes: {passes}, label: {label}")
+                # logger.debug(f"Filter: {f}, passes: {passes}, label: {label}")  # too verbose, even for debugging
                 if not passes:
                     return False, None
                 if label:

@@ -73,17 +73,18 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-# (2mio events)
-EXP="rixx1017523"
-RUN="520"
+# Example experiment and run numbers
+    # (2mio events)
+    # EXP="rixx1017523"
+    # RUN="520"
 
-# Step scan (3mio events)
-# EXP="rixx1016923"
-# RUN="152"
+    # Step scan (3mio events)
+    # EXP="rixx1016923"
+    # RUN="152"
 
-# Energy scan (3mio events, with scan PVs, no xgmd)
-# EXP="rixl1032923"
-# RUN="169"
+    # Energy scan (3mio events, with scan PVs, no xgmd)
+    # EXP="rixl1032923"
+    # RUN="169"
 
 HUTCH=${EXP:0:3}
 export EXPERIMENT=$EXP
@@ -147,5 +148,5 @@ export PS_EB_NODES=$EB_CORES
 LOGFILE="cube_%J.log"
 SBATCH_ARGS="--use-min-nodes --exclusive -o $LOGFILE --account $ACCOUNT -p $PARTITION --ntasks $TASKS"
 MPI_CMD="mpirun python -u -m mpi4py.run ${PYTHONEXE} $*"
-echo $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
-sbatch $SBATCH_ARGS --account $ACCOUNT --wrap="$MPI_CMD"
+echo $SBATCH_ARGS --wrap="$MPI_CMD"
+sbatch $SBATCH_ARGS --wrap="$MPI_CMD"

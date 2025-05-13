@@ -31,6 +31,7 @@ class SrvMsgType(Enum):
 
     DONE = 0
     NEW_BIN = 1
+    STEP_DONE = 2
 
 
 @dataclass
@@ -126,7 +127,7 @@ class CubeSrv:
         # Number of BD nodes working on a given bin.
         # In scan mode, a bin is distributed on all BD. Else 1 BD/bin:
         self.n_bd = size - n_eb - n_srv - 1 if scan_mode else 1
-
+        logger.info(f"Server expecting data from {self.n_bd} BD nodes.")
         self.file_handle = None
 
     def set_file_handle(self, run_num: int, exp: str, filepath: str = None):
@@ -137,7 +138,7 @@ class CubeSrv:
             logger.info(f"User custom filepath {filepath}.")
             filepath = Path(filepath)
         else:
-            filepath = Path(SIT_PSDM_DATA) / exp / "hdf5/smalldata/cube"
+            filepath = Path(SIT_PSDM_DATA) / exp[:3] / exp / "hdf5/smalldata/cube"
             logger.info(f"Using default filepath {filepath}.")
 
         filename = f"cube_{exp}_r{run_num:04d}.h5"
@@ -166,37 +167,55 @@ class CubeSrv:
                 if count_done == size - 1:
                     all_done = True
                     logger.info("All psana nodes are done.")
-            elif msg.msg_type == SrvMsgType.NEW_BIN:
-                yield msg.payload
+            else:
+                yield msg
 
     def run(self):
         # Dictionary to store partially combined data
         bin_cache: Dict[Tuple[str, int], BinData] = {}
-        bin_count: Dict[Tuple[str, int], int] = {}
+        bin_count: Dict[Tuple[str, int], int] = {}  # keep track of how many BD contributed to a bin
+        step_done: Dict[int, int] = {}  # keep track of bd who finished a step
 
-        for bin_data in self.yield_from_bd():
-            key = (bin_data.cube_label, bin_data.bin_index)
-            logger.debug(f"Got bin data for {key}")
+        # for bin_data in self.yield_from_bd():
+        for msg in self.yield_from_bd():
+            if msg.msg_type == SrvMsgType.NEW_BIN:
+                bin_data = msg.payload
+                key = (bin_data.cube_label, bin_data.bin_index)
+                logger.debug(f"Got bin data for {key}")
 
-            if key in bin_cache:
-                # Combine with existing data
-                bin_cache[key] = bin_cache[key] + bin_data
-                bin_count[key] += 1
-            else:
-                # Store new data
-                bin_cache[key] = bin_data
-                bin_count[key] = 1
+                if key in bin_cache:
+                    # Combine with existing data
+                    bin_cache[key] = bin_cache[key] + bin_data
+                    bin_count[key] += 1
+                else:
+                    # Store new data
+                    bin_cache[key] = bin_data
+                    bin_count[key] = 1
+            elif msg.msg_type == SrvMsgType.STEP_DONE:
+                step_idx = msg.payload["step_value"] - 1  # step starts from 1
+                if step_idx in step_done:
+                    step_done[step_idx] += 1
+                else:
+                    # First time we see this step
+                    step_done[step_idx] = 1
 
             to_be_deleted = []
             for key in bin_cache.keys():
                 logger.debug(f"key: {key}, count: {bin_count[key]}")
-                if bin_count[key] == self.n_bd:
-                    # All data for this bin has been received
-                    logger.debug(
-                        f"All data for {key} received. BD count: {bin_count[key]}"
-                    )
-                    self.process_bin(bin_cache[key])
-                    to_be_deleted.append(key)
+                if key[1] in step_done:
+                    if step_done[key[1]] == self.n_bd:
+                        """ 
+                        Note: we cannot rely on the bin_count here, because in some cases, not all
+                        BD will send data for a given bin. This is the case for example when there
+                        are more bd than there are batches of events in a step. In this case, the
+                        bin_count will be less than n_bd. Relying on the step_done count is safer.
+                        """
+                        # All data for this bin has been received
+                        logger.info(
+                            f"All data for {key} received. Number of BD who contributed: {bin_count[key]}"
+                        )
+                        self.process_bin(bin_cache[key])
+                        to_be_deleted.append(key)
             for key in to_be_deleted:
                 del bin_cache[key]
                 # del bin_count[key]  # Let's keep the count for debugging
@@ -209,7 +228,7 @@ class CubeSrv:
             f"Processing bin for cube label: {bin_data.cube_label}, bin index: {bin_data.bin_index}"
         )
         logger.info(f"Bin info: {bin_data.bin_info}")
-        # TODO: Add processing pipeline on the final binned data here.
+        # TODO: Add processing pipeline on the binned data here.
         step_info = bin_data.bin_info
         # TODO: add docstring to h5. For now it can't handle strings
         step_info.pop("step_docstring")

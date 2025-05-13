@@ -128,7 +128,7 @@ def create_dataset_from_key_value(
     if add_at_index is not None and len_data is None:
         raise ValueError("len_data must be specified if add_at_index is used")
 
-    print(f"### Create dataset in {parent} with name: {key}")
+    logger.info(f"### Create dataset in {parent} with name: {key}")
 
     # Create new dataset with the dict data
     data = np.asarray(value)
@@ -150,7 +150,7 @@ def create_dataset_from_key_value(
         )
 
         if False:
-            # OTHER APPROACH
+            # OTHER APPROACH. Can be modified for add_at_index
 
             # Create empty dataset with shape info from the array in data_dict
             data = np.asarray(value)
@@ -196,9 +196,9 @@ def add_dict_to_h5(
     add_at_index: Optional[int] = None,
 ) -> None:
     """
-    Add data to an HDF5 file or group, creating groups and datasets as needed. This
-    function is indented for datasets that will either be expanded (append or via
-    indexing) or summed. Default behavior is to append data.
+    Add data to an HDF5 file or group, creating groups and datasets as needed. For now this
+    function is intented for datasets that will be appended one-by-one. Future versions will
+    allow for adding data at a specific index and summing datasets.
 
     Parameters
     ----------
@@ -209,7 +209,9 @@ def add_dict_to_h5(
     sum_dataset : List[str], optional
         Keys for which to sum instead of appending data. Default is ['count'].
     len_data : Optional[int], optional
-        Initial size of the first dimension for all datasets.
+        Size of the first dimension for all datasets.
+        Comment: Could use the add_at_index as the potential size of the dataset, and
+                 resize if needed...
     add_at_index : Optional[int], optional
         Index at which to add data in datasets. If None, appends data.
         len_data must be specified if add_at_index is used.
