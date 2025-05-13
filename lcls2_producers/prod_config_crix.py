@@ -22,7 +22,7 @@ def get_intg(run):
     if run > 0:
         intg_main = ""
         intg_addl = []
-    
+
         # typical chemRIXS
         # intg_main = 'axis_svls'
         # intg_addl = ['andor_vls', 'andor_dir']
@@ -45,18 +45,19 @@ def getROIs(run):
         ret_dict["axis_svls"] = [full_roi]
 
         # and the FIM waveforms
-        ret_dict['rix_fim0'] = [full_roi]
-        ret_dict['rix_fim1'] = [full_roi]
-        ret_dict['crix_w8'] = [full_roi]
-        # Currently chemRIXS uses channels 1 and 2 
+        ret_dict["rix_fim0"] = [full_roi]
+        ret_dict["rix_fim1"] = [full_roi]
+        ret_dict["crix_w8"] = [full_roi]
+        # Currently chemRIXS uses channels 1 and 2
         hsd_dict = {}
         # hsd_dict['hsd_0'] = [0,-1]
         hsd_dict["hsd_1"] = [3000, 8000]
         hsd_dict["hsd_2"] = [3000, 8000]
         # hsd_dict['hsd_3'] = [0,-1]
-        ret_dict['hsd'] = hsd_dict
+        ret_dict["hsd"] = hsd_dict
 
     return ret_dict
+
 
 def get_droplet2photon(run):
     ret_dict = {}
@@ -65,23 +66,23 @@ def get_droplet2photon(run):
         # ##### Axis setup #####
         d2p_dict = {}
         # droplet args
-        d2p_dict['droplet'] = {
-            'threshold': 50,
+        d2p_dict["droplet"] = {
+            "threshold": 50,
             # 'thresholdLow': 0,
             "thresADU": 0,  # discard droplet whose total ADU is below this value
             "useRms": False,
         }
 
         # droplet2Photons args
-        d2p_dict['d2p'] = {
-            'aduspphot': 200,
+        d2p_dict["d2p"] = {
+            "aduspphot": 200,
             # 'roi_mask': np.load('path_to_mask.npy'),
             "cputime": True,
         }
         d2p_dict["nData"] = None
         d2p_dict["get_photon_img"] = False
 
-        ret_dict['axis_svls'] = d2p_dict
+        ret_dict["axis_svls"] = d2p_dict
 
     return ret_dict
 
@@ -159,7 +160,7 @@ def get_wf_svd(run):
 # epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
 epicsPV = []
 epicsPV = [
-    # Mono 
+    # Mono
     "SP1K1:MONO:CALC:ENERGY",
     "SP1K1:MONO:CALC:BANDWIDTH",
     # Solid manipulator
@@ -167,10 +168,10 @@ epicsPV = [
     "CRIX:CRYO:MMS:Y.RBV",
     "CRIX:CRYO:MMS:Z.RBV",
     # Laser
-    # ATM stage 
+    # ATM stage
     "LM2K2:COM_MP2_DLY1.RBV",
     "LAS:LHN:LLG2:02:PHASCTL:DELAY_SET",
-    "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET"
+    "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET",
 ]
 epicsOncePV = []
 
