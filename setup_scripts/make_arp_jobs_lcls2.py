@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', help='experiment name', type=str, default=os.environ.get('EXPERIMENT', ''))
 parser.add_argument('--partition', help='Partition on which to run the jobs', type=str, default='milano')
 parser.add_argument('--psplot_live', help='Make psplot-live job as well', type=int, default=0)
+parser.add_argument('--config', help='Config file for the producer', type=str, default=None)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -26,7 +27,7 @@ if 'milano' in args.partition:
     # smd
     executable = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_smd2.sh')
     trigger = 'START_OF_RUN'
-    
+
     # summaries
     executable_summaries = str(SDF_BASE / 'results/smalldata_tools/arp_scripts/submit_plots.sh')
     queue_summaries = args.partition
@@ -35,20 +36,24 @@ if 'milano' in args.partition:
 else:
     print('No known system related to this queue. Exit now.')
     sys.exit(0)
-    
 
 
-    
+
+
 job_defs = []
 
 # smallData job
+parameters = f'--partition {args.partition} --postRuntable --nodes {nodes} --wait'
+if args.config is not None:
+    parameters += f' --config {args.config}'
+
 job_defs.append( {
     'name': 'smd',
     'executable': executable,
     'trigger': trigger,
     'location': location,
-    'parameters': f'--partition {args.partition} --postRuntable --nodes {nodes} --wait'
-    } )
+    'parameters': parameters
+} )
 
 # psplot_live job
 job_defs.append( {
