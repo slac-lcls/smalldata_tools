@@ -718,6 +718,7 @@ if len(sumDict['Sums'].keys())>0:
 #     print(sumDict)
     small_data.save(sumDict)
 
+small_data.save()
 small_data.close()
 COMM.Barrier()
 
@@ -741,7 +742,6 @@ if ds.rank==0:
 
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
-small_data.save()
 if os.environ.get('ARP_JOB_ID', None) is not None:
     if ds.size > 1:
         if ds.rank == 0:

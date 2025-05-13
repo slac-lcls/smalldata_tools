@@ -91,6 +91,41 @@ def detOnceData(det, data, ts, noarch):
     return data
 
 
+class damageDetector(DefaultDetector):
+    def __init__(self, detname="damage", run=None):
+        self.name = detname
+        self.detname = detname
+        self.detNames = []
+        self.damageDets = []
+        if run is None:
+            return
+        # run.detnames: set[str]
+        for dn in run.detnames:
+            if dn in ("epicsinfo", "triginfo") or "pvdetinfo" in dn:
+                continue
+            self.detNames.append(dn)
+            det = run.Detector(dn)
+            self.damageDets.append(psana.detector.damage.Damage(det.raw))
+        self.detAlias = [det for det in self.detNames]
+
+    def in_run(self):
+        return True
+
+    def data(self, evt):
+        dl = {}
+        for idx, detName in enumerate(self.detNames):
+            damage = self.damageDets[idx].count(evt)
+            val = 0
+            if damage is None:
+                val = 0
+            elif damage == {}:
+                val = 1
+            else:
+                val = 0
+            dl[detName] = val
+        return dl
+
+
 class genericDetector(DefaultDetector):
     """
     Detector to get whatever is under the 'raw' field, minus the default
@@ -190,6 +225,34 @@ class fimfexDetector(DefaultDetector):
                 dl[field] = dat
                 if isinstance(dl[field], list):
                     dl[field] = np.array(dl[field])
+        return dl
+
+
+class usbEncoder(DefaultDetector):
+    """
+    Detector for US Digital USB encoder bld.
+    """
+
+    def __init__(self, detname, run=None, name="enc"):
+        super().__init__(detname, name, run)
+        if self.in_run():
+            self._data_field, self._sub_fields = self.get_fields("raw")
+
+    def data(self, evt):
+        dl = {}
+        if self._data_field is not None and self._sub_fields is not None:
+            channel_descriptions = []
+            data = []
+            for field in self._sub_fields:
+                if field == "descriptions":
+                    channel_descriptions = getattr(self._data_field, field)(evt)
+                else:
+                    data = getattr(self._data_field, field)(evt)
+
+            if data is not None:
+                for i in range(4):
+                    if (desc := channel_descriptions[i]) != "":
+                        dl[desc] = data[i]
         return dl
 
 
