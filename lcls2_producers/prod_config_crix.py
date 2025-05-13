@@ -170,7 +170,7 @@ epicsPV = [
     # Laser
     # ATM stage 
     "LM2K2:COM_MP2_DLY1.RBV",
-    "LAS:LHN:LLG2:02:PHASCTL:DELAY_SE",
+    "LAS:LHN:LLG2:02:PHASCTL:DELAY_SET",
     "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET",
 ]
 epicsOncePV = []
