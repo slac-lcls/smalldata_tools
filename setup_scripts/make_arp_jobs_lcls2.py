@@ -69,13 +69,17 @@ job_defs.append(
 )
 
 # psplot_live job
+parameters = f"--partition {args.partition} --nodes {nodes} --wait --psplot_live"
+if args.config is not None:
+    parameters += f" --config {args.config}"
+
 job_defs.append(
     {
         "name": "smd_psplot_live",
         "executable": executable,
         "trigger": trigger,
         "location": location,
-        "parameters": f"--partition {args.partition} --nodes {nodes} --wait --psplot_live",
+        "parameters": parameters,
     }
 )
 
