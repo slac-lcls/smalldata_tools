@@ -53,7 +53,7 @@ def parse_args():  # move to another file?
         "-C",
         "--config",
         type=str,
-        default = None,
+        default=None,
         help="Configuration file name (without the cube_config and .py suffix)",
     )
     parser.add_argument(
@@ -163,10 +163,10 @@ else:
     config = import_module(config_module)
 
     cube_obj = cube.cube.get_cube(myrun, engine=event_engine.smalldata_tools_engine)
-    
+
     processors = config.detectors(myrun)
     cube_obj.add_processors(processors)
-    
+
     screener = config.screener(myrun)
     cube_obj.set_event_screener(screener)
 

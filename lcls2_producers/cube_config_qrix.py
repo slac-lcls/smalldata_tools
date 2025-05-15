@@ -56,7 +56,9 @@ def screener(run):
     )
 
     xray_on = BoolFilter(
-        lightstatus_det, "xray", expected_state=True,
+        lightstatus_det,
+        "xray",
+        expected_state=True,
     )
 
     xray_off = BoolFilter(
