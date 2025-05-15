@@ -11,6 +11,7 @@ from smalldata_tools.lcls2.DetObject import DetObject
 
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
+from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdROIFunc
 
 from smalldata_tools.lcls2.cube.event_screener import *
 
@@ -29,16 +30,28 @@ def detectors(run: psana.psexp.run.Run):
     func = ROIFunc(**full_roi)
     fim1.addFunc(func)
 
-    # HSD
-    hsd = run.Detector("hsd")
-
     # Archon
     archon_roi = {"thresADU": 70, "writeArea": True, "calcPars": False, "ROI": None}
     archon = DetObject("archon", run)
     func = ROIFunc(**archon_roi)
     archon.addFunc(func)
 
-    dets = [fim0, fim1, archon]
+    # HSD
+    hsd_rois = {
+        'hsd_0': [0, -1],
+        'hsd_1': [3000, 8000],
+        'hsd_2': [3000, 8000],
+        'hsd_3': [0, -1],
+    }
+    hsd = DetObject("hsd", run)
+    hsdsplit = hsdsplitFunc(writeHsd=False)
+    for hsd_name, hsd_roi in hsd_rois.items():
+        hsd_roi = {"name": hsd_name + "__ROI", "writeArea": True, "ROI": hsd_roi}
+        func = hsdROIFunc(**hsd_roi)
+        hsdsplit.addFunc(func)
+    hsd.addFunc(hsdsplit)
+
+    dets = [fim0, fim1, archon, hsd]
     return dets
 
 
