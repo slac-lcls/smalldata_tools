@@ -289,7 +289,7 @@ def get_cube(
     if run.scaninfo == {}:
         is_scan = False
         if run.ds.unique_user_rank():
-            logger.info("Instantiating CubeFlycan.")
+            logger.info("Instantiating CubeFlyScan.")
         cube = CubeFlyScan(run, engine=engine)
     else:
         is_scan = True
