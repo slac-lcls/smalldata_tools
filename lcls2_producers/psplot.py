@@ -26,7 +26,7 @@ class PsplotCallbacks:
 class PsplotCallback(metaclass=ABCMeta):
     def __init__(self, **kwargs):
         logger.info(f"Instantiating {type(self).__name__} with arguments {kwargs}")
-        self.data_fields = kwargs['data_fields']
+        self.data_fields = kwargs["data_fields"]
         self._needed = self.need()
 
     @abstractmethod

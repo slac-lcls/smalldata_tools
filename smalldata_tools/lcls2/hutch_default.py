@@ -54,8 +54,7 @@ def tmoDetectors(run, beamCodes=[[162], [91]]):
     return dets
 
 
-# def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[-272]):
-def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[273]):
+def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[272]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
@@ -69,9 +68,9 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[273]
     dets.append(fimfexDetector("rix_fim2", run))
     dets.append(fimfexDetector("crix_w8", run))
     dets.append(interpolatedEncoder("mono_encoder", run))
-    dets.append(ttDetector("atmopal", run, saveTraces=False))
+    dets.append(ttDetector("c_atmopal", run, saveTraces=False))
     dets.append(genericDetector("mono_hrencoder", run))
-    # dets.append(ttDetector("c_piranha", run, saveTraces=True))
+    dets.append(ttDetector("c_piranha", run, saveTraces=False))
     # dets.append(epicsDetector(PVlist=[], run=run))
     return dets
 
