@@ -12,8 +12,10 @@ size = COMM.Get_size()
 import logging
 
 from pathlib import Path
+from importlib import import_module
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+smdata_tools_path = Path(__file__).parent.parent
+sys.path.insert(0, str(smdata_tools_path))
 
 import smalldata_tools
 
@@ -48,6 +50,13 @@ def parse_args():  # move to another file?
         help="Experiment name",
     )
     parser.add_argument(
+        "-C",
+        "--config",
+        type=str,
+        default = None,
+        help="Configuration file name (without the cube_config and .py suffix)",
+    )
+    parser.add_argument(
         "--batchsize", type=int, default=1024, help="Batch size for processing"
     )
     parser.add_argument("--nevents", help="number of events", type=int, default=-1)
@@ -61,7 +70,12 @@ start_time = time.time()
 
 args = parse_args()
 exp = args.experiment
+hutch = exp[:3]
 run = args.run
+
+if args.config is None:
+    logger.error("Please provide a configuration file name.")
+    sys.exit(1)
 
 # Setup datasource
 os.environ["PS_SMD_N_EVENTS"] = f"{args.batchsize}"  # SMD0 to EB batches
@@ -143,11 +157,17 @@ else:
     import smalldata_tools.lcls2.cube as cube
     import smalldata_tools.lcls2.cube.event_engine as event_engine
     from smalldata_tools.lcls2.cube.processors import qrix_detectors, qrix_screener
+    from smalldata_tools.lcls2.cube.utils import get_config_file
+
+    config_module = get_config_file(args.config, smdata_tools_path / "lcls2_producers")
+    config = import_module(config_module)
 
     cube_obj = cube.cube.get_cube(myrun, engine=event_engine.smalldata_tools_engine)
-    processors = qrix_detectors(myrun)
+    
+    processors = config.detectors(myrun)
     cube_obj.add_processors(processors)
-    screener = qrix_screener(myrun)
+    
+    screener = config.screener(myrun)
     cube_obj.set_event_screener(screener)
 
     cube_obj.run()

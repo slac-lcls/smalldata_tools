@@ -1,6 +1,7 @@
-from enum import Enum  # , StrEnum py3.11)
 import logging
 import time
+from enum import Enum  # , StrEnum py3.11)
+from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,19 @@ class PsanaNode(str, Enum):
     EB = "EB"
     BD = "BD"
     SRV = "SRV"
+
+
+def get_config_file(name, folder_path):
+    """Find config file using pathlib"""
+    folder = Path(folder_path)
+    target_file = folder / f"cube_config_{name}.py"
+
+    if target_file.exists():
+        return target_file.stem  # return the file name without extension
+    else:
+        if rank == 0:
+            logger.error(f"Config file {target_file} not found.")
+        sys.exit(1)
 
 
 def reduce_by_key(reduced: dict, new_data: dict, reduction_func: callable) -> dict:

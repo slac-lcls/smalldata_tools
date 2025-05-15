@@ -1,7 +1,10 @@
 import sys
 import psana
 
-from . import event_screener as screener
+from pathlib import Path
+
+smdata_tools_path = Path(__file__).parent.parent
+sys.path.insert(0, str(smdata_tools_path))
 
 from smalldata_tools.lcls2 import default_detectors, hutch_default
 from smalldata_tools.lcls2.DetObject import DetObject
@@ -9,8 +12,10 @@ from smalldata_tools.lcls2.DetObject import DetObject
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
 
+from smalldata_tools.lcls2.cube.event_screener import *
 
-def qrix_detectors(run: psana.psexp.run.Run):
+
+def detectors(run: psana.psexp.run.Run):
     dets = []
 
     full_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
@@ -37,35 +42,33 @@ def qrix_detectors(run: psana.psexp.run.Run):
     return dets
 
 
-def qrix_screener(run):
+def screener(run):
     ddets = hutch_default.rixDetectors(run)
     lightstatus_det = [d for d in ddets if d.name == "lightStatus"][0]
 
     # Individual filters
-    laser_on = screener.BoolFilter(
+    laser_on = BoolFilter(
         lightstatus_det, "laser", expected_state=True, label="laser_on"
     )
 
-    laser_off = screener.BoolFilter(
+    laser_off = BoolFilter(
         lightstatus_det, "laser", expected_state=False, label="laser_off"
     )
 
-    xray_on = screener.BoolFilter(
-        lightstatus_det,
-        "xray",
-        expected_state=1,
+    xray_on = BoolFilter(
+        lightstatus_det, "xray", expected_state=True,
     )
 
-    xray_off = screener.BoolFilter(
-        lightstatus_det, "xray", expected_state=0, label="dropped_shots"
+    xray_off = BoolFilter(
+        lightstatus_det, "xray", expected_state=False, label="dropped_shots"
     )
 
     # Combine individual filters into composite filters for different states
-    screener_on = screener.CompositeFilter([laser_on, xray_on])
-    screener_off = screener.CompositeFilter([laser_off, xray_on])
+    screener_on = CompositeFilter([laser_on, xray_on])
+    screener_off = CompositeFilter([laser_off, xray_on])
 
     # Combine all screeners into an OR screener to be run by the cube
-    event_screener = screener.CompositeFilter(
+    event_screener = CompositeFilter(
         [screener_on, screener_off, xray_off], require_all=False
     )
     return event_screener

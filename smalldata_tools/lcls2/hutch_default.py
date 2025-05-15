@@ -54,7 +54,7 @@ def tmoDetectors(run, beamCodes=[[162], [91]]):
     return dets
 
 
-def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[272]):
+def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[273]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
