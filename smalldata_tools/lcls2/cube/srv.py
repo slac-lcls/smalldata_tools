@@ -120,7 +120,7 @@ class CubeSrv:
         scan_mode (bool, optional): If True, each BD processes all bins. Defaults to True.
     """
 
-    def __init__(self, file_kwargs: dict, scan_mode: bool = True):
+    def __init__(self, scan_mode: bool = True):
         n_eb = int(os.environ.get("PS_EB_NODES"))
         n_srv = int(os.environ.get("PS_SRV_NODES"))
 

@@ -172,7 +172,7 @@ class ThresholdFilter(EventScreener):
             Optional label for the cube.
             Default is None
         """
-        super().__init__(detector_name, data_key, label=label)
+        super().__init__(detector, data_key, label=label)
         self.threshold = threshold
         self.greater_than = greater_than
 

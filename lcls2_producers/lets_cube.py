@@ -54,6 +54,7 @@ def parse_args():  # move to another file?
         "--config",
         type=str,
         default=None,
+        required=True,
         help="Configuration file name (without the cube_config and .py suffix)",
     )
     parser.add_argument(
@@ -72,10 +73,6 @@ args = parse_args()
 exp = args.experiment
 hutch = exp[:3]
 run = args.run
-
-if args.config is None:
-    logger.error("Please provide a configuration file name.")
-    sys.exit(1)
 
 # Setup datasource
 os.environ["PS_SMD_N_EVENTS"] = f"{args.batchsize}"  # SMD0 to EB batches
@@ -145,7 +142,7 @@ else:
 if psana_node == PsanaNode.SRV:
     from smalldata_tools.lcls2.cube.srv import CubeSrv
 
-    cube_srv = CubeSrv(myrun)
+    cube_srv = CubeSrv()
     cube_srv.set_file_handle(
         exp=exp,
         run_num=run,
@@ -156,7 +153,6 @@ if psana_node == PsanaNode.SRV:
 else:
     import smalldata_tools.lcls2.cube as cube
     import smalldata_tools.lcls2.cube.event_engine as event_engine
-    from smalldata_tools.lcls2.cube.processors import qrix_detectors, qrix_screener
     from smalldata_tools.lcls2.cube.utils import get_config_file
 
     config_module = get_config_file(args.config, smdata_tools_path / "lcls2_producers")
