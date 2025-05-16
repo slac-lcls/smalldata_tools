@@ -1,0 +1,96 @@
+import sys
+import logging
+import time
+from enum import Enum  # , StrEnum py3.11)
+from pathlib import Path
+from mpi4py import MPI
+
+COMM = MPI.COMM_WORLD
+rank = COMM.Get_rank()
+size = COMM.Get_size()
+
+
+logger = logging.getLogger(__name__)
+
+
+class PsanaNode(str, Enum):
+    SMD0 = "SMD0"
+    EB = "EB"
+    BD = "BD"
+    SRV = "SRV"
+
+
+def get_config_file(name, folder_path):
+    """Find config file using pathlib"""
+    folder = Path(folder_path)
+    target_file = folder / f"cube_config_{name}.py"
+
+    if target_file.exists():
+        return target_file.stem  # return the file name without extension
+    else:
+        if rank == 0:
+            logger.error(f"Config file {target_file} not found.")
+        sys.exit(1)
+
+
+def reduce_by_key(reduced: dict, new_data: dict, reduction_func: callable) -> dict:
+    """
+    Recursively reduce the new data by the keys of the reduced data using the provided
+    reduction function.
+
+    Parameters
+    ----------
+    reduced : dict
+        The dictionary holding the reduced data.
+    new_data : dict
+        The new data to be added to the reduced dictionary.
+    reduction_func : callable
+        The function to reduce the data. It should take two arguments: the existing
+        value and the new value.
+
+    Returns
+    -------
+    dict
+        The reduced dictionary.
+    """
+    for key, value in new_data.items():
+        if isinstance(value, dict):
+            if key not in reduced:
+                reduced[key] = {}
+            reduce_by_key(reduced[key], new_data[key], reduction_func)
+        else:
+            if key in reduced:
+                reduced[key] = reduction_func(reduced[key], value)
+            else:
+                reduced[key] = value
+    return reduced
+
+
+def append_reduction(reduced, new):
+    if isinstance(reduced, list):
+        reduced.append(new)
+    else:
+        reduced = [reduced]
+        reduced.append(new)
+    return reduced
+
+
+def timing_decorator(func):
+    """
+    Decorator to measure execution time of methods.
+
+    Example:
+    --------
+        @timing_decorator
+        def apply(self, evt):
+            ...
+    """
+
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        logger.debug(f"{func.__name__} took {(end-start)*1000:.2f} ms")
+        return result
+
+    return wrapper

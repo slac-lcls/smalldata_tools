@@ -17,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     "--queue", help="Queue on which to run the jobs", type=str, default="milano"
 )
-parser.add_argument("--cube", help="Make cube job as well", type=int, default=0)
+parser.add_argument("--cube", help="Make cube job as well", type=bool, default=False)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -66,7 +66,7 @@ job_defs.append(
 )
 
 # cube job
-if args.cube > 0:
+if args.cube:
     job_defs.append(
         {
             "name": "cube",
