@@ -41,7 +41,9 @@ if "milano" in args.partition:
     trigger = "START_OF_RUN"
 
     # cube
-    executable_cube = str(SDF_BASE / "results/smalldata_tools/arp_scripts/lets_cube_lclc2.sh")
+    executable_cube = str(
+        SDF_BASE / "results/smalldata_tools/arp_scripts/lets_cube_lclc2.sh"
+    )
     trigger_cube = "MANUAL"
 
     # summaries
