@@ -42,8 +42,8 @@ do
         shift 2
         ;;
     --cube)
-        CUBE=1
-        shift 1
+        CUBE="$2"
+        shift 2
         ;;
     --psplot_live)
         PSPLOT_LIVE=1
@@ -107,8 +107,8 @@ mkdir -p $SDF_BASE/stats/summary/Cube
 
 # make arp jobs
 echo "Now making ARP jobs"
-LCLS1_HUTCHES=("xpp" "xcs" "cxi" "mec")
-LCLS2_HUTCHES=("tmo" "txi" "rix" "ued" "mfx")
+LCLS1_HUTCHES=("xcs" "cxi" "mec")
+LCLS2_HUTCHES=("tmo" "txi" "rix" "ued" "mfx" "xpp")
 
 if [ $QUEUE != "0" ]; then
     if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then
@@ -116,6 +116,6 @@ if [ $QUEUE != "0" ]; then
         python $MYDIR/make_arp_jobs_lcls1.py --experiment $EXP --queue $QUEUE --cube $CUBE --config $CONFIG
     elif [[ ${LCLS2_HUTCHES[@]} =~ $HUTCH ]]; then
         source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/psconda.sh
-        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE --config $CONFIG
+        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE --config $CONFIG --cube $CUBE
     fi
 fi

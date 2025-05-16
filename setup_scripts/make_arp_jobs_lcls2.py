@@ -23,6 +23,7 @@ parser.add_argument(
 parser.add_argument(
     "--config", help="Config file for the producer", type=str, default=None
 )
+parser.add_argument("--cube", help="Make cube job as well", type=str, default=None)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -38,6 +39,10 @@ if "milano" in args.partition:
     # smd
     executable = str(SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh")
     trigger = "START_OF_RUN"
+
+    # cube
+    executable_cube = str(SDF_BASE / "results/smalldata_tools/arp_scripts/lets_cube_lclc2.sh")
+    trigger_cube = "MANUAL"
 
     # summaries
     executable_summaries = str(
@@ -82,6 +87,18 @@ job_defs.append(
         "parameters": parameters,
     }
 )
+
+# cube job
+if args.cube is not None:
+    job_defs.append(
+        {
+            "name": "cube",
+            "executable": executable_cube,
+            "trigger": trigger_cube,
+            "location": location,
+            "parameters": f"--config {args.cube}",
+        }
+    )
 
 # summary plots job
 if hutch in ["rix", "xcs", "xpp"]:

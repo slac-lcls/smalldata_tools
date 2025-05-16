@@ -16,7 +16,7 @@ $(basename "$0"):
         --eb_cores
             Number of cores for psana EventBuilder nodes (default: 8 ; 2 for interactive)
         --bd_cores
-            Number of cores for psana Big Data nodes per EB node (default: 8 ; 3 for interactive)
+            Number of cores for psana Big Data nodes per EB node (default: 12 ; 3 for interactive)
         --s3df
             Force S3DF data location
         --interactive
@@ -137,7 +137,7 @@ ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 CORES_PER_NODE=120
 
 EB_CORES=${EB_CORES:=8}
-BD_CORES=${BD_CORES:=8}
+BD_CORES=${BD_CORES:=12}
 SRV_CORES=1
 TASKS=$(expr $BD_CORES \* $EB_CORES + $EB_CORES + $SRV_CORES + 1)  # BD + EB + SRV + SMD0
 
@@ -148,5 +148,5 @@ export PS_EB_NODES=$EB_CORES
 LOGFILE="cube_%J.log"
 SBATCH_ARGS="--use-min-nodes --exclusive -o $LOGFILE --account $ACCOUNT -p $PARTITION --ntasks $TASKS"
 MPI_CMD="mpirun python -u -m mpi4py.run ${PYTHONEXE} $*"
-echo $SBATCH_ARGS --wrap="$MPI_CMD"
+echo "$SBATCH_ARGS" --wrap="$MPI_CMD"
 sbatch $SBATCH_ARGS --wrap="$MPI_CMD"
