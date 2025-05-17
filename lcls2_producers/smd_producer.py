@@ -828,6 +828,7 @@ if not ds.is_srv():
     if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
         small_data.save_summary(sumDict)
 
+    logger.info("Saving detector configurtation to UserDataCfg")
     userDataCfg = {}
     for det in default_dets:
         # Make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
@@ -835,6 +836,11 @@ if not ds.is_srv():
         if det.name not in noConfigSave:
             userDataCfg[det.name] = det.params_as_dict()
     for det in dets:
+        try:
+            userDataCfg[det._name] = det.params_as_dict()
+        except:
+            userDataCfg[det.name] = det.params_as_dict()
+    for det in int_dets:
         try:
             userDataCfg[det._name] = det.params_as_dict()
         except:
