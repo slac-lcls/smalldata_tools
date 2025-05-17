@@ -73,6 +73,8 @@ def define_dets(run, det_list):
         droplet_args = config.get_droplet(run)
     if "get_azav" in dir(config):
         azav_args = config.get_azav(run)
+    if "get_polynomial_correction" in dir(config):
+        polynomial_args = config.get_polynomial_correction(run)
 
     dets = []
 
@@ -202,6 +204,10 @@ def define_dets(run, det_list):
             dFunc.addFunc(sparsifyFunc(nData=nData))
             det.addFunc(dFunc)
 
+        if detname in polynomial_args:
+            poly_corr_func = PolynomialCurveCorrection(**polynomial_args[detname])
+            det.addFunc(poly_corr_func)
+
         det.storeSum(sumAlgo="calib")
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
         dets.append(det)
@@ -246,9 +252,9 @@ from smalldata_tools.ana_funcs.waveformFunc import (
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
-
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.smd_svd import SvdFit
+from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
 
 import psplot
 from psmon import publish
