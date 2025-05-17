@@ -180,6 +180,9 @@ fi
 export PS_SRV_NODES=$SRV_CORES
 export PS_EB_NODES=$EB_CORES
 
+# If we run into the chunk size error:
+# export PS_SMD_CHUNKSIZE=1073741824
+
 SBATCH_ARGS="--nodes $NODES --account $ACCOUNT -p $PARTITION"
 
 echo "sbatch arguments: $SBATCH_ARGS"
