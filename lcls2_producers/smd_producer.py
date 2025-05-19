@@ -55,6 +55,7 @@ def define_dets(run, det_list):
     wfs_svd_args = {}
     droplet_args = {}
     azav_args = {}
+    polynomial_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
