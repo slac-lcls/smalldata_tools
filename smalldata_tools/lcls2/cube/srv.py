@@ -234,13 +234,25 @@ class CubeSrv:
         step_info = bin_data.bin_info
         # TODO: add docstring to h5. For now it can't handle strings
         step_info.pop("step_docstring")
+        self.step_info_to_h5(bin_data.bin_info)
+        self.bin_to_h5(bin_data)
+    
+    def step_info_to_h5(self, step_info: dict):
+        """
+        Add the bin info to the HDF5 file, skipping if the bin info is already present.
+        """
+        if 'step_value' not in self.file_handle:
+            pass
+        elif step_info['step_value'] in self.file_handle['step_value']:
+            logger.debug(f"Bin info for step {step_info['step_value']} already present.")
+            return
+        print(f"Add bin info for step {step_info}.")
         h5_utils.add_dict_to_h5(
             parent=self.file_handle,
             data_dict=step_info,
         )
-        self.write_bin_to_h5(bin_data)
 
-    def write_bin_to_h5(self, bin_data: BinData):
+    def bin_to_h5(self, bin_data: BinData):
         """
         Write the bin data to the HDF5 file.
         """
