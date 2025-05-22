@@ -31,14 +31,14 @@ def DetObject(srcName, run, **kwargs):
     detector_classes = {
         "epix100": Epix100Object,
         "epix10ka": Epix10kObject,
-        "opal": OpalObject,
+        "opal": SimpleCameraObject,
         "hsd": HsdObject,
         "wave8": Wave8Object,
         "pv": PVObject,
         "piranha4": PiranhaObject,
         "archon": ArchonObject,
         "jungfrau": JungfrauObject,
-        "pv": PVObject,  # For alvium etc.
+        "axis": SimpleCameraObject,
     }
 
     cls = detector_classes[det._dettype]
@@ -282,12 +282,16 @@ class CameraObject(DetObjectClass):
         self.imgShape = None
 
 
-class OpalObject(CameraObject):
+class SimpleCameraObject(CameraObject):
     def __init__(self, det, run, **kwargs):
-        super(OpalObject, self).__init__(det, run, **kwargs)
+        super().__init__(det, run, **kwargs)
+
+        # Try to be smart about common mode and use calib if the detector has pedestals.
+        if self.ped is not None and self.common_mode == 0:
+            self.common_mode = 30
 
     def getData(self, evt):
-        super(OpalObject, self).getData(evt)
+        super().getData(evt)
         if self.common_mode < 0:
             self.evt.dat = self.det.raw.raw(evt)
         elif (
