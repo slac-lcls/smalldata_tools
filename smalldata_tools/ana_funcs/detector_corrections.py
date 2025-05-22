@@ -95,7 +95,7 @@ class PolynomialCurveCorrection(DetObjectFunc):
         return image_shifted
 
     @staticmethod
-    def polynomial_correction_vectorized(data, poly_coefficients):
+    def polynomial_correction_vectorized(image, polynomial_coefficients):
         """
         Most efficient but only works if the polynomial correction is monotonic.
         """
@@ -118,7 +118,7 @@ class PolynomialCurveCorrection(DetObjectFunc):
         return image[shifted_rows, col_indices]
 
     @staticmethod
-    def curve_correction_ndimage(image, poly_coefficients):
+    def curve_correction_ndimage(image, polynomial_coefficients):
         """
         Slowest, but might be useful if more generic correction are to be implemented
         in the future, or if we want to support non-integer shifts.
