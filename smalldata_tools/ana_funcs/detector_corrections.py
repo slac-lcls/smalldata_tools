@@ -133,7 +133,7 @@ class PolynomialCurveCorrection(DetObjectFunc):
         # Apply shift to each column - still uses a loop but with optimized ndimage function
         for i in range(image.shape[1]):
             output[:, i] = ndimage_shift(
-                image[:, i], -shift_values[i], mode="constant", cval=0, order=0
+                image[:, i], -shift[i], mode="constant", cval=0, order=0
             )
 
         return output
