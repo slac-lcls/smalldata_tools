@@ -186,8 +186,10 @@ class CubeStepScan(Cube):
         run: psana.psexp.run.Run,
         engine: callable = event_engine.smalldata_tools_engine,
         processors: list = None,
+        event_screener: event_screener.EventScreener = None,
+        **kwargs: dict,
     ):
-        super().__init__(run, engine, processors)
+        super().__init__(run, engine, processors, event_screener, **kwargs)
         self.step = None
         self.step_data = {}
 
@@ -268,6 +270,7 @@ class CubeStepScan(Cube):
 def get_cube(
     run: psana.psexp.run.Run,
     engine: callable = event_engine.smalldata_tools_engine,
+    **kwargs: dict,
 ) -> Cube:
     """
     Factory function to create a Cube object based on run type.
@@ -280,6 +283,9 @@ def get_cube(
         The psana run object to create a cube from
     engine : callable, optional
         The engine to use for processing events, defaults to smalldata_tools_engine
+    kwargs : dict, optional
+        Additional keyword arguments to be passed to the Cube constructor. See the Cube
+        class for details. This can include processors, event_screener, etc.
 
     Returns
     -------
@@ -290,10 +296,10 @@ def get_cube(
         is_scan = False
         if run.ds.unique_user_rank():
             logger.info("Instantiating CubeFlyScan.")
-        cube = CubeFlyScan(run, engine=engine)
+        cube = CubeFlyScan(run, engine=engine, **kwargs)
     else:
         is_scan = True
         if run.ds.unique_user_rank():
             logger.info("Instantiating CubeStepScan.")
-        cube = CubeStepScan(run, engine=engine)
+        cube = CubeStepScan(run, engine=engine, **kwargs)
     return cube

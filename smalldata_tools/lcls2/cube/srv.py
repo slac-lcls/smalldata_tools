@@ -52,7 +52,6 @@ class BinData:
         bin_info (Any):
             Additional metadata or information about the bin.
             Can be of any type depending on the binning method used.
-
     """
 
     cube_label: str
