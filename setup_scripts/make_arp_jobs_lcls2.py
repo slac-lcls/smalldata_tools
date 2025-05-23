@@ -15,13 +15,16 @@ parser.add_argument(
     default=os.environ.get("EXPERIMENT", ""),
 )
 parser.add_argument(
-    "--partition", help="Partition on which to run the jobs", type=str, default="milano"
+    "--queue", help="Partition on which to run the jobs", type=str, default="milano"
 )
 parser.add_argument(
-    "--psplot_live", help="Make psplot-live job as well", type=int, default=0
+    "--psplot_live", help="Make psplot-live job as well", action="store_true"
 )
 parser.add_argument(
     "--config", help="Config file for the producer", type=str, default=None
+)
+parser.add_argument(
+    "--cube", help="Cube config to make cube job for.", type=str, default=None
 )
 args = parser.parse_args()
 
@@ -30,7 +33,7 @@ hutch = exp[:3].lower()
 SDF_BASE = Path(f"/sdf/data/lcls/ds/{hutch}/{exp}")
 
 # job arguments
-if "milano" in args.partition:
+if "milano" in args.queue:
     location = "S3DF"
     nodes = 2
     account = f"lcls:{exp}"
@@ -39,11 +42,17 @@ if "milano" in args.partition:
     executable = str(SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh")
     trigger = "START_OF_RUN"
 
+    # cube
+    executable_cube = str(
+        SDF_BASE / "results/smalldata_tools/arp_scripts/lets_cube_lclc2.sh"
+    )
+    trigger_cube = "MANUAL"
+
     # summaries
     executable_summaries = str(
         SDF_BASE / "results/smalldata_tools/arp_scripts/submit_plots.sh"
     )
-    queue_summaries = args.partition
+    queue_summaries = args.queue
     run_param_name = "SmallData"
     args_summaries = ""
 else:
@@ -54,7 +63,7 @@ else:
 job_defs = []
 
 # smallData job
-parameters = f"--partition {args.partition} --postRuntable --nodes {nodes} --wait"
+parameters = f"--partition {args.queue} --postRuntable --nodes {nodes} --wait"
 if args.config is not None:
     parameters += f" --config {args.config}"
 
@@ -69,19 +78,32 @@ job_defs.append(
 )
 
 # psplot_live job
-parameters = f"--partition {args.partition} --nodes {nodes} --wait --psplot_live"
-if args.config is not None:
-    parameters += f" --config {args.config}"
+if args.psplot_live:
+    parameters = f"--partition {args.queue} --nodes {nodes} --wait --psplot_live"
+    if args.config is not None:
+        parameters += f" --config {args.config}"
 
-job_defs.append(
-    {
-        "name": "smd_psplot_live",
-        "executable": executable,
-        "trigger": trigger,
-        "location": location,
-        "parameters": parameters,
-    }
-)
+    job_defs.append(
+        {
+            "name": "smd_psplot_live",
+            "executable": executable,
+            "trigger": trigger,
+            "location": location,
+            "parameters": parameters,
+        }
+    )
+
+# cube job
+if args.cube is not None:
+    job_defs.append(
+        {
+            "name": "cube",
+            "executable": executable_cube,
+            "trigger": trigger_cube,
+            "location": location,
+            "parameters": f"--config {args.cube}",
+        }
+    )
 
 # summary plots job
 if hutch in ["rix", "xcs", "xpp"]:
