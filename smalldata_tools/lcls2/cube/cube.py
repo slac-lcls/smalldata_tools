@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 import logging
 import psana
 
-from typing import Any
+from typing import Any, Callable
 from mpi4py import MPI
 
 COMM = MPI.COMM_WORLD
@@ -21,7 +21,7 @@ class Cube(metaclass=ABCMeta):
     def __init__(
         self,
         run: psana.psexp.run.Run,
-        engine: callable = event_engine.smalldata_tools_engine,
+        engine: Callable = event_engine.smalldata_tools_engine,
         processors: list = None,
         event_screener: event_screener.EventScreener = None,
         **kwargs: dict,
