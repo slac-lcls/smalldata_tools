@@ -23,7 +23,9 @@ parser.add_argument(
 parser.add_argument(
     "--config", help="Config file for the producer", type=str, default=None
 )
-parser.add_argument("--cube", help="Cube config to make cube job for.", type=str, default=None)
+parser.add_argument(
+    "--cube", help="Cube config to make cube job for.", type=str, default=None
+)
 args = parser.parse_args()
 
 exp = args.experiment
