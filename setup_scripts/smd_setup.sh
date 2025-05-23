@@ -31,30 +31,37 @@ do
 		;;
     -e|--experiment)
         EXP="$2"
+        ARGS+=("--experiment $2")
         shift 2
         ;;
     -q|--queue)
         QUEUE="$2"
+        ARGS+=("--queue $2")
         shift 2
         ;;
     -C|--config)
         CONFIG="$2"
+        ARGS+=("--config $2")
         shift 2
         ;;
     --cube)
         CUBE="$2"
+        ARGS+=("--cube $2")
         shift 2
         ;;
     --psplot_live)
         PSPLOT_LIVE=1
-        shift;;
-    *) # all other possibilities
+        ARGS+=("--psplot_live")
+        shift
+        ;;
+    *) 
+        # all other possibilities
         ARGS+=("$1")
-        echo $@
         shift
         ;;
     esac
 done
+set -- "${ARGS[@]}"
 
 umask 002
 
@@ -113,9 +120,9 @@ LCLS2_HUTCHES=("tmo" "txi" "rix" "ued" "mfx" "xpp")
 if [ $QUEUE != "0" ]; then
     if [[ ${LCLS1_HUTCHES[@]} =~ $HUTCH ]]; then
         source /sdf/group/lcls/ds/ana/sw/conda1/manage/bin/psconda.sh
-        python $MYDIR/make_arp_jobs_lcls1.py --experiment $EXP --queue $QUEUE --cube $CUBE --config $CONFIG
+        python $MYDIR/make_arp_jobs_lcls1.py $*
     elif [[ ${LCLS2_HUTCHES[@]} =~ $HUTCH ]]; then
         source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/psconda.sh
-        python $MYDIR/make_arp_jobs_lcls2.py --experiment $EXP --partition $QUEUE --psplot_live $PSPLOT_LIVE --config $CONFIG --cube $CUBE
+        python $MYDIR/make_arp_jobs_lcls2.py $*
     fi
 fi
