@@ -488,9 +488,13 @@ if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-intg_main, intg_addl = config.get_intg(run)
-integrating_detectors = []
-skip_intg = False
+if hasattr(config, 'get_intg'):
+    intg_main, intg_addl = config.get_intg(run)
+    integrating_detectors = []
+    skip_intg = False
+else:
+    intg_main, intg_addl = (None, None)
+    skip_intg = True
 
 if intg_main is not None and intg_main != "":
     ds = psana.DataSource(**datasource_args)
