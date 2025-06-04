@@ -135,7 +135,7 @@ class CubeSrv:
         # Dictionary to track the number of BD expected to send data for each bin.
         # Important nuance:
         # The fact that a BD is expected to send data for a bin does not mean that it will. It just means
-        # that we expect is to communicate about this step, i.e. it will send a STEP_DONE message for it, 
+        # that we expect is to communicate about this step, i.e. it will send a STEP_DONE message for it,
         # even if it does see any event from that step.
         # The actual number of contributions to a bin may be less than the expected contributions. Both are
         # logged at the end of the run.
@@ -182,11 +182,13 @@ class CubeSrv:
                 if msg.msg_type == SrvMsgType.BD_DONE:
                     step_idx = msg.payload
                     # Remove one contributor from all steps after the last step seen by this BD:
-                    logger.debug("BD {sender} done, Removing contribution above step", step_idx)
+                    logger.debug(
+                        "BD {sender} done, Removing contribution above step", step_idx
+                    )
                     for k, v in self.expected_contributions.items():
                         if k > step_idx:
                             self.expected_contributions[k] -= 1
-                    
+
                     # Update the expected contributions if they dont already exist and
                     # decrement the number of BD remaining.
                     # This case typically arises when the the batch size is comparable or large than
@@ -196,8 +198,11 @@ class CubeSrv:
                         if ii not in self.expected_contributions:
                             self.expected_contributions[ii] = self.n_bd
                     self.n_bd -= 1
-                    logger.debug("Updated expected contributions per step:", self.expected_contributions)
-                        
+                    logger.debug(
+                        "Updated expected contributions per step:",
+                        self.expected_contributions,
+                    )
+
                 if count_done == size - 1:
                     all_done = True
                     logger.info("All psana nodes are done.")
@@ -225,12 +230,14 @@ class CubeSrv:
                     # Store new data
                     bin_cache[key] = bin_data
                     bin_count[key] = 1
-                    
+
                     # The bin_index may have been already created if a BD is done working and has seen
                     # steps / bins past this one.
                     if key[1] not in self.expected_contributions:
-                        # If we never saw this bin before, we expect all remaining BD to contribute                    
-                        self.expected_contributions[key[1]] = self.n_bd  # by default we expect all BD to contribute
+                        # If we never saw this bin before, we expect all remaining BD to contribute
+                        self.expected_contributions[key[1]] = (
+                            self.n_bd
+                        )  # by default we expect all BD to contribute
 
             elif msg.msg_type == SrvMsgType.STEP_DONE:
                 step_idx = msg.payload["step_value"] - 1  # step starts from 1
@@ -249,16 +256,18 @@ class CubeSrv:
                         # BD will send data for a given bin. This is the case for example when there
                         # are more bd than there are batches of events in a step. In this case, the
                         # bin_count will be less than n_bd. Relying on the step_done count is safer.
-                        # 
+                        #
                         # All data for this bin has been received
                         self.process_bin(bin_cache[key])
                         to_be_deleted.append(key)
             for key in to_be_deleted:
                 del bin_cache[key]
                 # del bin_count[key]  # Let's keep the count for debugging
-        
+
         logger.info(f"Number of BD who saw each step: {step_done}")
-        logger.info(f"Number of expected contributions per bin: {self.expected_contributions}")
+        logger.info(
+            f"Number of expected contributions per bin: {self.expected_contributions}"
+        )
         logger.info(f"Number of contributions to each cube and bin: {bin_count}")
         logger.info("Server done, close file handle.")
         self.file_handle.close()

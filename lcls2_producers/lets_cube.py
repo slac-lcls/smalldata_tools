@@ -122,7 +122,7 @@ else:
 
     processors = config.detectors(myrun)
     cube_obj.add_processors(processors)
-    
+
     screener = config.screener(myrun)
     cube_obj.set_event_screener(screener)
 

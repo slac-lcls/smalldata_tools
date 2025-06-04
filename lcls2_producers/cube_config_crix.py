@@ -36,14 +36,13 @@ def detectors(run: psana.psexp.run.Run):
     # axis_svls: Dropplet + projection
     axis_svls = DetObject("axis_svls", run)
     func = DropletFunc(
-        threshold = 3,
-        thresADU = 0,  # discard droplet whose total ADU is below this value
-        useRms = False
+        threshold=3,
+        thresADU=0,  # discard droplet whose total ADU is below this value
+        useRms=False,
     )
     func.addFunc(unsparsifyFunc())
     func.addFunc(projectionFunc(axis=0))
     axis_svls.addFunc(func)
-
 
     # FIMs
     fim0 = DetObject("rix_fim0", run)

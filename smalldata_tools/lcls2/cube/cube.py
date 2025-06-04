@@ -268,7 +268,9 @@ class CubeStepScan(Cube):
         elif self.node_type == PsanaNode.EB:
             msg = SrvCubeMessage(msg_type=SrvMsgType.EB_DONE, sender=rank)
         elif self.node_type == PsanaNode.BD:
-            msg = SrvCubeMessage(msg_type=SrvMsgType.BD_DONE, sender=rank, payload=nstep)
+            msg = SrvCubeMessage(
+                msg_type=SrvMsgType.BD_DONE, sender=rank, payload=nstep
+            )
         else:
             logger.error(f"Unexpected psana node type: {self.node_type}")
         COMM.send(msg, dest=size - 1)
