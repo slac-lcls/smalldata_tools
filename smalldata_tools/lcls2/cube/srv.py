@@ -5,7 +5,7 @@ import h5py
 import psana
 
 from enum import Enum  # , StrEnum py3.11)
-from typing import Union, Any
+from typing import Union, Any, Dict, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,9 +29,11 @@ class SrvMsgType(Enum):
     Message types for the server.
     """
 
-    DONE = 0
-    NEW_BIN = 1
-    STEP_DONE = 2
+    SMD0_DONE = 0
+    EB_DONE = 1
+    BD_DONE = 2
+    NEW_BIN = 3
+    STEP_DONE = 4
 
 
 @dataclass
@@ -100,7 +102,7 @@ class CubeSrv:
 
     The class operates in two modes:
     - Scan mode: Each BD worker processes all bins
-    - Non-scan mode: Each bin is processed by a single BD worker (TODO: NOT IMPLEMENTED)
+    - Non-scan mode: Each bin is processed by a single BD for each EB (NOT IMPLEMENTED YET)
 
     Attributes:
         n_bd (int): Number of BD (Bin Data) nodes that will send data
@@ -120,14 +122,24 @@ class CubeSrv:
     """
 
     def __init__(self, scan_mode: bool = True):
-        n_eb = int(os.environ.get("PS_EB_NODES"))
-        n_srv = int(os.environ.get("PS_SRV_NODES"))
-
-        # Number of BD nodes working on a given bin.
-        # In scan mode, a bin is distributed on all BD. Else 1 BD/bin:
-        self.n_bd = size - n_eb - n_srv - 1 if scan_mode else 1
-        logger.info(f"Server expecting data from {self.n_bd} BD nodes.")
         self.file_handle = None
+
+        n_eb = int(os.environ.get("PS_EB_NODES", 1))
+        n_srv = int(os.environ.get("PS_SRV_NODES", 1))
+        n_smd0 = 1
+        # Number of BD nodes working on a given bin.
+        # In scan mode, a bin is distributed to all BD. Else each EB distributes 1 bin to 1 BD:
+        self.n_bd = size - n_eb - n_srv - n_smd0 if scan_mode else n_eb
+        logger.info(f"Server expecting data from {self.n_bd} BD nodes.")
+
+        # Dictionary to track the number of BD expected to send data for each bin.
+        # Important nuance:
+        # The fact that a BD is expected to send data for a bin does not mean that it will. It just means
+        # that we expect is to communicate about this step, i.e. it will send a STEP_DONE message for it, 
+        # even if it does see any event from that step.
+        # The actual number of contributions to a bin may be less than the expected contributions. Both are
+        # logged at the end of the run.
+        self.expected_contributions = {}
 
     def set_file_handle(self, run_num: int, exp: str, filepath: str = None):
         """
@@ -161,27 +173,48 @@ class CubeSrv:
         count_done = 0
         while not all_done:
             sender, msg = self.recv()
-            if msg.msg_type == SrvMsgType.DONE:
+            if (
+                msg.msg_type == SrvMsgType.SMD0_DONE
+                or msg.msg_type == SrvMsgType.EB_DONE
+                or msg.msg_type == SrvMsgType.BD_DONE
+            ):
                 count_done += 1
+                if msg.msg_type == SrvMsgType.BD_DONE:
+                    step_idx = msg.payload
+                    # Remove one contributor from all steps after the last step seen by this BD:
+                    logger.debug("BD {sender} done, Removing contribution above step", step_idx)
+                    for k, v in self.expected_contributions.items():
+                        if k > step_idx:
+                            self.expected_contributions[k] -= 1
+                    
+                    # Update the expected contributions if they dont already exist and
+                    # decrement the number of BD remaining.
+                    # This case typically arises when the the batch size is comparable or large than
+                    # the number of events per step. In that case it is likely that some BDs do not see
+                    # any events and are taken straight to the end of the step loop.
+                    for ii in range(step_idx + 1):
+                        if ii not in self.expected_contributions:
+                            self.expected_contributions[ii] = self.n_bd
+                    self.n_bd -= 1
+                    logger.debug("Updated expected contributions per step:", self.expected_contributions)
+                        
                 if count_done == size - 1:
                     all_done = True
                     logger.info("All psana nodes are done.")
-            else:
-                yield msg
+            yield msg
 
     def run(self):
-        # Dictionary to store partially combined data
+        # Dictionary to store partially combined data:
         bin_cache: Dict[Tuple[str, int], BinData] = {}
-        # keep track of how many BD contributed to a bin:
+        # Keep track of how many BD contributed to a bin:
         bin_count: Dict[Tuple[str, int], int] = {}
-        # keep track of bd who finished a step:
+        # Keep track of bd who finished a step:
         step_done: Dict[int, int] = {}
 
-        # for bin_data in self.yield_from_bd():
         for msg in self.yield_from_bd():
             if msg.msg_type == SrvMsgType.NEW_BIN:
                 bin_data = msg.payload
-                key = (bin_data.cube_label, bin_data.bin_index)
+                key = (bin_data.cube_label, bin_data.bin_index)  # (label, index)
                 logger.debug(f"Got bin data for {key}")
 
                 if key in bin_cache:
@@ -192,6 +225,13 @@ class CubeSrv:
                     # Store new data
                     bin_cache[key] = bin_data
                     bin_count[key] = 1
+                    
+                    # The bin_index may have been already created if a BD is done working and has seen
+                    # steps / bins past this one.
+                    if key[1] not in self.expected_contributions:
+                        # If we never saw this bin before, we expect all remaining BD to contribute                    
+                        self.expected_contributions[key[1]] = self.n_bd  # by default we expect all BD to contribute
+
             elif msg.msg_type == SrvMsgType.STEP_DONE:
                 step_idx = msg.payload["step_value"] - 1  # step starts from 1
                 if step_idx in step_done:
@@ -202,25 +242,24 @@ class CubeSrv:
 
             to_be_deleted = []
             for key in bin_cache.keys():
-                logger.debug(f"key: {key}, count: {bin_count[key]}")
+                # logger.debug(f"key: {key}, count: {bin_count[key]}")
                 if key[1] in step_done:
-                    if step_done[key[1]] == self.n_bd:
-                        """
-                        Note: we cannot rely on the bin_count here, because in some cases, not all
-                        BD will send data for a given bin. This is the case for example when there
-                        are more bd than there are batches of events in a step. In this case, the
-                        bin_count will be less than n_bd. Relying on the step_done count is safer.
-                        """
+                    if step_done[key[1]] == self.expected_contributions[key[1]]:
+                        # Note: we cannot rely on the bin_count here, because in some cases, not all
+                        # BD will send data for a given bin. This is the case for example when there
+                        # are more bd than there are batches of events in a step. In this case, the
+                        # bin_count will be less than n_bd. Relying on the step_done count is safer.
+                        # 
                         # All data for this bin has been received
-                        logger.info(
-                            f"All data for {key} received. Number of BD who contributed: {bin_count[key]}"
-                        )
                         self.process_bin(bin_cache[key])
                         to_be_deleted.append(key)
             for key in to_be_deleted:
                 del bin_cache[key]
                 # del bin_count[key]  # Let's keep the count for debugging
-
+        
+        logger.info(f"Number of BD who saw each step: {step_done}")
+        logger.info(f"Number of expected contributions per bin: {self.expected_contributions}")
+        logger.info(f"Number of contributions to each cube and bin: {bin_count}")
         logger.info("Server done, close file handle.")
         self.file_handle.close()
 
@@ -228,7 +267,7 @@ class CubeSrv:
         logger.info(
             f"Processing bin for cube label: {bin_data.cube_label}, bin index: {bin_data.bin_index}"
         )
-        logger.info(f"Bin info: {bin_data.bin_info}")
+        logger.debug(f"Bin info: {bin_data.bin_info}")
         # TODO: Add processing pipeline on the binned data here.
         step_info = bin_data.bin_info
         # TODO: add docstring to h5. For now it can't handle strings
@@ -247,7 +286,6 @@ class CubeSrv:
                 f"Bin info for step {step_info['step_value']} already present."
             )
             return
-        print(f"Add bin info for step {step_info}.")
         h5_utils.add_dict_to_h5(
             parent=self.file_handle,
             data_dict=step_info,

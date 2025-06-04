@@ -7,6 +7,7 @@ class LogConfig:
     FullFormat = "[ %(asctime)s | %(levelname)-3s | %(filename)s] %(message)s"
     Level = logging.INFO
     # Level = logging.DEBUG
+    # Level = logging.WARNING
 
     @staticmethod
     def get_package_name(name):

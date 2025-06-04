@@ -28,7 +28,7 @@ formatter = logging.Formatter(log_format)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-from smalldata_tools.lcls2.cube.utils import PsanaNode
+# from smalldata_tools.lcls2.cube.utils import PsanaNode
 
 
 def parse_args():  # move to another file?
@@ -98,48 +98,8 @@ if ds.unique_user_rank():
     print(f"DS batchsize: {ds.batch_size}")
     print("#### END DATASOURCE AND PSANA ENV VAR INFO ####\n")
 
-
-# Get comms and print ranks details
-psana_node = PsanaNode.SMD0 if rank == 0 else None
-
-if not ds.is_srv():
-    comms = ds.comms
-
-    psana_comm = comms.psana_comm
-    psana_size = psana_comm.Get_size()
-    psana_rank = psana_comm.Get_rank()
-
-    bd_comm = comms.bd_comm
-    if bd_comm is not None:
-        bd_size = bd_comm.Get_size()
-        bd_rank = bd_comm.Get_rank()
-    else:
-        bd_rank = MPI.UNDEFINED
-
-    if bd_rank == 0:
-        psana_node = PsanaNode.EB
-    elif bd_rank > 0:
-        psana_node = PsanaNode.BD
-
-    if ds.unique_user_rank():
-        print(f"MPI COMM sizes:\tWorld: {size},\tpsana: {psana_size},\tbd: {bd_size}\n")
-        n_eb = int(os.environ.get("PS_EB_NODES"))
-        n_srv = int(os.environ.get("PS_SRV_NODES"))
-        n_bd = size - n_eb - n_srv - 1
-        print(
-            f"PSANA nodes: # EB nodes (total): {n_eb}, # BD nodes (total): {n_bd}, "
-            f"# BD nodes per EB: {n_bd / n_eb}\n\n"
-        )
-else:
-    print(f"SRV World Rank: {rank}")
-    psana_node = PsanaNode.SRV
-    psana_comm = MPI.COMM_NULL
-    psana_rank = MPI.UNDEFINED
-    bd_rank = MPI.UNDEFINED
-
-
 """ Main processing """
-if psana_node == PsanaNode.SRV:
+if ds.is_srv():
     from smalldata_tools.lcls2.cube.srv import CubeSrv
 
     cube_srv = CubeSrv()
@@ -162,7 +122,7 @@ else:
 
     processors = config.detectors(myrun)
     cube_obj.add_processors(processors)
-
+    
     screener = config.screener(myrun)
     cube_obj.set_event_screener(screener)
 

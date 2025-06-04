@@ -10,7 +10,7 @@ rank = COMM.Get_rank()
 size = COMM.Get_size()
 
 from . import event_engine
-from .utils import PsanaNode, reduce_by_key, append_reduction
+from .utils import PsanaNode, get_psana_node_type, reduce_by_key, append_reduction
 from .srv import SrvMsgType, SrvCubeMessage, BinData
 from . import event_screener
 
@@ -55,6 +55,7 @@ class Cube(metaclass=ABCMeta):
         # Reduction passed to utils.reduce_by_key to combine a bin from different
         # BD (simple sum):
         self.reduction_func = lambda x, y: x + y
+        self.node_type = get_psana_node_type(run.ds)
 
     def add_processors(self, processors):
         """
@@ -262,9 +263,16 @@ class CubeStepScan(Cube):
                 dest=size - 1,
             )
 
-        msg = SrvCubeMessage(msg_type=SrvMsgType.DONE, sender=rank)
+        if self.node_type == PsanaNode.SMD0:
+            msg = SrvCubeMessage(msg_type=SrvMsgType.SMD0_DONE, sender=rank)
+        elif self.node_type == PsanaNode.EB:
+            msg = SrvCubeMessage(msg_type=SrvMsgType.EB_DONE, sender=rank)
+        elif self.node_type == PsanaNode.BD:
+            msg = SrvCubeMessage(msg_type=SrvMsgType.BD_DONE, sender=rank, payload=nstep)
+        else:
+            logger.error(f"Unexpected psana node type: {self.node_type}")
         COMM.send(msg, dest=size - 1)
-        logger.debug(f"Rank {rank}: Done with {nstep} steps.")
+        logger.info(f"Rank {rank} done at after {nstep} steps.")
 
 
 def get_cube(

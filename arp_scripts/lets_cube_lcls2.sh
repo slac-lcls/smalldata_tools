@@ -86,7 +86,11 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
     # EXP="rixl1032923"
     # RUN="169"
 
+EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
+RUN="${RUN_NUM:=$RUN}" # default to the environment variable if submitted from the elog
 HUTCH=${EXP:0:3}
+# Export EXP and RUN for when running form the CLI
+# This should just re-write the existing variables when running from the elog
 export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
@@ -97,7 +101,7 @@ export SMD_ROOT=`echo $CWD | sed  "s|/arp_scripts||g"`
 export SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 echo "Sourcing environment"
 source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
-# source /sdf/home/e/espov/dev/lcls2/setup_env.sh
+# source /sdf/home/e/espov/dev/lcls2/setup_env.sh  # dev
 
 
 # Figure out the right base path for the data (or use S3DF in force case)
