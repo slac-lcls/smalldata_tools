@@ -48,6 +48,7 @@ def getROIs(run):
         ret_dict["rix_fim0"] = [full_roi]
         ret_dict["rix_fim1"] = [full_roi]
         ret_dict["crix_w8"] = [full_roi]
+
         # Currently chemRIXS uses channels 1 and 2
         hsd_dict = {}
         # hsd_dict['hsd_0'] = [0,-1]
@@ -84,6 +85,20 @@ def get_droplet2photon(run):
 
         ret_dict["axis_svls"] = d2p_dict
 
+    return ret_dict
+
+
+def get_polynomial_correction(run):
+    ret_dict = {}
+
+    if run > 0:
+        # Polynomial correction for the axis_svls
+        coeffs = [1.29626379e-6, -1.33220754e-2, 4.70900708e1]  # quadratic correction
+        ret_dict["axis_svls"] = {
+            "polynomial_coefficients": coeffs,
+            "axis": 1,
+            "method": "roll",
+        }
     return ret_dict
 
 
