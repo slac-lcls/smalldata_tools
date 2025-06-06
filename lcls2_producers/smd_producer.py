@@ -495,7 +495,7 @@ if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-if hasattr(config, 'get_intg'):
+if hasattr(config, "get_intg"):
     intg_main, intg_addl = config.get_intg(run)
     integrating_detectors = []
     skip_intg = False
