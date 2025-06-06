@@ -39,22 +39,6 @@ def getDetSums(run):
     return ret_dict
 
 
-def get_droplet(run):
-    if isinstance(run,str):
-        run=int(run)
-
-    ret_dict = {}
-    if run >0:
-        drop_dict = {}
-        drop_dict['threshold'] = 1.0
-        drop_dict['relabel'] = True
-        drop_dict['useRms'] = False
-        ret_dict[roi_detname] = [ drop_dict ]
-
-    return ret_dict
-
-
-
 
 #########################################################
 # run independent parameters 
