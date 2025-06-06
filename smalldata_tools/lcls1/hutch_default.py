@@ -211,7 +211,7 @@ def xcsDetectors(beamCodes=[[-137], [89]], env=None):
                 "dccm_th1_setpoint",
                 "dccm_th2_setpoint",
                 "dccm_E",
-                "dccm_E_setpoint"
+                "dccm_E_setpoint",
             ]
         )
     )
