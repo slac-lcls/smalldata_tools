@@ -93,13 +93,13 @@ def get_polynomial_correction(run):
             "axis": 1,
             "method": "roll",  # 'vectorized' or 'ndimage' are also options
         }
-        poly_corr_args['droplet'] = {
+        poly_corr_args["droplet"] = {
             "threshold": 3,
             "thresADU": 0,  # discard droplet whose total ADU is below this value
             "useRms": False,
         }
-        poly_corr_args['projection'] = {"axis": 0}
-        
+        poly_corr_args["projection"] = {"axis": 0}
+
         ret_dict["axis_svls"] = poly_corr_args
     return ret_dict
 

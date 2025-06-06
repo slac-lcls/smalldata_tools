@@ -127,10 +127,8 @@ else:
     for detector in processors:
         if isinstance(detector, NullDetObject):
             if ds.unique_user_rank():
-                
-                logger.warning(
-                    f"Detector {detector._name} is not defined."
-                )
+
+                logger.warning(f"Detector {detector._name} is not defined.")
         else:
             temp.append(detector)
     processors = temp

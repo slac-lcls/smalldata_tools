@@ -216,11 +216,12 @@ class DetObjectClass(object):
             # print('%s'%key, self._storeSum[key] )
 
 
-class NullDetObject():
+class NullDetObject:
     """
     A dummy detector object that does nothing.
     Useful to handle instantiation in case the detector is not present in the data.
     """
+
     def __init__(self, *args, **kwargs):
         self._name = kwargs.get("name", "NullDetObject")
         self.det = None
@@ -229,7 +230,7 @@ class NullDetObject():
         self._storeSum = {}
         self.applyMask = 0
         self.dataAccessTime = 0.0
-    
+
     def addFunc(self, func):
         """
         Do nothing, as this is a null object.

@@ -43,9 +43,9 @@ def detectors(run: psana.psexp.run.Run):
     )
     unsparsify = unsparsifyFunc()
     poly_corr = PolynomialCurveCorrection(
-        polynomial_coefficients = [1.29626379e-6, -1.33220754e-2, 4.70900708e1],
-        axis = 1,
-        method = "roll"
+        polynomial_coefficients=[1.29626379e-6, -1.33220754e-2, 4.70900708e1],
+        axis=1,
+        method="roll",
     )
     projection = projectionFunc(axis=0)
     poly_corr.addFunc(projection)
@@ -108,7 +108,5 @@ def screener(run):
     screener_off = CompositeFilter([laser_off, xray_on])
 
     # Combine all screeners into an OR screener to be run by the cube
-    event_screener = CompositeFilter(
-        [laser_on, laser_off], require_all=False
-    )
+    event_screener = CompositeFilter([laser_on, laser_off], require_all=False)
     return event_screener

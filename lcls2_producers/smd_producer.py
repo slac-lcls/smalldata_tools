@@ -200,7 +200,7 @@ def define_dets(run, det_list):
             if "nData" in droplet_args[detname].keys():
                 nData = droplet_args[detname].pop("nData")
             else:
-                nData = None    
+                nData = None
             dFunc = dropletFunc(**droplet_args[detname])
             dFunc.addFunc(sparsifyFunc(nData=nData))
             det.addFunc(dFunc)
@@ -221,11 +221,11 @@ def define_dets(run, det_list):
                 # If projection is requested, add it to the polynomial correction.
                 proj_args = polynomial_args[detname].pop("projection")
                 proj_func = projectionFunc(**proj_args)
-            
+
             poly_corr_func = PolynomialCurveCorrection(**polynomial_args[detname])
             if "proj_func" in locals():
                 print("Add projection")
-                poly_corr_func.addFunc(proj_func) 
+                poly_corr_func.addFunc(proj_func)
             obj.addFunc(poly_corr_func)
 
         det.storeSum(sumAlgo="calib")
@@ -514,7 +514,7 @@ if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
 # Setup if integrating detectors are requested.
-if hasattr(config, 'get_intg'):
+if hasattr(config, "get_intg"):
     intg_main, intg_addl = config.get_intg(run)
     integrating_detectors = []
     skip_intg = False
