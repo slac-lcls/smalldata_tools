@@ -10,8 +10,9 @@ from smalldata_tools.lcls2 import default_detectors, hutch_default
 from smalldata_tools.lcls2.DetObject import DetObject
 
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, projectionFunc
-from smalldata_tools.ana_funcs.droplet import DropletFunc
-from smalldata_tools.ana_funcs.sparsify import unsparsifyFunc
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
+from smalldata_tools.ana_funcs.sparsifyFunc import unsparsifyFunc
 from smalldata_tools.ana_funcs.waveformFunc import WfIntegration
 from smalldata_tools.ana_funcs.waveformFunc import hsdsplitFunc, hsdROIFunc
 
@@ -35,14 +36,22 @@ def detectors(run: psana.psexp.run.Run):
 
     # axis_svls: Dropplet + projection
     axis_svls = DetObject("axis_svls", run)
-    func = DropletFunc(
+    droplet = dropletFunc(
         threshold=3,
         thresADU=0,  # discard droplet whose total ADU is below this value
         useRms=False,
     )
-    func.addFunc(unsparsifyFunc())
-    func.addFunc(projectionFunc(axis=0))
-    axis_svls.addFunc(func)
+    unsparsify = unsparsifyFunc()
+    poly_corr = PolynomialCurveCorrection(
+        polynomial_coefficients = [1.29626379e-6, -1.33220754e-2, 4.70900708e1],
+        axis = 1,
+        method = "roll"
+    )
+    projection = projectionFunc(axis=0)
+    poly_corr.addFunc(projection)
+    unsparsify.addFunc(poly_corr)
+    droplet.addFunc(unsparsify)
+    axis_svls.addFunc(droplet)
 
     # FIMs
     fim0 = DetObject("rix_fim0", run)
@@ -55,8 +64,8 @@ def detectors(run: psana.psexp.run.Run):
 
     # HSD
     hsd_rois = {
-        "hsd_0": [0, -1],
-        "hsd_3": [0, -1],
+        "hsd_1": [0, -1],
+        "hsd_2": [0, -1],
     }
     hsd = DetObject("hsd", run)
     hsdsplit = hsdsplitFunc(writeHsd=False)
@@ -67,6 +76,7 @@ def detectors(run: psana.psexp.run.Run):
     hsd.addFunc(hsdsplit)
 
     dets = [fim0, fim1, hsd, andor_dir, andor_vls, axis_svls]
+    # dets = [fim0, fim1, andor_vls, axis_svls]
     return dets
 
 
@@ -99,6 +109,6 @@ def screener(run):
 
     # Combine all screeners into an OR screener to be run by the cube
     event_screener = CompositeFilter(
-        [screener_on, screener_off, xray_off], require_all=False
+        [laser_on, laser_off], require_all=False
     )
     return event_screener

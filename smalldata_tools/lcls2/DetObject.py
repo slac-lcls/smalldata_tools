@@ -26,7 +26,7 @@ def DetObject(srcName, run, **kwargs):
             logger.warning(
                 f"failed to make detector for {srcName} on rank {rank}: {run.detnames}"
             )
-        return None
+        return NullDetObject(name=srcName)
     det.alias = srcName
     detector_classes = {
         "epix100": Epix100Object,
@@ -214,6 +214,27 @@ class DetObjectClass(object):
                     print("could not add ", dat_to_be_summed)
                     print("could not to ", self._storeSum[key])
             # print('%s'%key, self._storeSum[key] )
+
+
+class NullDetObject():
+    """
+    A dummy detector object that does nothing.
+    Useful to handle instantiation in case the detector is not present in the data.
+    """
+    def __init__(self, *args, **kwargs):
+        self._name = kwargs.get("name", "NullDetObject")
+        self.det = None
+        self.run = None
+        self.evt = Event()
+        self._storeSum = {}
+        self.applyMask = 0
+        self.dataAccessTime = 0.0
+    
+    def addFunc(self, func):
+        """
+        Do nothing, as this is a null object.
+        """
+        pass
 
 
 class CameraObject(DetObjectClass):

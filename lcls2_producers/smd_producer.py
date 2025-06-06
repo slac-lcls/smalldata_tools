@@ -200,14 +200,33 @@ def define_dets(run, det_list):
             if "nData" in droplet_args[detname].keys():
                 nData = droplet_args[detname].pop("nData")
             else:
-                nData = None
+                nData = None    
             dFunc = dropletFunc(**droplet_args[detname])
             dFunc.addFunc(sparsifyFunc(nData=nData))
             det.addFunc(dFunc)
 
         if detname in polynomial_args:
+            obj = det
+            if "droplet" in polynomial_args[detname]:
+                # If polynomial correction is applied to droplet data, we need to
+                # add the droplet function first.
+                droplet_args = polynomial_args[detname].pop("droplet")
+                droplet_func = dropletFunc(**droplet_args)
+                unsparsify = unsparsifyFunc()
+                droplet_func.addFunc(unsparsify)
+                det.addFunc(droplet_func)
+                obj = unsparsify
+
+            if "projection" in polynomial_args[detname]:
+                # If projection is requested, add it to the polynomial correction.
+                proj_args = polynomial_args[detname].pop("projection")
+                proj_func = projectionFunc(**proj_args)
+            
             poly_corr_func = PolynomialCurveCorrection(**polynomial_args[detname])
-            det.addFunc(poly_corr_func)
+            if "proj_func" in locals():
+                print("Add projection")
+                poly_corr_func.addFunc(proj_func) 
+            obj.addFunc(poly_corr_func)
 
         det.storeSum(sumAlgo="calib")
         logger.debug(f"Rank {rank} Add det {detname}: {det}")

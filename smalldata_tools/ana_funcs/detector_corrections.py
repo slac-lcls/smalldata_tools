@@ -78,7 +78,14 @@ class PolynomialCurveCorrection(DetObjectFunc):
             shifted_image = np.transpose(shifted_image)
 
         self.dat = shifted_image
-        return {"corrected_image": shifted_image}
+        ret_dict = {"corrected_image": shifted_image}
+
+        subfuncResults = self.processFuncs()
+        for k in subfuncResults:
+            for kk in subfuncResults[k]:
+                ret_dict[f"{k}_{kk}"] = subfuncResults[k][kk]
+
+        return ret_dict
 
     @staticmethod
     def polynomial_correction(image, polynomial_coefficients):
