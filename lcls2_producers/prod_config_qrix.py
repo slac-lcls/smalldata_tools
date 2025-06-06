@@ -19,9 +19,9 @@ def get_intg(run):
     run = int(run)
     intg_main = None
     intg_addl = []
-    if run > 0:
-        intg_main = 'archon'
-        intg_addl = []
+    # if run > 0:
+    #     intg_main = "archon"
+    #     intg_addl = []
 
     return intg_main, intg_addl
 
@@ -36,23 +36,20 @@ def getROIs(run):
 
     if run > 0:
         # Save the full DET.
-        ret_dict['q_piranha'] = [full_roi]
-        ret_dict['q_atmopal'] = [full_roi]
-        ret_dict['archon'] = [full_roi]
-
+        ret_dict["q_piranha"] = [full_roi]
+        ret_dict["q_atmopal"] = [full_roi]
+        ret_dict["archon"] = [full_roi]
 
         # and the FIM waveforms
         ret_dict["rix_fim0"] = [full_roi]
         ret_dict["rix_fim1"] = [full_roi]
-        ret_dict['qrix_w8'] = [full_roi]
+        ret_dict["qrix_w8"] = [full_roi]
 
         # hsd channels used by qRIXS
         hsd_dict = {}
-        hsd_dict['hsd_0'] = [0,-1]
-        # hsd_dict["hsd_1"] = [3000, 8000]
-        # hsd_dict["hsd_2"] = [3000, 8000]
-        hsd_dict['hsd_3'] = [0,-1]
-        ret_dict['hsd'] = hsd_dict
+        hsd_dict["hsd_0"] = [0, -1]
+        hsd_dict["hsd_3"] = [0, -1]
+        ret_dict["hsd"] = hsd_dict
 
     return ret_dict
 
@@ -82,20 +79,6 @@ def get_droplet2photon(run):
 
         ret_dict["archon"] = d2p_dict
 
-    return ret_dict
-
-
-def get_wf_hitfinder(run):
-    ret_dict = {}
-
-    # if run>0:
-    #     andor_vls = {  # for andor_vls in 1-D mode
-    #         'threshold' : 4,
-    #         'treshold_max' : 3500,
-    #         'use_rms' : True,
-    #         'bkg_roi' : (500, 800)
-    #     }
-    #     ret_dict['andor_vls'] = andor_vls
     return ret_dict
 
 
