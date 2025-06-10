@@ -34,7 +34,7 @@ def detectors(run: psana.psexp.run.Run):
     func = ROIFunc(**full_roi)
     andor_vls.addFunc(func)
 
-    # axis_svls: Dropplet + projection
+    # axis_svls: Dropplet + curve correction + projection
     axis_svls = DetObject("axis_svls", run)
     droplet = dropletFunc(
         threshold=3,
@@ -76,7 +76,6 @@ def detectors(run: psana.psexp.run.Run):
     hsd.addFunc(hsdsplit)
 
     dets = [fim0, fim1, hsd, andor_dir, andor_vls, axis_svls]
-    # dets = [fim0, fim1, andor_vls, axis_svls]
     return dets
 
 

@@ -24,7 +24,7 @@ def DetObject(srcName, run, **kwargs):
     except:
         if rank == 0:
             logger.warning(
-                f"failed to make detector for {srcName} on rank {rank}: {run.detnames}"
+                f"failed to make detector for {srcName}: {run.detnames}"
             )
         return NullDetObject(name=srcName)
     det.alias = srcName
