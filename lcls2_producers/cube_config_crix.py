@@ -62,7 +62,7 @@ def detectors(run: psana.psexp.run.Run):
     func = ROIFunc(**full_roi)
     fim1.addFunc(func)
 
-    crix_w8 = DetObject("crix_w8",run)
+    crix_w8 = DetObject("crix_w8", run)
     func = ROIFunc(**full_roi)
     crix_w8.addFunc(func)
 
