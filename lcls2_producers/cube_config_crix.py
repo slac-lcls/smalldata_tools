@@ -47,7 +47,7 @@ def detectors(run: psana.psexp.run.Run):
         axis=1,
         method="roll",
     )
-    projection = projectionFunc(axis=0)
+    projection = projectionFunc(axis=1)
     poly_corr.addFunc(projection)
     unsparsify.addFunc(poly_corr)
     droplet.addFunc(unsparsify)
@@ -62,6 +62,10 @@ def detectors(run: psana.psexp.run.Run):
     func = ROIFunc(**full_roi)
     fim1.addFunc(func)
 
+    crix_w8 = DetObject("crix_w8",run)
+    func = ROIFunc(**full_roi)
+    crix_w8.addFunc(func)
+
     # HSD
     hsd_rois = {
         "hsd_1": [0, -1],
@@ -75,7 +79,7 @@ def detectors(run: psana.psexp.run.Run):
         hsdsplit.addFunc(func)
     hsd.addFunc(hsdsplit)
 
-    dets = [fim0, fim1, hsd, andor_dir, andor_vls, axis_svls]
+    dets = [fim0, fim1, crix_w8, hsd, andor_dir, andor_vls, axis_svls]
     return dets
 
 
