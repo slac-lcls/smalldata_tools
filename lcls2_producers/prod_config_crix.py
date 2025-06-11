@@ -29,9 +29,6 @@ def get_intg(run):
     return intg_main, intg_addl
 
 
-slow_detectors = []  # NOT IMPLEMENTED
-
-
 def getROIs(run):
     ret_dict = {}
 
@@ -51,10 +48,8 @@ def getROIs(run):
 
         # Currently chemRIXS uses channels 1 and 2
         hsd_dict = {}
-        # hsd_dict['hsd_0'] = [0,-1]
         hsd_dict["hsd_1"] = [3000, 8000]
         hsd_dict["hsd_2"] = [3000, 8000]
-        # hsd_dict['hsd_3'] = [0,-1]
         ret_dict["hsd"] = hsd_dict
 
     return ret_dict
@@ -93,12 +88,19 @@ def get_polynomial_correction(run):
 
     if run > 0:
         # Polynomial correction for the axis_svls
-        coeffs = [1.29626379e-6, -1.33220754e-2, 4.70900708e1]  # quadratic correction
-        ret_dict["axis_svls"] = {
-            "polynomial_coefficients": coeffs,
+        poly_corr_args = {
+            "polynomial_coefficients": [1.29626379e-6, -1.33220754e-2, 4.70900708e1],
             "axis": 1,
-            "method": "roll",
+            "method": "roll",  # 'vectorized' or 'ndimage' are also options
         }
+        poly_corr_args["droplet"] = {
+            "threshold": 3,
+            "thresADU": 0,  # discard droplet whose total ADU is below this value
+            "useRms": False,
+        }
+        poly_corr_args["projection"] = {"axis": 0}
+
+        ret_dict["axis_svls"] = poly_corr_args
     return ret_dict
 
 
@@ -173,20 +175,47 @@ def get_wf_svd(run):
 # epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'),
 #               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
 # epicsOncePV = [('GDET:FEE1:241:ENRC', "MyTest"), 'GDET:FEE1:242:ENRC', "FOO:BAR:BAZ"]
-epicsPV = []
 epicsPV = [
+    "EM2K0:XGMD:ETM:01:Reading",
+    "EM2K0:XGMD:ETM:02:Reading",
+    "EM2K0:XGMD:HPS:milliJoulesPerPulse",
+    "EM2K0:XGMD:HPS:AvgPulseIntensity",
+    # VLS
+    "CRIX:VLS:CAM:MMS:PITCH.RBV",
+    "CRIX:VLS:MMS:MP.RBV",
+    "CRIX:VLS:MMS:GP.RBV",
+    # SVLS
+    "CRIXS:SVLS:GRA:MMS:Y.RBV",
+    "CRIXS:SVLS:DET:MMS:Y_Angle.RBV",
+    "CRIXS:SVLS:DET:MMS:Z.RBV",
     # Mono
+    "SP1K1:MONO:MMS:M_PI.RBV",
+    "SP1K1:MONO:MMS:G_PI.RBV",
     "SP1K1:MONO:CALC:ENERGY",
     "SP1K1:MONO:CALC:BANDWIDTH",
-    # Solid manipulator
+    "SP1K1:MONO:CALC:CFF",
+    # Jet
+    "CRIX:RCC:MMS:X.RBV",
+    "CRIX:RCC:MMS:Y.RBV",
+    "CRIX:RCC:MMS:Z.RBV",
+    "CRIX:SDS:MMS:X.RBV",
+    "CRIX:SDS:MMS:Y.RBV",
+    "CRIX:SDS:MMS:Z.RBV",
+    "CRIX:SDS:MMS:ZENCODER.RBV",
+    # APD
+    "CRIX:PDET:MMS:THETA.RBV",
+    "CRIX:PDET:MMS:Y.RBV",
+    # Solid sample
     "CRIX:CRYO:MMS:X.RBV",
     "CRIX:CRYO:MMS:Y.RBV",
     "CRIX:CRYO:MMS:Z.RBV",
+    "CRIX:CRYO:MMS:RY.RBV",
     # Laser
-    # ATM stage
     "LM2K2:COM_MP2_DLY1.RBV",
     "LAS:LHN:LLG2:02:PHASCTL:DELAY_SET",
     "LAS:LHN:LLG2:01:PHASCTL:DELAY_SET",
+    "LM2K2:INJ_MP1_ATT1_WP1",
+    "LM2K2:INJ_MP1_ATT1_WP2",
 ]
 epicsOncePV = []
 

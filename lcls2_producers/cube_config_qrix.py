@@ -39,8 +39,6 @@ def detectors(run: psana.psexp.run.Run):
     # HSD
     hsd_rois = {
         "hsd_0": [0, -1],
-        "hsd_1": [3000, 8000],
-        "hsd_2": [3000, 8000],
         "hsd_3": [0, -1],
     }
     hsd = DetObject("hsd", run)

@@ -18,6 +18,7 @@ smdata_tools_path = Path(__file__).parent.parent
 sys.path.insert(0, str(smdata_tools_path))
 
 import smalldata_tools
+from smalldata_tools.lcls2.DetObject import NullDetObject
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -121,6 +122,15 @@ else:
     cube_obj = cube.cube.get_cube(myrun, engine=event_engine.smalldata_tools_engine)
 
     processors = config.detectors(myrun)
+    # weed out NullDetObjects:
+    temp = []
+    for detector in processors:
+        if isinstance(detector, NullDetObject):
+            if ds.unique_user_rank():
+                logger.warning(f"Detector {detector._name} is not defined.")
+        else:
+            temp.append(detector)
+    processors = temp
     cube_obj.add_processors(processors)
 
     screener = config.screener(myrun)
