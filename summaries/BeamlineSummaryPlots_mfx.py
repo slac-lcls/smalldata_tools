@@ -6,17 +6,13 @@ import sys
 import os
 import argparse
 import logging
-import socket
 import requests
-from requests.auth import HTTPBasicAuth
-from typing import Optional, Tuple, Dict, Union, List
-import mimetypes
+from typing import Optional, Tuple, List
 
 import h5py
 import numpy as np
 import panel as pn
 import holoviews as hv
-from holoviews import dim
 
 hv.extension("bokeh")
 pn.extension()
@@ -32,16 +28,14 @@ try:
 except:
     fpath = fpathup
 sys.path.append(fpath)
-from smalldata_tools.lcls1.SmallDataAna_psana import SmallDataAna_psana as sdaps
+
 from smalldata_tools.utilities import image_from_dxy
 from smalldata_tools.utilities import rebin
-from smalldata_tools.utilities import evtt2Rt
-from smalldata_tools.utilities import postRunTable
-from smalldata_tools.utilities import getElogBasicAuth
 from smalldata_tools.utilities import postElogMsg
 
-#this should also be shared among the data quality plots and/or in code where it runs consistenly
+
 def postDetectorDamageMsg(
+    h5: h5py.File,
     detectors: list,
     exp: str,
     run: int,
@@ -55,6 +49,7 @@ def postDetectorDamageMsg(
 
     Parameters
     ----------
+    h5 (h5py.File) Smalldata hdf5 file.
     detectors (list[str]) Names of detectors to report on.
     exp (str) Experiment name.
     run (int) Run number. Usually the current run.
@@ -66,12 +61,6 @@ def postDetectorDamageMsg(
         the threshold to post to eLog. Only detectors passing the threshold
         will be included.
     """
-    if smd_dir:
-        anaps = sdaps(exp, run, dirname=smd_dir)
-    else:
-        anaps = sdaps(exp, run)
-
-    ana = anaps.sda
 
     table_header: str = (
         '<thead><tr><th colspan="3">' f"<center>{title}</center>" "</th></tr></thead>"
@@ -87,7 +76,7 @@ def postDetectorDamageMsg(
 
     for det_name in detectors:
         try:
-            damage_var: np.ndarray = ana.getVar(f"damage/{det_name}")
+            damage_var: np.ndarray = h5[f"damage/{det_name}"]
             damage: int = len(damage_var[damage_var == 0])
         except Exception:
             continue
@@ -106,29 +95,28 @@ def postDetectorDamageMsg(
         postElogMsg(exp=exp, msg=msg, tag=tag, title=title)
 
 
+# def makeRunTableData(ana, ipmUpDim, ipmDownDim, Filter, scanName):
+#    n162 = ana.getVar("evr/code_162").sum()
+#    ana.addCut("evr/code_162", -0.5, 0.5, "xon")
+#    ana.addCut("evr/code_137", 0.5, 1.5, "xon")
+#    nOff = ana.getFilter("xon").shape[0] - ana.getFilter("xon").sum()
+#    # data to be posted to the run table if so requested.
+#    runtable_data = {"N dropped Shots": int(nOff), "N BYKIK 162": int(n162)}
+#    if scanName != "":
+#        runtable_data["scanName"] = scanName
 
-def makeRunTableData(ana, ipmUpDim, ipmDownDim, Filter, scanName):
-    n162 = ana.getVar("evr/code_162").sum()
-    ana.addCut("evr/code_162", -0.5, 0.5, "xon")
-    ana.addCut("evr/code_137", 0.5, 1.5, "xon")
-    nOff = ana.getFilter("xon").shape[0] - ana.getFilter("xon").sum()
-    # data to be posted to the run table if so requested.
-    runtable_data = {"N dropped Shots": int(nOff), "N BYKIK 162": int(n162)}
-    if scanName != "":
-        runtable_data["scanName"] = scanName
+#    ipmUpVar = ana.getVar(ipmUpDim.name, useFilter=Filter)
+#    ipmDownVar = ana.getVar(ipmDownDim.name, useFilter=Filter)
+#    ipmUpP = np.nanpercentile(ipmUpVar, [25, 50, 75])
+#    ipmDownP = np.nanpercentile(ipmDownVar, [25, 50, 75])
+#    runtable_data["%s_1qt" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[0]
+#    runtable_data["%s_med" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[1]
+#    runtable_data["%s_3qt" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[2]
+#    runtable_data["%s_1qt" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[0]
+#    runtable_data["%s_med" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[1]
+#    runtable_data["%s_3qt" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[2]
 
-    ipmUpVar = ana.getVar(ipmUpDim.name, useFilter=Filter)
-    ipmDownVar = ana.getVar(ipmDownDim.name, useFilter=Filter)
-    ipmUpP = np.nanpercentile(ipmUpVar, [25, 50, 75])
-    ipmDownP = np.nanpercentile(ipmDownVar, [25, 50, 75])
-    runtable_data["%s_1qt" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[0]
-    runtable_data["%s_med" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[1]
-    runtable_data["%s_3qt" % (ipmUpDim.name.replace("/", "__"))] = ipmUpP[2]
-    runtable_data["%s_1qt" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[0]
-    runtable_data["%s_med" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[1]
-    runtable_data["%s_3qt" % (ipmDownDim.name.replace("/", "__"))] = ipmDownP[2]
-
-    return runtable_data
+#    return runtable_data
 
 
 # logging.basicConfig(level=logging.DEBUG)
@@ -180,46 +168,56 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
 ######################################
 ### load data for the chosen run  ####
 ######################################
-# get the ana & anaps objects (from smalldata_tools
-if args.directory is not None:
-    anaps = sdaps(expname, run, dirname=args.directory)
-else:
-    anaps = sdaps(expname, run)
 
-ana = anaps.sda  #
+smd_path = (
+    f"/sdf/data/lcls/ds/mfx/{args.experiment}/hdf5/smalldata/"
+    f"{args.experiment}_Run{run:04d}.h5"
+)
+h5 = h5py.File(smd_path)
 
 ## Defining initial selection (laser-on events)
 iniFilter = "initial"
-ana.addCut("lightStatus/xray", 0.5, 1.5, iniFilter)
-ana.addCut("lightStatus/laser", 0.5, 1.5, iniFilter)
+
+xray = h5["lightStatus/xray"][()]
+laser = h5["lightStatus/laser"][()]
+
+evtFilter = xray > 0
+#evtFilter &= laser > 0
 
 ### Get data & define axis title&ranges.
 
-ipmUpDim = hv.Dimension(("ipm_dg1/sum", "ipm_dg1 Sum"))
-ipmDownDim = hv.Dimension(("ipm_dg2/sum", "ipm_dg2 Sum"))
+ipmUpDim = hv.Dimension(("MfxDg1BmMon/totalIntensityJoules", "ipm_dg1 Sum"))
+ipmDownDim = hv.Dimension(("MfxDg2BmMon/totalIntensityJoules", "ipm_dg2 Sum"))
 
-# xes1Dim = hv.Dimension(("ePix100_1/var_full_sparse"))
-
-# rayonixDim = hv.Dimension(('Rayonix/ROI_0_sum','Rayonix intensity'))
 eventTimeDim = hv.Dimension(("eventTimeR", "relative event time"))
 # l3eDim = hv.Dimension(('l3e','L3 Energy'))
 
-scanVar = ana.getScanName()
-try:
-    scanDim = hv.Dimension(("scan/%s" % scanVar, "%s" % scanVar))
-except:
-    scanDim = None
+# scanVar = ana.getScanName()
+# try:
+#    scanDim = hv.Dimension(("scan/%s" % scanVar, "%s" % scanVar))
+# except:
+#    scanDim = None
+scanVar = ""
+scanDim = None
 nevtsDim = hv.Dimension(("nevents", "N events / scan point"))
 nevtsLxtDim = hv.Dimension(("neventslxt", "N events / lxt"))
 
 # timing vars.
 lxtDim = hv.Dimension(("epics/lxt", "lxt"))
 
-ipmUpVar = ana.getVar(ipmUpDim.name, useFilter=iniFilter)
-ipmDownVar = ana.getVar(ipmDownDim.name, useFilter=iniFilter)
-stepVar = ana.getVar("scan/varStep", useFilter=iniFilter)
-# l3eVar = ana.getVar('ebeam/L3_energy',useFilter=iniFilter)
-eventTimeRaw = ana.getVar("event_time", useFilter=iniFilter)
+try:
+    ipmUpVar = h5[ipmUpDim.name][evtFilter]
+except:
+    print("DG1 IPM not available")
+try:
+    ipmDownVar = h5[ipmDownDim.name][evtFilter]
+except:
+    print("DG2 IPM not available")
+try:
+    stepVar = h5["scan/varStep"][evtFilter]
+except:
+    stepVar = None
+eventTimeRaw = h5["timing/timestamp"][evtFilter]
 eventTime = (eventTimeRaw >> 32).astype(float) + ((eventTimeRaw << 32) >> 32).astype(
     float
 ) * 1e-9
@@ -242,7 +240,7 @@ except Exception as e:
     print(e)
 
 try:
-    azav = ana.getVar("epix10k2M/azav_azav", useFilter=iniFilter)
+    azav = h5["epix10k2M/azav_azav"][evtFilter]
     azav_sum = np.nanmean(azav, axis=0)
     azav_peak = np.argmax(azav_sum)
     if len(azav.shape) > 2:
@@ -268,7 +266,7 @@ except:
 
 lxt_fast_his = None
 try:
-    lxt_fast = ana.getVar("enc/lasDelay", useFilter=iniFilter)
+    lxt_fast = h5["enc/lasDelay"][evtFilter]
     print(np.nanstd(lxt_fast))
     if lxt_fast is not None and np.nanstd(lxt_fast) < 1e-4:
         lxt_fast_his = np.histogram(
@@ -281,13 +279,7 @@ except:
     pass
 
 # droppled sthots.
-ana.addCut("lightStatus/xray", -0.5, 0.5, "off")
-ana.addCut("evr/code_137", -0.5, 0.5, "hxroff")
-if ana.getFilter("hxroff").sum() > ana.getFilter("off").sum():
-    offFilter = "hxroff"
-else:
-    offFilter = "off"
-nOff = ana.getFilter(offFilter).sum()
+nOff = h5["lightStatus/xray"][xray < 1].size
 
 #########################################
 # INSERT DATA QUALITY PLOTS HERE
@@ -335,12 +327,11 @@ gspec[0:2, 0:8] = pn.Column(ipmTimeLayout)
 gspec[2:5, 0:4] = pn.Column(ipmLayout)
 
 detNames: list = [
-    "epix_1",
-    "epix10k2M",
-    "Rayonix",
-    "epix_2",
-    "FEE_SPEC0",
-    "EBeam",
+    "jungfrau",
+    "epix100_0",
+    "epix100_1",
+    "feespec",
+    "ebeamh",
 ]  # for tracking events missing data in one of these categories
 
 plots = []
@@ -349,7 +340,7 @@ from holoviews.operation.timeseries import rolling
 for detname in detNames:
     try:
         damageDim = hv.Dimension((f"damage/{detname}", f"{detname} Present"))
-        damageVar = ana.getVar(damageDim.name, useFilter=iniFilter)
+        damageVar = h5[damageDim.name][evtFilter]
         damagePlot = rolling(
             hv.Curve(damageVar, vdims=[damageDim], label=f"{detname}").opts(
                 axiswise=True, color=hv.Palette("Spectral")
@@ -375,8 +366,8 @@ import matplotlib.pyplot as plt
 
 detImgs = []
 detGrids = []
-for detImgName in ana.Keys("Sums"):
-    image = ana.fh5.get_node("/%s" % detImgName).read()
+for detImgName in h5["Sums"].keys():
+    image = h5[f"Sums/{detImgName}"][()]
     if len(image.shape) > 2:
         if detImgName.find("135") < 0:
             detName = (
@@ -390,21 +381,22 @@ for detImgName in ana.Keys("Sums"):
                 .replace("_skipFirst", "")
             )
             # detName = detImgName.replace("Sums/","").split("_")[0]
-            ix = ana.fh5.get_node("/UserDataCfg/%s/ix" % detName).read()
-            iy = ana.fh5.get_node("/UserDataCfg/%s/iy" % detName).read()
+            ix = h5[f"/UserDataCfg/{detName}/ix"][()]
+            iy = h5[f"/UserDataCfg/{detName}/iy"][()]
             image = image_from_dxy(image, ix, iy)
         else:
             # somehow the epix10k135 has the wrong shape....
             image = image[0]
             # image = image.squeeze()
-    if max(image.shape[0], image.shape[1]) > detImgMaxSize:
-        rebinFactor = float(detImgMaxSize) / max(image.shape[0], image.shape[1])
-        imageR = rebin(
-            image,
-            [int(image.shape[0] * rebinFactor), int(image.shape[1] * rebinFactor)],
-        ) / (ana.getVar("fiducials").shape[0])
-    else:
-        imageR = image / (ana.getVar("fiducials").shape[0])
+    imageR = image / len(xray)
+    # if max(image.shape[0], image.shape[1]) > detImgMaxSize:
+    #    rebinFactor = float(detImgMaxSize) / max(image.shape[0], image.shape[1])
+    #    imageR = rebin(
+    #        image,
+    #        [int(image.shape[0] * rebinFactor), int(image.shape[1] * rebinFactor)],
+    #    ) / (ana.getVar("fiducials").shape[0])
+    # else:
+    #    imageR = image / (ana.getVar("fiducials").shape[0])
     # imgArrays.append(imageR/ana.getVar('fiducials').shape[0])
     imgDim = hv.Dimension(
         ("image", detImgName.replace("Sums/", "").replace("_calib_img", " Mean Image")),
@@ -426,7 +418,7 @@ for detImgName in ana.Keys("Sums"):
     detGrids.append(detGrid)
 
 if nOff > 100:
-    for detImgName in ana.Keys("Sums"):
+    for detImgName in h5["Sums"].keys():
         if detImgName.find("dropped"):
             continue
         if detImgName.find("square"):
@@ -492,7 +484,7 @@ if nOff > 100:
 # DROPLETS
 ##########
 def processDropletData(
-    ana,  #: smalldata_tools.SmallDataAna.SmallDataAna,
+    h5: h5py.File,
     det_name: str,
     adr_thr: Tuple[int, int] = (2, 15),
     rot_angle: Optional[float] = None,
@@ -506,16 +498,15 @@ def processDropletData(
 
     Parameters
     ----------
-    ana (smalldata_tools.SmallDataAna.SmallDataAna) ana object for pulling data
-        from smalldata file.
+    h5 (h5py.File) smalldata hdf5 file.
     det_name (str) The detector to get droplet data for.
     adu_thr (tuple) 2-tuple of lower and upper threshold to apply to the data.
     rot_angle (float) Rotation to apply to the image prior to projections. In
         degrees. By default, unused.
     """
-    col = ana.getVar(f"{det_name}/var_full_sparse/col")
-    row = ana.getVar(f"{det_name}/var_full_sparse/row")
-    adu = ana.getVar(f"{det_name}/var_full_sparse/data")
+    col = h5[f"{det_name}/var_full_sparse/col"][()]
+    row = h5[f"{det_name}/var_full_sparse/row"][()]
+    adu = h5[f"{det_name}/var_full_sparse/data"][()]
     n_droplets = len(adu)
 
     # Additional thresholding.
@@ -547,7 +538,7 @@ def processDropletData(
 # ROIS
 ##########
 def processROIData(
-    ana,  #: smalldata_tools.SmallDataAna.SmallDataAna,
+    h5: h5py.File,
     det_name: str,
     adr_thr: Tuple[int, int] = (2, 15),  # Currently unused
     rot_angle: Optional[float] = None,  # Currently unused
@@ -555,7 +546,7 @@ def processROIData(
     List[str], List[np.ndarray], List[np.ndarray]
 ]:  # roi_num, dimg, spatial, xes
     roi_keys: List[str] = [
-        key for key in ana.Keys() if f"{det_name}/ROI" and "projection_data" in key
+        key for key in h5.keys() if f"{det_name}/ROI" and "projection_data" in key
     ]
     roi_nums = []
     print("Process ROI Data")
@@ -566,7 +557,7 @@ def processROIData(
         if roi_num not in roi_nums:
             roi_nums.append(roi_num)
 
-        proj: np.ndarray = ana.getVar(roi_key)
+        proj: np.ndarray = h5[roi_key][()]
 
         # Be weary if spatial and spectrum are swapped!
         if "spatial" in roi_key:
@@ -582,10 +573,10 @@ def processROIData(
 
 
 xesPlots = []
-for det in ["epix_1", "epix_2"]:  # detNames:
+for det in ["epix100_0", "epix100_1"]:  # detNames:
     try:
         dimg, spatial_proj, xes_proj = processDropletData(
-            ana=ana, det_name=det, rot_angle=1
+            h5=h5, det_name=det, rot_angle=1
         )
         # dimg_flip = np.fliplr(dimg)
 
@@ -619,7 +610,7 @@ for det in ["epix_1", "epix_2"]:  # detNames:
 
         # DO ROI PROCESSING -----
         xes_roi_grid = pn.GridSpec(max_width=700, name=f"XES (ROIs) - {det}")
-        roi_nums, spatial_projs, xes_projs = processROIData(ana=ana, det_name=det)
+        roi_nums, spatial_projs, xes_projs = processROIData(h5=h5, det_name=det)
         for idx in range(len(roi_nums)):
             roi_num: str = roi_nums[idx]
             print("Making ROI Plots")
@@ -658,8 +649,8 @@ for det in ["epix_1", "epix_2"]:  # detNames:
 ###########
 feeGrid = pn.GridSpec(max_width=700, name="FEE Stats")
 try:
-    feeDamageDim = hv.Dimension(("damage/FEE_SPEC0", "FEE Present"))
-    feeDamageVar = ana.getVar(feeDamageDim.name, useFilter=iniFilter)
+    feeDamageDim = hv.Dimension(("damage/feespec", "FEE Present"))
+    feeDamageVar = h5[feeDamageDim.name][()]
     feeDamagePlot = hv.Curve(feeDamageVar, vdims=[feeDamageDim]).opts(
         axiswise=True, xlabel="Event", ylabel="FEE Present", title="Damage/FEE"
     )
@@ -668,8 +659,8 @@ except Exception as e:
     pass
 
 try:
-    feeSpecDim = hv.Dimension(("feeBld/hproj", "FEE Spec (mean)"))
-    feeSpecVar = ana.getVar(feeSpecDim.name, useFilter=iniFilter)
+    feeSpecDim = hv.Dimension(("feespec/hproj", "FEE Spec (mean)"))
+    feeSpecVar = h5[feeSpecDim.name][evtFilter]
     feeSpecPlot = hv.Curve(np.mean(feeSpecVar, axis=0), vdims=[feeSpecDim]).opts(
         axiswise=True, xlabel="Energy (Pixel)", ylabel="I", title="FEE Spectrum"
     )
@@ -678,8 +669,8 @@ try:
     x = np.arange(feeSpecVar[0].shape[0])
     feeCOMDim = hv.Dimension(("ProcessedFee", "FEE COM"))
     feeCOMVar = np.sum(feeSpecVar * x, axis=1) / np.sum(feeSpecVar, axis=1)
-    eBeamDim = hv.Dimension(("ebeam/photon_energy", "eBeam Energy"))
-    eBeamVar = ana.getVar(eBeamDim.name, useFilter=iniFilter)
+    eBeamDim = hv.Dimension(("ebeamh/ebeamPhotonEnergy", "eBeam Energy"))
+    eBeamVar = h5[eBeamDim.name][evtFilter]
     energyCorrPlot = hv.HexTiles(
         (eBeamVar, feeCOMVar), kdims=[eBeamDim, feeCOMDim]
     ).opts(axiswise=True, xlabel="eBeam Energy", ylabel="FEE COM", title="FEE vs eBeam")
@@ -699,6 +690,8 @@ for xes_grid in xesPlots:
 for detGrid in detGrids:
     tabs.append(detGrid)
 
+tabs.append(feeGrid)
+
 if int(os.environ.get("RUN_NUM", "-1")) > 0:
     requests.post(
         os.environ["JID_UPDATE_COUNTERS"],
@@ -711,6 +704,7 @@ if save_elog:
     pageTitleFormat = "BeamlineSummary/BeamlineSummary_Run{run:04d}"
     prepareHtmlReport(tabs, expname, run, pageTitleFormat)
     postDetectorDamageMsg(
+        h5=h5,
         detectors=detNames,
         exp=expname,
         run=run,
@@ -727,11 +721,11 @@ if save_elog:
 
 if args.postStats:
     if scanVar == "":
-        encDelay = ana.getVar("enc/lasDelay")
+        encDelay = h5["enc/lasDelay"]
         delta_encDelay = np.nanmax(encDelay) - np.nanmin(encDelay)
         if delta_encDelay > 0.5:
             scanVar = "delay"
     elif scanVar.find("lxt"):
         scanVar = "delay"
-    runtable_data = makeRunTableData(ana, ipmUpDim, ipmDownDim, iniFilter, scanVar)
-    postRunTable(runtable_data)
+    # runtable_data = makeRunTableData(ana, ipmUpDim, ipmDownDim, iniFilter, scanVar)
+    # postRunTable(runtable_data)

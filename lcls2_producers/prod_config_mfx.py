@@ -3,8 +3,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-# detectors = ['jungfrau','epix100']
-detectors = ["epix100", "alvium", "jungfrau"]  # , 'qadc1']
+detectors = ["epix100_0", "epix100_1", "alvium"]  # , 'qadc1']
 # detectors = []
 integrating_detectors = []
 
@@ -38,16 +37,25 @@ def getROIs(run):
     jungfrau_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
     alv_roi = {"writeArea": True, "calcPars": False, "ROI": None, "thresADU": None}
 
-    epix100_roi = {
+    epix100_0_roi = {
         "thresADU": None,
         "writeArea": True,
         "calcPars": False,
-        "ROI": [[0, 710], [119, 197]],
+        "ROI":[[0, 300], [0, 710]],
+    }
+
+
+    epix100_1_roi = {
+        "thresADU": None,
+        "writeArea": True,
+        "calcPars": False,
+        "ROI": [[0,300],[0,710]],
     }
 
     if run > 0:
         # ret_dict['jungfrau'] = [jungfrau_roi]
-        ret_dict["epix100"] = [epix100_roi]
+        ret_dict["epix100_0"] = [epix100_0_roi]
+        ret_dict["epix100_1"] = [epix100_1_roi]
         ret_dict["alvium"] = [alv_roi]
         ...
     return ret_dict
