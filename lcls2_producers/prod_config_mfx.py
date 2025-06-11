@@ -41,15 +41,14 @@ def getROIs(run):
         "thresADU": None,
         "writeArea": True,
         "calcPars": False,
-        "ROI":[[0, 300], [0, 710]],
+        "ROI": [[0, 300], [0, 710]],
     }
-
 
     epix100_1_roi = {
         "thresADU": None,
         "writeArea": True,
         "calcPars": False,
-        "ROI": [[0,300],[0,710]],
+        "ROI": [[0, 300], [0, 710]],
     }
 
     if run > 0:
