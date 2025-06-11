@@ -106,7 +106,7 @@ if args.cube is not None:
     )
 
 # summary plots job
-if hutch in ["rix", "xcs", "xpp"]:
+if hutch in ["rix", "xcs", "xpp", "mfx"]:
     job_defs.append(
         {
             "name": "run_summary",

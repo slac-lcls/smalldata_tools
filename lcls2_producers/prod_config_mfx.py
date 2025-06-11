@@ -3,33 +3,9 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-# detectors = ['jungfrau','epix100']
-detectors = ["epix100", "alvium", "jungfrau"]  # , 'qadc1']
+detectors = ["epix100_0", "epix100_1", "alvium"]  # , 'qadc1']
 # detectors = []
 integrating_detectors = []
-
-
-# NOTE TO MFX: Do not modify get_intg. This does not apply to MFX but is required for
-# smalldata
-# Comment: the first integrating detector will set the sub-sampling of all
-# integrating detectors.
-def get_intg(run):
-    """
-    Returns
-    -------
-    intg_main (str):  This detector ill be passed to the psana datasource. It should be the SLOWEST of
-                all integrating detectors in the data
-    intg_addl (list of str): The detectors in this list will be analyzed as integrating detectors. It is
-                             important that the readout frequency of these detectors is commensurate and
-                             in-phase with intg_main.
-    """
-    run = int(run)
-    intg_main = None
-    intg_addl = []
-    if run > 0:
-        intg_main = ""
-        intg_addl = []
-    return intg_main, intg_addl
 
 
 def getROIs(run):
@@ -38,16 +14,24 @@ def getROIs(run):
     jungfrau_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
     alv_roi = {"writeArea": True, "calcPars": False, "ROI": None, "thresADU": None}
 
-    epix100_roi = {
+    epix100_0_roi = {
         "thresADU": None,
         "writeArea": True,
         "calcPars": False,
-        "ROI": [[0, 710], [119, 197]],
+        "ROI": [[0, 300], [0, 710]],
+    }
+
+    epix100_1_roi = {
+        "thresADU": None,
+        "writeArea": True,
+        "calcPars": False,
+        "ROI": [[0, 300], [0, 710]],
     }
 
     if run > 0:
         # ret_dict['jungfrau'] = [jungfrau_roi]
-        ret_dict["epix100"] = [epix100_roi]
+        ret_dict["epix100_0"] = [epix100_0_roi]
+        ret_dict["epix100_1"] = [epix100_1_roi]
         ret_dict["alvium"] = [alv_roi]
         ...
     return ret_dict
