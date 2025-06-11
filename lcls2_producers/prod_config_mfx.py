@@ -8,29 +8,6 @@ detectors = ["epix100_0", "epix100_1", "alvium"]  # , 'qadc1']
 integrating_detectors = []
 
 
-# NOTE TO MFX: Do not modify get_intg. This does not apply to MFX but is required for
-# smalldata
-# Comment: the first integrating detector will set the sub-sampling of all
-# integrating detectors.
-def get_intg(run):
-    """
-    Returns
-    -------
-    intg_main (str):  This detector ill be passed to the psana datasource. It should be the SLOWEST of
-                all integrating detectors in the data
-    intg_addl (list of str): The detectors in this list will be analyzed as integrating detectors. It is
-                             important that the readout frequency of these detectors is commensurate and
-                             in-phase with intg_main.
-    """
-    run = int(run)
-    intg_main = None
-    intg_addl = []
-    if run > 0:
-        intg_main = ""
-        intg_addl = []
-    return intg_main, intg_addl
-
-
 def getROIs(run):
     ret_dict = {}
 
