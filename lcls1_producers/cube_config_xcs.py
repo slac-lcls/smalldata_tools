@@ -52,3 +52,6 @@ hist_list = {
     #'tt/AMPL': [],
     #'tt/FLTPOSFWHM': []
 }
+
+# save as tiff file (ingore unless MEC)
+save_tiff = False
