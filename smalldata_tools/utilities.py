@@ -1311,17 +1311,17 @@ def getRunsWithTag(
     return tagged_runs
 
 
-def get_calib_file(run, directory, f_end='.data'):
+def get_calib_file(run, directory, f_end=".data"):
     bkgfiles = os.listdir(directory)
-    bf = [f.split('/')[-1] for f in bkgfiles if f.split('/')[-1].find(f_end)>0]
-    background = ''
+    bf = [f.split("/")[-1] for f in bkgfiles if f.split("/")[-1].find(f_end) > 0]
+    background = ""
     closest = 1
     for f in bf:
-        begstr = f.split('-')[0]
-        endstr = f.split('-')[1].replace(f_end,'')
-        if int(begstr)<run:
-            if endstr=='end' or int(endstr)>run:
+        begstr = f.split("-")[0]
+        endstr = f.split("-")[1].replace(f_end, "")
+        if int(begstr) < run:
+            if endstr == "end" or int(endstr) > run:
                 if closest < int(begstr):
                     background = f
                     closest = int(begstr)
-    return(f'{directory}{background}')
+    return f"{directory}{background}"

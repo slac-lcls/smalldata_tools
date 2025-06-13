@@ -70,16 +70,16 @@ class azav_pyfai(DetObjectFunc):
         #    in case people mess w/ the input
         # we should also extra q/theta/... bins for plotting later.
         azcfg = self.ai.get_config()
-        dcfg = azcfg.pop('detector_config')
-        ocfg = dcfg.pop('orientation')
-        for k,v in azcfg.items():
-            setattr(self,'azcfg_%s'%k,v)
-        for k,v in dcfg.items():
-            setattr(self,'azcfg_det_%s'%k,v)
-        setattr(self,'azcfg_detorientation',ocfg.value)
-        setattr(self,'azcfg_qvals',self.ai.get_qa())
-        #setattr(self,'azcfg_qvals',self.ai.get_qa())
-        
+        dcfg = azcfg.pop("detector_config")
+        ocfg = dcfg.pop("orientation")
+        for k, v in azcfg.items():
+            setattr(self, "azcfg_%s" % k, v)
+        for k, v in dcfg.items():
+            setattr(self, "azcfg_det_%s" % k, v)
+        setattr(self, "azcfg_detorientation", ocfg.value)
+        setattr(self, "azcfg_qvals", self.ai.get_qa())
+        # setattr(self,'azcfg_qvals',self.ai.get_qa())
+
         # integration arguments
         self.pol_factor = kwargs.pop("polarization_factor", 1)
         self.npts = kwargs.pop("npts", 256)
