@@ -19,8 +19,9 @@ def get_filters(run):
         filters = [
             ['lightStatus/xray',0.5,1.5,'filter1'],
             ['ipm4/sum',2e3,3e4,'filter1'],
-        #     ['tt/FLTPOSFWHM',50,200,'filter1']
-        #     ['evr/code_41',0.5,1.5,'custom']
+            ['tt/FLTPOSFWHM',30,175,'filter1'],
+            ['tt/FLTPOS_PS',.05,.75,'filter1'],
+            ['tt/AMPL',.02,.23,'filter1']
         ]
     return filters
 
@@ -38,7 +39,7 @@ detDict = {'source':'epix_1',
            'full':1,
            'image':1,
            'thresADU':6.5,
-           'common_mode':0}
+           'common_mode':None}
 
 varList = ['ipm4/sum','ipm5/sum', detDict]
 
@@ -48,9 +49,9 @@ varList = ['ipm4/sum','ipm5/sum', detDict]
 hist_list = {
     'ipm4/sum': [0, 5e4, 70],
     'ipm5/sum': [0, 5e3, 70],
-    #'tt/FLTPOS_PS': [],
-    #'tt/AMPL': [],
-    #'tt/FLTPOSFWHM': []
+    'tt/FLTPOS_PS': [0,1,50],
+    'tt/AMPL': [0,.25,50],
+    'tt/FLTPOSFWHM': [0,300,60]
 }
 
 # save as tiff file (ingore unless MEC)
