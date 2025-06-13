@@ -29,7 +29,7 @@ def get_filters(run):
 """
 Set to laser=True if the laser sequence is being used, set to False if the laser sequence is not being used
 """
-laser = False
+laser = True
 use_tt = True
 
 # List detectors to be cubed. Area detector have additional options such as threshold
