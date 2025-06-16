@@ -306,7 +306,9 @@ def get_cube(
         is_scan = False
         if run.ds.unique_user_rank():
             logger.info("Instantiating CubeFlyScan.")
-        cube = CubeFlyScan(run, engine=engine, **kwargs)
+            logger.info("Not implemented yet.")
+        raise NotImplementedError
+        #cube = CubeFlyScan(run, engine=engine, **kwargs)
     else:
         is_scan = True
         if run.ds.unique_user_rank():
