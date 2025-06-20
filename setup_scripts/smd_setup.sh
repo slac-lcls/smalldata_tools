@@ -3,9 +3,9 @@
 usage()
 {
 cat << EOF
-$(basename "$0"): 
+$(basename "$0"):
 	Script to setup smalldata_tools on the S3DF for a given experiment.
-	
+
 	OPTIONS:
         -h|--help
             Definition of options
@@ -15,8 +15,8 @@ $(basename "$0"):
             Queue. Jobs are not setup if a queue is not given
         -C|--config
             Config to use without the prod_config prefix. Default: hutch config
-        --cube
-            Make cube job
+        --cube <config_name>
+            Make cube job.
 EOF
 }
 
@@ -45,6 +45,10 @@ do
         shift 2
         ;;
     --cube)
+       if [[ -z "$2" ]] || [[ "$2" =~ ^- ]]; then
+          echo "Error: --cube requires an argument." >&2
+          exit 1
+        fi
         CUBE="$2"
         ARGS+=("--cube $2")
         shift 2
@@ -54,7 +58,7 @@ do
         ARGS+=("--psplot_live")
         shift
         ;;
-    *) 
+    *)
         # all other possibilities
         ARGS+=("$1")
         shift
