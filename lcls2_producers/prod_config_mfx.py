@@ -95,6 +95,27 @@ def get_azav(run):
 
     return ret_dict
 
+def get_sum_algos(run):
+    """Specify detector sum algorithms for specific detectors or `all` detectors.
+
+    Provide a list of algorithms for each detector `detname`, or provide a list
+    under the `all` key which will be applied to each detector.
+
+    Possible algorithms:
+    - calib: Sum calib.
+    - calib_dropped: Sum calib of dropped.
+    - calib_dropped_square: Square of image.
+    - calib_thresADU1 (or 5, 10 etc): Apply threshold using the number after `ADU`
+    - calib_max: Maximum projection instead of sum.
+    """
+    ret_dict = {}
+    if run > 0:
+        ret_dict["all"] = ["calib", "calib_dropped", "calib_dropped_square", "calib_thresADU1"]
+        ret_dict["jungfrau"] = ["calib_thresADU5", "calib_max"]
+        # ret_dict["epix100_0"] = []
+        # ret_dict["epix100_1"] = []
+    return ret_dict
+
 
 ##########################################################
 # run independent parameters
