@@ -207,7 +207,13 @@ class DetObjectClass(object):
                     self._storeSum[key] = dat_to_be_summed.copy()
             else:
                 try:
-                    self._storeSum[key] += dat_to_be_summed
+                    if key.find("max") < 0:
+                        self._storeSum[key] += dat_to_be_summed
+                    else:
+                        # Care about nan behaviour?
+                        self._storeSum[key] = np.maximum(
+                            self._storeSum[key], dat_to_be_summed
+                        )
                 except:
                     print("could not add ", dat_to_be_summed)
                     print("could not to ", self._storeSum[key])

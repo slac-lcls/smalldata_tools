@@ -56,6 +56,7 @@ def define_dets(run, det_list):
     droplet_args = {}
     azav_args = {}
     polynomial_args = {}
+    sum_algo_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -76,6 +77,8 @@ def define_dets(run, det_list):
         azav_args = config.get_azav(run)
     if "get_polynomial_correction" in dir(config):
         polynomial_args = config.get_polynomial_correction(run)
+    if "get_sum_algos" in dir(config):
+        sum_algo_args = config.get_sum_algos(run)
 
     dets = []
 
@@ -228,7 +231,18 @@ def define_dets(run, det_list):
                 poly_corr_func.addFunc(proj_func)
             obj.addFunc(poly_corr_func)
 
-        det.storeSum(sumAlgo="calib")
+        if sum_algo_args == {}:
+            # Store calib by default even if algos. dictionary not defined
+            det.storeSum(sumAlgo="calib")
+        else:
+            # Add `all` algorithms
+            if "all" in sum_algo_args:
+                for algo in sum_algo_args["all"]:
+                    det.storeSum(sumAlgo=algo)
+            if detname in sum_algo_args:
+                for algo in sum_algo_args[detname]:
+                    det.storeSum(sumAlgo=algo)
+
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
         dets.append(det)
 
