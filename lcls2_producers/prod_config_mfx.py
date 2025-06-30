@@ -95,6 +95,7 @@ def get_azav(run):
 
     return ret_dict
 
+
 def get_sum_algos(run):
     """Specify detector sum algorithms for specific detectors or `all` detectors.
 
@@ -110,7 +111,12 @@ def get_sum_algos(run):
     """
     ret_dict = {}
     if run > 0:
-        ret_dict["all"] = ["calib", "calib_dropped", "calib_dropped_square", "calib_thresADU1"]
+        ret_dict["all"] = [
+            "calib",
+            "calib_dropped",
+            "calib_dropped_square",
+            "calib_thresADU1",
+        ]
         ret_dict["jungfrau"] = ["calib_thresADU5", "calib_max"]
         # ret_dict["epix100_0"] = []
         # ret_dict["epix100_1"] = []
