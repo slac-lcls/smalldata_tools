@@ -1312,6 +1312,29 @@ def getRunsWithTag(
 
 
 def get_calib_file(run, directory, f_end=".data"):
+    """
+    Find the most appropriate calibration file for a given run number.
+
+    This function searches a specified directory for files matching a naming
+    convention (`start-end.data` format) and returns the path to the calibration
+    file that best matches the given run number. The file name format is expected
+    to include a start run number and an end run number, separated by a hyphen.
+
+    Parameters
+    ----------
+    run : int
+        The run number for which the calibration file is needed.
+    directory : str
+        The path to the directory containing calibration files.
+    f_end : str, optional
+        The file extension to filter files (default is ".data").
+
+    Returns
+    -------
+    str
+        The full path to the calibration file that best matches the given run
+        number. If no suitable file is found, an empty string is returned.
+    """
     bkgfiles = os.listdir(directory)
     bf = [f.split("/")[-1] for f in bkgfiles if f.split("/")[-1].find(f_end) > 0]
     background = ""
