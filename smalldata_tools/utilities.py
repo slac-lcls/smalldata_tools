@@ -1347,4 +1347,8 @@ def get_calib_file(run, directory, f_end=".data"):
                 if closest < int(begstr):
                     background = f
                     closest = int(begstr)
+    if not background:
+        raise FileNotFoundError(
+            f"No matching calibration file found for run {run} in directory {directory}."
+        )
     return f"{directory}{background}"
