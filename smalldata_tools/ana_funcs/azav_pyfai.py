@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.utilities import image_from_dxy
 
+
 class azav_pyfai(DetObjectFunc):
     """
     Parameters
