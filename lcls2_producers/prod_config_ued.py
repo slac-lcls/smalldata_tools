@@ -60,7 +60,8 @@ def get_droplet2photon(run):
 # epicsPV = ['las_fs14_controller_time']
 # epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'),
 #               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
-epicsPV = []
+epicsPV = ["UED:USR:TCT:02:GET_TEMP_A"]
+epicsArchPV = ["LAKE02_TEMP_A"]
 epicsOncePV = []
 
 
