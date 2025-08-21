@@ -24,7 +24,7 @@ def get_intg(run):
         intg_addl = []
 
         # typical chemRIXS
-        intg_main = "axis_svls"
+        # intg_main = "axis_svls"
         # intg_addl = ['andor_vls', 'andor_dir']
     return intg_main, intg_addl
 
