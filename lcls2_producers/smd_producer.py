@@ -643,7 +643,7 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     #     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser', run=thisrun))
 
     if len(config.epicsOncePV) > 0:
-        EODet = epicsDetector(PVlist=epicsOncePV, name="epicsOnce", run=thisrun)
+        EODet = epicsDetector(PVlist=config.epicsOncePV, name="epicsOnce", run=thisrun)
     else:
         EODet = None
     EODetData = {"epicsOnce": {}}

@@ -145,7 +145,6 @@ def get_wf_svd(run):
     det_kwargs = {}
 
     if run < 0:
-        det_kwargs = {}
         w8s = ["rix_fim0", "rix_fim1", "crix_w8"]
         for w8 in w8s:
             # one basis file per channel
