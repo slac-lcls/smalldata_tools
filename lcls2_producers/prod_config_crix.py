@@ -24,7 +24,7 @@ def get_intg(run):
         intg_addl = []
 
         # typical chemRIXS
-        # intg_main = 'axis_svls'
+        intg_main = 'axis_svls'
         # intg_addl = ['andor_vls', 'andor_dir']
     return intg_main, intg_addl
 
@@ -86,7 +86,7 @@ def get_droplet2photon(run):
 def get_polynomial_correction(run):
     ret_dict = {}
 
-    if run > 0:
+    if run < 0:
         # Polynomial correction for the axis_svls
         poly_corr_args = {
             "polynomial_coefficients": [1.29626379e-6, -1.33220754e-2, 4.70900708e1],
@@ -142,9 +142,9 @@ def get_wf_integrate(run):
 
 
 def get_wf_svd(run):
-    ret_dict = {}
+    det_kwargs = {}
 
-    if run > 0:
+    if run < 0:
         det_kwargs = {}
         w8s = ["rix_fim0", "rix_fim1", "crix_w8"]
         for w8 in w8s:
