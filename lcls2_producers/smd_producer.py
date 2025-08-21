@@ -785,9 +785,13 @@ for evt_num, evt in enumerate(event_iter):
                 det.getData(evt)
 
                 if det.evt.dat is None:
-                    logger.info(f"Rank {rank}: Integrating detector {det._name} has no data on evt {evt_num}")
-                    userDictInt[det._name] = {}  # so we can still get the summed fast data
-                
+                    logger.info(
+                        f"Rank {rank}: Integrating detector {det._name} has no data on evt {evt_num}"
+                    )
+                    userDictInt[det._name] = (
+                        {}
+                    )  # so we can still get the summed fast data
+
                 else:
                     det.processFuncs()
                     userDictInt[det._name] = {}
@@ -838,12 +842,9 @@ for evt_num, evt in enumerate(event_iter):
     if args.all_events:
         small_data.event(evt, det_data)
     else:
-        scan_data = det_data.get('scan', {})
-        timing_data = det_data.get('timing', {})
-        data_for_smd = {
-            'scan': scan_data,
-            'timing': timing_data
-        }
+        scan_data = det_data.get("scan", {})
+        timing_data = det_data.get("timing", {})
+        data_for_smd = {"scan": scan_data, "timing": timing_data}
         small_data.event(evt, data_for_smd)
 
     # the ARP will pass run & exp via the environment, if I see that info, the post updates

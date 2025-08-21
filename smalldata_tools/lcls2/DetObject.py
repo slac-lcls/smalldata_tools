@@ -703,9 +703,7 @@ class Wave8Object(WaveformObject):
         try:
             self.evt.dat = np.squeeze(np.array(self.evt.dat)).astype(int)
         except:
-            logger.debug(
-               f"Wave8: Could not cast waveform times to array, set to None "
-            )
+            logger.debug(f"Wave8: Could not cast waveform times to array, set to None ")
             self.evt.dat = None
 
 
