@@ -56,28 +56,7 @@ def get_droplet2photon(run):
 def get_droplet(run):
     ret_dict = {}
 
-    if run < 30:
-        drop_dict = {
-            "threshold": 20,
-            "thresholdADU": 125,
-            "useRms": False,
-            #            "nData": None
-        }
-    elif run > 29 and run < 40:
-        drop_dict = {
-            "threshold": 25,
-            "thresholdADU": 120,
-            "useRms": False,
-            #            "nData": None
-        }
-    elif run > 40 and run < 100:
-        drop_dict = {
-            "threshold": 60,
-            "thresholdADU": 500,
-            "useRms": False,
-            #            "nData": None
-        }
-    elif run > 100:
+    if run < 0:
         drop_dict = {
             "threshold": 20,
             "thresholdADU": 125,

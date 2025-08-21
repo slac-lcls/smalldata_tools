@@ -82,9 +82,6 @@ class dropletFunc(DetObjectFunc):
                 ]
             )
             self._is_tiled = True
-
-        self._compData = np.ones_like(self._mask).astype(float)
-        self.comp_data = self._compData
         return
 
     def addFunc(self, func):
