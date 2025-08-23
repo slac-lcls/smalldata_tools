@@ -24,10 +24,9 @@ class CompressDecompress(DetObjectFunc):
 
             # Any returned dictionary will be saved to the h5 file under this detector
             return {}
-        
+
         def _compress(self, data):
             return data
-        
+
         def _decompress(self, data):
             return data
-
