@@ -18,14 +18,14 @@ def getROIs(run):
     if run > 0:
         # Save the full ANDOR and QUAD.
         ret_dict["andor"] = [full_roi]
-        # ret_dict['epixquad'] = [full_roi]
+        ret_dict["epixquad"] = [full_roi]
     return ret_dict
 
 
 def get_droplet2photon(run):
     ret_dict = {}
 
-    if run > 0:
+    if run < 0:
         # ##### epixquad (1010667 setup) #####
         d2p_dict = {}
         # droplet args
@@ -50,6 +50,20 @@ def get_droplet2photon(run):
 
         ret_dict["epixquad"] = d2p_dict
 
+    return ret_dict
+
+
+def get_droplet(run):
+    ret_dict = {}
+
+    if run < 0:
+        drop_dict = {
+            "threshold": 20,
+            "thresholdADU": 125,
+            "useRms": False,
+            #            "nData": None
+        }
+        ret_dict["epixquad"] = drop_dict
     return ret_dict
 
 

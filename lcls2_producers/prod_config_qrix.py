@@ -146,7 +146,7 @@ epicsPV = [
     "EM2K0:XGMD:ETM:01:Reading",
     "EM2K0:XGMD:ETM:02:Reading",
     "EM2K0:XGMD:HPS:milliJoulesPerPulse",
-    "EM2K0:XGMD:HPS:AvgPulseIntensityy",
+    "EM2K0:XGMD:HPS:AvgPulseIntensity",
 ]
 epicsOncePV = []
 

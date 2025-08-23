@@ -86,7 +86,7 @@ class ROIFunc(DetObjectFunc):
                 func.setKeyData("_compData", self._rms)
             except:
                 print("failed to set parameters needed to run droplets on ROI")
-                return
+                raise
         self.__dict__[func._name] = func
 
     def applyROI(self, array):
