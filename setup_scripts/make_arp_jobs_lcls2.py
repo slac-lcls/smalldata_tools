@@ -27,7 +27,9 @@ parser.add_argument(
     "--cube", help="Cube config to make cube job for.", type=str, default=None
 )
 parser.add_argument(
-    "--all_events", help="Save all events, not just integrating detectors", action="store_true"
+    "--all_events",
+    help="Save all events, not just integrating detectors",
+    action="store_true",
 )
 args = parser.parse_args()
 
@@ -42,7 +44,9 @@ if "milano" in args.queue:
     account = f"lcls:{exp}"
 
     # smd
-    executable_smd = str(SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh")
+    executable_smd = str(
+        SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh"
+    )
     trigger = "START_OF_RUN"
 
     # cube
