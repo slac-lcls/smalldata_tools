@@ -26,6 +26,9 @@ parser.add_argument(
 parser.add_argument(
     "--cube", help="Cube config to make cube job for.", type=str, default=None
 )
+parser.add_argument(
+    "--all_events", help="Save all events, not just integrating detectors", action="store_true"
+)
 args = parser.parse_args()
 
 exp = args.experiment
@@ -39,7 +42,7 @@ if "milano" in args.queue:
     account = f"lcls:{exp}"
 
     # smd
-    executable = str(SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh")
+    executable_smd = str(SDF_BASE / "results/smalldata_tools/arp_scripts/submit_smd2.sh")
     trigger = "START_OF_RUN"
 
     # cube
@@ -67,15 +70,20 @@ parameters = f"--partition {args.queue} --postRuntable --nodes {nodes} --wait"
 if args.config is not None:
     parameters += f" --config {args.config}"
 
-job_defs.append(
-    {
-        "name": "smd",
-        "executable": executable,
-        "trigger": trigger,
-        "location": location,
-        "parameters": parameters,
-    }
-)
+smd_job_def = {
+    "name": "smd",
+    "executable": executable_smd,
+    "trigger": trigger,
+    "location": location,
+    "parameters": parameters,
+}
+
+job_defs.append(smd_job_def)
+
+if "all_events" in args:
+    smd_job_def["parameters"] += " --all_events"
+    smd_job_def["trigger"] = "MANUAL"
+    job_defs.append(smd_job_def)
 
 # psplot_live job
 if args.psplot_live:

@@ -82,7 +82,7 @@ set -- "${POSITIONAL[@]}"
 
 SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 
-#Define cores if we don't have them
+# Define cores if we don't have them
 QUEUE=${QUEUE:='milano'}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
