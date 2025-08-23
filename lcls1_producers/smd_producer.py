@@ -70,6 +70,8 @@ def define_dets(run):
         d2p_args = config.get_droplet2photon(run)
     if "getDetSums" in dir(config):
         detsum_args = config.getDetSums(run)
+    if "getCompressionParameters" in dir(config):
+        compress_args = config.getCompressionParameters(run)
 
     detnames = config.detnames
                     
@@ -78,6 +80,7 @@ def define_dets(run):
     # Define detectors and their associated DetObjectFuncs
     for detname in detnames:
         havedet = checkDet(ds.env(), detname)
+        compression = False
         # Common mode
         if havedet:
             if detname=='': 
@@ -86,8 +89,14 @@ def define_dets(run):
             else:
                 common_mode=None
             det = DetObject(detname ,ds.env(), int(run), common_mode=common_mode)
-            
+
+
             # Analysis functions
+            # Get compression func
+            if detname in compress_args:
+                compress_decompress = CompressDecompress(compress_args[detname])
+                compression = True
+
             # ROIs:
             if detname in roi_args:
                 for ROI in roi_args[detname]:
@@ -95,7 +104,13 @@ def define_dets(run):
                     rfunc = ROIFunc(**ROI)
                     for pj in pjs:
                         rfunc.addFunc(projectionFunc(**pj))
-                    det.addFunc(rfunc)
+
+                    # If we want to test compression, let's add it at the beginning of the chain
+                    if compression:
+                        compress_decompress.addFunc(rfunc)
+                        det.addFunc(compress_decompress)
+                    else:
+                        det.addFunc(rfunc)
             # Azimuthal binning
             if detname in azint_args:
                 for azint in azint_args[detname]:
@@ -195,6 +210,7 @@ from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 # from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
+from smalldata_tools.ana_funcs.compression import CompressDecompress
 
 # Constants
 HUTCHES = [
