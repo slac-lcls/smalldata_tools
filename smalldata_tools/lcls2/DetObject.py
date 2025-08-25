@@ -717,7 +717,13 @@ class PiranhaObject(WaveformObject):
 
     def getData(self, evt):
         super(PiranhaObject, self).getData(evt)
-        self.evt.dat = self.det.raw.raw(evt)
+        try:
+            self.evt.dat = self.det.raw.raw(evt).astype(int)
+        except:
+            print(
+                "piranha: Could not cast piranha to array, set to None"
+            )
+            self.evt.dat = None
         return
 
 
