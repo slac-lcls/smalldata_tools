@@ -720,9 +720,7 @@ class PiranhaObject(WaveformObject):
         try:
             self.evt.dat = self.det.raw.raw(evt).astype(int)
         except:
-            print(
-                "piranha: Could not cast piranha to array, set to None"
-            )
+            print("piranha: Could not cast piranha to array, set to None")
             self.evt.dat = None
         return
 
