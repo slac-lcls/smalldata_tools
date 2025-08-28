@@ -384,6 +384,13 @@ parser.add_argument(
 parser.add_argument(
     "--config", help="Producer config file to use", default=None, type=str
 )
+parser.add_argument(
+    "--all_events",
+    help="Will write all events. If False, only writes h5 at slow detectors rate.",
+    action="store_true",
+    default=False,
+)
+
 args = parser.parse_args()
 
 logger.debug("Args to be used for small data run: {0}".format(args))
@@ -636,7 +643,7 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     #     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser', run=thisrun))
 
     if len(config.epicsOncePV) > 0:
-        EODet = epicsDetector(PVlist=epicsOncePV, name="epicsOnce", run=thisrun)
+        EODet = epicsDetector(PVlist=config.epicsOncePV, name="epicsOnce", run=thisrun)
     else:
         EODet = None
     EODetData = {"epicsOnce": {}}
@@ -741,6 +748,7 @@ for evt_num, evt in enumerate(event_iter):
 
     if len(int_dets) > 0:
         userDictInt = {}
+        # Get summed fast detectors' data for integrating detector event
         for det in int_dets:
             normdict[det._name]["count"] += 1
 
@@ -773,24 +781,30 @@ for evt_num, evt in enumerate(event_iter):
                     normdict[det._name]["timestamp_min"], evt.timestamp
                 )
 
-            try:
+            if evt.EndOfBatch():
                 det.getData(evt)
 
                 if det.evt.dat is None:
-                    continue
+                    logger.info(
+                        f"Rank {rank}: Integrating detector {det._name} has no data on evt {evt_num}"
+                    )
+                    userDictInt[det._name] = (
+                        {}
+                    )  # so we can still get the summed fast data
 
-                det.processFuncs()
-                userDictInt[det._name] = {}
-                tmpdict = getUserData(det)
-                for k, v in tmpdict.items():
-                    userDictInt[det._name][k] = v
+                else:
+                    det.processFuncs()
+                    userDictInt[det._name] = {}
+                    tmpdict = getUserData(det)
+                    for k, v in tmpdict.items():
+                        userDictInt[det._name][k] = v
 
-                try:
-                    envData = getUserEnvData(det)
-                    if len(envData.keys()) > 0:
-                        userDictInt[det._name + "_env"] = envData
-                except:
-                    pass
+                    try:
+                        envData = getUserEnvData(det)
+                        if len(envData.keys()) > 0:
+                            userDictInt[det._name + "_env"] = envData
+                    except:
+                        pass
 
                 # save data in integrating det dictionary & reset norm dictionary
                 for k, v in normdict[det._name].items():
@@ -805,9 +819,6 @@ for evt_num, evt in enumerate(event_iter):
                         normdict[det._name][k] = v * 0  # may not work for arrays....
                 # print(userDictInt)
                 small_data.event(evt, userDictInt, align_group="intg")
-            except:
-                print(f"Bad int_det processing on evt {evt_num}")
-                pass
 
     # store event-based data
     # if det_data is not None:
@@ -828,7 +839,13 @@ for evt_num, evt in enumerate(event_iter):
     # #save what was selected to be saved.
     # #print('SAVE ',det_data)
 
-    small_data.event(evt, det_data)
+    if args.all_events:
+        small_data.event(evt, det_data)
+    else:
+        scan_data = det_data.get("scan", {})
+        timing_data = det_data.get("timing", {})
+        data_for_smd = {"scan": scan_data, "timing": timing_data}
+        small_data.event(evt, data_for_smd)
 
     # the ARP will pass run & exp via the environment, if I see that info, the post updates
     if (
@@ -866,35 +883,36 @@ if not ds.is_srv():
     if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
         small_data.save_summary(sumDict)
 
-    logger.info("Saving detector configurtation to UserDataCfg")
-    userDataCfg = {}
-    for det in default_dets:
-        # Make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
-        noConfigSave = ["scan", "damage"]
-        if det.name not in noConfigSave:
-            userDataCfg[det.name] = det.params_as_dict()
-    for det in dets:
-        try:
-            userDataCfg[det._name] = det.params_as_dict()
-        except:
-            userDataCfg[det.name] = det.params_as_dict()
-    for det in int_dets:
-        try:
-            userDataCfg[det._name] = det.params_as_dict()
-        except:
-            userDataCfg[det.name] = det.params_as_dict()
-    if EODet is not None:
-        EODetData = detOnceData(EODet, EODetData, EODetTS, args.noarch)
-        if EODetData["epicsOnce"] != {}:
-            userDataCfg[EODet.name] = EODet.params_as_dict()
-            Config = {"UserDataCfg": userDataCfg}
-            Config.update(EODetData)
+    if ds.unique_user_rank():
+        logger.info("Saving detector configuration to UserDataCfg")
+        userDataCfg = {}
+        for det in default_dets:
+            # Make a list of configs not to be saved as lists of strings don't work in ps-4.2.5
+            noConfigSave = ["scan", "damage"]
+            if det.name not in noConfigSave:
+                userDataCfg[det.name] = det.params_as_dict()
+        for det in dets:
+            try:
+                userDataCfg[det._name] = det.params_as_dict()
+            except:
+                userDataCfg[det.name] = det.params_as_dict()
+        for det in int_dets:
+            try:
+                userDataCfg[det._name] = det.params_as_dict()
+            except:
+                userDataCfg[det.name] = det.params_as_dict()
+        if EODet is not None:
+            EODetData = detOnceData(EODet, EODetData, EODetTS, args.noarch)
+            if EODetData["epicsOnce"] != {}:
+                userDataCfg[EODet.name] = EODet.params_as_dict()
+                Config = {"UserDataCfg": userDataCfg}
+                Config.update(EODetData)
+            else:
+                Config = {"UserDataCfg": userDataCfg}
         else:
             Config = {"UserDataCfg": userDataCfg}
-    else:
-        Config = {"UserDataCfg": userDataCfg}
-    if small_data.summary:
-        small_data.save_summary(Config)  # this only works w/ 1 rank!
+        if small_data.summary:
+            small_data.save_summary(Config)  # this only works w/ 1 rank!
 
 # Finishing up:
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
