@@ -47,7 +47,7 @@ def define_dets(run):
     # Assumes that the config file with function parameters definition
     # has been imported under "config"
 
-    rois_args = {}  
+    roi_args = {}
     mectt_args = {}
     azint_args = {}
     azintpyfai_args = {}
