@@ -839,7 +839,7 @@ for evt_num, evt in enumerate(event_iter):
     # #save what was selected to be saved.
     # #print('SAVE ',det_data)
 
-    if args.all_events:
+    if len(int_dets) == 0 or args.all_events:
         small_data.event(evt, det_data)
     else:
         scan_data = det_data.get("scan", {})
