@@ -134,8 +134,12 @@ class azav_pyfai(DetObjectFunc):
                         self.mask = ~(np.ones_like(det.ped).astype(bool))
                     except:
                         self.mask = None
-        if self.mask.ndim == 3:
+        if self.mask is not None and self.mask.ndim == 3:
+            maskInv = ~(self.mask.astype(bool))
             self.mask = image_from_dxy(self.mask, self.ix, self.iy)
+            maskInvImg = image_from_dxy(maskInv, self.ix, self.iy)
+            maskImg = ~(maskInvImg)
+            self.mask = maskImg
 
         print(f"Azimuthal integrator:\n{self.ai}")
         return
@@ -174,4 +178,5 @@ class azav_pyfai(DetObjectFunc):
                 method="cython",
                 **self._azav_kwargs,
             )
+
             return {"azav": I, "q": q}

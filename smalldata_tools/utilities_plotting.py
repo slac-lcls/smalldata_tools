@@ -1543,6 +1543,7 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh, **kwargs):
     clipping = kwargs.pop("clipping", {"min": "black", "max": "magenta", "NaN": "gray"})
     kdims = kwargs.pop("kdims", None)
     bounds = kwargs.pop("bounds", None)
+    tools = kwargs.pop("tools", None)
 
     if not isinstance(data2plot, np.ndarray):
         try:
@@ -1578,6 +1579,8 @@ def _hv_image(data2plot, cmap, imgLow, imgHigh, **kwargs):
             cmap=cmap,
             clipping_colors=clipping,
         )
+        if tools is not None:
+            image.opts(tools=tools)
     elif data2plot.ndim == 3:
         imkwargs = {"vdims": hv.Dimension("z", range=(imgLow, imgHigh))}
         if kdims is not None:
