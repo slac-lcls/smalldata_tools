@@ -209,8 +209,7 @@ HUTCHES = [
 ]
 
 S3DF_BASE = Path('/sdf/data/lcls/ds/')
-FFB_BASE = Path('/cds/data/drpsrcf/')
-PSANA_BASE = Path('/cds/data/psdm/')
+FFB_BASE = Path('/sdf/data/lcls/drpsrcf/ffb/')
 PSDM_BASE = Path(os.environ.get('SIT_PSDM_DATA', S3DF_BASE))
 SD_EXT = Path('./hdf5/smalldata/')
 if rank == 0:
@@ -313,14 +312,7 @@ def get_xtc_files(base, exp, run):
 def get_sd_file(write_dir, exp, hutch):
     """Generate directory to write to, create file name"""
     if write_dir is None:
-        if useFFB and not onS3DF: # when on a drp node
-            write_dir = FFB_BASE / hutch.lower() / exp / '/scratch' / SD_EXT
-        elif onPSANA: # when on old psana system
-            write_dir = PSANA_BASE / hutch.lower() / exp, SD_EXT
-        elif onS3DF: # S3DF should now be the default
-            write_dir = S3DF_BASE / hutch.lower() / exp / SD_EXT
-        else:
-            logger.error('get_sd_file problem. Please fix.')
+        write_dir = S3DF_BASE / hutch.lower() / exp / SD_EXT
     logger.debug(f'hdf5 directory: {write_dir}')
 
     write_dir = Path(write_dir)
@@ -376,12 +368,8 @@ config = import_module(prod_cfg)
 # Figure out where we are and where to look for data
 xtc_files = []
 useFFB = False
-onS3DF = False
-onPSANA = False
 
 if hostname.find('sdf')>=0:
-    logger.debug('On S3DF')
-    onS3DF = True
     if 'ffb' in PSDM_BASE.as_posix():
         useFFB = True
         # wait for files to appear
@@ -408,29 +396,6 @@ if hostname.find('sdf')>=0:
     if len(xtc_files)==0:
         raise RuntimeError(f'We have no xtc files for run {run} in {exp} in the offline system.')
 
-elif hostname.find('drp')>=0:
-    nFiles=0
-    logger.debug('On FFB')
-    waitFilesStart=datetime.now()
-    while nFiles==0:
-        xtc_files = get_xtc_files(FFB_BASE, hutch, run)
-        nFiles = len(xtc_files)
-        if nFiles == 0:
-            if not args.wait:
-                if rank == 0:
-                    logger.error("We have no xtc files for run %s in %s in the FFB system,"\
-                          "Quitting now.")
-                sys.exit()
-            else:
-                if rank == 0:
-                    logger.info("We have no xtc files for run %s in %s in the FFB system," \
-                          "we will wait for 10 second and check again."%(run,exp))
-                time.sleep(10)
-    waitFilesEnd = datetime.now()
-    if rank == 0:
-        logger.info('Files appeared after %s seconds'%(str(waitFilesEnd-waitFilesStart)))
-    useFFB = True
-
 # If not a current experiment or files in ffb, look in psdm
 else:
     logger.debug('Not on FFB or S3DF, use old offline system')
@@ -453,8 +418,7 @@ if args.norecorder:
         ds_name += ':stream=0-79'
 if useFFB:
         ds_name += ':live'
-        if not onS3DF:
-            ds_name += f':dir=/cds/data/drpsrcf/{exp[0:3]}/{exp}/xtc'
+        ds_name += f':dir=/sdf/data/lcls/drpsrcf/ffb/{exp[0:3]}/{exp}/xtc'
         psana.setOption('PSXtcInput.XtcInputModule.liveTimeout', 300)
         # bigger timeout so that the live mode does not fail
 
@@ -613,10 +577,7 @@ if EODet is None:
 end_setup_dets = time.time()
 
 if args.tiff: # this needs to be done for S3DF
-    if onS3DF:
-        dirname = S3DF_BASE / f"{exp[:3]}/{exp}/scratch/run{int(run)}"
-    else:
-        dirname = PSANA_BASE / '%s/%s/scratch/run%d'%(args.experiment[:3],args.experiment,int(args.run))
+    dirname = S3DF_BASE / f"{exp[:3]}/{exp}/scratch/run{int(run)}"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
@@ -751,8 +712,6 @@ if os.environ.get('ARP_JOB_ID', None) is not None:
 logger.debug('Saved all small data')
 
 
-# This is no broken. How to access the file under /cds/...?
-# Should we put it under /sdf/ as well?
 if args.postRuntable and ds.rank==0:
     print('Posting to the run tables.')
     locStr=''
@@ -771,12 +730,9 @@ if args.postRuntable and ds.rank==0:
     #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
     #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
     user=(args.experiment[:3]+'opr').replace('dia','mcc')
-    if os.environ.get("ARP_LOCATION", None) == "S3DF":
-        with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader:
-            answer = reader.readline()
-    else:
-        with open('/cds/home/opr/%s/forElogPost.txt'%user,'r') as reader:
-            answer = reader.readline()
+
+    with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader:
+        answer = reader.readline()
     r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, 
                       auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
     print(r)

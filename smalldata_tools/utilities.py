@@ -1159,10 +1159,7 @@ def postRunTable(
     ws_url = url + "/run_control/{0}/ws/add_run_params".format(experiment)
     print("URL:", ws_url)
     user = experiment[:3] + "opr"
-    elogPostFile = "/cds/home/opr/%s/forElogPost.txt" % user
-    hostname = socket.gethostname()
-    if hostname.find("sdf") >= 0:
-        elogPostFile = "/sdf/group/lcls/ds/tools/forElogPost.txt"
+    elogPostFile = "/sdf/group/lcls/ds/tools/forElogPost.txt"
     with open(elogPostFile, "r") as reader:
         answer = reader.readline()
     r = requests.post(
@@ -1204,10 +1201,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
     """
     opr_name: str = f"{exp[:3]}opr"
     hostname: str = socket.gethostname()
-    if hostname.find("sdf") >= 0:
-        auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    else:
-        auth_path: str = f"/cds/home/opr/{opr_name}/forElogPost.txt"
+    auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
 
     with open(auth_path, "r") as f:
         pw: str = f.readline()[:-1]
