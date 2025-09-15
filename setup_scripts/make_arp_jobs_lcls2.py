@@ -84,7 +84,7 @@ smd_job_def = {
 
 job_defs.append(smd_job_def)
 
-if "all_events" in args:
+if args.all_events:
     smd_job_def["parameters"] += " --all_events"
     smd_job_def["trigger"] = "MANUAL"
     job_defs.append(smd_job_def)
