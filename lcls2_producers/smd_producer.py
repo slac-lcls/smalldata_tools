@@ -639,8 +639,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
             default_dets.append(
                 epicsDetector(PVlist=epicsPV, name="epicsAll", run=thisrun)
             )
-    # elif len(config.epicsPV) > 0:  # Should we still have this option for PVs?
-    #     default_dets.append(epicsDetector(PVlist=config.epicsPV, name='epicsUser', run=thisrun))
+    elif hasattr(config, "epicsArchFilePV") and len(config.epicsArchFilePV) > 0:
+        default_dets.append(epicsDetector(PVlist=config.epicsArchFilePV, name='epicsUser', run=thisrun))
 
     if len(config.epicsOncePV) > 0:
         EODet = epicsDetector(PVlist=config.epicsOncePV, name="epicsOnce", run=thisrun)
@@ -948,9 +948,10 @@ if rank == h5_rank:
 
     epics_archive = EpicsArchive()
     loop = asyncio.get_event_loop()
+    pvs = [pv[0] if isinstance(pv, tuple) else pv for pv in config.epicsPV]
     coroutines = [
         epics_archive.get_points(PV=pv, start=start, end=end, raw=True, useMS=True)
-        for pv in config.epicsPV
+        for pv in pvs
     ]
 
     logger.debug(f"Run PV retrieval (async)")
@@ -958,12 +959,20 @@ if rank == h5_rank:
 
     # Save to files
     h5_for_arch.create_group("epics_archiver")
-    for pv, data in zip(config.epicsPV, data):
+    for pv_, data in zip(config.epicsPV, data):
+        if isinstance(pv_, tuple):
+            # In format ("PV", "alias")
+            pv = pv_[0]
+            alias = pv_[1]
+        else:
+            pv = pv_
+            alias = None
         pv = pv.replace(":", "_")
         if data == []:
             continue
         data = np.asarray(data)
-        dset = h5_for_arch.create_dataset(f"epics_archiver/{pv}", data=data)
+        dset_name = pv if alias is None else alias
+        dset = h5_for_arch.create_dataset(f"epics_archiver/{dset_name}", data=data)
         logger.debug(f"Saved {pv} from archiver data.")
 
 
