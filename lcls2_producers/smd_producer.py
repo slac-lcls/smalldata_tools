@@ -640,7 +640,9 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
                 epicsDetector(PVlist=epicsPV, name="epicsAll", run=thisrun)
             )
     elif hasattr(config, "epicsArchFilePV") and len(config.epicsArchFilePV) > 0:
-        default_dets.append(epicsDetector(PVlist=config.epicsArchFilePV, name='epicsUser', run=thisrun))
+        default_dets.append(
+            epicsDetector(PVlist=config.epicsArchFilePV, name="epicsUser", run=thisrun)
+        )
 
     if len(config.epicsOncePV) > 0:
         EODet = epicsDetector(PVlist=config.epicsOncePV, name="epicsOnce", run=thisrun)
