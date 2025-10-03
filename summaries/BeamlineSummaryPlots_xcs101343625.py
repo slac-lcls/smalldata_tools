@@ -438,74 +438,73 @@ try:
         print("fwhm",fwhm)
 
         # ===================================================================
-        # Part 2: Convert the Histogram
+        # Part 2: Convert the Histogram (with NaN-safe, robust autoranging)
         # ===================================================================
         
-        # --- Key Difference: Pre-bin the data with NumPy ---
-        # plt.hist does this automatically; hv.Histogram expects binned data.
-        counts1, edges1 = np.histogram(
-            data.Alvium_spec.spectrum_R2_h, 
-            bins=100, 
-            range=(0, 1)
-        )
-            
-        counts2, edges2 = np.histogram(
-            data.Alvium_spec.spectrum_R2_v, 
-            bins=100, 
-            range=(0, 1)
-        )
-            
-        # Convert the EArray to a NumPy array by slicing it
-        bandwidth_numpy_array = data.Alvium_spec.spectrum_sigma[:]*res*2.35
-        
-        counts3, edges3 = np.histogram(
-            bandwidth_numpy_array, 
-            bins=50, 
-            range=(1, 50)
-            )
-
+        # --- Convert EArrays to NumPy arrays ---
         r2_h_numpy_array = data.Alvium_spec.spectrum_R2_h[:]
+        r2_v_numpy_array = data.Alvium_spec.spectrum_R2_v[:]
+        bandwidth_numpy_array = data.Alvium_spec.spectrum_sigma[:] * res * 2.35
         ipm4_numpy_array = data.ipm4.sum[:]
+
+
+        # --- Histogram 1: R^2 spectrum ---
+
+        # Step 1: Filter out NaN values for the histogram data itself
+        r2_h_filtered = r2_h_numpy_array[~np.isnan(r2_h_numpy_array)]
         
-        # Create the HoloViews Histogram object
-        # We pass it a tuple of (bin_edges, bin_counts)
+        # Step 2: Calculate a robust range using np.nanpercentile on the ORIGINAL array
+        # This safely ignores NaNs to find the 1st and 99th percentile
+        robust_range_1 = np.nanpercentile(r2_h_numpy_array, [1, 99])
+
+        # Step 3: Create the histogram using the filtered data and the robust range
+        counts1, edges1 = np.histogram(
+            r2_h_filtered, 
+            bins=100,
+            range=robust_range_1 # Use the percentile-based range
+        )
+
+        # --- Histogram 2: R^2 beam (Apply the same pattern) ---
+        r2_v_filtered = r2_v_numpy_array[~np.isnan(r2_v_numpy_array)]
+        robust_range_2 = np.nanpercentile(r2_v_numpy_array, [1, 99])
+        counts2, edges2 = np.histogram(
+            r2_v_filtered, 
+            bins=100,
+            range=robust_range_2
+        )
+
+        # --- Histogram 3: Bandwidth (Apply the same pattern) ---
+        bandwidth_filtered = bandwidth_numpy_array[~np.isnan(bandwidth_numpy_array)]
+        robust_range_3 = np.nanpercentile(bandwidth_numpy_array, [1, 99])
+        counts3, edges3 = np.histogram(
+            bandwidth_filtered, 
+            bins=50,
+            range=robust_range_3
+        )
+
+
+        # Create the HoloViews Histogram objects (No changes here)
         histogram_plot1 = hv.Histogram((edges1, counts1), 
                                        kdims=['R^2 spectrum'], 
                                        vdims=['shots'])
-    
+
         histogram_plot2 = hv.Histogram((edges2, counts2), 
                                        kdims=['R^2 beam'], 
                                        vdims=['shots'])
-        
+
         histogram_plot3 = hv.Histogram((edges3, counts3), 
                                        kdims=['Bandwidth (eV)'], 
                                        vdims=['shots'])
 
-        scatter_plot_ipm = hv.Scatter((r2_h_numpy_array, ipm4_numpy_array), kdims='R^2 spectrum', vdims='i0')
+        # For the scatter plot, it's also good practice to filter NaNs
+        # This prevents HoloViews from trying to plot points at invalid coordinates
+        valid_scatter_indices = ~np.isnan(r2_h_numpy_array) & ~np.isnan(ipm4_numpy_array)
+        scatter_plot_ipm = hv.Scatter(
+            (r2_h_numpy_array[valid_scatter_indices], ipm4_numpy_array[valid_scatter_indices]), 
+            kdims='R^2 spectrum', vdims='i0'
+        )
 
         
-        # Apply styling to the histogram
-        histogram_plot1.opts(
-            width=250, 
-            height=300, 
-            title="R^2 Spectrum",
-            tools=['hover'] # Add hover tool for interactivity
-        )
-
-        histogram_plot2.opts(
-            width=250, 
-            height=300, 
-            title="R^2 Beam",
-            tools=['hover'] # Add hover tool for interactivity
-        )
-
-        histogram_plot3.opts(
-            width=250, 
-            height=300, 
-            title="Distribution of Bandwidth (eV)",
-            tools=['hover'] # Add hover tool for interactivity
-        )
-            
         final_histo_layout = histogram_plot1 + histogram_plot2 + histogram_plot3 + scatter_plot_ipm
         
         
