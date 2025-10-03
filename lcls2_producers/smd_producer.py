@@ -1020,4 +1020,6 @@ if args.postRuntable and ds.unique_user_rank():
 
     postRunTable(runtable_data=runtable_data, experiment=args.experiment, run=args.run)
     if det_presence != {}:
-        postRunTable(runtable_data=det_presence, experiment=args.experiment, run=args.run)
+        postRunTable(
+            runtable_data=det_presence, experiment=args.experiment, run=args.run
+        )

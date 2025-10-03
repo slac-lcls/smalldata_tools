@@ -1152,6 +1152,7 @@ def KdeCuts(values, bandwidth="scott", percentile=[0.1, 99.9], nBins=1000):
     retDict["rightMaxDistToLine"] = [dxRight, dyRight]
     return retDict
 
+
 def get_elog_active_expmt(hutch: str, *, endstation: int = 0) -> Optional[str]:
     """Get the current active experiment for a hutch.
 
@@ -1184,9 +1185,7 @@ def get_elog_active_expmt(hutch: str, *, endstation: int = 0) -> Optional[str]:
         return None
 
 
-def postRunTable(
-    runtable_data: dict, experiment: str, run: str
-):
+def postRunTable(runtable_data: dict, experiment: str, run: str):
     base_url_auth = "https://pswww.slac.stanford.edu/ws-auth/lgbk/"
     base_url_jwt: str = "https://pswww.slac.stanford.edu/ws-jwt/lgbk/lgbk"
     endpoint: str = f"run_control/{experiment}/ws/add_run_params"
@@ -1216,10 +1215,11 @@ def postRunTable(
                 # No kerberos ticket. Out of luck
                 logger.warning("Cannot post run table.")
                 return None
-            auth_jwt = { "Authorization": auth_token }
+            auth_jwt = {"Authorization": auth_token}
             resp = _postRunTable(runtable_data, run, full_url_jwt, auth_jwt)
     logger.debug(resp)
     return None
+
 
 def _postRunTable(
     runtable_data: dict, run: str, url: str, auth: Union[dict, HTTPBasicAuth]
@@ -1267,7 +1267,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
     -------
     http_auth (HTTPBasicAuth) Authentication for eLog API.
     """
-    opr_name: str = f"{exp[:3]}opr".replace("dia","mcc")
+    opr_name: str = f"{exp[:3]}opr".replace("dia", "mcc")
     auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
 
     with open(auth_path, "r") as f:
@@ -1413,6 +1413,7 @@ def get_calib_file(run, directory, f_end=".data"):
             f"No matching calibration file found for run {run} in directory {directory}."
         )
     return f"{directory}{background}"
+
 
 def request_arp_token(exp: str, lifetime: int = 300) -> Optional[str]:
     """Request an ARP token via Kerberos endpoint.
