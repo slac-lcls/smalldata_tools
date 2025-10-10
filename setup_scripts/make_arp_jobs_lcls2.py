@@ -96,6 +96,21 @@ if hutch in ["rix", "xcs", "xpp"]:
             "parameters": f"--queue {queue_summaries} {args_summaries}",
         }
     )
+# RIX smd_all_events
+if hutch in ["rix"]:
+    job_defs.append(
+     	{
+            "name": "smd_all_events",
+            "executable": executable,
+            "trigger": "MANUAL",
+            "run_param_name": run_param_name,
+            "run_param_value": "done",
+            "location": location,
+            "parameters": f"--partition milano --nodes 2 --wait --config qrix --all_events",
+        }
+    )
+
+
 
 
 for job_def in job_defs:
