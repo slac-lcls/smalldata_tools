@@ -85,9 +85,11 @@ smd_job_def = {
 job_defs.append(smd_job_def)
 
 if args.all_events:
-    smd_job_def["parameters"] += " --all_events"
-    smd_job_def["trigger"] = "MANUAL"
-    job_defs.append(smd_job_def)
+    smd_all_events_job_def = smd_job_def.copy()
+    smd_all_events_job_def["name"] = "smd_all_events"
+    smd_all_events_job_def["parameters"] += " --all_events"
+    smd_all_events_job_def["trigger"] = "MANUAL"
+    job_defs.append(smd_all_events_job_def)
 
 # psplot_live job
 if args.psplot_live:
