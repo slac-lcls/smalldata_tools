@@ -174,7 +174,7 @@ fpathup = '/'.join(fpath.split('/')[:-1])
 sys.path.append(fpathup)
 logger.info(f'\n{fpathup}')
 
-from smalldata_tools.utilities import printMsg, checkDet
+from smalldata_tools.utilities import printMsg, checkDet, postRunTable
 from smalldata_tools.common.detector_base import getUserData, getUserEnvData
 from smalldata_tools.lcls1.default_detectors import detData, detOnceData
 from smalldata_tools.lcls1.default_detectors import ttRawDetector
@@ -688,7 +688,7 @@ dets_time_start = (start_setup_dets-start_job)/60
 dets_time_end = (end_setup_dets-start_job)/60
 evt_time_start = (start_evt_loop-start_job)/60
 evt_time_end = (end_evt_loop-start_job)/60
-logger.debug(f"##### Timing benchmarks core {ds.rank}: ##### """)
+logger.debug(f"##### Timing benchmarks core {ds.rank}: ##### ")
 logger.debug(f'Setup dets: \n\tStart: {dets_time_start:.2f} min\n\tEnd: {dets_time_end:.2f} min')
 logger.debug(f'\tDuration:{dets_time_end-dets_time_start:.2f}')
 logger.debug(f'Event loop: \n\tStart: {evt_time_start:.2f} min\n\tEnd: {evt_time_end:.2f} min')
@@ -725,18 +725,7 @@ if args.postRuntable and ds.rank==0:
     else:
         runtable_data["SmallData%s"%locStr]="done"
     time.sleep(5)
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    print('URL:',ws_url)
-    #krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    #r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    user=(args.experiment[:3]+'opr').replace('dia','mcc')
 
-    with open('/sdf/group/lcls/ds/tools/forElogPost.txt') as reader:
-        answer = reader.readline()
-    r = requests.post(ws_url, params={"run_num": args.run}, json=runtable_data, 
-                      auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-    print(r)
+    postRunTable(runtable_data=runtable_data, experiment=args.experiment, run=args.run)
     if det_presence!={}:
-        rp = requests.post(ws_url, params={"run_num": args.run}, json=det_presence,
-                           auth=HTTPBasicAuth(args.experiment[:3]+'opr', answer[:-1]))
-        print(rp)
+        postRunTable(runtable_data=det_presence, experiment=args.experiment, run=args.run)
