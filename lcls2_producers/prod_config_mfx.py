@@ -124,11 +124,17 @@ def get_sum_algos(run):
 ##########################################################
 # run independent parameters
 ##########################################################
-# These lists are either PV names, aliases, or tuples with both.
-# epicsPV = ['las_fs14_controller_time']
+# Will be taken from the archiver
+# This list is PV names or tuples (PV name, alias)
+epicsPV = []
+
+# Will be taken from the XTC (epicsArch file)
+# NOTE: Data appears to be shot-to-shot in the HDF5 but is NOT! This for convenience only
+# These lists are either PV names, aliases, or tuples (PV name, alias)
+# epicsArchFilePV = ['las_fs14_controller_time']
 # epicsOncePV = ['m0c0_vset', ('TMO:PRO2:MPOD:01:M2:C3:VoltageMeasure', 'MyAlias'),
 #               'IM4K4:PPM:SPM:VOLT_RBV', "FOO:BAR:BAZ", ("X:Y:Z", "MCBTest"), "A:B:C"]
-epicsPV = []
+epicsArchFilePV = []
 epicsOncePV = []
 
 
