@@ -293,6 +293,7 @@ class GenericContainerObject(DetObjectClass):
         ]
         return top_field_obj, fields
 
+
 class CameraObject(DetObjectClass):
     def __init__(self, det, run, **kwargs):
         super(CameraObject, self).__init__(det, run, **kwargs)
