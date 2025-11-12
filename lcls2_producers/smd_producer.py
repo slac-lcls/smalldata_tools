@@ -55,6 +55,7 @@ def define_dets(run, det_list):
     wfs_svd_args = {}
     droplet_args = {}
     azav_args = {}
+    azav_pyfai_args = {}
     polynomial_args = {}
     sum_algo_args = {}
 
@@ -75,6 +76,8 @@ def define_dets(run, det_list):
         droplet_args = config.get_droplet(run)
     if "get_azav" in dir(config):
         azav_args = config.get_azav(run)
+    if "get_azav_pyfai" in dir(config):
+        azav_pyfai_args = config.get_azav_pyfai(run)
     if "get_polynomial_correction" in dir(config):
         polynomial_args = config.get_polynomial_correction(run)
     if "get_sum_algos" in dir(config):
@@ -126,6 +129,9 @@ def define_dets(run, det_list):
         ####################################
         if detname in azav_args:
             det.addFunc(azimuthalBinning(**azav_args[detname]))
+
+        if detname in azav_pyfai_args:
+            det.addFunc(azav_pyfai(**azav_pyfai_args[detname]))
 
         if detname in rois_args:
             # ROI extraction
@@ -233,6 +239,10 @@ def define_dets(run, det_list):
 
         if sum_algo_args == {}:
             # Store calib by default even if algos. dictionary not defined
+            # NOTE: This can cause issues if you are relying on it for sums, and have
+            #       added a waveform PV detector (like a QADC) to the detnames list.
+            #       If this is causing issues, the simple fix is just to define the
+            #       sum algorithms in the config file explicitly
             det.storeSum(sumAlgo="calib")
         else:
             # Add `all` algorithms
@@ -287,6 +297,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import SvdFit
 from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
 
@@ -965,6 +976,27 @@ if rank == h5_rank:
         data = np.asarray(data)
         dset = h5_for_arch.create_dataset(f"epics_archiver/{pv}", data=data)
         logger.debug(f"Saved {pv} from archiver data.")
+    h5_for_arch.close()
+
+MPI.COMM_WORLD.Barrier()
+if ds.unique_user_rank():
+    import h5py
+    h5_for_arch = h5py.File(h5_f_name, "a")
+
+    def write_config(file_handle, base_name, cfg_dict):
+        for key, val in cfg_dict.items():
+            if isinstance(val, dict):
+                file_handle.create_group(f"{base_name}/{key}")
+                write_config(file_handle, f"{base_name}/{key}", val)
+            else:
+                file_handle.create_dataset(f"{base_name}/{key}", data=val)
+
+    if "UserDataCfg" not in h5_for_arch.keys():
+        # This guard is necessary for serial datasource when running interactively
+        h5_for_arch.create_group("UserDataCfg")
+        write_config(h5_for_arch, "UserDataCfg", Config["UserDataCfg"])
+
+    h5_for_arch.close()
 
 
 end_prod_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")

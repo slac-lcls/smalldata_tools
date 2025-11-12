@@ -411,7 +411,7 @@ class epicsDetector(DefaultDetector):
 
         for p in PVlist:
             try:
-                if type(p) == tuple:
+                if isinstance(p, tuple) or isinstance(p, list):
                     # User specified PV and alias.
                     pv = p[0]
                     al = p[1]
