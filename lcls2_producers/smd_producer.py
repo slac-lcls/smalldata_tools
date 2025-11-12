@@ -981,6 +981,7 @@ if rank == h5_rank:
 MPI.COMM_WORLD.Barrier()
 if ds.unique_user_rank():
     import h5py
+
     h5_for_arch = h5py.File(h5_f_name, "a")
 
     def write_config(file_handle, base_name, cfg_dict):
