@@ -37,6 +37,7 @@ def DetObject(srcName, run, **kwargs):
         "archon": ArchonObject,
         "jungfrau": JungfrauObject,
         "axis": SimpleCameraObject,
+        "generic_container": GenericContainerObject,
     }
 
     cls = detector_classes[det._dettype]
@@ -241,6 +242,56 @@ class NullDetObject:
         """
         pass
 
+
+class GenericContainerObject(DetObjectClass):
+    def __init__(self, det, run, **kwargs):
+        super().__init__(det, run, **kwargs)
+        self._is_tiled_camera = False
+
+        if hasattr(self.det, "xtc1dump"):
+            # Container is a generic coming from an XTC1 to XTC2 conversion
+            self._data_field, self._sub_fields = self.get_fields("xtc1dump")
+        else:
+            raise RuntimeError(
+                "Currently only xtc1-xtc2 GenericContainers are supported."
+            )
+
+        if "calib" in self._sub_fields:
+            # We'll say that this is a camera-type generic
+            self._is_tiled_camera = True
+            self.ped = None
+            self.gain = None
+            self.mask = None
+            self.cmask = None
+
+            self.ix = None
+            self.iy = None
+
+    def getData(self, evt):
+        super().getData(evt)
+        if self._is_tiled_camera:
+            # We save calibrated data using the conversion process
+            # No need to do anything else
+            self.evt.dat = self.det.xtc1dump.calib(evt)
+
+    def get_fields(self, top_field):
+        """
+        Parameters
+        ----------
+        Top field: str
+            Usually 'fex' or 'raw'
+        """
+        # Not ideal duplicating this here.... But don't want to inherit
+        # from default detector directly
+        top_field_obj = getattr(self.det, top_field)
+        if top_field_obj is None:
+            return top_field_obj, None
+        fields = [
+            field
+            for field in dir(top_field_obj)
+            if (field[0] != "_" and field not in self._veto_fields)
+        ]
+        return top_field_obj, fields
 
 class CameraObject(DetObjectClass):
     def __init__(self, det, run, **kwargs):
