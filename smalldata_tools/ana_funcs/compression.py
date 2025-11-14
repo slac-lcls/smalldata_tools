@@ -37,4 +37,4 @@ class pressioCompressDecompress(DetObjectFunc):
         decompressed_img = self._compressor.decode(compressed_img, decompressed_img)
 
         data = decompressed_img
-        return None
+        return {}

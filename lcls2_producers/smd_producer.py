@@ -557,7 +557,7 @@ if not args.psdm_dir:
     else:
         logger.warning("On an unknow system, things may get weird.")
 else:
-    logger.info(f"Requested data be found at: {args.pdsm_dir}")
+    logger.info(f"Requested data be found at: {args.psdm_dir}")
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
