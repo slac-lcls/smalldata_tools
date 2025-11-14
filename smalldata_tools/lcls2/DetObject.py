@@ -5,7 +5,6 @@ import logging
 from psana.pscalib.calib.MDBWebUtils import calib_constants
 from smalldata_tools.common.detector_base import DetObjectFunc, Event
 from smalldata_tools.utilities import cm_epix
-from future.utils import iteritems
 from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
@@ -105,7 +104,7 @@ class DetObjectClass(object):
             parList.update(
                 {
                     "%s__%s" % (sf._name, key): value
-                    for key, value in iteritems(sfPars)
+                    for key, value in sfPars.items()
                     if (
                         key[0] != "_"
                         and isinstance(value, (str, int, float, np.ndarray, tuple))

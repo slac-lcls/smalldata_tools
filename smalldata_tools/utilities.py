@@ -2,8 +2,10 @@ import os
 import numpy as np
 import time
 import h5py
-import tables
-from scipy import optimize
+try:
+    import tables
+except ModuleNotFoundError:
+    print("Cannot use tables - must use h5py.")
 from scipy import ndimage
 from scipy import signal
 from scipy import sparse
@@ -19,9 +21,7 @@ from collections import deque
 from itertools import islice
 from bisect import insort, bisect_left
 
-import xarray as xr
 from numba import jit
-from numba.types import List
 
 import sys
 
@@ -291,9 +291,13 @@ def hasKey(inkey, inh5=None, printThis=False):
     if inh5 is None:
         print("no input file given")
         return hasKey
-    if not isinstance(inh5, tables.file.File):
-        print("input file is not a tables h5file")
-        return hasKey
+    try:
+        if not isinstance(inh5, tables.file.File):
+            print("input file is not a tables h5file")
+            return hasKey
+    except NameError:
+        print("Cannot use tables - must use h5py.")
+        return None
 
     try:
         if inkey[0] == ["/"]:
@@ -690,6 +694,7 @@ def hist2d(
 
 ###
 def dictToHdf5(filename, indict):
+    import xarray as xr
     f = h5py.File(filename, "w")
     if isinstance(indict, dict):
         for key in indict.keys():
