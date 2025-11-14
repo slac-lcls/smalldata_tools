@@ -2,6 +2,7 @@
 
 #SBATCH --job-name=smd
 #SBATCH --exclusive
+#SBATCH --cpu-per-task=1
 # Note: when run trough sbatch, this script runs from the slurm scheduler folder
 
 usage()
