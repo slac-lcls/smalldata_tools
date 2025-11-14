@@ -246,7 +246,12 @@ class NullDetObject:
 class GenericContainerObject(DetObjectClass):
     def __init__(self, det, run, **kwargs):
         super().__init__(det, run, **kwargs)
+        self._epicsinfo = run.epicsinfo
+        self._stashed_run = run
+
         self._is_tiled_camera = False
+        self._veto_fields = ["TypeId", "Version", "config"]
+        self._searched_for_calib = False
 
         if hasattr(self.det, "xtc1dump"):
             # Container is a generic coming from an XTC1 to XTC2 conversion
@@ -263,12 +268,42 @@ class GenericContainerObject(DetObjectClass):
             self.gain = None
             self.mask = None
             self.cmask = None
+            self.rms = None
 
             self.ix = None
             self.iy = None
+            self.x = None
+            self.y = None
 
     def getData(self, evt):
         super().getData(evt)
+        if not self._searched_for_calib:
+            for name,name0 in self._epicsinfo:
+                det = self._stashed_run.Detector(name)
+                if self._name in name:
+                    dgrams = det._env_store.env_managers[0].dgrams
+                    for dgram in dgrams:
+                        raw = dgram.epics[0].raw
+                        attrs = vars(raw)
+                        for attr_name in attrs:
+                            if "pedestals" in attr_name:
+                                self.ped = getattr(raw, attr_name)
+                            if "gain" in attr_name:
+                                self.gain = getattr(raw, attr_name)
+                            if "mask" in attr_name:
+                                self.mask = getattr(raw, attr_name)
+                                self.cmask = self.mask
+                            if "pixel_index_map" in attr_name:
+                                index_map = getattr(raw, attr_name)
+                                self.ix = index_map[...,0]
+                                self.iy = index_map[...,1]
+                            if "pixel_position" in attr_name:
+                                pixel_pos = getattr(raw, attr_name)
+                                self.x = pixel_pos[...,0]
+                                self.y = pixel_pos[...,1]
+                    self._searched_for_calib = True
+                    break
+
         if self._is_tiled_camera:
             # We save calibrated data using the conversion process
             # No need to do anything else

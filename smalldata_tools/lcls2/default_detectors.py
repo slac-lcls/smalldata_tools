@@ -105,7 +105,10 @@ class damageDetector(DefaultDetector):
                 continue
             self.detNames.append(dn)
             det = run.Detector(dn)
-            self.damageDets.append(psana.detector.damage.Damage(det.raw))
+            if hasattr(det, "raw"):
+                self.damageDets.append(psana.detector.damage.Damage(det.raw))
+            elif hasattr(det, "xtc1dump"):
+                self.damageDets.append(psana.detector.damage.Damage(det.xtc1dump))
         self.detAlias = [det for det in self.detNames]
 
     def in_run(self):
