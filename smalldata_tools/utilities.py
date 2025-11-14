@@ -2,6 +2,7 @@ import os
 import numpy as np
 import time
 import h5py
+
 try:
     import tables
 except ModuleNotFoundError:
@@ -695,6 +696,7 @@ def hist2d(
 ###
 def dictToHdf5(filename, indict):
     import xarray as xr
+
     f = h5py.File(filename, "w")
     if isinstance(indict, dict):
         for key in indict.keys():

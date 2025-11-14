@@ -545,7 +545,9 @@ if not args.psdm_dir:
                     time.sleep(10)
             waitFilesEnd = datetime.now()
             if rank == 0:
-                print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+                print(
+                    f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds"
+                )
 
         xtc_files = get_xtc_files(PSDM_BASE, exp, run)
         if len(xtc_files) == 0:

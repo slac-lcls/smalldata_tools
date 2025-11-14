@@ -2,6 +2,7 @@ import numpy as np
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 
+
 class pressioCompressDecompress(DetObjectFunc):
     """Function to compress and decompress the data.
 
