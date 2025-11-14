@@ -615,6 +615,9 @@ if intg_main is not None and intg_main != "":
 if args.psplot_live_mode:
     datasource_args["psmon_publish"] = publish
 
+if hasattr(config, "xdetectors") and config.xdetectors:
+    datasource_args["xdetectors"] = config.xdetectors
+
 ds = psana.DataSource(**datasource_args)
 
 if ds.unique_user_rank():
