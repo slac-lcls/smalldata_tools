@@ -1,7 +1,10 @@
 import os
 import copy
 import numpy as np
-import tables
+try:
+    import tables
+except ModuleNotFoundError:
+    print("Cannot use tables - must use h5py.")
 
 from smalldata_tools.utilities import cm_epix
 from smalldata_tools.utilities import cm_uxi
