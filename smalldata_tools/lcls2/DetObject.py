@@ -278,7 +278,7 @@ class GenericContainerObject(DetObjectClass):
     def getData(self, evt):
         super().getData(evt)
         if not self._searched_for_calib:
-            for name,name0 in self._epicsinfo:
+            for name, name0 in self._epicsinfo:
                 det = self._stashed_run.Detector(name)
                 if self._name in name:
                     dgrams = det._env_store.env_managers[0].dgrams
@@ -295,12 +295,12 @@ class GenericContainerObject(DetObjectClass):
                                 self.cmask = self.mask
                             if "pixel_index_map" in attr_name:
                                 index_map = getattr(raw, attr_name)
-                                self.ix = index_map[...,0]
-                                self.iy = index_map[...,1]
+                                self.ix = index_map[..., 0]
+                                self.iy = index_map[..., 1]
                             if "pixel_position" in attr_name:
                                 pixel_pos = getattr(raw, attr_name)
-                                self.x = pixel_pos[...,0]
-                                self.y = pixel_pos[...,1]
+                                self.x = pixel_pos[..., 0]
+                                self.y = pixel_pos[..., 1]
                     self._searched_for_calib = True
                     break
 
