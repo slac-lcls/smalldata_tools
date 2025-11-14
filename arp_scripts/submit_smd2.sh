@@ -1,14 +1,70 @@
 #!/bin/bash
 
+
 usage()
 {
 cat << EOF
 $(basename "$0"):
-	Primary script to launch a smalldata_tools run analysis for LCLS-II.
+    Primary script to launch a smalldata_tools run analysis for LCLS-II.
 
-	OPTIONS:
-        -h|--help
-            Definition of options
+    OPTIONS:
+        -h, --help
+            Show this help message and exit.
+
+        -e, --experiment EXP
+            Specify the experiment name (e.g., cxilr6716).
+
+        -r, --run RUN
+            Specify the run number.
+
+        -d, --directory DIR
+            Specify the output directory.
+
+        -n, --nevents NEVENTS
+            Number of events to process.
+
+        --interactive
+            Run in interactive mode (no SLURM submission).
+
+        --nodes NODES
+            Number of nodes to use (default: 2 for milano).
+
+        --ntasks NTASKS
+            Total number of MPI tasks to use.
+
+        --memory MEMORY
+            Memory allocation per task. Only used if --ntasks is specified.
+
+        --eb_cores EB_CORES
+            Number of event builder cores.
+
+        --srv_cores SRV_CORES
+            Number of server cores.
+
+        --account ACCOUNT
+            SLURM account to use (default: lcls:\$EXP).
+
+        --reservation RESERVATION
+            SLURM reservation to use.
+
+        --logdir LOGDIR
+            Directory for log files.
+
+        -p, --partition PARTITION
+            SLURM partition to use (default: milano).
+
+        --s3df
+            Force use of S3DF data path.
+
+        --mpi_optim
+            Enable MPI optimization for very high rates.
+
+        --psplot_live
+            Enable psplot live mode (single SRV node).
+
+    Example usage:
+        $(basename "$0") -e cxilr6716 -r 45 --nodes 4
+
 EOF
 }
 
@@ -51,6 +107,16 @@ do
         ;;
     --nodes)
         NODES=$2
+        shift
+        shift
+        ;;
+    --ntasks)
+        NTASKS=$2
+        shift
+        shift
+        ;;
+    --memory)
+        MEMORY=$2
         shift
         shift
         ;;
@@ -106,6 +172,15 @@ do
 done
 set -- "${POSITIONAL[@]}"
 
+
+# If ntasks is specified, nodes and srv_cores must be specified too. This
+#  is the fully custom mode.
+if [[ -v NTASKS && (! -v NODES || ! -v SRV_CORES) ]]; then
+  echo "Error: --ntasks requires both --nodes and --srv_cores to be also specified."
+  exit 1
+fi
+
+
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
 
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog
@@ -150,13 +225,26 @@ DEFPARTITION='milano'
 PARTITION=${PARTITION:=$DEFPARTITION}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
+SBATCH_ARGS="--account $ACCOUNT -p $PARTITION"
 
 # EB, BD and SRV core allocation
-if [[ "$PARTITION" == "milano" ]]; then
-    # For milano:
+# Full custom
+if [ -v NTASKS ] && [ -v NODES ]; then
+    echo "Using user-defined NTASKS: $NTASKS, NODES: $NODES, SRV_CORES: $SRV_CORES"
+    MPI_SLOTS=$NTASKS
+
+    SBATCH_ARGS+=" --nodes=$NODES --ntasks=$NTASKS"
+    if [ -v MEMORY ]; then
+        SBATCH_ARGS+=" --mem-per-cpu=$MEMORY"
+    fi
+
+# For milano:
+elif [[ "$PARTITION" == "milano" ]]; then
     CORES_PER_NODE=120
     DEFAULT_NODES=2
     NODES=${NODES:=$DEFAULT_NODES}
+
+    SBATCH_ARGS+=" --nodes=$NODES"
 
     if [ -v MPI_OPTIM ]; then
         MPI_SLOTS=$(($CORES_PER_NODE*($NODES-1)))  # Number of cores on all nodes but the one for SMD0
@@ -170,20 +258,18 @@ if [[ "$PARTITION" == "milano" ]]; then
         # Use a single SRV node for psplot_live
         DEFAULT_SRV_CORES=1
     fi
-
-    SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}
-
-    DEFAULT_EB_CORES=$((($MPI_SLOTS-$SRV_CORES)/16))  # 1/16 is the recommended ratio for generic jobs.
-    EB_CORES=${EB_NODES:=$DEFAULT_EB_CORES}
 fi
+
+SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}
+
+DEFAULT_EB_CORES=$((($MPI_SLOTS-$SRV_CORES)/16))  # 1/16 is the recommended ratio for generic jobs.
+EB_CORES=${EB_NODES:=$DEFAULT_EB_CORES}
 
 export PS_SRV_NODES=$SRV_CORES
 export PS_EB_NODES=$EB_CORES
 
 # If we run into the chunk size error:
 # export PS_SMD_CHUNKSIZE=1073741824
-
-SBATCH_ARGS="--nodes $NODES --account $ACCOUNT -p $PARTITION"
 
 echo "sbatch arguments: $SBATCH_ARGS"
 
