@@ -22,6 +22,7 @@ import subprocess
 import socket
 from pathlib import Path
 from scipy import sparse
+
 try:
     import tables
 except ModuleNotFoundError:

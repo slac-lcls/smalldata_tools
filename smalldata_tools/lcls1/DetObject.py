@@ -1,6 +1,7 @@
 import os
 import copy
 import numpy as np
+
 try:
     import tables
 except ModuleNotFoundError:

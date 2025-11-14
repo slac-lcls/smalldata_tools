@@ -4,6 +4,7 @@ import os
 import time
 import numpy as np
 from collections import namedtuple
+
 try:
     import tables
 except ModuleNotFoundError:
