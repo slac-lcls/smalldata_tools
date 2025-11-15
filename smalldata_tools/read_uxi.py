@@ -4,7 +4,11 @@ import os
 import time
 import numpy as np
 from collections import namedtuple
-import tables
+
+try:
+    import tables
+except ModuleNotFoundError:
+    print("Cannot use tables - must use h5py.")
 import requests
 from datetime import datetime
 from krtc import KerberosTicket

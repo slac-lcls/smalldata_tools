@@ -4,7 +4,6 @@ import copy
 import numpy as np
 import time
 import h5py
-import tables
 from matplotlib import pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib import gridspec

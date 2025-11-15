@@ -22,7 +22,11 @@ import subprocess
 import socket
 from pathlib import Path
 from scipy import sparse
-import tables
+
+try:
+    import tables
+except ModuleNotFoundError:
+    print("Cannot use tables - must use h5py.")
 from matplotlib import gridspec
 from pylab import ginput
 from matplotlib import pyplot as plt

@@ -1,7 +1,6 @@
 import logging
 import numpy as np
 from dataclasses import dataclass
-from future.utils import iteritems
 from abc import ABCMeta, abstractmethod
 
 logger = logging.getLogger(__name__)
@@ -102,12 +101,12 @@ class DetObjectFunc(object):
             self.__dict__[key] = kwargs[key]
 
     def setFromDet(self, det):
-        for k, sfunc in iteritems(self.__dict__):
+        for k, sfunc in self.__dict__.items():
             if isinstance(sfunc, DetObjectFunc):
                 sfunc.setFromDet(det)  # pass parameters from det (rms, geometry, .....)
 
     def setFromFunc(self, parentFunc=None):
-        for k, sfunc in iteritems(self.__dict__):
+        for k, sfunc in self.__dict__.items():
             if isinstance(sfunc, DetObjectFunc):
                 sfunc.setFromFunc(
                     self
@@ -145,7 +144,7 @@ class DetObjectFunc(object):
             }
         )
         remKeys = [key for key in self.__dict__ if (key not in parList)]
-        for key, value in iteritems(parList):
+        for key, value in parList.items():
             funcPars["%s_%s" % (self._name, key)] = value
         if self._debug:
             print("DEBUG: keys which are not parameters:", self._name, remKeys)

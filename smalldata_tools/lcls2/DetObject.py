@@ -5,7 +5,6 @@ import logging
 from psana.pscalib.calib.MDBWebUtils import calib_constants
 from smalldata_tools.common.detector_base import DetObjectFunc, Event
 from smalldata_tools.utilities import cm_epix
-from future.utils import iteritems
 from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
@@ -37,6 +36,7 @@ def DetObject(srcName, run, **kwargs):
         "archon": ArchonObject,
         "jungfrau": JungfrauObject,
         "axis": SimpleCameraObject,
+        "generic_container": GenericContainerObject,
     }
 
     cls = detector_classes[det._dettype]
@@ -104,7 +104,7 @@ class DetObjectClass(object):
             parList.update(
                 {
                     "%s__%s" % (sf._name, key): value
-                    for key, value in iteritems(sfPars)
+                    for key, value in sfPars.items()
                     if (
                         key[0] != "_"
                         and isinstance(value, (str, int, float, np.ndarray, tuple))
@@ -240,6 +240,92 @@ class NullDetObject:
         Do nothing, as this is a null object.
         """
         pass
+
+
+class GenericContainerObject(DetObjectClass):
+    def __init__(self, det, run, **kwargs):
+        super().__init__(det, run, **kwargs)
+        self._epicsinfo = run.epicsinfo
+        self._stashed_run = run
+
+        self._is_tiled_camera = False
+        self._veto_fields = ["TypeId", "Version", "config"]
+        self._searched_for_calib = False
+
+        if hasattr(self.det, "xtc1dump"):
+            # Container is a generic coming from an XTC1 to XTC2 conversion
+            self._data_field, self._sub_fields = self.get_fields("xtc1dump")
+        else:
+            raise RuntimeError(
+                "Currently only xtc1-xtc2 GenericContainers are supported."
+            )
+
+        if "calib" in self._sub_fields:
+            # We'll say that this is a camera-type generic
+            self._is_tiled_camera = True
+            self.ped = None
+            self.gain = None
+            self.mask = None
+            self.cmask = None
+            self.rms = None
+
+            self.ix = None
+            self.iy = None
+            self.x = None
+            self.y = None
+
+    def getData(self, evt):
+        super().getData(evt)
+        if not self._searched_for_calib:
+            for name, name0 in self._epicsinfo:
+                det = self._stashed_run.Detector(name)
+                if self._name in name:
+                    dgrams = det._env_store.env_managers[0].dgrams
+                    for dgram in dgrams:
+                        raw = dgram.epics[0].raw
+                        attrs = vars(raw)
+                        for attr_name in attrs:
+                            if "pedestals" in attr_name:
+                                self.ped = getattr(raw, attr_name)
+                            if "gain" in attr_name:
+                                self.gain = getattr(raw, attr_name)
+                            if "mask" in attr_name:
+                                self.mask = getattr(raw, attr_name)
+                                self.cmask = self.mask
+                            if "pixel_index_map" in attr_name:
+                                index_map = getattr(raw, attr_name)
+                                self.ix = index_map[..., 0]
+                                self.iy = index_map[..., 1]
+                            if "pixel_position" in attr_name:
+                                pixel_pos = getattr(raw, attr_name)
+                                self.x = pixel_pos[..., 0]
+                                self.y = pixel_pos[..., 1]
+                    self._searched_for_calib = True
+                    break
+
+        if self._is_tiled_camera:
+            # We save calibrated data using the conversion process
+            # No need to do anything else
+            self.evt.dat = self.det.xtc1dump.calib(evt)
+
+    def get_fields(self, top_field):
+        """
+        Parameters
+        ----------
+        Top field: str
+            Usually 'fex' or 'raw'
+        """
+        # Not ideal duplicating this here.... But don't want to inherit
+        # from default detector directly
+        top_field_obj = getattr(self.det, top_field)
+        if top_field_obj is None:
+            return top_field_obj, None
+        fields = [
+            field
+            for field in dir(top_field_obj)
+            if (field[0] != "_" and field not in self._veto_fields)
+        ]
+        return top_field_obj, fields
 
 
 class CameraObject(DetObjectClass):

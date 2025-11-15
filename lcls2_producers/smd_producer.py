@@ -36,9 +36,16 @@ logger.setLevel(
 
 if rank == 0:
     logger.info(f"MPI size: {size}")
-    logger.info(
-        "psana conda environment is {0}".format(os.environ["CONDA_DEFAULT_ENV"])
-    )
+    if os.getenv("CONDA_DEFAULT_ENV") is not None:
+        logger.info(
+            "psana conda environment is {0}".format(os.environ["CONDA_DEFAULT_ENV"])
+        )
+    else:
+        spack_env = os.getenv("SPACK_ENV")
+        if spack_env is not None:
+            logger.info(f"psana spack environment is {spack_env}")
+        else:
+            logger.info("Could not determine what psana environment is in use.")
 
 
 # DEFINE DETECTOR AND ADD ANALYSIS FUNCTIONS
@@ -55,8 +62,10 @@ def define_dets(run, det_list):
     wfs_svd_args = {}
     droplet_args = {}
     azav_args = {}
+    azav_pyfai_args = {}
     polynomial_args = {}
     sum_algo_args = {}
+    pressio_compression_args = {}
 
     # Get the functions arguments from the production config
     if "getROIs" in dir(config):
@@ -75,10 +84,14 @@ def define_dets(run, det_list):
         droplet_args = config.get_droplet(run)
     if "get_azav" in dir(config):
         azav_args = config.get_azav(run)
+    if "get_azav_pyfai" in dir(config):
+        azav_pyfai_args = config.get_azav_pyfai(run)
     if "get_polynomial_correction" in dir(config):
         polynomial_args = config.get_polynomial_correction(run)
     if "get_sum_algos" in dir(config):
         sum_algo_args = config.get_sum_algos(run)
+    if "get_pressio_compression" in dir(config):
+        pressio_compression_args = config.get_pressio_compression(run)
 
     dets = []
 
@@ -99,6 +112,11 @@ def define_dets(run, det_list):
         else:
             det = DetObject(detname, thisrun, common_mode=common_mode)
         logger.debug(f"Instantiated det {detname}: {det}")
+
+        #             **** Compression MUST be the first operation ****             #
+        # It is "transparent" in that it just compresses then decompresses the data #
+        if detname in pressio_compression_args:
+            det.addFunc(pressioCompressDecompress(**pressio_compression_args[detname]))
 
         # HSD need special treatment due to their data structure.
         # TO REVIEW / REVISE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -126,6 +144,9 @@ def define_dets(run, det_list):
         ####################################
         if detname in azav_args:
             det.addFunc(azimuthalBinning(**azav_args[detname]))
+
+        if detname in azav_pyfai_args:
+            det.addFunc(azav_pyfai(**azav_pyfai_args[detname]))
 
         if detname in rois_args:
             # ROI extraction
@@ -233,6 +254,10 @@ def define_dets(run, det_list):
 
         if sum_algo_args == {}:
             # Store calib by default even if algos. dictionary not defined
+            # NOTE: This can cause issues if you are relying on it for sums, and have
+            #       added a waveform PV detector (like a QADC) to the detnames list.
+            #       If this is causing issues, the simple fix is just to define the
+            #       sum algorithms in the config file explicitly
             det.storeSum(sumAlgo="calib")
         else:
             # Add `all` algorithms
@@ -287,8 +312,10 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.smd_svd import SvdFit
 from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
+from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
 
 import psplot
 from psmon import publish
@@ -390,6 +417,12 @@ parser.add_argument(
     action="store_true",
     default=False,
 )
+parser.add_argument(
+    "--psdm_dir",
+    help="Override SIT_PSDM_DATA regardless of environment variables set.",
+    type=str,
+    default="",
+)
 
 args = parser.parse_args()
 
@@ -484,53 +517,61 @@ onS3DF = False
 useFFB = False
 xtc_files = []
 
-if hostname.find("sdf") >= 0:
-    logger.debug("On S3DF")
-    onS3DF = True
-    if "ffb" in PSDM_BASE.as_posix():
-        useFFB = True
-        # wait for files to appear
-        nFiles = 0
-        n_wait = 0
-        max_wait = 20  # 10s wait per cycle.
-        waitFilesStart = datetime.now()
-        while nFiles == 0:
-            if n_wait > max_wait:
-                raise RuntimeError(
-                    "Waited {str(n_wait*10)}s, still no files available. Giving up."
-                )
-            xtc_files = get_xtc_files(PSDM_BASE, exp, run)
-            nFiles = len(xtc_files)
-            if nFiles == 0:
-                if rank == 0:
-                    print(
-                        f"We have no xtc files for run {run} in {exp} in the FFB system, "
-                        "we will wait for 10 second and check again."
+if not args.psdm_dir:
+    if hostname.find("sdf") >= 0:
+        logger.debug("On S3DF")
+        onS3DF = True
+        if "ffb" in PSDM_BASE.as_posix():
+            useFFB = True
+            # wait for files to appear
+            nFiles = 0
+            n_wait = 0
+            max_wait = 20  # 10s wait per cycle.
+            waitFilesStart = datetime.now()
+            while nFiles == 0:
+                if n_wait > max_wait:
+                    raise RuntimeError(
+                        "Waited {str(n_wait*10)}s, still no files available. Giving up."
                     )
-                n_wait += 1
-                time.sleep(10)
-        waitFilesEnd = datetime.now()
-        if rank == 0:
-            print(f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds")
+                xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+                nFiles = len(xtc_files)
+                if nFiles == 0:
+                    if rank == 0:
+                        print(
+                            f"We have no xtc files for run {run} in {exp} in the FFB system, "
+                            "we will wait for 10 second and check again."
+                        )
+                    n_wait += 1
+                    time.sleep(10)
+            waitFilesEnd = datetime.now()
+            if rank == 0:
+                print(
+                    f"Files appeared after {str(waitFilesEnd-waitFilesStart)} seconds"
+                )
 
-    xtc_files = get_xtc_files(PSDM_BASE, exp, run)
-    if len(xtc_files) == 0:
-        raise RuntimeError(
-            f"We have no xtc files for run {run} in {exp} in the offline system."
-        )
+        xtc_files = get_xtc_files(PSDM_BASE, exp, run)
+        if len(xtc_files) == 0:
+            raise RuntimeError(
+                f"We have no xtc files for run {run} in {exp} in the offline system."
+            )
+    else:
+        logger.warning("On an unknow system, things may get weird.")
 else:
-    logger.warning("On an unknow system, things may get weird.")
+    logger.info(f"Requested data be found at: {args.psdm_dir}")
 
 # Get output file, check if we can write to it
 h5_f_name = get_sd_file(args.directory, exp, hutch)
 
 # Create data source.
 datasource_args = {"exp": exp, "run": int(run)}
-if useFFB:
-    datasource_args["live"] = True
+if not args.psdm_dir:
+    if useFFB:
+        datasource_args["live"] = True
 
-if rank == 0:
-    logger.info("Opening the data source:")
+    if rank == 0:
+        logger.info("Opening the data source:")
+else:
+    datasource_args["dir"] = args.psdm_dir
 if args.nevents != 0:
     datasource_args["max_events"] = args.nevents
 
@@ -573,6 +614,9 @@ if intg_main is not None and intg_main != "":
 
 if args.psplot_live_mode:
     datasource_args["psmon_publish"] = publish
+
+if hasattr(config, "xdetectors") and config.xdetectors:
+    datasource_args["xdetectors"] = config.xdetectors
 
 ds = psana.DataSource(**datasource_args)
 
@@ -976,6 +1020,28 @@ if rank == h5_rank:
         dset_name = pv if alias is None else alias
         dset = h5_for_arch.create_dataset(f"epics_archiver/{dset_name}", data=data)
         logger.debug(f"Saved {pv} from archiver data.")
+    h5_for_arch.close()
+
+MPI.COMM_WORLD.Barrier()
+if ds.unique_user_rank():
+    import h5py
+
+    h5_for_arch = h5py.File(h5_f_name, "a")
+
+    def write_config(file_handle, base_name, cfg_dict):
+        for key, val in cfg_dict.items():
+            if isinstance(val, dict):
+                file_handle.create_group(f"{base_name}/{key}")
+                write_config(file_handle, f"{base_name}/{key}", val)
+            else:
+                file_handle.create_dataset(f"{base_name}/{key}", data=val)
+
+    if "UserDataCfg" not in h5_for_arch.keys():
+        # This guard is necessary for serial datasource when running interactively
+        h5_for_arch.create_group("UserDataCfg")
+        write_config(h5_for_arch, "UserDataCfg", Config["UserDataCfg"])
+
+    h5_for_arch.close()
 
 
 end_prod_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
