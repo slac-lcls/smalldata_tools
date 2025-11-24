@@ -301,12 +301,42 @@ class GenericContainerObject(DetObjectClass):
                                 self.x = pixel_pos[..., 0]
                                 self.y = pixel_pos[..., 1]
                     self._searched_for_calib = True
+                    self.reprocessFuncs()
                     break
 
         if self._is_tiled_camera:
             # We save calibrated data using the conversion process
             # No need to do anything else
             self.evt.dat = self.det.xtc1dump.calib(evt)
+
+    def addFunc(self, func):
+        try:
+            # Some of these may fail for these containers because mask and such
+            # is not available until after first event. We therefor will reprocess
+            # afterwards
+            super().addFunc(func)
+        except:
+            ...
+
+    def reprocessFuncs(self):
+        """Rerun setup for DetObjectFuncs.
+
+        DetObjectFuncs may need reprocessing for these containers because certain
+        information that is available for all other detectors at Configure/BeginRun
+        is no available until after the first event. Rather than rework everything for
+        this edge-case, the edge-case will just catch errors and rerun the config.
+        """
+        for func in [
+            self.__dict__[k]
+            for k in self.__dict__
+            if isinstance(self.__dict__[k], DetObjectFunc)
+        ]:
+            func.setFromDet(self)
+            try:
+                func.setFromFunc()
+            except:
+                print("Failed to pass parameters to children of ", func._name)
+
 
     def get_fields(self, top_field):
         """
