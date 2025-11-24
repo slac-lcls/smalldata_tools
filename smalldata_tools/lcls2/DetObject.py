@@ -337,7 +337,6 @@ class GenericContainerObject(DetObjectClass):
             except:
                 print("Failed to pass parameters to children of ", func._name)
 
-
     def get_fields(self, top_field):
         """
         Parameters
