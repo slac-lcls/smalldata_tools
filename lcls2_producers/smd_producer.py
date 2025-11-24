@@ -322,7 +322,7 @@ from psmon import publish
 
 
 # Constants
-HUTCHES = ["TMO", "RIX", "UED", "MFX"]
+HUTCHES = ["TMO", "RIX", "UED", "MFX", "XPP"]
 
 S3DF_BASE = Path("/sdf/data/lcls/ds/")
 FFB_BASE = Path("/cds/data/drpsrcf/")
