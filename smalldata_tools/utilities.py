@@ -1160,25 +1160,93 @@ def KdeCuts(values, bandwidth="scott", percentile=[0.1, 99.9], nBins=1000):
     return retDict
 
 
-def postRunTable(
-    runtable_data, experiment, run, url="https://pswww.slac.stanford.edu/ws-auth/lgbk/"
-):
-    ws_url = url + "/run_control/{0}/ws/add_run_params".format(experiment)
-    print("URL:", ws_url)
-    user = experiment[:3] + "opr"
-    elogPostFile = "/sdf/group/lcls/ds/tools/forElogPost.txt"
-    with open(elogPostFile, "r") as reader:
-        answer = reader.readline()
-    r = requests.post(
-        ws_url,
-        params={"run_num": run},
-        json=runtable_data,
-        auth=HTTPBasicAuth(experiment[:3] + "opr", answer[:-1]),
-    )
-    # we might need to use this for non=current expetiments. Currently does not work in ARP
-    # krbheaders = KerberosTicket("HTTP@" + urlparse(ws_url).hostname).getAuthHeaders()
-    # r = requests.post(ws_url, headers=krbheaders, params={"run_num": args.run}, json=runtable_data)
-    print(r)
+def get_elog_active_expmt(hutch: str, *, endstation: int = 0) -> Optional[str]:
+    """Get the current active experiment for a hutch.
+
+    This function is one of two functions to manage the HTTP request independently.
+    This is because it does not require an authorization object, and its result
+    is needed for the generic function `elog_http_request` to work properly.
+
+    Args:
+        hutch (str): The hutch to get the active experiment for.
+
+        endstation (int): The hutch endstation to get the experiment for. This
+            should generally be 0.
+    """
+
+    base_url: str = "https://pswww.slac.stanford.edu/ws/lgbk/lgbk"
+    endpoint: str = "ws/activeexperiment_for_instrument_station"
+    url: str = f"{base_url}/{endpoint}"
+    params: dict[str, str] = {"instrument_name": hutch, "station": f"{endstation}"}
+    resp: requests.models.Response = requests.get(url, params)
+    if resp.status_code > 300:
+        logger.error(
+            f"Error getting current experiment!\n\t\tIncorrect hutch: '{hutch}'?"
+        )
+        return None
+    if resp.json()["success"]:
+        return resp.json()["value"]["name"]
+    else:
+        msg: str = resp.json()["error_msg"]
+        logger.error(f"Error getting current experiment! Err: {msg}")
+        return None
+
+
+def postRunTable(runtable_data: dict, experiment: str, run: str):
+    base_url_auth = "https://pswww.slac.stanford.edu/ws-auth/lgbk/"
+    base_url_jwt: str = "https://pswww.slac.stanford.edu/ws-jwt/lgbk/lgbk"
+    endpoint: str = f"run_control/{experiment}/ws/add_run_params"
+
+    full_url_auth: str = f"{base_url_auth}/{endpoint}"
+    full_url_jwt: str = f"{base_url_jwt}/{endpoint}"
+
+    auth_token: Optional[str] = os.getenv("Authorization")
+    resp: requests.models.Response
+    if auth_token:
+        # Use token-based first
+        # This works for active and inactive experiments
+        auth_jwt: dict[str, str] = {
+            "Authorization": auth_token,
+        }
+        resp = _postRunTable(runtable_data, run, full_url_jwt, auth_jwt)
+    else:
+        # No token - so ran from command line
+        if experiment == get_elog_active_expmt(hutch=experiment[:3]):
+            # We have an active experiment, so can use operator authentication
+            auth_opr: HTTPBasicAuth = getElogBasicAuth(exp=experiment)
+            resp = _postRunTable(runtable_data, run, full_url_auth, auth_opr)
+        else:
+            # Not analyzing an active experiment. We'll attempt kerberos
+            auth_token = request_arp_token(exp=experiment, lifetime=10)
+            if auth_token is None:
+                # No kerberos ticket. Out of luck
+                logger.warning("Cannot post run table.")
+                return None
+            auth_jwt = {"Authorization": auth_token}
+            resp = _postRunTable(runtable_data, run, full_url_jwt, auth_jwt)
+    logger.debug(resp)
+    return None
+
+
+def _postRunTable(
+    runtable_data: dict, run: str, url: str, auth: Union[dict, HTTPBasicAuth]
+) -> requests.models.Response:
+    resp: requests.models.Response
+    if isinstance(auth, dict):
+        resp = requests.post(
+            url,
+            params={"run_num": run},
+            json=runtable_data,
+            headers=auth,
+        )
+    else:
+        resp = requests.post(
+            url,
+            params={"run_num": run},
+            json=runtable_data,
+            auth=auth,
+        )
+    return resp
 
 
 ## function that chops the 64 bit time integer into soemthing a bit more realistic
@@ -1206,8 +1274,7 @@ def getElogBasicAuth(exp: str) -> HTTPBasicAuth:
     -------
     http_auth (HTTPBasicAuth) Authentication for eLog API.
     """
-    opr_name: str = f"{exp[:3]}opr"
-    hostname: str = socket.gethostname()
+    opr_name: str = f"{exp[:3]}opr".replace("dia", "mcc")
     auth_path: str = "/sdf/group/lcls/ds/tools/forElogPost.txt"
 
     with open(auth_path, "r") as f:
@@ -1353,3 +1420,46 @@ def get_calib_file(run, directory, f_end=".data"):
             f"No matching calibration file found for run {run} in directory {directory}."
         )
     return f"{directory}{background}"
+
+
+def request_arp_token(exp: str, lifetime: int = 300) -> Optional[str]:
+    """Request an ARP token via Kerberos endpoint.
+
+    A token is required for job submission.
+
+    Parameters
+    ----------
+    exp : str
+        The experiment to request the token for. All tokens are scoped to a single
+        experiment.
+
+    lifetime : int
+        The lifetime, in minutes, of the token. After the token expires, it can no
+        longer be used. The maximum time you can request is 480 minutes (i.e. 8 hours).
+
+    Returns
+    -------
+    token : str
+        The token that can be used for API requests.
+    """
+    from kerberos import GSSError  # type: ignore
+    from krtc import KerberosTicket  # type: ignore
+
+    try:
+        krbheaders: dict[str, str] = KerberosTicket(
+            "HTTP@pswww.slac.stanford.edu"
+        ).getAuthHeaders()
+    except GSSError:
+        logger.warning(
+            "Cannot proceed without credentials. Try running `kinit` from the command-line."
+        )
+        return None
+    base_url: str = "https://pswww.slac.stanford.edu/ws-kerb/lgbk/lgbk"
+    token_endpoint: str = (
+        f"{base_url}/{exp}/ws/generate_arp_token?token_lifetime={lifetime}"
+    )
+    resp: requests.models.Response = requests.get(token_endpoint, headers=krbheaders)
+    resp.raise_for_status()
+    token: str = resp.json()["value"]
+    formatted_token: str = f"Bearer {token}"
+    return formatted_token
