@@ -44,6 +44,7 @@ class dropletFunc(DetObjectFunc):
         self.threshold = kwargs.get("threshold", 5.0)
         self.thresholdLow = kwargs.get("thresholdLow", self.threshold)
         self.thresADU = kwargs.get("thresADU", None)
+        self.pixmax = kwargs.get("pixmax", None)
         self.useRms = kwargs.get("useRms", True)
         self.relabel = kwargs.get("relabel", True)
         self._mask = kwargs.get("mask", None)
@@ -117,6 +118,8 @@ class dropletFunc(DetObjectFunc):
         imgIn = img.copy()
         if self._mask is not None:
             imgIn[self._mask == 0] = 0
+        if self.pixmax is not None:
+            imgIn[imgIn > np.ones_like(self._mask).astype(float) * self.pixmax] = 0
         self.applyThreshold(imgIn, donut, invert, low)  # modifies in place
         return imgIn
 
