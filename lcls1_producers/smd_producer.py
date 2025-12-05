@@ -468,7 +468,7 @@ else:
     epicsPVlist = ds.env().epicsStore().aliases()
 if (args.full or args.epicsAll) and len(epicsPVlist)>0:
     logger.debug('adding all epicsPVs....')
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+    default_dets.append(epicsDetector(PVlist=epicsPVlist, name='epicsAll'))
 #save specified list of PVs once/run, not nothing has been passed, save all.
 if len(config.epicsOncePV) > 0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
@@ -724,6 +724,8 @@ if args.postRuntable and ds.rank==0:
         runtable_data["SmallData%s"%locStr]="default"
     else:
         runtable_data["SmallData%s"%locStr]="done"
+    if args.full:
+        runtable_data["SmallDataFull%s"%locStr]="done"
     time.sleep(5)
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
     print('URL:',ws_url)
