@@ -74,9 +74,7 @@ def addArchiverData(det, data, ts):
         return data
     for i, pv in enumerate(det.missingPV):
         try:
-            (t, v) = arch.get_points(
-                pv, start=ts, end=ts + 30, two_lists=True, raw=True
-            )
+            t, v = arch.get_points(pv, start=ts, end=ts + 30, two_lists=True, raw=True)
         except Exception:
             continue  # Not in the archiver!
         #

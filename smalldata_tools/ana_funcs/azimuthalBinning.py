@@ -8,6 +8,7 @@ from smalldata_tools.common.detector_base import DetObjectFunc
 from mpi4py import MPI
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
 from smalldata_tools.common.shared_azav_cache import SharedAzavCache
+
 try:
     import psutil
 except Exception:
@@ -34,18 +35,20 @@ def _azav_debug(msg):
         print(f"[DEBUG] rank {rank} {msg}")
     sys.stdout.flush()
 
+
 def _rss_cur_mb():
     if psutil is None:
         return -1.0
     try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
     except Exception:
         return -1.0
+
 
 def _pss_cur_mb():
     if psutil is not None:
         try:
-            return psutil.Process(os.getpid()).memory_full_info().pss / (1024 ** 2)
+            return psutil.Process(os.getpid()).memory_full_info().pss / (1024**2)
         except Exception:
             pass
     try:
@@ -141,7 +144,9 @@ class azimuthalBinning(DetObjectFunc):
         self._det_name = getattr(
             det,
             "_name",
-            getattr(det, "alias", getattr(getattr(det, "det", None), "_det_name", "unknown")),
+            getattr(
+                det, "alias", getattr(getattr(det, "det", None), "_det_name", "unknown")
+            ),
         )
         if self._geom_id is not None or shared_geo is None or raw is None:
             return
@@ -224,13 +229,13 @@ class azimuthalBinning(DetObjectFunc):
         # if self._mask is None and det.mask is not None:
         #    setattr(self, '_mask', det.mask.astype(np.uint8))
         if det.x is not None:
-            #self.x = det.x.flatten() / 1e3
-            #self.y = det.y.flatten() / 1e3
+            # self.x = det.x.flatten() / 1e3
+            # self.y = det.y.flatten() / 1e3
             self.x = det.x.astype(np.float32, copy=False).ravel() / 1e3
             self.y = det.y.astype(np.float32, copy=False).ravel() / 1e3
             _azav_debug("azav setFromDet after x/y flatten")
             if det.z is not None:
-                #self.z = det.z.flatten() / 1e3
+                # self.z = det.z.flatten() / 1e3
                 self.z = det.z.astype(np.float32, copy=False).ravel() / 1e3
                 _azav_debug("azav setFromDet after z flatten")
             else:
@@ -285,8 +290,12 @@ class azimuthalBinning(DetObjectFunc):
         cache = self._shared_cache
         cache_enabled = cache is not None and cache.enabled
         shared_mem = cache.shared_mem if cache_enabled else None
-        shm_comm = getattr(shared_mem, "shm_comm", None) if shared_mem is not None else None
-        is_leader = getattr(shared_mem, "is_leader", False) if shared_mem is not None else False
+        shm_comm = (
+            getattr(shared_mem, "shm_comm", None) if shared_mem is not None else None
+        )
+        is_leader = (
+            getattr(shared_mem, "is_leader", False) if shared_mem is not None else False
+        )
         key = self._build_cache_key() if cache_enabled else None
         _azav_debug(f"azav cache_enabled: {cache_enabled}, key: {key is not None}")
 
@@ -296,10 +305,12 @@ class azimuthalBinning(DetObjectFunc):
             cached_corr = cache.get_if_present(key, "correction")
             cached_mask = cache.get_if_present(key, "mask")
             meta = cache.get_meta(key)
-            if cached_idxs is not None and cached_norm is not None and cached_corr is not None:
-                _azav_debug(
-                    f"azav shared cache hit det={self._det_name or 'unknown'}"
-                )
+            if (
+                cached_idxs is not None
+                and cached_norm is not None
+                and cached_corr is not None
+            ):
+                _azav_debug(f"azav shared cache hit det={self._det_name or 'unknown'}")
                 if cached_mask is not None:
                     self._mask = cached_mask.astype(bool)
                 self.Cake_idxs = cached_idxs
@@ -339,9 +350,9 @@ class azimuthalBinning(DetObjectFunc):
             self.xcen = float(self.xcen)
             self.ycen = float(self.ycen)
 
-        # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
-            (A, B, C) = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
-            (a, b, c) = (
+            # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
+            A, B, C = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
+            a, b, c = (
                 self.xcen + (self.dis_to_sam + self.z_off) * np.tan(ty),
                 float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
                 (self.dis_to_sam + self.z_off),
@@ -362,7 +373,9 @@ class azimuthalBinning(DetObjectFunc):
             self.msg("calculating phi...", cr=0)
             matrix_phi = np.arccos(
                 ((A**2 + C**2) * (y - b) - A * B * (x - a) + B * C * c)
-                / np.sqrt((A**2 + C**2) * (r**2 - (A * (x - a) + B * (y - b) - C * c) ** 2))
+                / np.sqrt(
+                    (A**2 + C**2) * (r**2 - (A * (x - a) + B * (y - b) - C * c) ** 2)
+                )
             )
             idx = (y >= self.ycen) & (np.isnan(matrix_phi))
             matrix_phi[idx] = 0
@@ -419,7 +432,9 @@ class azimuthalBinning(DetObjectFunc):
                 print(
                     "pixels will underflow, will put all pixels beyond range into first bin in phi"
                 )
-                self.idxphi[self.idxphi < 0] = 0  # put all 'underflow' bins in first bin.
+                self.idxphi[self.idxphi < 0] = (
+                    0  # put all 'underflow' bins in first bin.
+                )
             if self.idxphi.max() >= self.nphi:
                 print(
                     "pixels will overflow, will put all pixels beyond range into first bin in phi"
@@ -428,8 +443,8 @@ class azimuthalBinning(DetObjectFunc):
                     0  # put all 'overflow' bins in first bin.
                 )
 
-        # print('DEBUG phi ',self.phiVec)
-        # print('DEBUG phi ',np.unique(self.idxphi))
+            # print('DEBUG phi ',self.phiVec)
+            # print('DEBUG phi ',np.unique(self.idxphi))
 
             # include geometrical corrections
             geom = (self.dis_to_sam + self.z_off) / r
@@ -470,7 +485,9 @@ class azimuthalBinning(DetObjectFunc):
             )
             self.Cake_idxs[self._mask.ravel()] = 0
             # send the masked ones in the first bin
-            self.Cake_Npixel = np.bincount(self.Cake_idxs, minlength=self.nq * self.nphi)
+            self.Cake_Npixel = np.bincount(
+                self.Cake_idxs, minlength=self.nq * self.nphi
+            )
             # self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
             self.Cake_norm = np.reshape(self.Cake_Npixel, (self.nphi, self.nq))
             # /self.correction1D
@@ -489,7 +506,9 @@ class azimuthalBinning(DetObjectFunc):
                 rbin = np.array(self.rbin)
                 if rbin.size == 1:
                     if rank == 0 and self._debug:
-                        print("q-bin size has been given: rmax: ", r_max, " rbin ", rbin)
+                        print(
+                            "q-bin size has been given: rmax: ", r_max, " rbin ", rbin
+                        )
                     # self.rbins = np.arange(0,q_max+rbin,rbin)
                     self.rbins = np.arange(r_min - rbin, r_max + rbin, rbin)
                 else:
@@ -522,8 +541,8 @@ class azimuthalBinning(DetObjectFunc):
                 # /self.correction1D
                 # print('nrend ',self.nr, self.Cake_idxs.max())
 
-        # last_idx = self.idxq.max()
-        # print("last index",last_idx)
+            # last_idx = self.idxq.max()
+            # print("last index",last_idx)
             self.msg("...done")
 
             self.header = "# Parameters for data reduction\n"
@@ -573,13 +592,25 @@ class azimuthalBinning(DetObjectFunc):
                     key, "mask", spec["mask"][0], spec["mask"][1], zero_init=False
                 )
                 shared_idxs, _ = cache.get_or_allocate(
-                    key, "cake_idxs", spec["cake_idxs"][0], spec["cake_idxs"][1], zero_init=False
+                    key,
+                    "cake_idxs",
+                    spec["cake_idxs"][0],
+                    spec["cake_idxs"][1],
+                    zero_init=False,
                 )
                 shared_norm, _ = cache.get_or_allocate(
-                    key, "cake_norm", spec["cake_norm"][0], spec["cake_norm"][1], zero_init=False
+                    key,
+                    "cake_norm",
+                    spec["cake_norm"][0],
+                    spec["cake_norm"][1],
+                    zero_init=False,
                 )
                 shared_corr, _ = cache.get_or_allocate(
-                    key, "correction", spec["correction"][0], spec["correction"][1], zero_init=False
+                    key,
+                    "correction",
+                    spec["correction"][0],
+                    spec["correction"][1],
+                    zero_init=False,
                 )
                 if is_leader:
                     shared_mask[:] = self._mask

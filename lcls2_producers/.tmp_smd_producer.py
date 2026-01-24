@@ -321,7 +321,6 @@ from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
 import psplot
 from psmon import publish
 
-
 # Constants
 HUTCHES = ["TMO", "RIX", "UED", "MFX", "XPP"]
 
@@ -446,6 +445,7 @@ def _debug_event(evt_num):
     if DEBUG_EVERY > 0 and evt_num % DEBUG_EVERY == 0:
         return True
     return False
+
 
 logger.debug("Args to be used for small data run: {0}".format(args))
 
@@ -611,9 +611,7 @@ if intg_main is not None and intg_main != "":
     intg_ds_end = time.perf_counter()
     if DEBUG_TIMING and rank == 0:
         _debug_print(
-            "DataSource(intg check) init {:.6f}s".format(
-                intg_ds_end - intg_ds_start
-            )
+            "DataSource(intg check) init {:.6f}s".format(intg_ds_end - intg_ds_start)
         )
     intg_run_start = time.perf_counter()
     thisrun = next(ds.runs())
@@ -1017,9 +1015,7 @@ for evt_num, evt in enumerate(event_iter):
     smd_end = time.perf_counter()
     if debug_evt:
         _debug_print(
-            "evt {} small_data.event {:.6f}s".format(
-                evt_num, smd_end - smd_start
-            )
+            "evt {} small_data.event {:.6f}s".format(evt_num, smd_end - smd_start)
         )
         if evt_num == 0:
             _debug_print(
@@ -1027,9 +1023,7 @@ for evt_num, evt in enumerate(event_iter):
                     time.perf_counter() - job_perf_start
                 )
             )
-        _debug_print(
-            "evt {} total {:.6f}s".format(evt_num, smd_end - evt_start)
-        )
+        _debug_print("evt {} total {:.6f}s".format(evt_num, smd_end - evt_start))
 
     # the ARP will pass run & exp via the environment, if I see that info, the post updates
     if (
@@ -1070,9 +1064,7 @@ if not ds.is_srv():
     sum_end = time.perf_counter()
     if DEBUG_TIMING and ds.unique_user_rank():
         _debug_print(
-            "summary sums {:.6f}s dets={}".format(
-                sum_end - sum_start, len(dets)
-            )
+            "summary sums {:.6f}s dets={}".format(sum_end - sum_start, len(dets))
         )
 
     if ds.unique_user_rank():

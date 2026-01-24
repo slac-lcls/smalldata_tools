@@ -5,7 +5,6 @@ import logging
 from psmon import publish
 from psmon.plots import Image, XYPlot, MultiPlot
 
-
 logger = logging.getLogger(__name__)
 
 

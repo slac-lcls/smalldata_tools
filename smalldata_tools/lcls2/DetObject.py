@@ -3,6 +3,7 @@ import copy
 import time
 import numpy as np
 import logging
+
 try:
     import psutil
 except Exception:
@@ -18,13 +19,15 @@ import psana
 
 logger = logging.getLogger(__name__)
 
+
 def _rss_cur_mb():
     if psutil is None:
         return -1.0
     try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
     except Exception:
         return -1.0
+
 
 def _detobj_debug_enabled():
     return os.environ.get("SMD_DEBUG_DETOBJ", "0") == "1"
@@ -34,9 +37,7 @@ def DetObject(srcName, run, **kwargs):
     if rank == 0:
         logger.info(f"Getting the detector for: {srcName}")
     det = None
-    print(
-        f"[DEBUG] rank {rank} DetObject det={srcName} rss_cur_mb={_rss_cur_mb():.2f}"
-    )
+    print(f"[DEBUG] rank {rank} DetObject det={srcName} rss_cur_mb={_rss_cur_mb():.2f}")
     try:
         det = run.Detector(srcName)
         print(
@@ -405,6 +406,7 @@ class CameraObject(DetObjectClass):
                 )
             )
             det_last = now
+
         self._common_mode_list = [0, -1, 30]  # none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:

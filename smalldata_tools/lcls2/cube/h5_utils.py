@@ -249,10 +249,8 @@ def add_dict_to_h5(
             if key in parent:
                 if add_at_index is not None:
                     # TODO: Make function to add data at specified index
-                    raise NotImplementedError(
-                        "Adding data at a specific index is not \
-                                               implemented yet."
-                    )
+                    raise NotImplementedError("Adding data at a specific index is not \
+                                               implemented yet.")
                 else:
                     # Append data to existing dataset
                     append_to_dataset(parent[key], value)
