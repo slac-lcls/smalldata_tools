@@ -1,7 +1,12 @@
 import os
 import copy
+import time
 import numpy as np
 import logging
+try:
+    import psutil
+except Exception:
+    psutil = None
 from psana.pscalib.calib.MDBWebUtils import calib_constants
 from smalldata_tools.common.detector_base import DetObjectFunc, Event
 from smalldata_tools.utilities import cm_epix
@@ -13,13 +18,30 @@ import psana
 
 logger = logging.getLogger(__name__)
 
+def _rss_cur_mb():
+    if psutil is None:
+        return -1.0
+    try:
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+    except Exception:
+        return -1.0
+
+def _detobj_debug_enabled():
+    return os.environ.get("SMD_DEBUG_DETOBJ", "0") == "1"
+
 
 def DetObject(srcName, run, **kwargs):
     if rank == 0:
         logger.info(f"Getting the detector for: {srcName}")
     det = None
+    print(
+        f"[DEBUG] rank {rank} DetObject det={srcName} rss_cur_mb={_rss_cur_mb():.2f}"
+    )
     try:
         det = run.Detector(srcName)
+        print(
+            f"[DEBUG] rank {rank} DetObject run.Detector det={srcName} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
     except:
         if rank == 0:
             logger.warning(f"failed to make detector for {srcName}: {run.detnames}")
@@ -48,6 +70,7 @@ class DetObjectClass(object):
         self, det, run, **kwargs
     ):  # name=None, common_mode=None, applyMask=0):
         self.det = det
+        detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
         self._detid = det._detid
         self._name = kwargs.get("name", self.det._det_name)  # srcName)
 
@@ -56,6 +79,9 @@ class DetObjectClass(object):
         self.applyMask = kwargs.get("applyMask", 0)
 
         self.dataAccessTime = 0.0
+        print(
+            f"[DEBUG] rank {rank} DetObject DetObjectClass __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
 
     def params_as_dict(self):
         """Returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
@@ -360,6 +386,25 @@ class GenericContainerObject(DetObjectClass):
 class CameraObject(DetObjectClass):
     def __init__(self, det, run, **kwargs):
         super(CameraObject, self).__init__(det, run, **kwargs)
+        det_debug = _detobj_debug_enabled()
+        detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
+        det_t0 = time.perf_counter() if det_debug else None
+        det_last = det_t0
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
+
+        def _dbg(label):
+            nonlocal det_last
+            if not det_debug:
+                return
+            now = time.perf_counter()
+            print(
+                "[DEBUG Rank{}] DetObject det={} {} delta={:.6f}s total={:.6f}s".format(
+                    rank, detname, label, now - det_last, now - det_t0
+                )
+            )
+            det_last = now
         self._common_mode_list = [0, -1, 30]  # none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -385,20 +430,36 @@ class CameraObject(DetObjectClass):
             self.ped = det.raw._pedestals()
         except:
             self.ped = None
+        _dbg("pedestals")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject pedestals det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         try:
             self.rms = det.raw._rms()
         except:
             self.rms = None
+        _dbg("rms")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject rms det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         try:
             self.gain = det.raw._gain()
         except:
             self.gain = None
+        _dbg("gain")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject gain det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         try:
             self.mask = det.raw._mask(calib=False, status=True, edges=True)
             self.cmask = det.raw._mask(calib=True, status=True, edges=True)
         except:
             self.mask = None
             self.cmask = None
+        _dbg("mask")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject mask det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         # self.det.calibconst['pop_rbfs'][1] return meta data for the calib data.
         # self.rms = self.det.rms(run)
         # self.gain_mask = self.det.gain_mask(run)
@@ -407,6 +468,10 @@ class CameraObject(DetObjectClass):
         self.local_gain = None
         self._getImgShape()
         self._gainSwitching = False
+        _dbg("imgshape")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject imgshape det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         try:
             self.x, self.y, self.z = det.raw._pixel_coords(do_tilt=True, cframe=0)
             self.x = self.x.squeeze()
@@ -414,6 +479,10 @@ class CameraObject(DetObjectClass):
             self.z = self.z.squeeze()
         except:
             self.x, self.y, self.z = None, None, None
+        _dbg("pixel_coords")
+        print(
+            f"[DEBUG] rank {rank} DetObject CameraObject pixel_coords det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
 
     def getData(self, evt):
         super(CameraObject, self).getData(evt)
@@ -456,6 +525,26 @@ class TiledCameraObject(CameraObject):
     def __init__(self, det, run, **kwargs):
         # super().__init__(det,env,run, **kwargs)
         super(TiledCameraObject, self).__init__(det, run, **kwargs)
+        det_debug = _detobj_debug_enabled()
+        detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
+        det_t0 = time.perf_counter() if det_debug else None
+        det_last = det_t0
+        print(
+            f"[DEBUG] rank {rank} DetObject TiledCameraObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
+
+        def _dbg(label):
+            nonlocal det_last
+            if not det_debug:
+                return
+            now = time.perf_counter()
+            print(
+                "[DEBUG Rank{}] DetObject det={} {} delta={:.6f}s total={:.6f}s".format(
+                    rank, detname, label, now - det_last, now - det_t0
+                )
+            )
+            det_last = now
+
         try:
             self.ix, self.iy = det.raw._pixel_coord_indexes()
         except:
@@ -465,9 +554,11 @@ class TiledCameraObject(CameraObject):
                 )
             self.ix = self.x  # need to change this so ix & iy are integers!
             self.iy = self.y
+        _dbg("pixel_coord_indexes")
         self.ix = self.ix.squeeze()
         self.iy = self.iy.squeeze()
         self._needsGeo = True  # FIX ME: not sure it should be here.
+        _dbg("tiled_finalize")
 
     def getData(self, evt):
         super(TiledCameraObject, self).getData(evt)
@@ -683,10 +774,45 @@ class JungfrauObject(TiledCameraObject):
         self.pixelsize = [75e-6]
         self.isGainswitching = True
 
+        det_debug = _detobj_debug_enabled()
+        detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
+        det_t0 = time.perf_counter() if det_debug else None
+        det_last = det_t0
+        print(
+            f"[DEBUG] rank {rank} DetObject JungfrauObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
+
+        def _dbg(label):
+            nonlocal det_last
+            if not det_debug:
+                return
+            now = time.perf_counter()
+            print(
+                "[DEBUG Rank{}] DetObject det={} {} delta={:.6f}s total={:.6f}s".format(
+                    rank, detname, label, now - det_last, now - det_t0
+                )
+            )
+            det_last = now
+
         try:
+            img_start = time.perf_counter() if det_debug else None
             self.imgShape = self.det.raw.image(run, self.ped[0]).shape
+            if det_debug:
+                now = time.perf_counter()
+                print(
+                    "[DEBUG Rank{}] DetObject det={} det.raw.image delta={:.6f}s total={:.6f}s".format(
+                        rank, detname, now - img_start, now - det_t0
+                    )
+                )
+            print(
+                f"[DEBUG] rank {rank} DetObject JungfrauObject det.raw.image det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+            )
         except:
             pass
+        _dbg("jungfrau_init")
+        print(
+            f"[DEBUG] rank {rank} DetObject JungfrauObject init done det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
+        )
         self._gainSwitching = True
         # self._common_mode_list.append()
 

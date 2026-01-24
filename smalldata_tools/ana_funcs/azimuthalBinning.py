@@ -2,14 +2,62 @@ import numpy as np
 import sys
 import time
 import h5py
+import os
 import smalldata_tools.utilities as util
 from smalldata_tools.common.detector_base import DetObjectFunc
 from mpi4py import MPI
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
+from smalldata_tools.common.shared_azav_cache import SharedAzavCache
+try:
+    import psutil
+except Exception:
+    psutil = None
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 mpiSize = comm.Get_size()
+
+
+def _azav_debug(msg):
+    if os.environ.get("SMD_DEBUG_AZAV_SHM", "0") != "1":
+        return
+    rss = _rss_cur_mb()
+    pss = _pss_cur_mb()
+    suffix = []
+    if rss >= 0:
+        suffix.append(f"rss_mb={rss:.2f}")
+    if pss >= 0:
+        suffix.append(f"pss_mb={pss:.2f}")
+    if suffix:
+        print(f"[DEBUG] rank {rank} {msg} " + " ".join(suffix))
+    else:
+        print(f"[DEBUG] rank {rank} {msg}")
+    sys.stdout.flush()
+
+def _rss_cur_mb():
+    if psutil is None:
+        return -1.0
+    try:
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+    except Exception:
+        return -1.0
+
+def _pss_cur_mb():
+    if psutil is not None:
+        try:
+            return psutil.Process(os.getpid()).memory_full_info().pss / (1024 ** 2)
+        except Exception:
+            pass
+    try:
+        with open("/proc/self/smaps_rollup", "r") as fh:
+            for line in fh:
+                if line.startswith("Pss:"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        return float(parts[1]) / 1024.0
+    except Exception:
+        pass
+    return -1.0
 
 
 class azimuthalBinning(DetObjectFunc):
@@ -65,6 +113,9 @@ class azimuthalBinning(DetObjectFunc):
         self.geomCorr = kwargs.pop("geomCorr", True)
         self.polCorr = kwargs.pop("polCorr", True)
         self.square = kwargs.pop("square", False)
+        self._shared_cache = kwargs.pop("shared_cache", None)
+        self._det_name = kwargs.pop("det_name", None)
+        self._geom_id = kwargs.pop("geom_id", None)
 
         center = kwargs.pop("center", None)
         if center is not None:
@@ -76,8 +127,87 @@ class azimuthalBinning(DetObjectFunc):
 
         if self._mask is not None:
             self._mask = np.asarray(self._mask, dtype=bool)
+        _azav_debug("azav initialized rss_cur_mb={:.2f}    ".format(_rss_cur_mb()))
+
+    def _init_shared_cache(self, det):
+        if self._shared_cache is not None:
+            return
+        raw = getattr(getattr(det, "det", None), "raw", None)
+        shared_geo = getattr(raw, "_shared_geo_cache", None)
+        shared_mem = getattr(shared_geo, "shared_mem", None)
+        if shared_mem is None:
+            return
+        self._shared_cache = SharedAzavCache(shared_mem=shared_mem)
+        self._det_name = getattr(
+            det,
+            "_name",
+            getattr(det, "alias", getattr(getattr(det, "det", None), "_det_name", "unknown")),
+        )
+        if self._geom_id is not None or shared_geo is None or raw is None:
+            return
+        try:
+            geotxt = None
+            calibconst = getattr(raw, "_calibconst", None)
+            if isinstance(calibconst, dict):
+                geotxt_entry = calibconst.get("geometry")
+                if geotxt_entry:
+                    geotxt = geotxt_entry[0]
+            if geotxt is None and getattr(raw, "_path_geo_default", None) is not None:
+                try:
+                    geotxt = raw._det_geotxt_default()
+                except Exception:
+                    geotxt = None
+            segnums = getattr(raw, "_segment_numbers", None)
+            self._geom_id = shared_geo.build_geom_id(geotxt, segnums, {"azav": True})
+        except Exception:
+            self._geom_id = None
+
+    def _azav_params(self):
+        phi_bins = self.phiBins
+        if isinstance(phi_bins, np.ndarray):
+            phi_bins = phi_bins.tolist()
+        qbin = self.qbin
+        if isinstance(qbin, np.ndarray):
+            qbin = qbin.tolist()
+        rbin = self.rbin
+        if isinstance(rbin, np.ndarray):
+            rbin = rbin.tolist()
+        params = {
+            "xcen": float(self.xcen),
+            "ycen": float(self.ycen),
+            "dis_to_sam": float(self.dis_to_sam),
+            "eBeam": float(self.eBeam),
+            "phiBins": phi_bins,
+            "qbin": qbin,
+            "rbin": rbin,
+            "Pplane": float(self.Pplane),
+            "tx": float(self.tx),
+            "ty": float(self.ty),
+            "geomCorr": bool(self.geomCorr),
+            "polCorr": bool(self.polCorr),
+            "square": bool(self.square),
+            "thresRms": self.thresRms,
+            "thresADU": self.thresADU,
+            "thresADUhigh": self.thresADUhigh,
+        }
+        if self._mask is not None:
+            params["mask_shape"] = tuple(self._mask.shape)
+            params["mask_sum"] = int(self._mask.sum())
+        if self.x is not None:
+            params["xy_shape"] = tuple(self.x.shape)
+        return params
+
+    def _build_cache_key(self):
+        cache = self._shared_cache
+        if cache is None or not cache.enabled:
+            return None
+        det_name = self._det_name or "unknown"
+        params = self._azav_params()
+        azav_id = cache.build_azav_id(self._geom_id, params)
+        return cache.make_key(det_name, azav_id)
 
     def setFromDet(self, det):
+        _azav_debug("azav setFromDet start")
         if det.mask is not None and det.cmask is not None:
             if (
                 self._mask is not None
@@ -88,18 +218,29 @@ class azimuthalBinning(DetObjectFunc):
                 )
             else:
                 self._mask = ~(det.cmask.astype(bool) & det.mask.astype(bool))
+        _azav_debug("azav setFromDet after mask")
         self._mask = self._mask.flatten()
+        _azav_debug("azav setFromDet after mask flatten")
         # if self._mask is None and det.mask is not None:
         #    setattr(self, '_mask', det.mask.astype(np.uint8))
         if det.x is not None:
-            self.x = det.x.flatten() / 1e3
-            self.y = det.y.flatten() / 1e3
+            #self.x = det.x.flatten() / 1e3
+            #self.y = det.y.flatten() / 1e3
+            self.x = det.x.astype(np.float32, copy=False).ravel() / 1e3
+            self.y = det.y.astype(np.float32, copy=False).ravel() / 1e3
+            _azav_debug("azav setFromDet after x/y flatten")
             if det.z is not None:
-                self.z = det.z.flatten() / 1e3
+                #self.z = det.z.flatten() / 1e3
+                self.z = det.z.astype(np.float32, copy=False).ravel() / 1e3
+                _azav_debug("azav setFromDet after z flatten")
             else:
                 self.z = np.zeros_like(det.x.flatten())
+                _azav_debug("azav setFromDet after z default")
             self.z_off = np.nanmean(self.z) - self.z
             # z_off defined such that z_off >0 is downstream
+        _azav_debug("azav setFromDet before _init_shared_cache")
+        self._init_shared_cache(det)
+        _azav_debug("azav after _init_shared_cache")
 
     def setFromFunc(self, func=None):
         super(azimuthalBinning, self).setFromFunc()
@@ -122,7 +263,9 @@ class azimuthalBinning(DetObjectFunc):
                 self._mask = (~(getattr(func, maskattr).astype(bool))).flatten()
         # elif func._rms is not None:
         #    self._mask = np.ones_like(func._rms).flatten()
+        _azav_debug("azav setFromFunc")
         self._setup()
+        _azav_debug("azav after _setup")
 
     def _setup(self):
 
@@ -139,213 +282,344 @@ class azimuthalBinning(DetObjectFunc):
                 print("no x/y array have been passed, will return None")
                 return None
 
-        tx = np.deg2rad(self.tx)
-        ty = np.deg2rad(self.ty)
-        self.xcen = float(self.xcen)
-        self.ycen = float(self.ycen)
+        cache = self._shared_cache
+        cache_enabled = cache is not None and cache.enabled
+        shared_mem = cache.shared_mem if cache_enabled else None
+        shm_comm = getattr(shared_mem, "shm_comm", None) if shared_mem is not None else None
+        is_leader = getattr(shared_mem, "is_leader", False) if shared_mem is not None else False
+        key = self._build_cache_key() if cache_enabled else None
+        _azav_debug(f"azav cache_enabled: {cache_enabled}, key: {key is not None}")
+
+        if cache_enabled and key is not None:
+            cached_idxs = cache.get_if_present(key, "cake_idxs")
+            cached_norm = cache.get_if_present(key, "cake_norm")
+            cached_corr = cache.get_if_present(key, "correction")
+            cached_mask = cache.get_if_present(key, "mask")
+            meta = cache.get_meta(key)
+            if cached_idxs is not None and cached_norm is not None and cached_corr is not None:
+                _azav_debug(
+                    f"azav shared cache hit det={self._det_name or 'unknown'}"
+                )
+                if cached_mask is not None:
+                    self._mask = cached_mask.astype(bool)
+                self.Cake_idxs = cached_idxs
+                self.Cake_norm = cached_norm
+                self.correction = cached_corr
+                if meta is not None:
+                    self.nphi = meta.get("nphi", cached_norm.shape[0])
+                    if meta.get("rbin", False):
+                        self.nr = meta.get("nr", cached_norm.shape[1])
+                    else:
+                        self.nq = meta.get("nq", cached_norm.shape[1])
+                    phi_vec = meta.get("phiVec")
+                    if phi_vec is not None:
+                        self.phiVec = np.array(phi_vec)
+                    qbins = meta.get("qbins")
+                    if qbins is not None:
+                        self.qbins = np.array(qbins)
+                    q_vals = meta.get("q")
+                    if q_vals is not None:
+                        self.q = np.array(q_vals)
+                    theta_vals = meta.get("theta")
+                    if theta_vals is not None:
+                        self.theta = np.array(theta_vals)
+                else:
+                    self.nphi = cached_norm.shape[0]
+                    if self.rbin is not None:
+                        self.nr = cached_norm.shape[1]
+                    else:
+                        self.nq = cached_norm.shape[1]
+                return
+
+        compute_needed = (not cache_enabled) or is_leader
+        if compute_needed:
+            _azav_debug("azav computing binning")
+            tx = np.deg2rad(self.tx)
+            ty = np.deg2rad(self.ty)
+            self.xcen = float(self.xcen)
+            self.ycen = float(self.ycen)
 
         # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
-        (A, B, C) = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
-        (a, b, c) = (
-            self.xcen + (self.dis_to_sam + self.z_off) * np.tan(ty),
-            float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
-            (self.dis_to_sam + self.z_off),
-        )
-
-        x = self.x
-        y = self.y
-        r = np.sqrt((x - a) ** 2 + (y - b) ** 2 + c**2)
-        self.r = r
-
-        self.msg("calculating theta...", cr=0)
-        matrix_theta = np.arccos((A * (x - a) + B * (y - b) - C * c) / r)
-        self.matrix_theta = matrix_theta
-        self.msg("...done")
-
-        if self._debug:
-            print("matrix theta: ", self.matrix_theta.shape)
-        self.msg("calculating phi...", cr=0)
-        matrix_phi = np.arccos(
-            ((A**2 + C**2) * (y - b) - A * B * (x - a) + B * C * c)
-            / np.sqrt((A**2 + C**2) * (r**2 - (A * (x - a) + B * (y - b) - C * c) ** 2))
-        )
-        idx = (y >= self.ycen) & (np.isnan(matrix_phi))
-        matrix_phi[idx] = 0
-        idx = (y < self.ycen) & (np.isnan(matrix_phi))
-        matrix_phi[idx] = np.pi
-        idx = x < self.xcen
-        matrix_phi[idx] = (np.pi - matrix_phi[idx]) + np.pi
-        #        matrix_phi[idx] = temp+n.pi
-        self.matrix_phi = matrix_phi
-        self.msg("...done")
-
-        self.msg("calculating pol matrix...", cr=0)
-        Pout = 1 - self.Pplane
-        pol = Pout * (
-            1 - (np.sin(matrix_phi) * np.sin(matrix_theta)) ** 2
-        ) + self.Pplane * (1 - (np.cos(matrix_phi) * np.sin(matrix_theta)) ** 2)
-
-        self.msg("... done")
-        self.pol = pol
-        theta_max = np.nanmax(matrix_theta[~self._mask])
-
-        self.msg("calculating digitize")
-        if isinstance(self.phiBins, np.ndarray):
-            self.phiBins = self.phiBins.tolist()
-        if isinstance(self.phiBins, list):
-            if max(self.phiBins) < (2 * np.pi - 0.01):
-                # self.phiBins.append(2*np.pi)
-                self.phiBins.append(np.array(self.phiBins).max() + 0.001)
-            if min(self.phiBins) > 0:
-                # self.phiBins.append(0)
-                self.phiBins.append(np.array(self.phiBins).min() - 0.001)
-            self.phiBins.sort()
-            self.nphi = len(self.phiBins)
-            pbm = self.matrix_phi + (self.phiBins[1] - self.phiBins[0]) / 2
-            pbm[pbm >= 2 * np.pi] -= 2 * np.pi
-            self.phiVec = np.array(self.phiBins)
-        else:
-            self.nphi = self.phiBins
-            # phiint = 2*np.pi/self.phiBins
-            phiint = (self.matrix_phi.max() - self.matrix_phi.min()) / self.phiBins
-            pbm = self.matrix_phi + phiint / 2
-            pbm[pbm >= 2 * np.pi] -= 2 * np.pi
-            # self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
-            self.phiVec = np.linspace(
-                self.matrix_phi.min(),
-                self.matrix_phi.max() + np.spacing(np.min(pbm)),
-                self.phiBins + 1,
+            (A, B, C) = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
+            (a, b, c) = (
+                self.xcen + (self.dis_to_sam + self.z_off) * np.tan(ty),
+                float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
+                (self.dis_to_sam + self.z_off),
             )
-            # self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
 
-        self.pbm = pbm  # added for debugging of epix10k artifacts.
-        self.idxphi = np.digitize(pbm.ravel(), self.phiVec) - 1
-        if self.idxphi.min() < 0:
-            print(
-                "pixels will underflow, will put all pixels beyond range into first bin in phi"
+            x = self.x
+            y = self.y
+            r = np.sqrt((x - a) ** 2 + (y - b) ** 2 + c**2)
+            self.r = r
+
+            self.msg("calculating theta...", cr=0)
+            matrix_theta = np.arccos((A * (x - a) + B * (y - b) - C * c) / r)
+            self.matrix_theta = matrix_theta
+            self.msg("...done")
+
+            if self._debug:
+                print("matrix theta: ", self.matrix_theta.shape)
+            self.msg("calculating phi...", cr=0)
+            matrix_phi = np.arccos(
+                ((A**2 + C**2) * (y - b) - A * B * (x - a) + B * C * c)
+                / np.sqrt((A**2 + C**2) * (r**2 - (A * (x - a) + B * (y - b) - C * c) ** 2))
             )
-            self.idxphi[self.idxphi < 0] = 0  # put all 'underflow' bins in first bin.
-        if self.idxphi.max() >= self.nphi:
-            print(
-                "pixels will overflow, will put all pixels beyond range into first bin in phi"
-            )
-            self.idxphi[self.idxphi == self.nphi] = (
-                0  # put all 'overflow' bins in first bin.
-            )
+            idx = (y >= self.ycen) & (np.isnan(matrix_phi))
+            matrix_phi[idx] = 0
+            idx = (y < self.ycen) & (np.isnan(matrix_phi))
+            matrix_phi[idx] = np.pi
+            idx = x < self.xcen
+            matrix_phi[idx] = (np.pi - matrix_phi[idx]) + np.pi
+            #        matrix_phi[idx] = temp+n.pi
+            self.matrix_phi = matrix_phi
+            self.msg("...done")
+
+            self.msg("calculating pol matrix...", cr=0)
+            Pout = 1 - self.Pplane
+            pol = Pout * (
+                1 - (np.sin(matrix_phi) * np.sin(matrix_theta)) ** 2
+            ) + self.Pplane * (1 - (np.cos(matrix_phi) * np.sin(matrix_theta)) ** 2)
+
+            self.msg("... done")
+            self.pol = pol
+            theta_max = np.nanmax(matrix_theta[~self._mask])
+
+            self.msg("calculating digitize")
+            if isinstance(self.phiBins, np.ndarray):
+                self.phiBins = self.phiBins.tolist()
+            if isinstance(self.phiBins, list):
+                if max(self.phiBins) < (2 * np.pi - 0.01):
+                    # self.phiBins.append(2*np.pi)
+                    self.phiBins.append(np.array(self.phiBins).max() + 0.001)
+                if min(self.phiBins) > 0:
+                    # self.phiBins.append(0)
+                    self.phiBins.append(np.array(self.phiBins).min() - 0.001)
+                self.phiBins.sort()
+                self.nphi = len(self.phiBins)
+                pbm = self.matrix_phi + (self.phiBins[1] - self.phiBins[0]) / 2
+                pbm[pbm >= 2 * np.pi] -= 2 * np.pi
+                self.phiVec = np.array(self.phiBins)
+            else:
+                self.nphi = self.phiBins
+                # phiint = 2*np.pi/self.phiBins
+                phiint = (self.matrix_phi.max() - self.matrix_phi.min()) / self.phiBins
+                pbm = self.matrix_phi + phiint / 2
+                pbm[pbm >= 2 * np.pi] -= 2 * np.pi
+                # self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
+                self.phiVec = np.linspace(
+                    self.matrix_phi.min(),
+                    self.matrix_phi.max() + np.spacing(np.min(pbm)),
+                    self.phiBins + 1,
+                )
+                # self.phiVec = np.linspace(0,2*np.pi+np.spacing(np.min(pbm)),self.phiBins+1)
+
+            self.pbm = pbm  # added for debugging of epix10k artifacts.
+            self.idxphi = np.digitize(pbm.ravel(), self.phiVec) - 1
+            if self.idxphi.min() < 0:
+                print(
+                    "pixels will underflow, will put all pixels beyond range into first bin in phi"
+                )
+                self.idxphi[self.idxphi < 0] = 0  # put all 'underflow' bins in first bin.
+            if self.idxphi.max() >= self.nphi:
+                print(
+                    "pixels will overflow, will put all pixels beyond range into first bin in phi"
+                )
+                self.idxphi[self.idxphi == self.nphi] = (
+                    0  # put all 'overflow' bins in first bin.
+                )
 
         # print('DEBUG phi ',self.phiVec)
         # print('DEBUG phi ',np.unique(self.idxphi))
 
-        # include geometrical corrections
-        geom = (self.dis_to_sam + self.z_off) / r
-        # pixels are not perpendicular to scattered beam
-        geom *= (self.dis_to_sam + self.z_off) / r**2
-        # scattered radiation is proportional to 1/r^2
-        self.msg("calculating normalization...", cr=0)
-        self.geom = geom
-        self.geom /= self.geom.max()
-        if not self.geomCorr:
-            self.geom = np.ones_like(self.geom).astype(float)
-        if not self.polCorr:
-            self.pol = np.ones_like(self.pol).astype(float)
-        self.correction = self.geom * self.pol
+            # include geometrical corrections
+            geom = (self.dis_to_sam + self.z_off) / r
+            # pixels are not perpendicular to scattered beam
+            geom *= (self.dis_to_sam + self.z_off) / r**2
+            # scattered radiation is proportional to 1/r^2
+            self.msg("calculating normalization...", cr=0)
+            self.geom = geom
+            self.geom /= self.geom.max()
+            if not self.geomCorr:
+                self.geom = np.ones_like(self.geom).astype(float)
+            if not self.polCorr:
+                self.pol = np.ones_like(self.pol).astype(float)
+            self.correction = self.geom * self.pol
 
-        # coordinates in q
-        self.matrix_q = 4 * np.pi / self.lam * np.sin(self.matrix_theta / 2)
-        q_max = np.nanmax(self.matrix_q[~self._mask])
-        q_min = np.nanmin(self.matrix_q[~self._mask])
-        qbin = np.array(self.qbin)
-        if qbin.size == 1:
-            if rank == 0 and self._debug:
-                print("q-bin size has been given: qmax: ", q_max, " qbin ", qbin)
-            # self.qbins = np.arange(0,q_max+qbin,qbin)
-            self.qbins = np.arange(q_min - qbin, q_max + qbin, qbin)
-        else:
-            self.qbins = qbin
-        self.q = (self.qbins[0:-1] + self.qbins[1:]) / 2
-        self.nq = self.q.size
-        self.idxq = np.digitize(self.matrix_q.ravel(), self.qbins) - 1
-        self.idxq[self._mask.ravel()] = 0
-        # send the masked ones in the first bin
-
-        self.theta = 2 * np.arcsin(self.q * self.lam / 4 / np.pi)
-        # 2D binning!
-        self.Cake_idxs = np.ravel_multi_index(
-            (self.idxphi, self.idxq), (self.nphi, self.nq)
-        )
-        self.Cake_idxs[self._mask.ravel()] = 0
-        # send the masked ones in the first bin
-        self.Cake_Npixel = np.bincount(self.Cake_idxs, minlength=self.nq * self.nphi)
-        # self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
-        self.Cake_norm = np.reshape(self.Cake_Npixel, (self.nphi, self.nq))
-        # /self.correction1D
-        # self.correction1D    =self.correction1D[:self.nq]/self.Npixel
-
-        # coordinates in r
-        if self.rbin is not None:
-            x = self.x
-            y = self.y
-            rl = np.sqrt((x - self.xcen) ** 2 + (y - self.ycen) ** 2)
-            self.rlocal = rl
-            # r_max = np.nanmax(self.rlocal)
-            # r_min = np.nanmin(self.rlocal)
-            r_max = np.nanmax(self.rlocal[~self._mask])
-            r_min = np.nanmin(self.rlocal[~self._mask])
-            rbin = np.array(self.rbin)
-            if rbin.size == 1:
+            # coordinates in q
+            self.matrix_q = 4 * np.pi / self.lam * np.sin(self.matrix_theta / 2)
+            q_max = np.nanmax(self.matrix_q[~self._mask])
+            q_min = np.nanmin(self.matrix_q[~self._mask])
+            qbin = np.array(self.qbin)
+            if qbin.size == 1:
                 if rank == 0 and self._debug:
-                    print("q-bin size has been given: rmax: ", r_max, " rbin ", rbin)
-                # self.rbins = np.arange(0,q_max+rbin,rbin)
-                self.rbins = np.arange(r_min - rbin, r_max + rbin, rbin)
+                    print("q-bin size has been given: qmax: ", q_max, " qbin ", qbin)
+                # self.qbins = np.arange(0,q_max+qbin,qbin)
+                self.qbins = np.arange(q_min - qbin, q_max + qbin, qbin)
             else:
-                self.rbins = rbin
-            self.rbinsbound = (self.rbins[0:-1] + self.rbins[1:]) / 2
-            # print('self.rbinsbound ',self.rbinsbound)
-            self.nr = self.rbinsbound.size
-            # print('nr ',self.nr)
-            # here, the bin-range is > thew actual range unlike for q where the bined range is < than the actual range...
-            if (np.nanmax(self.rlocal) - np.nanmin(self.rlocal)) < (
-                self.rbins.max() - self.rbins.min()
-            ):
-                self.nr += 1
-            self.idxr = np.digitize(self.rlocal.ravel(), self.rbins) - 1
-            self.idxr[self._mask.ravel()] = 0
+                self.qbins = qbin
+            self.q = (self.qbins[0:-1] + self.qbins[1:]) / 2
+            self.nq = self.q.size
+            self.idxq = np.digitize(self.matrix_q.ravel(), self.qbins) - 1
+            self.idxq[self._mask.ravel()] = 0
             # send the masked ones in the first bin
-            # print('2 r', self.idxr.min(), self.idxr.max(), self.idxphi.min(), self.idxphi.max())
-            # print('2 ns' , self.nphi, self.nr, self.rbins.size, self.rbinsbound.size)
+
+            self.theta = 2 * np.arcsin(self.q * self.lam / 4 / np.pi)
+            # 2D binning!
             self.Cake_idxs = np.ravel_multi_index(
-                (self.idxphi, self.idxr), (self.nphi, self.nr)
+                (self.idxphi, self.idxq), (self.nphi, self.nq)
             )
-            # print('3', self.Cake_idxs.shape, self.Cake_idxs.max())
             self.Cake_idxs[self._mask.ravel()] = 0
             # send the masked ones in the first bin
-            self.Cake_Npixel = np.bincount(
-                self.Cake_idxs, minlength=self.nr * self.nphi
-            )
+            self.Cake_Npixel = np.bincount(self.Cake_idxs, minlength=self.nq * self.nphi)
             # self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
-            self.Cake_norm = np.reshape(self.Cake_Npixel, (self.nphi, self.nr))
+            self.Cake_norm = np.reshape(self.Cake_Npixel, (self.nphi, self.nq))
             # /self.correction1D
-            # print('nrend ',self.nr, self.Cake_idxs.max())
+            # self.correction1D    =self.correction1D[:self.nq]/self.Npixel
+
+            # coordinates in r
+            if self.rbin is not None:
+                x = self.x
+                y = self.y
+                rl = np.sqrt((x - self.xcen) ** 2 + (y - self.ycen) ** 2)
+                self.rlocal = rl
+                # r_max = np.nanmax(self.rlocal)
+                # r_min = np.nanmin(self.rlocal)
+                r_max = np.nanmax(self.rlocal[~self._mask])
+                r_min = np.nanmin(self.rlocal[~self._mask])
+                rbin = np.array(self.rbin)
+                if rbin.size == 1:
+                    if rank == 0 and self._debug:
+                        print("q-bin size has been given: rmax: ", r_max, " rbin ", rbin)
+                    # self.rbins = np.arange(0,q_max+rbin,rbin)
+                    self.rbins = np.arange(r_min - rbin, r_max + rbin, rbin)
+                else:
+                    self.rbins = rbin
+                self.rbinsbound = (self.rbins[0:-1] + self.rbins[1:]) / 2
+                # print('self.rbinsbound ',self.rbinsbound)
+                self.nr = self.rbinsbound.size
+                # print('nr ',self.nr)
+                # here, the bin-range is > thew actual range unlike for q where the bined range is < than the actual range...
+                if (np.nanmax(self.rlocal) - np.nanmin(self.rlocal)) < (
+                    self.rbins.max() - self.rbins.min()
+                ):
+                    self.nr += 1
+                self.idxr = np.digitize(self.rlocal.ravel(), self.rbins) - 1
+                self.idxr[self._mask.ravel()] = 0
+                # send the masked ones in the first bin
+                # print('2 r', self.idxr.min(), self.idxr.max(), self.idxphi.min(), self.idxphi.max())
+                # print('2 ns' , self.nphi, self.nr, self.rbins.size, self.rbinsbound.size)
+                self.Cake_idxs = np.ravel_multi_index(
+                    (self.idxphi, self.idxr), (self.nphi, self.nr)
+                )
+                # print('3', self.Cake_idxs.shape, self.Cake_idxs.max())
+                self.Cake_idxs[self._mask.ravel()] = 0
+                # send the masked ones in the first bin
+                self.Cake_Npixel = np.bincount(
+                    self.Cake_idxs, minlength=self.nr * self.nphi
+                )
+                # self.Cake_Npixel = self.Npixel[:self.nq*self.nphi]
+                self.Cake_norm = np.reshape(self.Cake_Npixel, (self.nphi, self.nr))
+                # /self.correction1D
+                # print('nrend ',self.nr, self.Cake_idxs.max())
 
         # last_idx = self.idxq.max()
         # print("last index",last_idx)
-        self.msg("...done")
+            self.msg("...done")
 
-        self.header = "# Parameters for data reduction\n"
-        self.header += "# xcen, ycen = %.2f m %.2f m\n" % (self.xcen, self.ycen)
-        self.header += "# sample det distance = %.4f m\n" % (self.dis_to_sam)
-        self.header += "# wavelength = %.4f Ang\n" % (self.lam)
-        self.header += "# detector angles x,y = %.3f,%.3f deg\n" % (
-            np.rad2deg(tx),
-            np.rad2deg(ty),
-        )
-        self.header += "# fraction of inplane pol %.3f\n" % (self.Pplane)
-        if isinstance(qbin, float):
-            self.header += "# q binning : %.3f Ang-1\n" % (qbin)
-        # remove idx & correction values for masked pixels. Also remove maks pixels from image in process fct
-        self.Cake_idxs = self.Cake_idxs[self._mask.ravel() == 0]
-        self.correction = self.correction.flatten()[self._mask.ravel() == 0]
-        # print('return ', self.Cake_idxs.shape, self.Cake_idxs.max())
+            self.header = "# Parameters for data reduction\n"
+            self.header += "# xcen, ycen = %.2f m %.2f m\n" % (self.xcen, self.ycen)
+            self.header += "# sample det distance = %.4f m\n" % (self.dis_to_sam)
+            self.header += "# wavelength = %.4f Ang\n" % (self.lam)
+            self.header += "# detector angles x,y = %.3f,%.3f deg\n" % (
+                np.rad2deg(tx),
+                np.rad2deg(ty),
+            )
+            self.header += "# fraction of inplane pol %.3f\n" % (self.Pplane)
+            if isinstance(qbin, float):
+                self.header += "# q binning : %.3f Ang-1\n" % (qbin)
+            # remove idx & correction values for masked pixels. Also remove maks pixels from image in process fct
+            self.Cake_idxs = self.Cake_idxs[self._mask.ravel() == 0]
+            self.correction = self.correction.flatten()[self._mask.ravel() == 0]
+            # print('return ', self.Cake_idxs.shape, self.Cake_idxs.max())
+            _azav_debug("azav computing binning done")
+
+        if cache_enabled and key is not None:
+            _azav_debug(f"azav storing azav cache for key {key}")
+            spec = None
+            meta = None
+            if is_leader:
+                spec = {
+                    "mask": (self._mask.shape, str(self._mask.dtype)),
+                    "cake_idxs": (self.Cake_idxs.shape, str(self.Cake_idxs.dtype)),
+                    "cake_norm": (self.Cake_norm.shape, str(self.Cake_norm.dtype)),
+                    "correction": (self.correction.shape, str(self.correction.dtype)),
+                }
+                meta = {
+                    "nphi": self.nphi,
+                    "nq": getattr(self, "nq", None),
+                    "nr": getattr(self, "nr", None),
+                    "rbin": self.rbin is not None,
+                    "phiVec": self.phiVec.tolist() if hasattr(self, "phiVec") else None,
+                    "qbins": self.qbins.tolist() if hasattr(self, "qbins") else None,
+                    "q": self.q.tolist() if hasattr(self, "q") else None,
+                    "theta": self.theta.tolist() if hasattr(self, "theta") else None,
+                }
+                cache.record_meta(key, meta)
+            if shm_comm is not None:
+                spec = shm_comm.bcast(spec, root=0)
+                meta = shm_comm.bcast(meta, root=0)
+            if spec is not None:
+                shared_mask, _ = cache.get_or_allocate(
+                    key, "mask", spec["mask"][0], spec["mask"][1], zero_init=False
+                )
+                shared_idxs, _ = cache.get_or_allocate(
+                    key, "cake_idxs", spec["cake_idxs"][0], spec["cake_idxs"][1], zero_init=False
+                )
+                shared_norm, _ = cache.get_or_allocate(
+                    key, "cake_norm", spec["cake_norm"][0], spec["cake_norm"][1], zero_init=False
+                )
+                shared_corr, _ = cache.get_or_allocate(
+                    key, "correction", spec["correction"][0], spec["correction"][1], zero_init=False
+                )
+                if is_leader:
+                    shared_mask[:] = self._mask
+                    shared_idxs[:] = self.Cake_idxs
+                    shared_norm[:] = self.Cake_norm
+                    shared_corr[:] = self.correction
+                    _azav_debug(
+                        f"azav shared cache leader wrote det={self._det_name or 'unknown'}"
+                    )
+                if shared_mem is not None:
+                    shared_mem.barrier()
+                self._mask = shared_mask.astype(bool)
+                self.Cake_idxs = shared_idxs
+                self.Cake_norm = shared_norm
+                self.correction = shared_corr
+                if not is_leader:
+                    _azav_debug(
+                        f"azav shared cache retrieved det={self._det_name or 'unknown'}"
+                    )
+                if meta is not None:
+                    self.nphi = meta.get("nphi", self.Cake_norm.shape[0])
+                    if meta.get("rbin", False):
+                        self.nr = meta.get("nr", self.Cake_norm.shape[1])
+                    else:
+                        self.nq = meta.get("nq", self.Cake_norm.shape[1])
+                    phi_vec = meta.get("phiVec")
+                    if phi_vec is not None:
+                        self.phiVec = np.array(phi_vec)
+                    qbins = meta.get("qbins")
+                    if qbins is not None:
+                        self.qbins = np.array(qbins)
+                    q_vals = meta.get("q")
+                    if q_vals is not None:
+                        self.q = np.array(q_vals)
+                    theta_vals = meta.get("theta")
+                    if theta_vals is not None:
+                        self.theta = np.array(theta_vals)
+            _azav_debug("azav storing azav cache done")
+            return
+
         return
 
     def msg(self, s, cr=True):
