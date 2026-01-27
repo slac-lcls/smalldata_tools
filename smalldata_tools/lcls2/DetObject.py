@@ -3,6 +3,7 @@ import copy
 import time
 import numpy as np
 import logging
+
 try:
     import psutil
 except Exception:
@@ -18,13 +19,15 @@ import psana
 
 logger = logging.getLogger(__name__)
 
+
 def _rss_cur_mb():
     if psutil is None:
         return -1.0
     try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
+        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
     except Exception:
         return -1.0
+
 
 def _detobj_debug_enabled():
     return os.environ.get("SMD_DEBUG_DETOBJ", "0") == "1"
@@ -393,6 +396,7 @@ class CameraObject(DetObjectClass):
                 )
             )
             det_last = now
+
         self._common_mode_list = [0, -1, 30]  # none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -801,7 +805,11 @@ class JungfrauObject(TiledCameraObject):
             and self.common_mode in [7, 71, 72, 0]
         ):
             self.evt.dat *= self.local_gain  # apply own gain
-        print('[DEBUG] rank {rank} JungfrauObject getData delta={dt:.6f}s'.format(rank=rank, dt=MPI.Wtime()-t0))
+        print(
+            "[DEBUG] rank {rank} JungfrauObject getData delta={dt:.6f}s".format(
+                rank=rank, dt=MPI.Wtime() - t0
+            )
+        )
         # correct for area of pixels.
         # if self.areas is not None:
         #    self.evt.dat /= self.areas
