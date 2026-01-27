@@ -1,12 +1,12 @@
-import numpy as np
-import sys
-import time
-import h5py
 import os
-import smalldata_tools.utilities as util
-from smalldata_tools.common.detector_base import DetObjectFunc
+import sys
+
+import numpy as np
 from mpi4py import MPI
+
+import smalldata_tools.utilities as util
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc
+from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.common.shared_azav_cache import SharedAzavCache
 
 try:
@@ -339,8 +339,12 @@ class azimuthalBinning(DetObjectFunc):
             self.ycen = float(self.ycen)
 
             # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
-            A, B, C = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
-            a, b, c = (
+            (A, B, C) = (
+                -np.sin(ty) * np.cos(tx),
+                -np.sin(tx),
+                -np.cos(ty) * np.cos(tx),
+            )
+            (a, b, c) = (
                 self.xcen + (self.dis_to_sam + self.z_off) * np.tan(ty),
                 float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
                 (self.dis_to_sam + self.z_off),
