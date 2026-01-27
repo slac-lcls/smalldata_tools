@@ -3,7 +3,6 @@ import copy
 import time
 import numpy as np
 import logging
-
 try:
     import psutil
 except Exception:
@@ -19,15 +18,13 @@ import psana
 
 logger = logging.getLogger(__name__)
 
-
 def _rss_cur_mb():
     if psutil is None:
         return -1.0
     try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
     except Exception:
         return -1.0
-
 
 def _detobj_debug_enabled():
     return os.environ.get("SMD_DEBUG_DETOBJ", "0") == "1"
@@ -37,12 +34,8 @@ def DetObject(srcName, run, **kwargs):
     if rank == 0:
         logger.info(f"Getting the detector for: {srcName}")
     det = None
-    print(f"[DEBUG] rank {rank} DetObject det={srcName} rss_cur_mb={_rss_cur_mb():.2f}")
     try:
         det = run.Detector(srcName)
-        print(
-            f"[DEBUG] rank {rank} DetObject run.Detector det={srcName} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
     except:
         if rank == 0:
             logger.warning(f"failed to make detector for {srcName}: {run.detnames}")
@@ -80,9 +73,6 @@ class DetObjectClass(object):
         self.applyMask = kwargs.get("applyMask", 0)
 
         self.dataAccessTime = 0.0
-        print(
-            f"[DEBUG] rank {rank} DetObject DetObjectClass __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
 
     def params_as_dict(self):
         """Returns parameters as dictionary to be stored in the hdf5 file (once/file)"""
@@ -391,9 +381,6 @@ class CameraObject(DetObjectClass):
         detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
         det_t0 = time.perf_counter() if det_debug else None
         det_last = det_t0
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
 
         def _dbg(label):
             nonlocal det_last
@@ -406,7 +393,6 @@ class CameraObject(DetObjectClass):
                 )
             )
             det_last = now
-
         self._common_mode_list = [0, -1, 30]  # none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -433,25 +419,16 @@ class CameraObject(DetObjectClass):
         except:
             self.ped = None
         _dbg("pedestals")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject pedestals det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         try:
             self.rms = det.raw._rms()
         except:
             self.rms = None
         _dbg("rms")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject rms det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         try:
             self.gain = det.raw._gain()
         except:
             self.gain = None
         _dbg("gain")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject gain det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         try:
             self.mask = det.raw._mask(calib=False, status=True, edges=True)
             self.cmask = det.raw._mask(calib=True, status=True, edges=True)
@@ -459,9 +436,6 @@ class CameraObject(DetObjectClass):
             self.mask = None
             self.cmask = None
         _dbg("mask")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject mask det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         # self.det.calibconst['pop_rbfs'][1] return meta data for the calib data.
         # self.rms = self.det.rms(run)
         # self.gain_mask = self.det.gain_mask(run)
@@ -471,9 +445,6 @@ class CameraObject(DetObjectClass):
         self._getImgShape()
         self._gainSwitching = False
         _dbg("imgshape")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject imgshape det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         try:
             self.x, self.y, self.z = det.raw._pixel_coords(do_tilt=True, cframe=0)
             self.x = self.x.squeeze()
@@ -482,9 +453,6 @@ class CameraObject(DetObjectClass):
         except:
             self.x, self.y, self.z = None, None, None
         _dbg("pixel_coords")
-        print(
-            f"[DEBUG] rank {rank} DetObject CameraObject pixel_coords det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
 
     def getData(self, evt):
         super(CameraObject, self).getData(evt)
@@ -531,9 +499,6 @@ class TiledCameraObject(CameraObject):
         detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
         det_t0 = time.perf_counter() if det_debug else None
         det_last = det_t0
-        print(
-            f"[DEBUG] rank {rank} DetObject TiledCameraObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
 
         def _dbg(label):
             nonlocal det_last
@@ -780,9 +745,6 @@ class JungfrauObject(TiledCameraObject):
         detname = getattr(det, "_det_name", getattr(det, "alias", "unknown"))
         det_t0 = time.perf_counter() if det_debug else None
         det_last = det_t0
-        print(
-            f"[DEBUG] rank {rank} DetObject JungfrauObject __init__ det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
 
         def _dbg(label):
             nonlocal det_last
@@ -806,19 +768,14 @@ class JungfrauObject(TiledCameraObject):
                         rank, detname, now - img_start, now - det_t0
                     )
                 )
-            print(
-                f"[DEBUG] rank {rank} DetObject JungfrauObject det.raw.image det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-            )
         except:
             pass
         _dbg("jungfrau_init")
-        print(
-            f"[DEBUG] rank {rank} DetObject JungfrauObject init done det={detname} rss_cur_mb={_rss_cur_mb():.2f}"
-        )
         self._gainSwitching = True
         # self._common_mode_list.append()
 
     def getData(self, evt):
+        t0 = MPI.Wtime()
         super(JungfrauObject, self).getData(evt)
         mbits = 0  # do not apply mask (would set pixels to zero)
         # mbits=1 #set bad pixels to 0
@@ -844,7 +801,7 @@ class JungfrauObject(TiledCameraObject):
             and self.common_mode in [7, 71, 72, 0]
         ):
             self.evt.dat *= self.local_gain  # apply own gain
-
+        print('[DEBUG] rank {rank} JungfrauObject getData delta={dt:.6f}s'.format(rank=rank, dt=MPI.Wtime()-t0))
         # correct for area of pixels.
         # if self.areas is not None:
         #    self.evt.dat /= self.areas

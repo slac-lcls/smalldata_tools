@@ -14,7 +14,6 @@ import socket
 import os
 import logging
 import requests
-
 try:
     import psutil
 except Exception:
@@ -137,7 +136,6 @@ def define_dets(run, det_list):
         else:
             det = DetObject(detname, thisrun, common_mode=common_mode)
         _dd_mark("DetObject")
-        _debug_rank(f"DEFINE_DETS det={detname} after DetObject")
         logger.debug(f"Instantiated det {detname}: {det}")
 
         #             **** Compression MUST be the first operation ****             #
@@ -167,7 +165,6 @@ def define_dets(run, det_list):
             _dd_mark("hsd_setup")
             dets.append(det)
             _dd_mark("append")
-            _debug_rank(f"DEFINE_DETS det={detname} after append")
             continue
 
         ####################################
@@ -176,7 +173,6 @@ def define_dets(run, det_list):
         if detname in azav_args:
             det.addFunc(azimuthalBinning(**azav_args[detname]))
             _dd_mark("azav")
-            _debug_rank(f"DEFINE_DETS det={detname} after azav")
 
         if detname in azav_pyfai_args:
             det.addFunc(azav_pyfai(**azav_pyfai_args[detname]))
@@ -190,9 +186,8 @@ def define_dets(run, det_list):
                 thisROIFunc = ROIFunc(**ROI)
                 if proj_ax is not None:
                     thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
-                det.addFunc(thisROIFunc)
-            _dd_mark("rois")
-            _debug_rank(f"DEFINE_DETS det={detname} after rois")
+            det.addFunc(thisROIFunc)
+        _dd_mark("rois")
 
         if detname in d2p_args:
             if rank == 0:
@@ -226,7 +221,6 @@ def define_dets(run, det_list):
             dropfunc.addFunc(drop2phot_func)
             det.addFunc(dropfunc)
             _dd_mark("droplet2photon")
-            _debug_rank(f"DEFINE_DETS det={detname} after droplet2photon")
 
         # if detname in dimgs_args:
         #     # Detector image (det.raw.image())
@@ -311,12 +305,10 @@ def define_dets(run, det_list):
                 for algo in sum_algo_args[detname]:
                     det.storeSum(sumAlgo=algo)
         _dd_mark("sum_algos")
-        _debug_rank(f"DEFINE_DETS det={detname} after sum_algos")
 
         logger.debug(f"Rank {rank} Add det {detname}: {det}")
         dets.append(det)
         _dd_mark("append")
-        _debug_rank(f"DEFINE_DETS det={detname} after append")
 
     return dets
 
@@ -366,6 +358,7 @@ from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
 
 import psplot
 from psmon import publish
+
 
 # Constants
 HUTCHES = ["TMO", "RIX", "UED", "MFX", "XPP"]
@@ -472,37 +465,29 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-DEBUG_TIMING = os.environ.get("SMD_DEBUG_TIMING", "1") != "0"
-DEBUG_DET = os.environ.get("SMD_DEBUG_DET", "1") != "0"
+DEBUG_GLOBAL_TIMING = os.environ.get("SMD_DEBUG_TIMING", "0") != "0"
+DEBUG_DET = os.environ.get("SMD_DEBUG_DET", "0") != "0"
+DEBUG_EVT_TIMING = os.environ.get("SMD_DEBUG_EVT_TIMING", "0") != "0"
+DEBUG_EVT_TIMING_EVERY = int(os.environ.get("SMD_DEBUG_EVT_TIMING_EVERY", "0"))
 _last_mark = job_perf_start
+_evt_last_mark = None
 args_parsed_mark = None
 config_import_mark = None
 output_ready_mark = None
-
-
-def _debug_print(msg):
-    print(f"[DEBUG] {msg}")
-
-
-def _since_start(now=None):
-    if now is None:
-        now = time.perf_counter()
-    return now - job_perf_start
 
 
 def _rss_cur_mb():
     if psutil is None:
         return -1.0
     try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 ** 2)
     except Exception:
         return -1.0
-
 
 def _pss_cur_mb():
     if psutil is not None:
         try:
-            return psutil.Process(os.getpid()).memory_full_info().pss / (1024**2)
+            return psutil.Process(os.getpid()).memory_full_info().pss / (1024 ** 2)
         except Exception:
             pass
     try:
@@ -516,37 +501,48 @@ def _pss_cur_mb():
         pass
     return -1.0
 
-
-def _debug_rank(msg):
-    rss = _rss_cur_mb()
-    pss = _pss_cur_mb()
-    suffix = []
-    if rss >= 0:
-        suffix.append(f"rss_cur_mb={rss:.2f}")
-    if pss >= 0:
-        suffix.append(f"pss_mb={pss:.2f}")
-    if suffix:
-        print(f"[DEBUG] rank {rank} {msg} " + " ".join(suffix))
-    else:
-        print(f"[DEBUG] rank {rank} {msg}")
+def _debug_timing_evt(evt_num):
+    if not DEBUG_EVT_TIMING:
+        return False
+    if DEBUG_EVT_TIMING_EVERY <= 0:
+        return evt_num == 0
+    return evt_num % DEBUG_EVT_TIMING_EVERY == 0
 
 
-def _debug_mark(label, now):
+def _debug_global_mark(label, now):
     global _last_mark
-    if not DEBUG_TIMING:
+    if not DEBUG_GLOBAL_TIMING or rank != 0:
         return
     delta = now - _last_mark
     since = now - job_perf_start
     print(
-        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s rss_cur_mb={_rss_cur_mb():.2f}"
+        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
     )
     _last_mark = now
 
 
+def _debug_evt_reset(now):
+    global _evt_last_mark
+    _evt_last_mark = now
+
+def _debug_evt_mark(label, now):
+    global _evt_last_mark
+    if not DEBUG_EVT_TIMING:
+        return
+    if _evt_last_mark is None:
+        _evt_last_mark = now
+    delta = now - _evt_last_mark
+    since = now - job_perf_start
+    print(
+        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
+    )
+    _evt_last_mark = now
+
+
+
 COMM.Barrier()
-args_parsed_mark = MPI.Wtime()
-if DEBUG_TIMING and rank == 0:
-    _debug_mark("args parsed", now=args_parsed_mark)
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("args parsed", now=MPI.Wtime())
 
 logger.debug("Args to be used for small data run: {0}".format(args))
 
@@ -750,15 +746,13 @@ if hasattr(config, "xdetectors") and config.xdetectors:
     datasource_args["xdetectors"] = config.xdetectors
 
 COMM.Barrier()
-ds_args_setup_mark = MPI.Wtime()
-if DEBUG_TIMING and rank == 0:
-    _debug_mark("ds args setup", now=ds_args_setup_mark)
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("ds args setup", now=MPI.Wtime())
 
 ds = psana.DataSource(**datasource_args)
 COMM.Barrier()
-ds_init_mark = MPI.Wtime()
-if DEBUG_TIMING and rank == 0:
-    _debug_mark("ds init", now=ds_init_mark)
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("ds init", now=MPI.Wtime())
 
 if ds.unique_user_rank():
     print("#### DATASOURCE AND PSANA ENV VAR INFO ####")
@@ -768,6 +762,7 @@ if ds.unique_user_rank():
     print(f"PS_SRV_NODES={os.environ.get('PS_SRV_NODES')}")
     print(f"PS_SMD_N_EVENTS={os.environ.get('PS_SMD_N_EVENTS')}")  # defaults to 1000
     print(f"DS batchsize: {ds.batch_size}")
+    print(f"SMD gather_interval: {args.gather_interval}")
     print("#### END DATASOURCE AND PSANA ENV VAR INFO ####\n")
     logger.info(f"Unique user rank: {rank}")
 
@@ -790,14 +785,12 @@ small_data_enabled = True
 if ps_srv_nodes == 0:
     small_data_enabled = False
     if ds.unique_user_rank():
-        logger.warning(
-            "PS_SRV_NODES=0: skipping ds.smalldata and all small_data operations."
-        )
+        logger.warning("PS_SRV_NODES=0: skipping ds.smalldata and all small_data operations.")
 thisrun = next(ds.runs())
 COMM.Barrier()
-run_init_mark = MPI.Wtime()
-if DEBUG_TIMING and rank == 0:
-    _debug_mark("run init", now=run_init_mark)
+run_init_mark = MPI.Wtime() 
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("run init", now=run_init_mark)
 
 # Generate smalldata object
 if small_data_enabled:
@@ -823,8 +816,8 @@ if small_data_enabled:
         )
     else:
         small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
-        # small_data = ds.smalldata(batch_size=args.gather_interval)
-        # if ds.unique_user_rank():
+        #small_data = ds.smalldata(batch_size=args.gather_interval)
+        #if ds.unique_user_rank():
         #    logger.info("Smalldata object created without filename.")
     if ds.unique_user_rank():
         logger.info("smalldata file has been successfully created.")
@@ -833,9 +826,9 @@ else:
         logger.warning("PS_SRV_NODES=0: small_data disabled; skipping ds.smalldata.")
 
 
-smd_init_mark = MPI.Wtime()
-if DEBUG_TIMING:
-    _debug_mark(f"rank {rank} smd init", now=smd_init_mark)
+if DEBUG_GLOBAL_TIMING:
+    smd_init_mark = MPI.Wtime()
+    print(f'[DEBUG] rank {rank} smd init since_start={smd_init_mark - job_perf_start:.6f}s delta={smd_init_mark - run_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
 
 ##########################################################
 ##
@@ -843,9 +836,7 @@ if DEBUG_TIMING:
 ##
 ##########################################################
 if not ds.is_srv():  # srv nodes do not have access to detectors.
-    _debug_rank("default det setup begin")
     default_dets = defaultDetectors(hutch.lower(), thisrun)
-    _debug_rank("default dets created")
     if ds.unique_user_rank():
         logger.info("Default detectors loaded:")
         for ddet in default_dets:
@@ -865,12 +856,10 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
             default_dets.append(
                 epicsDetector(PVlist=epicsPV, name="epicsAll", run=thisrun)
             )
-            _debug_rank("epicsAll dets added")
     elif hasattr(config, "epicsArchFilePV") and len(config.epicsArchFilePV) > 0:
         default_dets.append(
             epicsDetector(PVlist=config.epicsArchFilePV, name="epicsUser", run=thisrun)
         )
-        _debug_rank("epicsUser dets added")
 
     if len(config.epicsOncePV) > 0:
         EODet = epicsDetector(PVlist=config.epicsOncePV, name="epicsOnce", run=thisrun)
@@ -878,7 +867,6 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         EODet = None
     EODetData = {"epicsOnce": {}}
     EODetTS = None
-    _debug_rank("epicsOnce det setup")
 
     default_det_aliases = [det.name for det in default_dets]
 
@@ -893,12 +881,10 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     int_dets = []
     if not args.default:
         dets = define_dets(int(args.run), config.detectors)
-        _debug_rank("user dets defined")
         if not skip_intg:
             intg_dets_start = time.perf_counter()
             int_dets = define_dets(int(args.run), integrating_detectors)
             intg_dets_end = time.perf_counter()
-            _debug_rank("intg dets defined")
     if ds.unique_user_rank():
         logger.info(f"Detectors: {[det._name for det in dets]}")
         logger.info(f"Integrating detectors: {[det._name for det in int_dets]}")
@@ -946,21 +932,24 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     for det in int_dets:
         normdict[det._name] = {"count": 0, "timestamp_min": 0, "timestamp_max": 0}
 
-default_det_setup_mark = MPI.Wtime()
-if DEBUG_TIMING:
-    _debug_mark(f"rank {rank} default det setup", now=default_det_setup_mark)
+if DEBUG_GLOBAL_TIMING and ds.is_bd():
+    default_det_setup_mark = MPI.Wtime()
+    print(f'[DEBUG] rank {rank} default det setup since_start={default_det_setup_mark - job_perf_start:.6f}s delta={default_det_setup_mark - smd_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
 
 event_iter = thisrun.events()
 
 cn_events = 0
 sum_det_data_time = 0.0
+first_evt_mark = None
+smd_save_sum_mark = None
+smd_save_cfg_mark = None
 
 for evt_num, evt in enumerate(event_iter):
-    first_evt_end = MPI.Wtime()
-    if DEBUG_TIMING and evt_num == 0:
-        _debug_mark(f"rank {rank} first evt", now=first_evt_end)
-
+    if DEBUG_EVT_TIMING and evt_num == 0:
+        _debug_evt_reset(MPI.Wtime())
     det_data = detData(default_dets, evt)
+    if _debug_timing_evt(evt_num):
+        _debug_evt_mark(f"evt {evt_num} default detData", now=MPI.Wtime())
 
     # If we don't have the epics once data, try to get it!
     if EODet is not None and EODetData["epicsOnce"] == {}:
@@ -975,21 +964,15 @@ for evt_num, evt in enumerate(event_iter):
             det.getData(evt)
             det_getdata_mark = MPI.Wtime()
             if DEBUG_DET:
-                _debug_rank(
-                    f"evt {evt_num} det {det._name} getData time: {det_getdata_mark - det_start_mark:.6f}s"
-                )
+                print(f"[DEBUG] rank {rank} evt {evt_num} det {det._name} getData time: {det_getdata_mark - det_start_mark:.6f}s")
             det.processFuncs()
             det_process_mark = MPI.Wtime()
             if DEBUG_DET:
-                _debug_rank(
-                    f"evt {evt_num} det {det._name} processFuncs time: {det_process_mark - det_getdata_mark:.6f}s"
-                )
+                print(f"[DEBUG] rank {rank} evt {evt_num} det {det._name} processFuncs time: {det_process_mark - det_getdata_mark:.6f}s")
             userDict[det._name] = getUserData(det)
             det_userdata_mark = MPI.Wtime()
             if DEBUG_DET:
-                _debug_rank(
-                    f"evt {evt_num} det {det._name} getUserData time: {det_userdata_mark - det_process_mark:.6f}s"
-                )
+                print(f"[DEBUG] rank {rank} evt {evt_num} det {det._name} getUserData time: {det_userdata_mark - det_process_mark:.6f}s")
             try:
                 envData = getUserEnvData(det)
                 if len(envData.keys()) > 0:
@@ -998,30 +981,24 @@ for evt_num, evt in enumerate(event_iter):
                 pass
             det_envdata_mark = MPI.Wtime()
             if DEBUG_DET:
-                _debug_rank(
-                    f"evt {evt_num} det {det._name} getUserEnvData time: {det_envdata_mark - det_userdata_mark:.6f}s"
-                )
+                print(f"[DEBUG] rank {rank} evt {evt_num} det {det._name} getUserEnvData time: {det_envdata_mark - det_userdata_mark:.6f}s")
             det.processSums()
             det_processsums_mark = MPI.Wtime()
             if DEBUG_DET:
-                _debug_rank(
-                    f"evt {evt_num} det {det._name} processSums time: {det_processsums_mark - det_envdata_mark:.6f}s"
-                )
+                print(f"[DEBUG] rank {rank} evt {evt_num} det {det._name} processSums time: {det_processsums_mark - det_envdata_mark:.6f}s")
             # print(userDict[det._name])
         except Exception as e:
-            logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
-            print(e)
-            pass
-
+            logger.warning(f"Failed analyzing det {det} on evt {evt_num}: {e}", exc_info=True)
+            raise
+            #logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
+            #print(e)
+            #pass
+    
+    if _debug_timing_evt(evt_num):
+        _debug_evt_mark(f"evt {evt_num} user dets", now=MPI.Wtime())
     # Combine default data & user data into single dict.
     det_data.update(userDict)
-
-    det_process_mark = MPI.Wtime()
-    if DEBUG_TIMING:
-        _debug_rank(
-            f"evt {evt_num} det process time: {det_process_mark - first_evt_end:.6f}s"
-        )
-
+    
     # Integrating detectors
 
     if len(int_dets) > 0:
@@ -1104,6 +1081,8 @@ for evt_num, evt in enumerate(event_iter):
                 if small_data_enabled:
                     small_data.event(evt, userDictInt, align_group="intg")
                 intg_write = time.perf_counter()
+        if _debug_timing_evt(evt_num):
+            _debug_evt_mark(f"evt {evt_num} intg dets", now=MPI.Wtime())
 
     # store event-based data
     # if det_data is not None:
@@ -1132,11 +1111,8 @@ for evt_num, evt in enumerate(event_iter):
             timing_data = det_data.get("timing", {})
             data_for_smd = {"scan": scan_data, "timing": timing_data}
             small_data.event(evt, data_for_smd)
-    event_store_mark = MPI.Wtime()
-    if DEBUG_TIMING:
-        _debug_rank(
-            f"evt {evt_num} event store time: {event_store_mark - det_process_mark:.6f}s"
-        )
+    if _debug_timing_evt(evt_num):
+        _debug_evt_mark(f"evt {evt_num} event store", now=MPI.Wtime())
 
     # the ARP will pass run & exp via the environment, if I see that info, the post updates
     if (
@@ -1161,15 +1137,21 @@ for evt_num, evt in enumerate(event_iter):
                 pass
         elif ds.unique_user_rank():
             print("Processed evt %d" % evt_num)
-    cn_events += 1
-    end_evt_mark = MPI.Wtime()
-    if DEBUG_TIMING:
-        _debug_rank(
-            f"evt {evt_num} arp update time: {end_evt_mark - event_store_mark:.6f}s"
-        )
+    cn_events +=1
+    
+    # Add first_evt_mark at the end of the loop to make sure fist-event 
+    # heavy processing time is captured.
+    if evt_num == 0:
+        first_evt_mark = MPI.Wtime()
+    if DEBUG_GLOBAL_TIMING and evt_num == 0 and ds.is_bd():
+        print(f'[DEBUG] rank {rank} first evt start since_start={first_evt_mark - job_perf_start:.6f}s delta={first_evt_mark - default_det_setup_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
+
+last_evt_mark = None
+if DEBUG_GLOBAL_TIMING and ds.is_bd() and not ds.is_srv() and first_evt_mark is not None:
+    last_evt_mark = MPI.Wtime()
+    print(f'[DEBUG] rank {rank} last evt processing since_start={last_evt_mark - job_perf_start:.6f}s delta={last_evt_mark - first_evt_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
 
 if not ds.is_srv():
-    sum_start = time.perf_counter()
     sumDict = {"Sums": {}}
     if small_data_enabled:
         for det in dets:
@@ -1181,7 +1163,10 @@ if not ds.is_srv():
                     print("Problem with data sum for %s and key %s" % (det._name, key))
         if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
             small_data.save_summary(sumDict)
-    sum_end = time.perf_counter()
+    
+    if DEBUG_EVT_TIMING and ds.is_bd() and last_evt_mark is not None:
+        smd_save_sum_mark = MPI.Wtime()
+        print(f'[DEBUG] rank {rank} smd done save sum since_start={smd_save_sum_mark - job_perf_start:.6f}s delta={smd_save_sum_mark - last_evt_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
 
     if ds.unique_user_rank():
         logger.info("Saving detector configuration to UserDataCfg")
@@ -1213,10 +1198,11 @@ if not ds.is_srv():
             Config = {"UserDataCfg": userDataCfg}
         if small_data_enabled and small_data.summary:
             small_data.save_summary(Config)  # this only works w/ 1 rank!
+    
+    if DEBUG_EVT_TIMING and ds.is_bd() and smd_save_sum_mark is not None:
+        smd_save_cfg_mark = MPI.Wtime()
+        print(f'[DEBUG] rank {rank} smd done save cfg since_start={smd_save_cfg_mark - job_perf_start:.6f}s delta={smd_save_cfg_mark - smd_save_sum_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
 
-last_evt_mark = MPI.Wtime()
-if DEBUG_TIMING:
-    _debug_mark(f"rank {rank} last evt (num_events={cn_events})", now=last_evt_mark)
 # Finishing up:
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
 # are needed here.
@@ -1227,9 +1213,13 @@ if small_data_enabled:
     logger.debug(f"smalldata.done() on rank {rank}")
     small_data.done()
 
-small_data_done_mark = MPI.Wtime()
-if DEBUG_TIMING:
-    _debug_mark(f"rank {rank} smalldata done", now=small_data_done_mark)
+if DEBUG_EVT_TIMING and ds.is_bd() and not ds.is_srv() and smd_save_cfg_mark is not None:
+    smd_done_non_srv_mark = MPI.Wtime()
+    print(f'[DEBUG] rank {rank} smd done all since_start={smd_done_non_srv_mark - job_perf_start:.6f}s delta={smd_done_non_srv_mark - smd_save_cfg_mark:.6f}s pss_mb={_pss_cur_mb():.2f}')
+# Special print only for srv nodes
+if DEBUG_GLOBAL_TIMING and ds.is_srv():
+    smd_done_mark = MPI.Wtime()
+    print(f"[DEBUG] rank {rank} srv node done at since_start={smd_done_mark - job_perf_start:.6f}s delta={smd_done_mark - run_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}")
 
 # Epics data from the archiver
 h5_rank = None
@@ -1284,11 +1274,11 @@ if rank == h5_rank:
         logger.debug(f"Saved {pv} from archiver data.")
     h5_for_arch.close()
 
-epics_data_done_mark = MPI.Wtime()
-if DEBUG_TIMING:
-    _debug_mark(f"rank {rank} epics data done", now=epics_data_done_mark)
 
 MPI.COMM_WORLD.Barrier()
+if DEBUG_GLOBAL_TIMING and rank==0:
+    _debug_global_mark("psana all done", now=MPI.Wtime())
+
 if ds.unique_user_rank():
     import h5py
 
@@ -1308,6 +1298,7 @@ if ds.unique_user_rank():
         write_config(h5_for_arch, "UserDataCfg", Config["UserDataCfg"])
 
     h5_for_arch.close()
+
 
 
 end_prod_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")

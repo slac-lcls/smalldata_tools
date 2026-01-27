@@ -22,12 +22,19 @@ def main():
     )
     args = parser.parse_args()
 
-    rank_re = re.compile(r'^\[DEBUG\]\s+Rank(\d+)\s+(.*)$')
+    rank_patterns = (
+        re.compile(r'^\[DEBUG\]\s+Rank(\d+)\s+(.*)$'),
+        re.compile(r'^\[Rank\s+(\d+)\]\s+(.*)$'),
+    )
 
     stage_values = {}
     with open(args.logfile, "r", errors="replace") as f:
         for line in f:
-            m = rank_re.match(line)
+            m = None
+            for pat in rank_patterns:
+                m = pat.match(line)
+                if m:
+                    break
             if not m:
                 continue
             rank = int(m.group(1))
@@ -35,12 +42,21 @@ def main():
             if msg.startswith("Jungfrau calib cversion"):
                 add_value(stage_values, "jungfrau_calib_cversion", parse_time(msg), rank)
                 continue
-            if msg.startswith("Jungfrau calib time"):
+            if msg.startswith("Jungfrau calib_jungfrau_versions call time"):
+                add_value(stage_values, "jungfrau_calib_versions_time", parse_time(msg), rank)
+                continue
+            if msg.startswith("Jungfrau calib_jungfrau_versions get raw time"):
+                add_value(stage_values, "jungfrau_calib_get_raw_time", parse_time(msg), rank)
+                continue
+            if msg.startswith("Jungfrau DetCache.add_calibcons call time"):
+                add_value(stage_values, "jungfrau_detcache_add_calibcons_time", parse_time(msg), rank)
+                continue
+            if msg.startswith("Jungfrau det.raw.calib call time"):
                 add_value(stage_values, "jungfrau_calib_time", parse_time(msg), rank)
                 continue
 
     print("units seconds")
-    for key in ("jungfrau_calib_cversion", "jungfrau_calib_time"):
+    for key in ("jungfrau_calib_cversion", "jungfrau_calib_time", "jungfrau_detcache_add_calibcons_time", "jungfrau_calib_get_raw_time", "jungfrau_calib_versions_time"):
         entries = stage_values.get(key)
         if entries:
             vals = [v for v, _ in entries]
