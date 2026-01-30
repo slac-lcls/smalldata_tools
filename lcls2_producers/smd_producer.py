@@ -402,21 +402,24 @@ from psmon import publish
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
-from smalldata_tools.ana_funcs.detector_corrections import \
-    PolynomialCurveCorrection
+from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
 from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, projectionFunc
 from smalldata_tools.ana_funcs.smd_svd import SvdFit
 from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc, unsparsifyFunc
-from smalldata_tools.ana_funcs.waveformFunc import (SimpleHitFinder,
-                                                    WfIntegration, hsdROIFunc,
-                                                    hsdsplitFunc)
-from smalldata_tools.common.detector_base import (detData, getUserData,
-                                                  getUserEnvData)
-from smalldata_tools.lcls2.default_detectors import (detOnceData,
-                                                     epicsDetector,
-                                                     genericDetector)
+from smalldata_tools.ana_funcs.waveformFunc import (
+    SimpleHitFinder,
+    WfIntegration,
+    hsdROIFunc,
+    hsdsplitFunc,
+)
+from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
+from smalldata_tools.lcls2.default_detectors import (
+    detOnceData,
+    epicsDetector,
+    genericDetector,
+)
 from smalldata_tools.lcls2.DetObject import DetObject
 from smalldata_tools.lcls2.hutch_default import defaultDetectors
 
@@ -1275,8 +1278,7 @@ if rank == h5_rank:
 
     import h5py
 
-    from smalldata_tools.common.epicsarchive import (EpicsArchive,
-                                                     ts_to_datetime)
+    from smalldata_tools.common.epicsarchive import EpicsArchive, ts_to_datetime
 
     h5_for_arch = h5py.File(h5_f_name, "a")
 
