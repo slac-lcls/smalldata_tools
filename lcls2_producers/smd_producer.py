@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 
-import numpy as np
 import json
-import psana
 import time
 from datetime import datetime
+
+import numpy as np
+import psana
 
 begin_job_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
 start_job = time.time()
 
 import argparse
-import socket
-import os
 import logging
+import os
+import socket
+
 import requests
 
 try:
@@ -20,11 +22,11 @@ try:
 except Exception:
     psutil = None
 import sys
-from glob import glob
-from requests.auth import HTTPBasicAuth
-from pathlib import Path
 from importlib import import_module
+from pathlib import Path
+
 from mpi4py import MPI
+from requests.auth import HTTPBasicAuth
 
 COMM = MPI.COMM_WORLD
 rank = MPI.COMM_WORLD.Get_rank()
@@ -32,6 +34,73 @@ size = MPI.COMM_WORLD.Get_size()
 
 COMM.Barrier()
 job_perf_start = MPI.Wtime()
+DEBUG_GLOBAL_TIMING = os.environ.get("SMD_DEBUG_TIMING", "0") != "0"
+DEBUG_DET = os.environ.get("SMD_DEBUG_DET", "0") != "0"
+DEBUG_EVT_TIMING = os.environ.get("SMD_DEBUG_EVT_TIMING", "0") != "0"
+DEBUG_EVT_TIMING_EVERY = int(os.environ.get("SMD_DEBUG_EVT_TIMING_EVERY", "0"))
+_last_mark = job_perf_start
+_evt_last_mark = None
+args_parsed_mark = None
+config_import_mark = None
+output_ready_mark = None
+
+
+def _pss_cur_mb():
+    if psutil is not None:
+        try:
+            return psutil.Process(os.getpid()).memory_full_info().pss / (1024**2)
+        except Exception:
+            pass
+    try:
+        with open("/proc/self/smaps_rollup", "r") as fh:
+            for line in fh:
+                if line.startswith("Pss:"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        return float(parts[1]) / 1024.0
+    except Exception:
+        pass
+    return -1.0
+
+
+def _debug_timing_evt(evt_num):
+    if not DEBUG_EVT_TIMING:
+        return False
+    if DEBUG_EVT_TIMING_EVERY <= 0:
+        return evt_num == 0
+    return evt_num % DEBUG_EVT_TIMING_EVERY == 0
+
+
+def _debug_global_mark(label, now):
+    global _last_mark
+    if not DEBUG_GLOBAL_TIMING or rank != 0:
+        return
+    delta = now - _last_mark
+    since = now - job_perf_start
+    print(
+        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
+    )
+    _last_mark = now
+
+
+def _debug_evt_reset(now):
+    global _evt_last_mark
+    _evt_last_mark = now
+
+
+def _debug_evt_mark(label, now):
+    global _evt_last_mark
+    if not DEBUG_EVT_TIMING:
+        return
+    if _evt_last_mark is None:
+        _evt_last_mark = now
+    delta = now - _evt_last_mark
+    since = now - job_perf_start
+    print(
+        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
+    )
+    _evt_last_mark = now
+
 
 logger = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.DEBUG)
@@ -314,6 +383,10 @@ def define_dets(run, det_list):
     return dets
 
 
+COMM.Barrier()
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("generic module imports", now=MPI.Wtime())
+
 # General Workflow
 # This is meant for arp which means we will always have an exp and run
 
@@ -323,42 +396,42 @@ sys.path.append(fpathup)
 if rank == 0:
     logger.info(fpathup)
 
-from smalldata_tools.utilities import printMsg, checkDet
-from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
-from smalldata_tools.lcls2.default_detectors import (
-    detOnceData,
-    epicsDetector,
-    genericDetector,
-)
-from smalldata_tools.lcls2.hutch_default import defaultDetectors
-from smalldata_tools.lcls2.DetObject import DetObject
-
-from smalldata_tools.ana_funcs.roi_rebin import (
-    ROIFunc,
-    spectrumFunc,
-    projectionFunc,
-    imageFunc,
-)
-from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc, unsparsifyFunc
-from smalldata_tools.ana_funcs.waveformFunc import WfIntegration, SimpleHitFinder
-from smalldata_tools.ana_funcs.waveformFunc import getCMPeakFunc, templateFitFunc
-from smalldata_tools.ana_funcs.waveformFunc import (
-    hsdsplitFunc,
-    hsdBaselineCorrectFunc,
-    hitFinderCFDFunc,
-    hsdROIFunc,
-)
-from smalldata_tools.ana_funcs.droplet import dropletFunc
-from smalldata_tools.ana_funcs.photons import photonFunc
-from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
-from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
-from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
-from smalldata_tools.ana_funcs.smd_svd import SvdFit
-from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
-from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
-
 import psplot
 from psmon import publish
+
+from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
+from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
+from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
+from smalldata_tools.ana_funcs.detector_corrections import \
+    PolynomialCurveCorrection
+from smalldata_tools.ana_funcs.droplet import dropletFunc
+from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
+from smalldata_tools.ana_funcs.roi_rebin import ROIFunc, projectionFunc
+from smalldata_tools.ana_funcs.smd_svd import SvdFit
+from smalldata_tools.ana_funcs.sparsifyFunc import sparsifyFunc, unsparsifyFunc
+from smalldata_tools.ana_funcs.waveformFunc import (SimpleHitFinder,
+                                                    WfIntegration, hsdROIFunc,
+                                                    hsdsplitFunc)
+from smalldata_tools.common.detector_base import (detData, getUserData,
+                                                  getUserEnvData)
+from smalldata_tools.lcls2.default_detectors import (detOnceData,
+                                                     epicsDetector,
+                                                     genericDetector)
+from smalldata_tools.lcls2.DetObject import DetObject
+from smalldata_tools.lcls2.hutch_default import defaultDetectors
+
+# Moved the unused imports to comments to reduce confusion
+# from smalldata_tools.ana_funcs.photons import photonFunc
+# from smalldata_tools.ana_funcs.roi_rebin import (imageFunc, spectrumFunc)
+# from smalldata_tools.ana_funcs.waveformFunc import (getCMPeakFunc,
+#                                                    hitFinderCFDFunc,
+#                                                    hsdBaselineCorrectFunc,
+#                                                    templateFitFunc)
+# from smalldata_tools.utilities import checkDet, printMsg
+
+COMM.Barrier()
+if DEBUG_GLOBAL_TIMING and rank == 0:
+    _debug_global_mark("custom module imports", now=MPI.Wtime())
 
 # Constants
 HUTCHES = ["TMO", "RIX", "UED", "MFX", "XPP"]
@@ -465,82 +538,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-DEBUG_GLOBAL_TIMING = os.environ.get("SMD_DEBUG_TIMING", "0") != "0"
-DEBUG_DET = os.environ.get("SMD_DEBUG_DET", "0") != "0"
-DEBUG_EVT_TIMING = os.environ.get("SMD_DEBUG_EVT_TIMING", "0") != "0"
-DEBUG_EVT_TIMING_EVERY = int(os.environ.get("SMD_DEBUG_EVT_TIMING_EVERY", "0"))
-_last_mark = job_perf_start
-_evt_last_mark = None
-args_parsed_mark = None
-config_import_mark = None
-output_ready_mark = None
-
-
-def _rss_cur_mb():
-    if psutil is None:
-        return -1.0
-    try:
-        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
-    except Exception:
-        return -1.0
-
-
-def _pss_cur_mb():
-    if psutil is not None:
-        try:
-            return psutil.Process(os.getpid()).memory_full_info().pss / (1024**2)
-        except Exception:
-            pass
-    try:
-        with open("/proc/self/smaps_rollup", "r") as fh:
-            for line in fh:
-                if line.startswith("Pss:"):
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        return float(parts[1]) / 1024.0
-    except Exception:
-        pass
-    return -1.0
-
-
-def _debug_timing_evt(evt_num):
-    if not DEBUG_EVT_TIMING:
-        return False
-    if DEBUG_EVT_TIMING_EVERY <= 0:
-        return evt_num == 0
-    return evt_num % DEBUG_EVT_TIMING_EVERY == 0
-
-
-def _debug_global_mark(label, now):
-    global _last_mark
-    if not DEBUG_GLOBAL_TIMING or rank != 0:
-        return
-    delta = now - _last_mark
-    since = now - job_perf_start
-    print(
-        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
-    )
-    _last_mark = now
-
-
-def _debug_evt_reset(now):
-    global _evt_last_mark
-    _evt_last_mark = now
-
-
-def _debug_evt_mark(label, now):
-    global _evt_last_mark
-    if not DEBUG_EVT_TIMING:
-        return
-    if _evt_last_mark is None:
-        _evt_last_mark = now
-    delta = now - _evt_last_mark
-    since = now - job_perf_start
-    print(
-        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
-    )
-    _evt_last_mark = now
-
 
 COMM.Barrier()
 if DEBUG_GLOBAL_TIMING and rank == 0:
@@ -607,6 +604,8 @@ if hutch not in HUTCHES:
     logger.error("Could not find {0} in list of available hutches".format(hutch))
     sys.exit()
 
+det_presence = {}
+
 
 # Get config file
 def get_config_file(name, folder_path=Path(fpathup) / "lcls2_producers"):
@@ -650,7 +649,7 @@ if not args.psdm_dir:
             while nFiles == 0:
                 if n_wait > max_wait:
                     raise RuntimeError(
-                        "Waited {str(n_wait*10)}s, still no files available. Giving up."
+                        f"Waited {str(n_wait*10)}s, still no files available. Giving up."
                     )
                 xtc_files = get_xtc_files(PSDM_BASE, exp, run)
                 nFiles = len(xtc_files)
@@ -899,7 +898,6 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         f"Rank {rank} integrating detectors: {[det._name for det in int_dets]}"
     )
 
-    det_presence = {}
     if args.full:
         try:
             aliases = [dn for dn in thisrun.detnames]
@@ -1151,6 +1149,7 @@ for evt_num, evt in enumerate(event_iter):
                             "value": evt_num + 1,
                         }
                     ],
+                    timeout=10,
                 )
             except:
                 print("ARP update post failed")
@@ -1273,8 +1272,11 @@ if small_data_enabled:
 if rank == h5_rank:
     logger.info(f"Getting epics data from Archiver (rank: {rank})")
     import asyncio
+
     import h5py
-    from smalldata_tools.common.epicsarchive import EpicsArchive, ts_to_datetime
+
+    from smalldata_tools.common.epicsarchive import (EpicsArchive,
+                                                     ts_to_datetime)
 
     h5_for_arch = h5py.File(h5_f_name, "a")
 
@@ -1286,34 +1288,35 @@ if rank == h5_rank:
         max(ts[int(-1e5) :])
     )  # assumes the early timestamps are in the last 10k events
 
-    epics_archive = EpicsArchive()
-    loop = asyncio.get_event_loop()
-    pvs = [pv[0] if isinstance(pv, tuple) else pv for pv in config.epicsPV]
-    coroutines = [
-        epics_archive.get_points(PV=pv, start=start, end=end, raw=True, useMS=True)
-        for pv in pvs
-    ]
+    if hasattr(config, "epicsPV") and config.epicsPV:
+        epics_archive = EpicsArchive()
+        loop = asyncio.get_event_loop()
+        pvs = [pv[0] if isinstance(pv, tuple) else pv for pv in config.epicsPV]
+        coroutines = [
+            epics_archive.get_points(PV=pv, start=start, end=end, raw=True, useMS=True)
+            for pv in pvs
+        ]
 
-    logger.debug(f"Run PV retrieval (async)")
-    data = loop.run_until_complete(asyncio.gather(*coroutines))
+        logger.debug(f"Run PV retrieval (async)")
+        data = loop.run_until_complete(asyncio.gather(*coroutines))
 
-    # Save to files
-    h5_for_arch.create_group("epics_archiver")
-    for pv_, data in zip(config.epicsPV, data):
-        if isinstance(pv_, tuple):
-            # In format ("PV", "alias")
-            pv = pv_[0]
-            alias = pv_[1]
-        else:
-            pv = pv_
-            alias = None
-        pv = pv.replace(":", "_")
-        if data == []:
-            continue
-        data = np.asarray(data)
-        dset_name = pv if alias is None else alias
-        dset = h5_for_arch.create_dataset(f"epics_archiver/{dset_name}", data=data)
-        logger.debug(f"Saved {pv} from archiver data.")
+        # Save to files
+        h5_for_arch.create_group("epics_archiver")
+        for pv_, data in zip(config.epicsPV, data):
+            if isinstance(pv_, tuple):
+                # In format ("PV", "alias")
+                pv = pv_[0]
+                alias = pv_[1]
+            else:
+                pv = pv_
+                alias = None
+            pv = pv.replace(":", "_")
+            if data == []:
+                continue
+            data = np.asarray(data)
+            dset_name = pv if alias is None else alias
+            dset = h5_for_arch.create_dataset(f"epics_archiver/{dset_name}", data=data)
+            logger.debug(f"Saved {pv} from archiver data.")
     h5_for_arch.close()
 
 
@@ -1365,6 +1368,7 @@ if ds.unique_user_rank():
                     "value": "~ %d cores * %d evts" % (size, evt_num),
                 }
             ],
+            timeout=10,
         )
     else:
         print(f"Last Event: {evt_num}")
@@ -1405,13 +1409,15 @@ if args.postRuntable and ds.unique_user_rank():
             params={"run_num": args.run},
             json=runtable_data,
             auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
+            timeout=10,
         )
         logger.debug(r)
-    if det_presence != {}:
+    if det_presence != {} and os.environ.get("ARP_LOCATION", None) == "S3DF":
         rp = requests.post(
             ws_url,
             params={"run_num": args.run},
             json=det_presence,
             auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
+            timeout=10,
         )
         logger.debug(rp)

@@ -13,6 +13,8 @@ $(basename "$0"):
             Number of MPI ranks to launch with mpirun
         --gather_interval
             Number of events per smalldata gather (default: 100)
+        --smd_debug_level
+            Debug level for SMD timing/envs (default: 0)
 EOF
 }
 
@@ -78,6 +80,11 @@ do
         GATHER_INTERVAL="$2"
         GATHER_INTERVAL_SET=1
         POSITIONAL+=("--gather_interval" "$2")
+        shift
+        shift
+        ;;
+    --smd_debug_level)
+        SMD_DEBUG_LEVEL="$2"
         shift
         shift
         ;;
@@ -160,6 +167,38 @@ else
     DATAPATH=`python $SMD_ROOT/arp_scripts/file_location.py -e $EXP -r $RUN`
 fi
 export SIT_PSDM_DATA=$DATAPATH
+
+SMD_DEBUG_LEVEL=${SMD_DEBUG_LEVEL:=0}
+export SMD_DEBUG_SMALLDATA_TIMING=0  # in psana/smalldata.py
+export SMD_DEBUG_TIMING=0
+export SMD_DEBUG_EVT_TIMING=0
+export SMD_DEBUG_TIMING_EVERY=0
+export SMD_DEBUG_DET=0
+export SMD_DEBUG_DETOBJ=0
+export SMD_DEBUG_AZAV_SHM=0
+
+if [ "$SMD_DEBUG_LEVEL" -ge 1 ]; then
+    export SMD_DEBUG_SMALLDATA_TIMING=1
+    export SMD_DEBUG_TIMING=1
+    export SMD_DEBUG_EVT_TIMING=1
+    export SMD_DEBUG_TIMING_EVERY=1
+    export SMD_DEBUG_DET=1
+fi
+if [ "$SMD_DEBUG_LEVEL" -ge 2 ]; then
+    export SMD_DEBUG_DETOBJ=1
+    export SMD_DEBUG_AZAV_SHM=1
+fi
+
+if [ "$SMD_DEBUG_LEVEL" -gt 0 ]; then
+    echo "[DEBUG] SMD_DEBUG_LEVEL: $SMD_DEBUG_LEVEL"
+    echo "[DEBUG] SMD_DEBUG_SMALLDATA_TIMING: $SMD_DEBUG_SMALLDATA_TIMING"
+    echo "[DEBUG] SMD_DEBUG_TIMING: $SMD_DEBUG_TIMING"
+    echo "[DEBUG] SMD_DEBUG_EVT_TIMING: $SMD_DEBUG_EVT_TIMING"
+    echo "[DEBUG] SMD_DEBUG_TIMING_EVERY: $SMD_DEBUG_TIMING_EVERY"
+    echo "[DEBUG] SMD_DEBUG_DET: $SMD_DEBUG_DET"
+    echo "[DEBUG] SMD_DEBUG_DETOBJ: $SMD_DEBUG_DETOBJ"
+    echo "[DEBUG] SMD_DEBUG_AZAV_SHM: $SMD_DEBUG_AZAV_SHM"
+fi
 
 if [ -v INTERACTIVE ]; then
     DEFAULT_SRV_CORES=1
