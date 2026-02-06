@@ -287,7 +287,8 @@ class azimuthalBinning(DetObjectFunc):
                 return None
 
         cache = self._shared_cache
-        cache_enabled = cache is not None and cache.enabled
+        use_shared = os.environ.get('AZAV_USE_SHARED', '0').strip().lower() in ("1", "true", "yes", "on")
+        cache_enabled = use_shared and cache is not None and cache.enabled
         shared_mem = cache.shared_mem if cache_enabled else None
         shm_comm = (
             getattr(shared_mem, "shm_comm", None) if shared_mem is not None else None
@@ -630,8 +631,17 @@ class azimuthalBinning(DetObjectFunc):
                     shared_mem.barrier()
                 self._mask = shared_mask.astype(bool)
                 self.Cake_idxs = shared_idxs
+                # Optionally copy shared Cake_idxs into private memory (one-time per process)
+                if self.Cake_idxs is not None and getattr(self.Cake_idxs, 'base', None) is not None:
+                    self.Cake_idxs = self.Cake_idxs.copy()
+                    print(f"[DEBUG] rank {rank} azav copied Cake_idxs from shared memory")
+
                 self.Cake_norm = shared_norm
                 self.correction = shared_corr
+                # Optionally copy shared correction into private memory (one-time per process)
+                if self.correction is not None and getattr(self.correction, 'base', None) is not None:
+                    self.correction = self.correction.copy()
+                    print(f"[DEBUG] rank {rank} azav copied correction from shared memory")
                 if not is_leader:
                     self._azav_mark(
                         f"azav shared cache retrieved det={self._det_name or 'unknown'}"
@@ -670,6 +680,7 @@ class azimuthalBinning(DetObjectFunc):
         sys.stdout.flush()
 
     def doCake(self, img, applyCorrection=True):
+        self._azav_mark("azav doCake start")
         if self.darkImg is not None:
             img -= self.darkImg
         if self.gainImg is not None:
@@ -705,6 +716,7 @@ class azimuthalBinning(DetObjectFunc):
         return self.Icake
 
     def process(self, data):
+        self._azav_mark("azav process start")
         data = data.copy()
         if self.thresADU is not None:
             data[data < self.thresADU] = 0.0
@@ -714,6 +726,7 @@ class azimuthalBinning(DetObjectFunc):
             data[data > self.thresRms * self.rms] = 0.0
         if self.square:
             data = data * data
+        self._azav_mark("azav process done")
         return {"azav": self.doCake(data)}
 
 

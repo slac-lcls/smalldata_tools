@@ -831,8 +831,10 @@ else:
     if ds.unique_user_rank():
         logger.warning("PS_SRV_NODES=0: small_data disabled; skipping ds.smalldata.")
 
-
-if DEBUG_GLOBAL_TIMING:
+# For debugging, bd timing 
+if DEBUG_GLOBAL_TIMING and ds.is_bd():
+    bd_node_comm = thisrun.comms.get_bd_node_comm()
+    bd_node_comm.Barrier()
     smd_init_mark = MPI.Wtime()
     print(
         f"[DEBUG] rank {rank} smd init since_start={smd_init_mark - job_perf_start:.6f}s delta={smd_init_mark - run_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
@@ -940,6 +942,8 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         normdict[det._name] = {"count": 0, "timestamp_min": 0, "timestamp_max": 0}
 
 if DEBUG_GLOBAL_TIMING and ds.is_bd():
+    bd_node_comm = thisrun.comms.get_bd_node_comm()
+    bd_node_comm.Barrier()
     default_det_setup_mark = MPI.Wtime()
     print(
         f"[DEBUG] rank {rank} default det setup since_start={default_det_setup_mark - job_perf_start:.6f}s delta={default_det_setup_mark - smd_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
