@@ -831,7 +831,7 @@ else:
     if ds.unique_user_rank():
         logger.warning("PS_SRV_NODES=0: small_data disabled; skipping ds.smalldata.")
 
-# For debugging, bd timing 
+# For debugging, bd timing
 if DEBUG_GLOBAL_TIMING and ds.is_bd():
     bd_node_comm = thisrun.comms.get_bd_node_comm()
     bd_node_comm.Barrier()
