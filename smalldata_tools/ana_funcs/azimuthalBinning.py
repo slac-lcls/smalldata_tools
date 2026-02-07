@@ -120,7 +120,6 @@ class azimuthalBinning(DetObjectFunc):
         if self._mask is not None:
             self._mask = np.asarray(self._mask, dtype=bool)
         self._azav_last = None
-        self._azav_mark("azav initialized")
 
     def _azav_mark(self, msg):
         now = time.perf_counter()
@@ -211,40 +210,33 @@ class azimuthalBinning(DetObjectFunc):
         return cache.make_key(det_name, azav_id)
 
     def setFromDet(self, det):
-        self._azav_mark("azav setFromDet start")
+        self._azav_last = time.perf_counter()
         if det.mask is not None and det.cmask is not None:
-            if (
-                self._mask is not None
-                and self._mask.flatten().shape == det.mask.flatten().shape
-            ):
-                self._mask = ~(
-                    self._mask.flatten().astype(bool) & det.mask.astype(bool).flatten()
-                )
+            det_mask = np.asarray(det.mask, dtype=bool).ravel()
+            det_cmask = np.asarray(det.cmask, dtype=bool).ravel()
+            if self._mask is not None:
+                base_mask = np.asarray(self._mask, dtype=bool).ravel()
+                if base_mask.shape == det_mask.shape:
+                    self._mask = ~(base_mask & det_mask)
+                else:
+                    self._mask = ~(det_cmask & det_mask)
             else:
-                self._mask = ~(det.cmask.astype(bool) & det.mask.astype(bool))
-        self._azav_mark("azav setFromDet after mask")
-        self._mask = self._mask.flatten()
-        self._azav_mark("azav setFromDet after mask flatten")
+                self._mask = ~(det_cmask & det_mask)
+        if self._mask is not None:
+            self._mask = np.asarray(self._mask, dtype=bool).ravel()
         # if self._mask is None and det.mask is not None:
         #    setattr(self, '_mask', det.mask.astype(np.uint8))
         if det.x is not None:
-            # self.x = det.x.flatten() / 1e3
-            # self.y = det.y.flatten() / 1e3
             self.x = det.x.astype(np.float32, copy=False).ravel() / 1e3
             self.y = det.y.astype(np.float32, copy=False).ravel() / 1e3
-            self._azav_mark("azav setFromDet after x/y flatten")
             if det.z is not None:
-                # self.z = det.z.flatten() / 1e3
                 self.z = det.z.astype(np.float32, copy=False).ravel() / 1e3
-                self._azav_mark("azav setFromDet after z flatten")
             else:
                 self.z = np.zeros_like(det.x.flatten())
-                self._azav_mark("azav setFromDet after z default")
             self.z_off = np.nanmean(self.z) - self.z
             # z_off defined such that z_off >0 is downstream
-        self._azav_mark("azav setFromDet before _init_shared_cache")
         self._init_shared_cache(det)
-        self._azav_mark("azav after _init_shared_cache")
+        self._azav_mark("azav setFromDet done")
 
     def setFromFunc(self, func=None):
         super(azimuthalBinning, self).setFromFunc()
@@ -267,9 +259,7 @@ class azimuthalBinning(DetObjectFunc):
                 self._mask = (~(getattr(func, maskattr).astype(bool))).flatten()
         # elif func._rms is not None:
         #    self._mask = np.ones_like(func._rms).flatten()
-        self._azav_mark("azav setFromFunc")
         self._setup()
-        self._azav_mark("azav after _setup")
 
     def _setup(self):
 
@@ -296,7 +286,7 @@ class azimuthalBinning(DetObjectFunc):
             getattr(shared_mem, "is_leader", False) if shared_mem is not None else False
         )
         key = self._build_cache_key() if cache_enabled else None
-        self._azav_mark(f"azav cache_enabled: {cache_enabled}, key: {key is not None}")
+        cache_hit = False
 
         if cache_enabled and key is not None:
             cached_idxs = cache.get_if_present(key, "cake_idxs")
@@ -309,9 +299,6 @@ class azimuthalBinning(DetObjectFunc):
                 and cached_norm is not None
                 and cached_corr is not None
             ):
-                self._azav_mark(
-                    f"azav shared cache hit det={self._det_name or 'unknown'}"
-                )
                 if cached_mask is not None:
                     self._mask = cached_mask.astype(bool)
                 self.Cake_idxs = cached_idxs
@@ -341,11 +328,12 @@ class azimuthalBinning(DetObjectFunc):
                         self.nr = cached_norm.shape[1]
                     else:
                         self.nq = cached_norm.shape[1]
-                return
+                cache_hit = True
 
         compute_needed = (not cache_enabled) or is_leader
+        if cache_hit:
+            compute_needed = False
         if compute_needed:
-            self._azav_mark("azav computing binning")
             tx = np.deg2rad(self.tx)
             ty = np.deg2rad(self.ty)
             self.xcen = float(self.xcen)
@@ -565,10 +553,8 @@ class azimuthalBinning(DetObjectFunc):
             self.Cake_idxs = self.Cake_idxs[self._mask.ravel() == 0]
             self.correction = self.correction.flatten()[self._mask.ravel() == 0]
             # print('return ', self.Cake_idxs.shape, self.Cake_idxs.max())
-            self._azav_mark("azav computing binning done")
-
-        if cache_enabled and key is not None:
-            self._azav_mark(f"azav storing azav cache for key {key}")
+    
+        if cache_enabled and key is not None and not cache_hit:
             spec = None
             meta = None
             if is_leader:
@@ -591,9 +577,7 @@ class azimuthalBinning(DetObjectFunc):
                 cache.record_meta(key, meta)
             if shm_comm is not None:
                 spec = shm_comm.bcast(spec, root=0)
-                self._azav_mark("azav bcast spec done")
                 meta = shm_comm.bcast(meta, root=0)
-                self._azav_mark("azav bcast meta done")
             if spec is not None:
                 shared_mask, _ = cache.get_or_allocate(
                     key, "mask", spec["mask"][0], spec["mask"][1], zero_init=False
@@ -624,19 +608,12 @@ class azimuthalBinning(DetObjectFunc):
                     shared_idxs[:] = self.Cake_idxs
                     shared_norm[:] = self.Cake_norm
                     shared_corr[:] = self.correction
-                    self._azav_mark(
-                        f"azav shared cache leader wrote det={self._det_name or 'unknown'}"
-                    )
                 if shared_mem is not None:
                     shared_mem.barrier()
                 self._mask = shared_mask.astype(bool)
                 self.Cake_idxs = shared_idxs
                 self.Cake_norm = shared_norm
                 self.correction = shared_corr
-                if not is_leader:
-                    self._azav_mark(
-                        f"azav shared cache retrieved det={self._det_name or 'unknown'}"
-                    )
                 if meta is not None:
                     self.nphi = meta.get("nphi", self.Cake_norm.shape[0])
                     if meta.get("rbin", False):
@@ -655,10 +632,9 @@ class azimuthalBinning(DetObjectFunc):
                     theta_vals = meta.get("theta")
                     if theta_vals is not None:
                         self.theta = np.array(theta_vals)
-            self._azav_mark("azav storing azav cache done")
-            return
+    
 
-        return
+        self._azav_mark("azav _setup done")
 
     def msg(self, s, cr=True):
         if self._debug:
@@ -671,7 +647,6 @@ class azimuthalBinning(DetObjectFunc):
         sys.stdout.flush()
 
     def doCake(self, img, applyCorrection=True):
-        self._azav_mark("azav doCake start")
         if self.darkImg is not None:
             img -= self.darkImg
         if self.gainImg is not None:
@@ -686,28 +661,24 @@ class azimuthalBinning(DetObjectFunc):
 
         if applyCorrection:
             # I=np.bincount(self.Cake_idxs, weights = img.ravel()/self.correction.ravel(), minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-            self._azav_mark("azav doCake np.bincount start")
-            I = np.bincount(
+                I = np.bincount(
                 self.Cake_idxs,
                 weights=img / self.correction.ravel(),
                 minlength=nradial * self.nphi,
             )
-            self._azav_mark("azav doCake np.bincount done")
-            I = I[: nradial * self.nphi]
+                I = I[: nradial * self.nphi]
         else:
             # I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-            self._azav_mark("azav doCake np.bincount start")
-            I = np.bincount(self.Cake_idxs, weights=img, minlength=self.nq * self.nphi)
-            self._azav_mark("azav doCake np.bincount done")
-            I = I[: self.nq * self.nphi]
+                I = np.bincount(self.Cake_idxs, weights=img, minlength=self.nq * self.nphi)
+                I = I[: self.nq * self.nphi]
         I = np.reshape(I, (self.nphi, self.nq))
         # don't calculate this - I don't think this is stored.
         # self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...
         self.Icake = I / self.Cake_norm
+        self._azav_mark("azav doCake done")
         return self.Icake
 
     def process(self, data):
-        self._azav_mark("azav process start")
         data = data.copy()
         if self.thresADU is not None:
             data[data < self.thresADU] = 0.0
@@ -717,7 +688,6 @@ class azimuthalBinning(DetObjectFunc):
             data[data > self.thresRms * self.rms] = 0.0
         if self.square:
             data = data * data
-        self._azav_mark("azav process done")
         return {"azav": self.doCake(data)}
 
 

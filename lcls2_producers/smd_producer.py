@@ -37,7 +37,6 @@ job_perf_start = MPI.Wtime()
 DEBUG_GLOBAL_TIMING = os.environ.get("SMD_DEBUG_TIMING", "0") != "0"
 DEBUG_DET = os.environ.get("SMD_DEBUG_DET", "0") != "0"
 DEBUG_EVT_TIMING = os.environ.get("SMD_DEBUG_EVT_TIMING", "0") != "0"
-DEBUG_EVT_TIMING_EVERY = int(os.environ.get("SMD_DEBUG_EVT_TIMING_EVERY", "0"))
 _last_mark = job_perf_start
 _evt_last_mark = None
 args_parsed_mark = None
@@ -64,11 +63,7 @@ def _pss_cur_mb():
 
 
 def _debug_timing_evt(evt_num):
-    if not DEBUG_EVT_TIMING:
-        return False
-    if DEBUG_EVT_TIMING_EVERY <= 0:
-        return evt_num == 0
-    return evt_num % DEBUG_EVT_TIMING_EVERY == 0
+    return DEBUG_EVT_TIMING
 
 
 def _debug_global_mark(label, now):
@@ -77,8 +72,12 @@ def _debug_global_mark(label, now):
         return
     delta = now - _last_mark
     since = now - job_perf_start
+    if label in ("ds args setup", "run init"):
+        pss_suffix = f" pss_mb={_pss_cur_mb():.2f}"
+    else:
+        pss_suffix = ""
     print(
-        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
+        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s{pss_suffix}"
     )
     _last_mark = now
 
@@ -97,7 +96,7 @@ def _debug_evt_mark(label, now):
     delta = now - _evt_last_mark
     since = now - job_perf_start
     print(
-        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s pss_mb={_pss_cur_mb():.2f}"
+        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s"
     )
     _evt_last_mark = now
 
@@ -831,15 +830,6 @@ else:
     if ds.unique_user_rank():
         logger.warning("PS_SRV_NODES=0: small_data disabled; skipping ds.smalldata.")
 
-# For debugging, bd timing
-if DEBUG_GLOBAL_TIMING and ds.is_bd():
-    bd_node_comm = thisrun.comms.get_bd_node_comm()
-    bd_node_comm.Barrier()
-    smd_init_mark = MPI.Wtime()
-    print(
-        f"[DEBUG] rank {rank} smd init since_start={smd_init_mark - job_perf_start:.6f}s delta={smd_init_mark - run_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
-    )
-
 ##########################################################
 ##
 ## Setting up the default detectors
@@ -942,11 +932,9 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
         normdict[det._name] = {"count": 0, "timestamp_min": 0, "timestamp_max": 0}
 
 if DEBUG_GLOBAL_TIMING and ds.is_bd():
-    bd_node_comm = thisrun.comms.get_bd_node_comm()
-    bd_node_comm.Barrier()
     default_det_setup_mark = MPI.Wtime()
     print(
-        f"[DEBUG] rank {rank} default det setup since_start={default_det_setup_mark - job_perf_start:.6f}s delta={default_det_setup_mark - smd_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
+        f"[DEBUG] rank {rank} default det setup since_start={default_det_setup_mark - job_perf_start:.6f}s delta={default_det_setup_mark - run_init_mark:.6f}s"
     )
 
 event_iter = thisrun.events()
@@ -958,10 +946,8 @@ smd_save_sum_mark = None
 smd_save_cfg_mark = None
 
 for evt_num, evt in enumerate(event_iter):
-    if DEBUG_EVT_TIMING and evt_num == 0:
-        _debug_evt_reset(MPI.Wtime())
     det_data = detData(default_dets, evt)
-    if _debug_timing_evt(evt_num):
+    if evt_num > 0 and _debug_timing_evt(evt_num):
         _debug_evt_mark(f"evt {evt_num} default detData", now=MPI.Wtime())
 
     # If we don't have the epics once data, try to get it!
@@ -1019,7 +1005,7 @@ for evt_num, evt in enumerate(event_iter):
             # print(e)
             # pass
 
-    if _debug_timing_evt(evt_num):
+    if evt_num > 0 and _debug_timing_evt(evt_num):
         _debug_evt_mark(f"evt {evt_num} user dets", now=MPI.Wtime())
     # Combine default data & user data into single dict.
     det_data.update(userDict)
@@ -1106,7 +1092,7 @@ for evt_num, evt in enumerate(event_iter):
                 if small_data_enabled:
                     small_data.event(evt, userDictInt, align_group="intg")
                 intg_write = time.perf_counter()
-        if _debug_timing_evt(evt_num):
+        if evt_num > 0 and _debug_timing_evt(evt_num):
             _debug_evt_mark(f"evt {evt_num} intg dets", now=MPI.Wtime())
 
     # store event-based data
@@ -1136,7 +1122,7 @@ for evt_num, evt in enumerate(event_iter):
             timing_data = det_data.get("timing", {})
             data_for_smd = {"scan": scan_data, "timing": timing_data}
             small_data.event(evt, data_for_smd)
-    if _debug_timing_evt(evt_num):
+    if evt_num > 0 and _debug_timing_evt(evt_num):
         _debug_evt_mark(f"evt {evt_num} event store", now=MPI.Wtime())
 
     # the ARP will pass run & exp via the environment, if I see that info, the post updates
@@ -1169,6 +1155,8 @@ for evt_num, evt in enumerate(event_iter):
     # heavy processing time is captured.
     if evt_num == 0:
         first_evt_mark = MPI.Wtime()
+        if DEBUG_EVT_TIMING:
+            _debug_evt_reset(first_evt_mark)
     if DEBUG_GLOBAL_TIMING and evt_num == 0 and ds.is_bd():
         print(
             f"[DEBUG] rank {rank} first evt start since_start={first_evt_mark - job_perf_start:.6f}s delta={first_evt_mark - default_det_setup_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
@@ -1183,7 +1171,7 @@ if (
 ):
     last_evt_mark = MPI.Wtime()
     print(
-        f"[DEBUG] rank {rank} last evt processing since_start={last_evt_mark - job_perf_start:.6f}s delta={last_evt_mark - first_evt_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
+        f"[DEBUG] rank {rank} last evt processing since_start={last_evt_mark - job_perf_start:.6f}s delta={last_evt_mark - first_evt_mark:.6f}s"
     )
 
 if not ds.is_srv():
@@ -1202,7 +1190,6 @@ if not ds.is_srv():
     if DEBUG_EVT_TIMING and ds.is_bd() and last_evt_mark is not None:
         smd_save_sum_mark = MPI.Wtime()
         print(
-            f"[DEBUG] rank {rank} smd done save sum since_start={smd_save_sum_mark - job_perf_start:.6f}s delta={smd_save_sum_mark - last_evt_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
         )
 
     if ds.unique_user_rank():
@@ -1239,7 +1226,6 @@ if not ds.is_srv():
     if DEBUG_EVT_TIMING and ds.is_bd() and smd_save_sum_mark is not None:
         smd_save_cfg_mark = MPI.Wtime()
         print(
-            f"[DEBUG] rank {rank} smd done save cfg since_start={smd_save_cfg_mark - job_perf_start:.6f}s delta={smd_save_cfg_mark - smd_save_sum_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
         )
 
 # Finishing up:
@@ -1260,13 +1246,11 @@ if (
 ):
     smd_done_non_srv_mark = MPI.Wtime()
     print(
-        f"[DEBUG] rank {rank} smd done all since_start={smd_done_non_srv_mark - job_perf_start:.6f}s delta={smd_done_non_srv_mark - smd_save_cfg_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
     )
 # Special print only for srv nodes
 if DEBUG_GLOBAL_TIMING and ds.is_srv():
     smd_done_mark = MPI.Wtime()
     print(
-        f"[DEBUG] rank {rank} srv node done at since_start={smd_done_mark - job_perf_start:.6f}s delta={smd_done_mark - run_init_mark:.6f}s pss_mb={_pss_cur_mb():.2f}"
     )
 
 # Epics data from the archiver
