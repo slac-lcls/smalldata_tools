@@ -553,7 +553,7 @@ class azimuthalBinning(DetObjectFunc):
             self.Cake_idxs = self.Cake_idxs[self._mask.ravel() == 0]
             self.correction = self.correction.flatten()[self._mask.ravel() == 0]
             # print('return ', self.Cake_idxs.shape, self.Cake_idxs.max())
-    
+
         if cache_enabled and key is not None and not cache_hit:
             spec = None
             meta = None
@@ -632,7 +632,6 @@ class azimuthalBinning(DetObjectFunc):
                     theta_vals = meta.get("theta")
                     if theta_vals is not None:
                         self.theta = np.array(theta_vals)
-    
 
         self._azav_mark("azav _setup done")
 
@@ -661,16 +660,16 @@ class azimuthalBinning(DetObjectFunc):
 
         if applyCorrection:
             # I=np.bincount(self.Cake_idxs, weights = img.ravel()/self.correction.ravel(), minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-                I = np.bincount(
+            I = np.bincount(
                 self.Cake_idxs,
                 weights=img / self.correction.ravel(),
                 minlength=nradial * self.nphi,
             )
-                I = I[: nradial * self.nphi]
+            I = I[: nradial * self.nphi]
         else:
             # I=np.bincount(self.Cake_idxs, weights = img.ravel()                        , minlength=self.nq*self.nphi); I=I[:self.nq*self.nphi]
-                I = np.bincount(self.Cake_idxs, weights=img, minlength=self.nq * self.nphi)
-                I = I[: self.nq * self.nphi]
+            I = np.bincount(self.Cake_idxs, weights=img, minlength=self.nq * self.nphi)
+            I = I[: self.nq * self.nphi]
         I = np.reshape(I, (self.nphi, self.nq))
         # don't calculate this - I don't think this is stored.
         # self.sig = 1./np.sqrt(self.ADU_per_photon)*np.sqrt(I)/self.Cake_norm    # ??? where comes this sqrt from? Ah I see...

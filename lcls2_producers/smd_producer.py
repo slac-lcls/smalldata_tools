@@ -76,9 +76,7 @@ def _debug_global_mark(label, now):
         pss_suffix = f" pss_mb={_pss_cur_mb():.2f}"
     else:
         pss_suffix = ""
-    print(
-        f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s{pss_suffix}"
-    )
+    print(f"[DEBUG] {label} since_start={since:.6f}s delta={delta:.6f}s{pss_suffix}")
     _last_mark = now
 
 
@@ -95,9 +93,7 @@ def _debug_evt_mark(label, now):
         _evt_last_mark = now
     delta = now - _evt_last_mark
     since = now - job_perf_start
-    print(
-        f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s"
-    )
+    print(f"[DEBUG] rank {rank} {label} since_start={since:.6f}s delta={delta:.6f}s")
     _evt_last_mark = now
 
 
@@ -1189,8 +1185,7 @@ if not ds.is_srv():
 
     if DEBUG_EVT_TIMING and ds.is_bd() and last_evt_mark is not None:
         smd_save_sum_mark = MPI.Wtime()
-        print(
-        )
+        print()
 
     if ds.unique_user_rank():
         logger.info("Saving detector configuration to UserDataCfg")
@@ -1225,8 +1220,7 @@ if not ds.is_srv():
 
     if DEBUG_EVT_TIMING and ds.is_bd() and smd_save_sum_mark is not None:
         smd_save_cfg_mark = MPI.Wtime()
-        print(
-        )
+        print()
 
 # Finishing up:
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
@@ -1245,13 +1239,11 @@ if (
     and smd_save_cfg_mark is not None
 ):
     smd_done_non_srv_mark = MPI.Wtime()
-    print(
-    )
+    print()
 # Special print only for srv nodes
 if DEBUG_GLOBAL_TIMING and ds.is_srv():
     smd_done_mark = MPI.Wtime()
-    print(
-    )
+    print()
 
 # Epics data from the archiver
 h5_rank = None
