@@ -287,13 +287,7 @@ class azimuthalBinning(DetObjectFunc):
                 return None
 
         cache = self._shared_cache
-        use_shared = os.environ.get("AZAV_USE_SHARED", "0").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        cache_enabled = use_shared and cache is not None and cache.enabled
+        cache_enabled = cache is not None and cache.enabled
         shared_mem = cache.shared_mem if cache_enabled else None
         shm_comm = (
             getattr(shared_mem, "shm_comm", None) if shared_mem is not None else None
@@ -597,6 +591,7 @@ class azimuthalBinning(DetObjectFunc):
                 cache.record_meta(key, meta)
             if shm_comm is not None:
                 spec = shm_comm.bcast(spec, root=0)
+                self._azav_mark("azav bcast spec done")
                 meta = shm_comm.bcast(meta, root=0)
                 self._azav_mark("azav bcast meta done")
             if spec is not None:
@@ -636,27 +631,8 @@ class azimuthalBinning(DetObjectFunc):
                     shared_mem.barrier()
                 self._mask = shared_mask.astype(bool)
                 self.Cake_idxs = shared_idxs
-                # Optionally copy shared Cake_idxs into private memory (one-time per process)
-                if (
-                    self.Cake_idxs is not None
-                    and getattr(self.Cake_idxs, "base", None) is not None
-                ):
-                    self.Cake_idxs = self.Cake_idxs.copy()
-                    print(
-                        f"[DEBUG] rank {rank} azav copied Cake_idxs from shared memory"
-                    )
-
                 self.Cake_norm = shared_norm
                 self.correction = shared_corr
-                # Optionally copy shared correction into private memory (one-time per process)
-                if (
-                    self.correction is not None
-                    and getattr(self.correction, "base", None) is not None
-                ):
-                    self.correction = self.correction.copy()
-                    print(
-                        f"[DEBUG] rank {rank} azav copied correction from shared memory"
-                    )
                 if not is_leader:
                     self._azav_mark(
                         f"azav shared cache retrieved det={self._det_name or 'unknown'}"
