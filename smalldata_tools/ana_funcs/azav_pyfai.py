@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 
 try:
@@ -5,9 +6,11 @@ try:
 except ModuleNotFoundError:
     print("pyFAI not available on LCLS-II env")
 
-from smalldata_tools.common.detector_base import DetObjectFunc
-from smalldata_tools.utilities import image_from_dxy
+### Can LCLSGeom be passed through LUTE or put in environment?
+sys.path.append("/sdf/group/lcls/ds/tools/LCLSGeom")
+from LCLSGeom.psana2.converter import PsanaToPyFAI
 
+from smalldata_tools.common.detector_base import DetObjectFunc
 
 class azav_pyfai(DetObjectFunc):
     """
@@ -49,23 +52,35 @@ class azav_pyfai(DetObjectFunc):
     def __init__(self, **kwargs):
         self._name = kwargs.get("name", "pyfai")
         super(azav_pyfai, self).__init__(**kwargs)
-
         self.mask = kwargs.pop("userMask", None)
         self.threshold = kwargs.pop("thres", None)
         self.return2d = kwargs.pop("return2d", "False")
-
-        # azimuthal integrator argument
+        # Hardcoded metrology file for now, but I can get it from the jungfrau psana Detector object, just unsure on how to do it !
+        # That allows us to map pixel indices to physical coordinates, without assembling and casting the image in a wrong 2D plane.
+        self.geometry_path = "/sdf/home/l/lconreux/geom/mfx100852324/geometry-def-jungfrau16M.data"
+        converter = PsanaToPyFAI(self.geometry_path)
+        pyFAI_detector = converter.detector
         self.poni_file = kwargs.pop("poni_file", None)
         if self.poni_file is not None:
-            self.ai = pyFAI.load(str(self.poni_file))
+            ai = pyFAI.load(str(self.poni_file))
+            dico = ai.getPyFAI()
+            self.ai = pyFAI.AzimuthalIntegrator(
+                detector=pyFAI_detector,
+                dist=dico.pop("dist"),
+                poni1=dico.pop("poni1"),
+                poni2=dico.pop("poni2"),
+                rot1=dico.pop("rot1"),
+                rot2=dico.pop("rot2"),
+                rot3=dico.pop("rot3"),
+                wavelength=dico.pop("wavelength"),
+            )
         else:
             self._ai_kwargs = kwargs.pop("ai_kwargs", None)
-            assert (
-                self._ai_kwargs is not None
-            ), "Need either a calibration file or a set of keywords arguments to instantiate the pyFAI integrator."
-            # self.ai = pyFAI.azimuthalIntegrator.AzimuthalIntegrator(**self._ai_kwargs) # why does it not work?
-            self.ai = pyFAI.AzimuthalIntegrator(**self._ai_kwargs)
-        print(f"Created azimuthal integrator for {self._name}")
+            if self._ai_kwargs is not None:
+                self.ai = pyFAI.AzimuthalIntegrator(
+                    detector=pyFAI_detector,
+                    **self._ai_kwargs
+                )
         # we should have code that extract setup parameters
         #    in case people mess w/ the input
         # we should also extra q/theta/... bins for plotting later.
@@ -94,27 +109,6 @@ class azav_pyfai(DetObjectFunc):
 
     def setFromDet(self, det):
         super(azav_pyfai, self).setFromDet(det)
-        # geometry
-        self.ix = det.ix
-        self.iy = det.iy
-
-        if self.poni_file is None:  # use calib value if calib file is given
-            if len(det.pixelsize) == 2:
-                if det.pixelsize[0] > 1:
-                    self.ai.pixel1 = det.pixelsize[0] * 1e-6
-                    self.ai.pixel2 = det.pixelsize[1] * 1e-6
-                else:
-                    self.ai.pixel1 = det.pixelsize[0]
-                    self.ai.pixel2 = det.pixelsize[1]
-            else:
-                if det.pixelsize[0] > 1:
-                    self.ai.pixel1 = det.pixelsize[0] * 1e-6
-                    self.ai.pixel2 = det.pixelsize[0] * 1e-6
-                else:
-                    self.ai.pixel1 = det.pixelsize[0]
-                    self.ai.pixel2 = det.pixelsize[0]
-
-        # use cmask by default. Note: pyFAI uses 0 for valid pixel.
         if (
             self.mask is not None
             and det.cmask is not None
@@ -135,12 +129,7 @@ class azav_pyfai(DetObjectFunc):
                     except:
                         self.mask = None
         if self.mask is not None and self.mask.ndim == 3:
-            maskInv = ~(self.mask.astype(bool))
-            self.mask = image_from_dxy(self.mask, self.ix, self.iy)
-            maskInvImg = image_from_dxy(maskInv, self.ix, self.iy)
-            maskImg = ~(maskInvImg)
-            self.mask = maskImg
-
+            self.mask = np.reshape(self.mask, (self.mask.shape[0]*self.mask.shape[1], self.mask.shape[2]))
         print(f"Azimuthal integrator:\n{self.ai}")
         return
 
@@ -149,9 +138,9 @@ class azav_pyfai(DetObjectFunc):
 
     def process(self, data):
         if self.threshold is not None:
-            data[data < threshold] = 0
+            data[data < self.threshold] = 0
         if data.ndim == 3:
-            data = image_from_dxy(data, self.ix, self.iy)
+            data = np.reshape(data, (data.shape[0]*data.shape[1], data.shape[2]))
         out = self._process(data)
         return out
 
@@ -178,5 +167,4 @@ class azav_pyfai(DetObjectFunc):
                 method="cython",
                 **self._azav_kwargs,
             )
-
             return {"azav": I, "q": q}
