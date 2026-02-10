@@ -89,6 +89,7 @@ fi
 echo "Producer command: $SMD_ROOT/lcls2_producers/$PYTHONEXE $@"
 if [ -n "$MPI_CORES" ]; then
     mpirun -n "$MPI_CORES" python -u -m mpi4py.run "$SMD_ROOT/lcls2_producers/$PYTHONEXE" "$@"
+    #mpirun -n "$MPI_CORES" --map-by rankfile:file=rankfile python -u -m mpi4py.run "$SMD_ROOT/lcls2_producers/$PYTHONEXE" "$@"
 else
     mpirun python -u -m mpi4py.run "$SMD_ROOT/lcls2_producers/$PYTHONEXE" "$@"
 fi

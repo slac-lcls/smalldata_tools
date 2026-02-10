@@ -251,7 +251,7 @@ def define_dets(run, det_list):
                 thisROIFunc = ROIFunc(**ROI)
                 if proj_ax is not None:
                     thisROIFunc.addFunc(projectionFunc(axis=proj_ax))
-            det.addFunc(thisROIFunc)
+                det.addFunc(thisROIFunc)
         _dd_mark("rois")
 
         if detname in d2p_args:
@@ -682,8 +682,6 @@ h5_f_name = get_sd_file(args.directory, exp, hutch)
 datasource_args = {
     "exp": exp,
     "run": int(run),
-    "monitor": False,
-    "log_level": "INFO",
 }
 if not args.psdm_dir:
     if useFFB:
@@ -780,13 +778,6 @@ if ps_eb_nodes > 0 and 1 <= rank <= ps_eb_nodes:
     print(f"[INFO] eb node rank {rank} hostname {hostname}")
 
 small_data = None
-small_data_enabled = True
-if ps_srv_nodes == 0:
-    small_data_enabled = False
-    if ds.unique_user_rank():
-        logger.warning(
-            "PS_SRV_NODES=0: skipping ds.smalldata and all small_data operations."
-        )
 thisrun = next(ds.runs())
 COMM.Barrier()
 run_init_mark = MPI.Wtime()
@@ -794,37 +785,32 @@ if DEBUG_GLOBAL_TIMING and rank == 0:
     _debug_global_mark("run init", now=run_init_mark)
 
 # Generate smalldata object
-if small_data_enabled:
+if ds.unique_user_rank():
+    logger.info(
+        "Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval)
+    )
+if args.psplot_live_mode:
     if ds.unique_user_rank():
-        logger.info(
-            "Opening the h5file %s, gathering at %d" % (h5_f_name, args.gather_interval)
-        )
-    if args.psplot_live_mode:
-        if ds.unique_user_rank():
-            logger.info("Setting up psplot_live plots.")
-        psplot_configs = config.get_psplot_configs(int(run))
-        psplot_callbacks = psplot.PsplotCallbacks()
+        logger.info("Setting up psplot_live plots.")
+    psplot_configs = config.get_psplot_configs(int(run))
+    psplot_callbacks = psplot.PsplotCallbacks()
 
-        for key, item in psplot_configs.items():
-            callback_func = item.pop("callback")
+    for key, item in psplot_configs.items():
+        callback_func = item.pop("callback")
 
-            psplot_callbacks.add_callback(callback_func(**item), name=key)
-    if args.psplot_live_mode:
-        small_data = ds.smalldata(
-            filename=None,
-            batch_size=args.gather_interval,
-            callbacks=[psplot_callbacks.run],
-        )
-    else:
-        small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
-        # small_data = ds.smalldata(batch_size=args.gather_interval)
-        # if ds.unique_user_rank():
-        #    logger.info("Smalldata object created without filename.")
-    if ds.unique_user_rank():
-        logger.info("smalldata file has been successfully created.")
+        psplot_callbacks.add_callback(callback_func(**item), name=key)
+    small_data = ds.smalldata(
+        filename=None,
+        batch_size=args.gather_interval,
+        callbacks=[psplot_callbacks.run],
+    )
 else:
-    if ds.unique_user_rank():
-        logger.warning("PS_SRV_NODES=0: small_data disabled; skipping ds.smalldata.")
+    small_data = ds.smalldata(filename=h5_f_name, batch_size=args.gather_interval)
+    # small_data = ds.smalldata(batch_size=args.gather_interval)
+    # if ds.unique_user_rank():
+    #    logger.info("Smalldata object created without filename.")
+if ds.unique_user_rank():
+    logger.info("smalldata file has been successfully created.")
 
 ##########################################################
 ##
@@ -993,13 +979,9 @@ for evt_num, evt in enumerate(event_iter):
                 )
             # print(userDict[det._name])
         except Exception as e:
-            logger.warning(
-                f"Failed analyzing det {det} on evt {evt_num}: {e}", exc_info=True
-            )
-            raise
-            # logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
-            # print(e)
-            # pass
+            logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
+            print(e)
+            pass
 
     if evt_num > 0 and _debug_timing_evt(evt_num):
         _debug_evt_mark(f"evt {evt_num} user dets", now=MPI.Wtime())
@@ -1085,8 +1067,7 @@ for evt_num, evt in enumerate(event_iter):
                         userDictInt[det._name][k] = v
                         normdict[det._name][k] = v * 0  # may not work for arrays....
                 # print(userDictInt)
-                if small_data_enabled:
-                    small_data.event(evt, userDictInt, align_group="intg")
+                small_data.event(evt, userDictInt, align_group="intg")
                 intg_write = time.perf_counter()
         if evt_num > 0 and _debug_timing_evt(evt_num):
             _debug_evt_mark(f"evt {evt_num} intg dets", now=MPI.Wtime())
@@ -1110,14 +1091,13 @@ for evt_num, evt in enumerate(event_iter):
     # #save what was selected to be saved.
     # #print('SAVE ',det_data)
 
-    if small_data_enabled:
-        if len(int_dets) == 0 or args.all_events:
-            small_data.event(evt, det_data)
-        else:
-            scan_data = det_data.get("scan", {})
-            timing_data = det_data.get("timing", {})
-            data_for_smd = {"scan": scan_data, "timing": timing_data}
-            small_data.event(evt, data_for_smd)
+    if len(int_dets) == 0 or args.all_events:
+        small_data.event(evt, det_data)
+    else:
+        scan_data = det_data.get("scan", {})
+        timing_data = det_data.get("timing", {})
+        data_for_smd = {"scan": scan_data, "timing": timing_data}
+        small_data.event(evt, data_for_smd)
     if evt_num > 0 and _debug_timing_evt(evt_num):
         _debug_evt_mark(f"evt {evt_num} event store", now=MPI.Wtime())
 
@@ -1172,16 +1152,15 @@ if (
 
 if not ds.is_srv():
     sumDict = {"Sums": {}}
-    if small_data_enabled:
-        for det in dets:
-            for key in det.storeSum().keys():
-                try:
-                    sumData = small_data.sum(det.storeSum()[key])
-                    sumDict["Sums"]["%s_%s" % (det._name, key)] = sumData
-                except:
-                    print("Problem with data sum for %s and key %s" % (det._name, key))
-        if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
-            small_data.save_summary(sumDict)
+    for det in dets:
+        for key in det.storeSum().keys():
+            try:
+                sumData = small_data.sum(det.storeSum()[key])
+                sumDict["Sums"]["%s_%s" % (det._name, key)] = sumData
+            except:
+                print("Problem with data sum for %s and key %s" % (det._name, key))
+    if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
+        small_data.save_summary(sumDict)
 
     if DEBUG_EVT_TIMING and ds.is_bd() and last_evt_mark is not None:
         smd_save_sum_mark = MPI.Wtime()
@@ -1215,7 +1194,7 @@ if not ds.is_srv():
                 Config = {"UserDataCfg": userDataCfg}
         else:
             Config = {"UserDataCfg": userDataCfg}
-        if small_data_enabled and small_data.summary:
+        if small_data.summary:
             small_data.save_summary(Config)  # this only works w/ 1 rank!
 
     if DEBUG_EVT_TIMING and ds.is_bd() and smd_save_sum_mark is not None:
@@ -1226,11 +1205,10 @@ if not ds.is_srv():
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
 # are needed here.
 # Hopefully this can be removed soon.
-if small_data_enabled:
-    logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
+logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
 
-    logger.debug(f"smalldata.done() on rank {rank}")
-    small_data.done()
+logger.debug(f"smalldata.done() on rank {rank}")
+small_data.done()
 
 if (
     DEBUG_EVT_TIMING
@@ -1247,10 +1225,9 @@ if DEBUG_GLOBAL_TIMING and ds.is_srv():
 
 # Epics data from the archiver
 h5_rank = None
-if small_data_enabled:
-    if small_data._type == "client" and small_data._full_filename is not None:
-        if small_data._client_comm.Get_rank() == 0:
-            h5_rank = rank
+if small_data._type == "client" and small_data._full_filename is not None:
+    if small_data._client_comm.Get_rank() == 0:
+        h5_rank = rank
 
 if rank == h5_rank:
     logger.info(f"Getting epics data from Archiver (rank: {rank})")

@@ -227,14 +227,16 @@ class azimuthalBinning(DetObjectFunc):
         # if self._mask is None and det.mask is not None:
         #    setattr(self, '_mask', det.mask.astype(np.uint8))
         if det.x is not None:
-            self.x = det.x.astype(np.float32, copy=False).ravel() / 1e3
-            self.y = det.y.astype(np.float32, copy=False).ravel() / 1e3
+            x = np.asarray(det.x).ravel()
+            y = np.asarray(det.y).ravel()
+            self.x = x
+            self.y = y
             if det.z is not None:
-                self.z = det.z.astype(np.float32, copy=False).ravel() / 1e3
+                self.z = np.asarray(det.z).ravel()
             else:
-                self.z = np.zeros_like(det.x.flatten())
-            self.z_off = np.nanmean(self.z) - self.z
-            # z_off defined such that z_off >0 is downstream
+                self.z = np.zeros_like(self.x)
+            self._coord_scale = np.array(1e-3, dtype=self.x.dtype)
+            self.z_off = None
         self._init_shared_cache(det)
         self._azav_mark("azav setFromDet done")
 
@@ -244,9 +246,12 @@ class azimuthalBinning(DetObjectFunc):
             self._setup()
             return
         if getattr(func, "_x", None) is not None:
-            self.x = func._x.flatten() / 1e3
+            self.x = np.asarray(func._x).ravel()
         if getattr(func, "_y", None) is not None:
-            self.y = func._y.flatten() / 1e3
+            self.y = np.asarray(func._y).ravel()
+        if self.x is not None:
+            self._coord_scale = np.array(1e-3, dtype=self.x.dtype)
+            self.z_off = None
         maskattr = "_mask"
         if not hasattr(func, maskattr):
             maskattr = "mask"
@@ -338,6 +343,18 @@ class azimuthalBinning(DetObjectFunc):
             ty = np.deg2rad(self.ty)
             self.xcen = float(self.xcen)
             self.ycen = float(self.ycen)
+            scale = getattr(self, "_coord_scale", None)
+            if scale is None:
+                scale = np.array(1e-3, dtype=self.x.dtype)
+                self._coord_scale = scale
+            x = self.x * scale
+            y = self.y * scale
+            if self.z_off is None:
+                if self.z is not None:
+                    z = self.z * scale
+                else:
+                    z = np.zeros_like(x)
+                self.z_off = np.nanmean(z) - z
 
             # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
             A, B, C = (
@@ -350,9 +367,6 @@ class azimuthalBinning(DetObjectFunc):
                 float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
                 (self.dis_to_sam + self.z_off),
             )
-
-            x = self.x
-            y = self.y
             r = np.sqrt((x - a) ** 2 + (y - b) ** 2 + c**2)
             self.r = r
 
@@ -488,8 +502,6 @@ class azimuthalBinning(DetObjectFunc):
 
             # coordinates in r
             if self.rbin is not None:
-                x = self.x
-                y = self.y
                 rl = np.sqrt((x - self.xcen) ** 2 + (y - self.ycen) ** 2)
                 self.rlocal = rl
                 # r_max = np.nanmax(self.rlocal)

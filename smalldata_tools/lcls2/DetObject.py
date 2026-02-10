@@ -805,11 +805,6 @@ class JungfrauObject(TiledCameraObject):
             and self.common_mode in [7, 71, 72, 0]
         ):
             self.evt.dat *= self.local_gain  # apply own gain
-        print(
-            "[DEBUG] rank {rank} JungfrauObject getData delta={dt:.6f}s".format(
-                rank=rank, dt=MPI.Wtime() - t0
-            )
-        )
         # correct for area of pixels.
         # if self.areas is not None:
         #    self.evt.dat /= self.areas

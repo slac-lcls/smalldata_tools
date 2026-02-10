@@ -2,10 +2,32 @@
 SharedAzavCache
 ===============
 
-Draft helper for storing azimuthalBinning precomputed arrays in MPI shared memory.
+Thin wrapper that caches azimuthalBinning precomputed arrays in MPI shared
+memory. Requires psana-provided shared memory (e.g., shared_geo.shared_mem)
+to be available.
 
-This is a sketch intended to mirror the SharedGeoCache interface used in psana.
-Integration points should call into this cache to get or build shared arrays.
+Concise call flow:
+1) Build key from detector name + azav_id (hash of geometry + params).
+   Example key prefix: "azav_jungfrau_3fa4c9d1a2b7".
+2) Check for arrays in shared memory (cache hit).
+3) On miss, leader computes arrays and allocates shared storage using spec,
+   then fills them; all ranks read the same shared arrays.
+4) Small metadata is stored locally per rank (not in shared memory).
+
+Example spec (shared allocation info):
+    {"mask": ((4096,), "bool"),
+     "cake_idxs": ((3050000,), "int64"),
+     "cake_norm": ((11, 512), "int64"),
+     "correction": ((4096,), "float64")}
+
+Example meta (local per-rank info):
+    {"nphi": 11, "nq": 512, "nr": None, "rbin": False,
+     "phiVec": [...], "qbins": [...], "q": [...], "theta": [...]}
+
+Stored in shared memory:
+    mask, cake_idxs, cake_norm, correction (large numeric arrays).
+Stored locally:
+    meta (small vectors and sizes for reconstruction).
 """
 
 from __future__ import annotations

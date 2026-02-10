@@ -155,9 +155,9 @@ export SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 
 # Source env. Needed to get python
 echo "Sourcing LCLS-II environment"
-# source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
+source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
 # source /sdf/home/e/espov/dev/lcls2/setup_env.sh
-source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/pscondatest.sh  # test env for new interface
+# source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/pscondatest.sh  # test env for new interface
 echo "PYTHONPATH after sourcing env: $PYTHONPATH"
 
 # Figure out the right base path for the data (or use S3DF in force case)
@@ -167,6 +167,9 @@ else
     DATAPATH=`python $SMD_ROOT/arp_scripts/file_location.py -e $EXP -r $RUN`
 fi
 export SIT_PSDM_DATA=$DATAPATH
+
+# Choose between NODE (default) or NUMA for shared memory scope.
+export PS_SHMEM_SCOPE=NUMA
 
 SMD_DEBUG_LEVEL=${SMD_DEBUG_LEVEL:=0}
 export SMD_DEBUG_TIMING=0
