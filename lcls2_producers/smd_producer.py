@@ -768,14 +768,10 @@ try:
     ps_srv_nodes = int(os.environ.get("PS_SRV_NODES", "0") or 0)
 except ValueError:
     ps_srv_nodes = 0
-if ps_srv_nodes > 0 and rank >= size - ps_srv_nodes:
-    print(f"[INFO] srv node rank {rank} hostname {hostname}")
 try:
     ps_eb_nodes = int(os.environ.get("PS_EB_NODES", "0") or 0)
 except ValueError:
     ps_eb_nodes = 0
-if ps_eb_nodes > 0 and 1 <= rank <= ps_eb_nodes:
-    print(f"[INFO] eb node rank {rank} hostname {hostname}")
 
 small_data = None
 thisrun = next(ds.runs())
