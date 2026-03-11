@@ -6,9 +6,10 @@ try:
 except ModuleNotFoundError:
     print("pyFAI not available on LCLS-II env")
 
-### Can LCLSGeom be passed through LUTE or put in environment?
-sys.path.append("/sdf/group/lcls/ds/tools/LCLSGeom")
-from LCLSGeom.psana2.converter import PsanaToPyFAI
+### Can we put LCLSGeom in environment?
+sys.path.append("/sdf/home/l/lconreux/LCLSGeom")
+from LCLSGeom.manager import get_geometry
+from LCLSGeom.converter import PsanaToPyFAI
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 
@@ -55,48 +56,13 @@ class azav_pyfai(DetObjectFunc):
         self.mask = kwargs.pop("userMask", None)
         self.threshold = kwargs.pop("thres", None)
         self.return2d = kwargs.pop("return2d", "False")
-        # Hardcoded metrology file for now, but I can get it from the jungfrau psana Detector object, just unsure on how to do it !
-        # That allows us to map pixel indices to physical coordinates, without assembling and casting the image in a wrong 2D plane.
-        self.geometry_path = "/sdf/home/l/lconreux/geom/mfx100852324/geometry-def-jungfrau16M.data"
-        converter = PsanaToPyFAI(self.geometry_path)
-        pyFAI_detector = converter.detector
         self.poni_file = kwargs.pop("poni_file", None)
-        if self.poni_file is not None:
-            ai = pyFAI.load(str(self.poni_file))
-            dico = ai.getPyFAI()
-            self.ai = pyFAI.AzimuthalIntegrator(
-                detector=pyFAI_detector,
-                dist=dico.pop("dist"),
-                poni1=dico.pop("poni1"),
-                poni2=dico.pop("poni2"),
-                rot1=dico.pop("rot1"),
-                rot2=dico.pop("rot2"),
-                rot3=dico.pop("rot3"),
-                wavelength=dico.pop("wavelength"),
-            )
-        else:
-            self._ai_kwargs = kwargs.pop("ai_kwargs", None)
-            if self._ai_kwargs is not None:
-                self.ai = pyFAI.AzimuthalIntegrator(
-                    detector=pyFAI_detector,
-                    **self._ai_kwargs
-                )
-        # we should have code that extract setup parameters
-        #    in case people mess w/ the input
-        # we should also extra q/theta/... bins for plotting later.
-        azcfg = self.ai.get_config()
-        dcfg = azcfg.pop("detector_config")
-        ocfg = dcfg.pop("orientation")
-        for k, v in azcfg.items():
-            setattr(self, "azcfg_%s" % k, v)
-        for k, v in dcfg.items():
-            setattr(self, "azcfg_det_%s" % k, v)
-        setattr(self, "azcfg_detorientation", ocfg.value)
-        setattr(self, "azcfg_qvals", self.ai.get_qa())
-        # setattr(self,'azcfg_qvals',self.ai.get_qa())
+        self._ai_kwargs = kwargs.pop("ai_kwargs", None)
+        if self._ai_kwargs is None and self.poni_file is None:
+            raise ValueError("Either a poni file or ai_kwargs must be provided to initialize the azimuthal integrator.")
 
         # integration arguments
-        self.pol_factor = kwargs.pop("polarization_factor", 1)
+        self.pol_factor = kwargs.pop("polarization_factor", -1)        
         self.npts = kwargs.pop("npts", 256)
         self.npts_az = kwargs.pop("npts_az", 360)
         # self.radial_range = kwargs.pop('radial_range',None)
@@ -130,6 +96,55 @@ class azav_pyfai(DetObjectFunc):
                         self.mask = None
         if self.mask is not None and self.mask.ndim == 3:
             self.mask = np.reshape(self.mask, (self.mask.shape[0]*self.mask.shape[1], self.mask.shape[2]))
+      
+        metrology = get_geometry(det.det.alias)
+        # instantiate PyFAI detector first 
+        # this adds the detector name mentioned in the poni file to pyFAI detector registry
+        # reading the poni file will not throw an error if the detector name is not in the registry
+        detector = PsanaToPyFAI.convert(metrology)
+        # if detector is 3D (panels, slow, fast), then this scripts creates a fake 2D detector by
+        # squeezing the panel and slow dimensions.
+        # the 3D pixel layout is passed using the metrology data !
+        if self._ai_kwargs is None:
+            ai = pyFAI.load(self.poni_file)
+            self._ai_kwargs = ai.getPyFAI()
+
+        if self._units == "q_A^-1":
+            if "wavelength" not in self._ai_kwargs:
+                raise ValueError("Wavelength must be provided when using q_A^-1 units. Check poni file or ai_kwargs inputs.")
+            self.ai = pyFAI.AzimuthalIntegrator(
+                detector=detector,
+                dist=self._ai_kwargs["dist"],
+                poni1=self._ai_kwargs["poni1"],
+                poni2=self._ai_kwargs["poni2"],
+                rot1=self._ai_kwargs["rot1"],
+                rot2=self._ai_kwargs["rot2"],
+                rot3=self._ai_kwargs["rot3"],
+                wavelength=self._ai_kwargs["wavelength"],
+            )
+        else:
+            self.ai = pyFAI.AzimuthalIntegrator(
+                detector=detector,
+                dist=self._ai_kwargs["dist"],
+                poni1=self._ai_kwargs["poni1"],
+                poni2=self._ai_kwargs["poni2"],
+                rot1=self._ai_kwargs["rot1"],
+                rot2=self._ai_kwargs["rot2"],
+                rot3=self._ai_kwargs["rot3"],
+            )
+        # we should have code that extract setup parameters
+        #    in case people mess w/ the input
+        # we should also extra q/theta/... bins for plotting later.
+        azcfg = self.ai.get_config()
+        dcfg = azcfg.pop("detector_config")
+        ocfg = dcfg.pop("orientation")
+        for k, v in azcfg.items():
+            setattr(self, "azcfg_%s" % k, v)
+        for k, v in dcfg.items():
+            setattr(self, "azcfg_det_%s" % k, v)
+        setattr(self, "azcfg_detorientation", ocfg.value)
+        setattr(self, "azcfg_qvals", self.ai.get_qa())
+        # setattr(self,'azcfg_qvals',self.ai.get_qa())
         print(f"Azimuthal integrator:\n{self.ai}")
         return
 
@@ -140,6 +155,8 @@ class azav_pyfai(DetObjectFunc):
         if self.threshold is not None:
             data[data < self.threshold] = 0
         if data.ndim == 3:
+            # instead of assembling the image, now we just squeeze the panel and slow dimensions
+            # so that image and detector have same shape.
             data = np.reshape(data, (data.shape[0]*data.shape[1], data.shape[2]))
         out = self._process(data)
         return out
