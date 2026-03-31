@@ -3,7 +3,8 @@ import psana
 from abc import ABCMeta
 import numpy as np
 from smalldata_tools.common.detector_base import DefaultDetector_base
-
+#DEBUG thinkg wether to add this here - not while we are running though
+from smalldata_tools.utilities import duration
 # from smalldata_tools.common.epicsarchive import EpicsArchive
 
 
@@ -919,6 +920,8 @@ class xtcavDetector(DefaultDetector):
         self.size = 1024
         self.method = method
         self.t = np.zeros(self.size)
+        self.add_duration = False
+        self.duration_interval = [0.1,0.9]
         try:
             from xtcav2.LasingOnCharacterization import LasingOnCharacterization
 
@@ -926,10 +929,16 @@ class xtcavDetector(DefaultDetector):
         except:
             return None
 
+    def setPars(self, xtcavPars):
+        for k in xtcavPars:
+            try:
+                setattr(self,k,xtcavPars[k])
+            except:
+                print('Failed to set parameter(s) for XTCAV',xtcavPars)
+
     def data(self, evt):
         # check if detectors are in event
         dl = {"success": 0}
-        xtcav_success = True
         arSize = 0
         agreement = -2
         timeAr = np.array([np.nan] * self.size)
@@ -968,6 +977,11 @@ class xtcavDetector(DefaultDetector):
                     dl["success"] = 3
             else:
                 full_results = self._XTCAVRetrieval.fullResults()
+                dl["success"] = 2
+
+                tCOM, powerCOM = self._XTCAVRetrieval.xRayPower('COM')
+                tRMS, powerRMS = self._XTCAVRetrieval.xRayPower('RMS')
+
                 keylist = [
                     "grounpnum",
                     "num_bunches",
@@ -982,6 +996,7 @@ class xtcavDetector(DefaultDetector):
                     ):
                         dl[key] = getattr(full_results, key).squeeze()
                 time_vals = dl.pop("t", None)
+                #print('time vals ',time_vals)
                 if time_vals is not None:
                     # somehow, MPI complains about this, but not any of the other arrays...
                     # dl['time']=time_vals
@@ -989,9 +1004,19 @@ class xtcavDetector(DefaultDetector):
                         self.t = time_vals
                     elif self.t != time_vals:
                         print("xtcav time array changed in run!")
+                dl["success"] = 3
         except:
             pass
 
+        if self.add_duration:
+            conv_factor = np.mean(np.diff(self.t))
+            if 'powerECOM' in dl:
+                pwr =  dl['powerECOM']
+                dl['ECOM_duration'] = conv_factor*duration(pwr, self.duration_interval)
+            if 'powerERMS' in dl:
+                pwr =  dl['powerERMS']
+                dl['ERMS_duration'] = conv_factor*duration(pwr, self.duration_interval)
+                
         return dl
 
 

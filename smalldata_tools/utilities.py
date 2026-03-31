@@ -1353,3 +1353,15 @@ def get_calib_file(run, directory, f_end=".data"):
             f"No matching calibration file found for run {run} in directory {directory}."
         )
     return f"{directory}{background}"
+
+def duration(x, interval):
+    try:
+        dur = np.cumsum(x)
+        dur = dur/dur[-1]
+        idxlow = abs(np.argmin(abs(dur-interval[0])))
+        idxhigh = abs(np.argmin(abs(dur-interval[1])))
+        idxdiff = abs(idxhigh-idxlow)
+    except:
+        idxdiff = float("NaN")
+
+    return idxdiff
