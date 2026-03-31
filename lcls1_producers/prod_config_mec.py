@@ -3,14 +3,8 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detnames = ['alvium_spot',
-            'alvium_nf_ff',
-            'Zyla_xray_east',
-            'alvium_tt',
-            'epix100a_2_bxrts',
-            'epix100a_1_xtcs',
-            'Epix10kaQuad2',
-            'Epix10kaQuad3']
+detnames = ['exampledet'
+            ]
 
 # 1) REGIONS OF INTEREST
 def getROIs(run):
@@ -21,47 +15,17 @@ def getROIs(run):
         run=int(run)
     ret_dict = {}
     if run > 0:
-        # Zyla_xray_east
         roi_dict = {
             'name':'ROI_0',
             'writeArea': True,
             'thresADU': None,
-            'ROI':[[157,487], [294,598]]
+            'ROI':[[157,487], [294,598]],
+            'pj': [{'name':'pj1', 'axis':0, 'thresADU': 0.0 }]}
         }
-        ret_dict['Zyla_xray_east'] = [ roi_dict ]
-
-        # epix100a_1_xtcs
-        roi0_dict = {'name':'ROI_0',
-                    'writeArea': True,
-                    'thresADU': None,
-                    'ROI':[[357,707], [0,768]],
-                    'pj': [{'name':'pj1', 'axis':0, 'thresADU': 0.0 }]}
-        roi1_dict = {'name':'ROI_1',
-                    'writeArea': True,
-                    'thresADU': 7.0,
-                    'ROI':[[357,707], [0,768]],
-                    'pj': [{'name':'pjt', 'axis':0, 'thresADU': 7.0 }]}
-        ret_dict['epix100a_1_xtcs'] = [ roi0_dict, roi1_dict ]
-
-        # epix100a_2_bxrts
-        roi0_dict = {'name':'ROI_0',
-                     'writeArea': True,
-                     'thresADU': None,
-                    'ROI':[[0,707], [360,370]],
-                    'pj': [{'name':'pj21', 'axis':1, 'thresADU': 0.0 }]}
-        roi1_dict = {'name':'ROI_1',
-                     'writeArea': True,
-                     'thresADU': None,
-                     'ROI':[[0,707], [310,320]],
-                     'pj': [{'name':'pj22', 'axis':1, 'thresADU': 0.0 }]}
-        roi2_dict = {'name':'ROI_2',
-                     'writeArea': True,
-                     'thresADU': 1,
-                     'ROI':[[0,707], [360,370]],
-                     'pj': [{'name':'pj2t', 'axis':1, 'thresADU': 1.0 }]}
-        ret_dict['epix100a_2_bxrts'] = [ roi0_dict, roi1_dict, roi2_dict ]
+        ret_dict['mydet'] = [ roi_dict ]
         
-    return ret_dict
+    #return ret_dict
+    return {}
 
 
 def get_mectt(run):
@@ -78,7 +42,8 @@ def get_mectt(run):
                'debug': False
     }
     ret_dict = {'alvium_tt': [ tt_dict ]}
-    return ret_dict
+    #return ret_dict
+    return {}
 
 
 # pyFAI function. 
@@ -107,7 +72,8 @@ def getAzIntPyFAIParams(run):
         az_dict["polarization_factor"] = -1
         ret_dict["Epix10kaQuad3"] = [ az_dict ]
 
-    return ret_dict
+    #return ret_dict
+    return {}
 
 
 def getDetSums(run):
@@ -115,11 +81,15 @@ def getDetSums(run):
         run=int(run)
     ret_dict = {}
     
+    ret_dict['Epix10kaQuad0'] = ['calib', 'calib_thresADU1', 'calib_dropped']
+    ret_dict['Epix10kaQuad1'] = ['calib', 'calib_thresADU1', 'calib_dropped']
     ret_dict['Epix10kaQuad2'] = ['calib', 'calib_thresADU1', 'calib_dropped']
     ret_dict['Epix10kaQuad3'] = ['calib', 'calib_thresADU1', 'calib_dropped']
     ret_dict['alvium_tt'] = ['calib', 'calib_thresADU10']
     # add the maximum-image for calibration runs.
     if run > 0 :
+        ret_dict['Epix10kaQuad0'].append('calib_max')
+        ret_dict['Epix10kaQuad1'].append('calib_max')
         ret_dict['Epix10kaQuad2'].append('calib_max')
         ret_dict['Epix10kaQuad3'].append('calib_max')
     
