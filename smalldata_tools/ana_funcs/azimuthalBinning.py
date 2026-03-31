@@ -145,8 +145,8 @@ class azimuthalBinning(DetObjectFunc):
         self.ycen = float(self.ycen)
 
         # equations based on J Chem Phys 113, 9140 (2000) [logbook D30580, pag 71]
-        (A, B, C) = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
-        (a, b, c) = (
+        A, B, C = (-np.sin(ty) * np.cos(tx), -np.sin(tx), -np.cos(ty) * np.cos(tx))
+        a, b, c = (
             self.xcen + (self.dis_to_sam + self.z_off) * np.tan(ty),
             float(self.ycen) - (self.dis_to_sam + self.z_off) * np.tan(tx),
             (self.dis_to_sam + self.z_off),

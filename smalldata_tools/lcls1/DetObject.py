@@ -247,14 +247,14 @@ class DetObjectClass(object):
                 self.run,
                 unbond=True,
                 status=True,
-                edges=(self.nedges>0),
-                central=(self.maskCentral>0),
+                edges=(self.nedges > 0),
+                central=(self.maskCentral > 0),
                 mrows=self.nedges,
                 mcols=self.nedges,
                 wcentral=self.maskCentral,
-                neighbors = (self.rneighbors>0),
-                rad = (self.rneighbors>0),
-                ptrn = 'r' #r:rhombus, 'c': circle, square: else
+                neighbors=(self.rneighbors > 0),
+                rad=(self.rneighbors > 0),
+                ptrn="r",  # r:rhombus, 'c': circle, square: else
             )
 
             if rank == 0 and self.mask is not None:
@@ -269,15 +269,15 @@ class DetObjectClass(object):
                 self.run,
                 unbond=True,
                 status=True,
-                edges=(self.nedges>0),
-                central=(self.maskCentral>0),
+                edges=(self.nedges > 0),
+                central=(self.maskCentral > 0),
                 calib=True,
                 mrows=self.nedges,
                 mcols=self.nedges,
                 wcentral=self.maskCentral,
-                neighbors = (self.rneighbors>0),
-                rad = (self.rneighbors>0),
-                ptrn = 'r' #r:rhombus, 'c': circle, square: else
+                neighbors=(self.rneighbors > 0),
+                rad=(self.rneighbors > 0),
+                ptrn="r",  # r:rhombus, 'c': circle, square: else
             )
             if (
                 self.cmask is not None
@@ -532,7 +532,9 @@ class CameraObject(DetObjectClass):
         self.gain_mask = self.det.gain_mask(run)
         self.gain = self.det.gain(run)
 
-        self.common_mode_pars = self.det.common_mode(run) # this just stores the default!
+        self.common_mode_pars = self.det.common_mode(
+            run
+        )  # this just stores the default!
         self.local_gain = None
         self._getImgShape()  # sets self.imgShape
         self._getMasks()  # sets mask, cmask, statusMask

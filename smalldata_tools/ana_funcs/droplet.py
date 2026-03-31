@@ -72,8 +72,8 @@ class dropletFunc(DetObjectFunc):
         setattr(self, "_rms", det.rms)
         self._compData = np.ones_like(self._mask).astype(float)
         if self.useRms:
-            print((self._rms.shape),(det.mask.shape),det.gain.shape)
-            print(len(self._rms.shape),len(det.mask.shape))
+            print((self._rms.shape), (det.mask.shape), det.gain.shape)
+            print(len(self._rms.shape), len(det.mask.shape))
             if len(self._rms.shape) > len(det.mask.shape):
                 self._compData *= self._rms[0] * det.gain[0]
             else:
@@ -195,10 +195,15 @@ class dropletFunc(DetObjectFunc):
         else:
             drop_ind_thres = drop_ind
             ret_dict["nDroplets"] = ret_dict["nDroplets_all"]
-            
+
         if self._fillFrac:
-            ret_dict['fill_frac']=np.sum(imgDrop>0)/imgDrop.size
-            ret_dict['fill_frac_dilated']=np.sum(binary_dilation((imgDrop>0), structure=np.ones((3,3), dtype=int)))/img.size
+            ret_dict["fill_frac"] = np.sum(imgDrop > 0) / imgDrop.size
+            ret_dict["fill_frac_dilated"] = (
+                np.sum(
+                    binary_dilation((imgDrop > 0), structure=np.ones((3, 3), dtype=int))
+                )
+                / img.size
+            )
 
         if not self._saveDrops:
             return ret_dict
@@ -285,7 +290,7 @@ class dropletFunc(DetObjectFunc):
             dat_dict["dpix_idx"] = sparse_img.data
             dat_dict["dpix_row"] = sparse_img.row
             dat_dict["dpix_col"] = sparse_img.col
-            dat_dict["dpix_data"] = data[imgDrop>0]
+            dat_dict["dpix_data"] = data[imgDrop > 0]
             # print(sparse_img.data, sparse_img.row, sparse_img.col, data[imgDrop>0])
 
         self.dat = dat_dict

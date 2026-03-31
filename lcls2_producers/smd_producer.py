@@ -320,7 +320,6 @@ from smalldata_tools.ana_funcs.compression import pressioCompressDecompress
 import psplot
 from psmon import publish
 
-
 # Constants
 HUTCHES = ["TMO", "RIX", "UED", "MFX", "XPP"]
 
