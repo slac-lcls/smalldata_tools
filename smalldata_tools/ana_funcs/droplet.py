@@ -3,6 +3,7 @@ import time
 import scipy.ndimage as ndi
 import skimage.measure as measure
 import scipy.ndimage.filters as filters
+from scipy.ndimage import binary_dilation
 from scipy import sparse
 from smalldata_tools.common.detector_base import DetObjectFunc
 
@@ -60,6 +61,8 @@ class dropletFunc(DetObjectFunc):
         self._saveDrops = False
         self._flagMasked = False
         self._needProps = False
+        self._saveDropPixels = kwargs.get("saveDropPixels", False)
+        self._fillFrac = kwargs.get("fillFrac", False)
         self._nMaxPixels = 15
 
     def setFromDet(self, det):
@@ -69,10 +72,12 @@ class dropletFunc(DetObjectFunc):
         setattr(self, "_rms", det.rms)
         self._compData = np.ones_like(self._mask).astype(float)
         if self.useRms:
+            print((self._rms.shape),(det.mask.shape),det.gain.shape)
+            print(len(self._rms.shape),len(det.mask.shape))
             if len(self._rms.shape) > len(det.mask.shape):
-                self._compData *= self._rms[0] / det.gain[0]
+                self._compData *= self._rms[0] * det.gain[0]
             else:
-                self._compData *= self._rms / det.gain
+                self._compData *= self._rms * det.gain
         self._is_tiled = False
         if len(det.ped.shape) > 2:
             self.footprint = np.array(
@@ -190,6 +195,10 @@ class dropletFunc(DetObjectFunc):
         else:
             drop_ind_thres = drop_ind
             ret_dict["nDroplets"] = ret_dict["nDroplets_all"]
+            
+        if self._fillFrac:
+            ret_dict['fill_frac']=np.sum(imgDrop>0)/imgDrop.size
+            ret_dict['fill_frac_dilated']=np.sum(binary_dilation((imgDrop>0), structure=np.ones((3,3), dtype=int)))/img.size
 
         if not self._saveDrops:
             return ret_dict
@@ -270,6 +279,15 @@ class dropletFunc(DetObjectFunc):
         dat_dict["_mask"] = self._mask
         dat_dict["_imgDrop"] = imgDrop
         dat_dict["_image"] = img
+
+        if self._saveDropPixels:
+            sparse_img = sparse.coo_array(imgDrop)
+            dat_dict["dpix_idx"] = sparse_img.data
+            dat_dict["dpix_row"] = sparse_img.row
+            dat_dict["dpix_col"] = sparse_img.col
+            dat_dict["dpix_data"] = data[imgDrop>0]
+            # print(sparse_img.data, sparse_img.row, sparse_img.col, data[imgDrop>0])
+
         self.dat = dat_dict
 
         return ret_dict
