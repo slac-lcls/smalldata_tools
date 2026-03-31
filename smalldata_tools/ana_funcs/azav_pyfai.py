@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 
 try:
@@ -6,8 +5,6 @@ try:
 except ModuleNotFoundError:
     print("pyFAI not available on LCLS-II env")
 
-### Can we put LCLSGeom in environment?
-sys.path.append("/sdf/home/l/lconreux/LCLSGeom")
 from LCLSGeom.manager import get_geometry
 from LCLSGeom.converter import PsanaToPyFAI
 
@@ -62,7 +59,7 @@ class azav_pyfai(DetObjectFunc):
             raise ValueError("Either a poni file or ai_kwargs must be provided to initialize the azimuthal integrator.")
 
         # integration arguments
-        self.pol_factor = kwargs.pop("polarization_factor", -1)        
+        self.pol_factor = kwargs.pop("polarization_factor", -1)  # Vertical Polarization by default post Run 18   
         self.npts = kwargs.pop("npts", 256)
         self.npts_az = kwargs.pop("npts_az", 360)
         # self.radial_range = kwargs.pop('radial_range',None)
@@ -101,7 +98,7 @@ class azav_pyfai(DetObjectFunc):
         # instantiate PyFAI detector first 
         # this adds the detector name mentioned in the poni file to pyFAI detector registry
         # reading the poni file will not throw an error if the detector name is not in the registry
-        detector = PsanaToPyFAI.convert(metrology)
+        detector = PsanaToPyFAI.convert(metrology, det.det.alias)
         # if detector is 3D (panels, slow, fast), then this scripts creates a fake 2D detector by
         # squeezing the panel and slow dimensions.
         # the 3D pixel layout is passed using the metrology data !
