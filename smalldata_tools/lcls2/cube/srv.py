@@ -21,7 +21,6 @@ size = COMM.Get_size()
 logger = logging.getLogger(__name__)
 
 
-#SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/"))
 H5_BASE= "/sdf/data/lcls/ds/"
 
 class SrvMsgType(Enum):
