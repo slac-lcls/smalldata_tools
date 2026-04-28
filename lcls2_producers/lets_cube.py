@@ -119,7 +119,7 @@ else:
     config_module = get_config_file(args.config, smdata_tools_path / "lcls2_producers")
     config = import_module(config_module)
 
-    cube_obj = cube.cube.get_cube(myrun, engine=event_engine.smalldata_tools_engine)
+    cube_obj = cube.cube.get_cube(ds, myrun, engine=event_engine.smalldata_tools_engine)
 
     processors = config.detectors(myrun)
     # weed out NullDetObjects:

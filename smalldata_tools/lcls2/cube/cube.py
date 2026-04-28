@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class Cube(metaclass=ABCMeta):
     def __init__(
         self,
+        ds,
         run: psana.psexp.run.Run,
         engine: Callable = event_engine.smalldata_tools_engine,
         processors: list = None,
@@ -55,7 +56,7 @@ class Cube(metaclass=ABCMeta):
         # Reduction passed to utils.reduce_by_key to combine a bin from different
         # BD (simple sum):
         self.reduction_func = lambda x, y: x + y
-        self.node_type = get_psana_node_type(run.ds)
+        self.node_type = get_psana_node_type(ds)
 
     def add_processors(self, processors):
         """
@@ -184,13 +185,14 @@ class CubeFlyScan(Cube):
 class CubeStepScan(Cube):
     def __init__(
         self,
+        ds,
         run: psana.psexp.run.Run,
         engine: callable = event_engine.smalldata_tools_engine,
         processors: list = None,
         event_screener: event_screener.EventScreener = None,
         **kwargs: dict,
     ):
-        super().__init__(run, engine, processors, event_screener, **kwargs)
+        super().__init__(ds,run, engine, processors, event_screener, **kwargs)
         self.step = None
         self.step_data = {}
 
@@ -278,6 +280,7 @@ class CubeStepScan(Cube):
 
 
 def get_cube(
+    ds,
     run: psana.psexp.run.Run,
     engine: callable = event_engine.smalldata_tools_engine,
     **kwargs: dict,
@@ -304,14 +307,14 @@ def get_cube(
     """
     if run.scaninfo == {}:
         is_scan = False
-        if run.ds.unique_user_rank():
+        if ds.unique_user_rank():
             logger.info("Instantiating CubeFlyScan.")
             logger.info("Not implemented yet.")
         raise NotImplementedError
         # cube = CubeFlyScan(run, engine=engine, **kwargs)
     else:
         is_scan = True
-        if run.ds.unique_user_rank():
+        if ds.unique_user_rank():
             logger.info("Instantiating CubeStepScan.")
-        cube = CubeStepScan(run, engine=engine, **kwargs)
+        cube = CubeStepScan(ds,run, engine=engine, **kwargs)
     return cube
