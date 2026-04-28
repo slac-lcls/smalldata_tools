@@ -3,7 +3,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detectors = ["andor", "epixquad"]
+detectors = ["andor", "epixquad1kfps"]
 # integrating_detectors = []
 integrating_detectors = []
 # Comment: the first integrating detector will set the sub-sampling of all
@@ -18,7 +18,7 @@ def getROIs(run):
     if run > 0:
         # Save the full ANDOR and QUAD.
         ret_dict["andor"] = [full_roi]
-        ret_dict["epixquad"] = [full_roi]
+        ret_dict["epixquad1kfps"] = [full_roi]
     return ret_dict
 
 
@@ -48,7 +48,7 @@ def get_droplet2photon(run):
         d2p_dict["nData"] = None
         d2p_dict["get_photon_img"] = False
 
-        ret_dict["epixquad"] = d2p_dict
+        ret_dict["epixquad1kfps"] = d2p_dict
 
     return ret_dict
 
@@ -63,7 +63,7 @@ def get_droplet(run):
             "useRms": False,
             #            "nData": None
         }
-        ret_dict["epixquad"] = drop_dict
+        ret_dict["epixquad1kfps"] = drop_dict
     return ret_dict
 
 

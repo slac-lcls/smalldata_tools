@@ -20,7 +20,7 @@ def detectors(run: psana.psexp.run.Run):
     full_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
 
     # epix_quad
-    epix_quad = DetObject("epixquad", run)
+    epix_quad = DetObject("epixquad1kfps", run)
     roi = {"thresADU": 70, "writeArea": True, "calcPars": False, "ROI": None}
     roi_func = ROIFunc(**roi)
 
