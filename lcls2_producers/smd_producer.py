@@ -283,7 +283,7 @@ sys.path.append(fpathup)
 if rank == 0:
     logger.info(fpathup)
 
-from smalldata_tools.utilities import printMsg, checkDet
+from smalldata_tools.utilities import postRunTable
 from smalldata_tools.common.detector_base import detData, getUserData, getUserEnvData
 from smalldata_tools.lcls2.default_detectors import (
     detOnceData,
@@ -1095,25 +1095,8 @@ if args.postRuntable and ds.unique_user_rank():
 
     time.sleep(5)
 
-    ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    logger.debug("URL: ", ws_url)
-    user = (args.experiment[:3] + "opr").replace("dia", "mcc")
-    if os.environ.get("ARP_LOCATION", None) == "S3DF":
-        with open("/sdf/group/lcls/ds/tools/forElogPost.txt") as reader:
-            answer = reader.readline()
-
-        r = requests.post(
-            ws_url,
-            params={"run_num": args.run},
-            json=runtable_data,
-            auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
-        )
-        logger.debug(r)
+    postRunTable(runtable_data=runtable_data, experiment=args.experiment, run=args.run)
     if det_presence != {}:
-        rp = requests.post(
-            ws_url,
-            params={"run_num": args.run},
-            json=det_presence,
-            auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
+        postRunTable(
+            runtable_data=det_presence, experiment=args.experiment, run=args.run
         )
-        logger.debug(rp)
