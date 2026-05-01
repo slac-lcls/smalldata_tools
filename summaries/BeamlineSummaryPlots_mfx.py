@@ -126,6 +126,11 @@ logger = logging.getLogger(__name__)
 # Define Args
 parser = argparse.ArgumentParser()
 parser.add_argument(
+    "--smd_path",
+    help="path to smalldata hdf5 file (def <exp>/hdf5/smalldata/<exp>_Run<run:04d>.h5)",
+    default=None,
+)
+parser.add_argument(
     "--run", help="run", type=str, default=os.environ.get("RUN_NUM", "")
 )
 parser.add_argument(
@@ -169,10 +174,13 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
 ### load data for the chosen run  ####
 ######################################
 
-smd_path = (
-    f"/sdf/data/lcls/ds/mfx/{args.experiment}/hdf5/smalldata/"
-    f"{args.experiment}_Run{run:04d}.h5"
-)
+if args.smd_path:
+    smd_path = args.smd_path
+else:
+    smd_path = (
+        f"/sdf/data/lcls/ds/mfx/{args.experiment}/hdf5/smalldata/"
+        f"{args.experiment}_Run{run:04d}.h5"
+    )
 h5 = h5py.File(smd_path)
 
 ## Defining initial selection (laser-on events)
@@ -297,7 +305,7 @@ try:
     ).options(color="r")
     ipmDownTimeMed = hv.Points(
         (eventTimeRMed, ipmDownMed),
-        kdims=[eventTimeDim, ipmUpDim],
+        kdims=[eventTimeDim, ipmDownDim],
         label=ipmDownDim.label,
     ).options(color="m")
 
@@ -321,10 +329,10 @@ else:
     lxtPlot = None
 
 gspec = pn.GridSpec(
-    sizing_mode="stretch_both", max_width=700, name="Data Quality - Run %d" % run
+    sizing_mode="stretch_both", max_width=1000, max_height=1000, name="Data Quality - Run %d" % run
 )
-gspec[0:2, 0:8] = pn.Column(ipmTimeLayout)
-gspec[2:5, 0:4] = pn.Column(ipmLayout)
+gspec[0:4, 0:4] = pn.Column(ipmTimeLayout)
+gspec[0:4, 4:8] = pn.Column(ipmLayout)
 
 detNames: list = [
     "jungfrau",
@@ -343,7 +351,7 @@ for detname in detNames:
         damageVar = h5[damageDim.name][evtFilter]
         damagePlot = rolling(
             hv.Curve(damageVar, vdims=[damageDim], label=f"{detname}").opts(
-                axiswise=True, color=hv.Palette("Spectral")
+                axiswise=True, color=hv.Palette("Spectral"), title=f"Damage {detname}"
             ),
             rolling_window=10,
         )
@@ -351,12 +359,20 @@ for detname in detNames:
         continue
     plots.append(damagePlot)
 
-multiDamagePlot = hv.Overlay(plots).opts(
-    xlabel="Event (rolling average of 10)",
-    ylabel="Present (Yes/No)",
-    title="Missing/Damaged Data",
+damagePanels = (
+    hv.Layout(plots)
+    .opts(
+        hv.opts.Curve(
+            xlabel="Event (rolling average of 10)",
+            ylabel="Present (Yes/No)",
+            axiswise=True,
+        )
+    )
+    .cols(len(plots))
+    if plots
+    else hv.Curve([]).opts(title="No Damage Data")
 )
-gspec[2:5, 4:8] = multiDamagePlot
+gspec[4:6, 0:8] = damagePanels
 
 
 #########################################
@@ -365,6 +381,7 @@ gspec[2:5, 4:8] = multiDamagePlot
 import matplotlib.pyplot as plt
 
 detImgs = []
+detHists = []
 detGrids = []
 for detImgName in h5["Sums"].keys():
     image = h5[f"Sums/{detImgName}"][()]
@@ -407,14 +424,33 @@ for detImgName in h5["Sums"].keys():
     # between panels!!
     detImgs.append(
         hv.Image(imageR, vdims=[imgDim], name=imgDim.label)
-        .options(colorbar=True, cmap="rainbow")
+        .options(colorbar=True, cmap="viridis")
         .opts(shared_axes=False)
     )
 
-    detGrid = pn.GridSpec(
-        sizing_mode="stretch_both", max_width=700, name=detImgName.replace("Sums/", "")
+    hist, bins = np.histogram(imageR.flatten(), bins='auto', range=(np.nanpercentile(imageR, 1.0), np.nanpercentile(imageR, 99.0)))
+    histDim = hv.Dimension(
+        ("hist", detImgName.replace("Sums/", "").replace("_calib_img", " Pixel Histogram")),
+        range=(np.nanpercentile(imageR, 1.0), np.nanpercentile(imageR, 99.0)),
     )
-    detGrid[0, 0] = pn.Row(detImgs[-1])
+    detHists.append(
+        hv.Histogram((hist, bins), kdims=[histDim], label=histDim.label).opts(
+            fill_color="#21918c",
+            line_color="black",
+            line_width=0.2,
+            alpha=0.85,
+            title=histDim.label,
+            xlabel="Pixel Intensity",
+            ylabel="Count",
+            invert_axes=True,
+        )
+    )
+
+    detGrid = pn.GridSpec(
+        sizing_mode="stretch_both", max_width=1600, max_height=1000, name=detImgName.replace("Sums/", "")
+    )
+    detGrid[0:2, 0:2] = pn.Row(detImgs[-1])
+    detGrid[0:2, 2] = pn.Row(detHists[-1])
     detGrids.append(detGrid)
 
 if nOff > 100:
@@ -464,17 +500,81 @@ if nOff > 100:
         )
         detImgs.append(
             hv.Image(imageR, vdims=[imgOffDim], name=imgOffDim.label).options(
-                colorbar=True, cmap="rainbow"
+                colorbar=True, cmap="viridis"
             )
         )
 
         detGrid = pn.GridSpec(
             sizing_mode="stretch_both",
-            max_width=700,
+            max_width=1600,
+            max_height=1000,
             name="%s, dropped shots" % detName,
         )
         detGrid[0, 0] = pn.Row(detImgs[-1])
         detGrids.append(detGrid)
+
+#################
+# Intensity Plots
+#################
+
+# IPM CORRELATION
+#################
+corrGrids = []
+for detName in detNames:
+    try:
+        azav = h5[f"{detName}/azav_azav"][evtFilter]
+    except:
+        try:
+            azav = h5[f"{detName}/pyfai_azav"][evtFilter]
+        except:
+            continue
+
+    if len(azav.shape) > 2:
+        total_scatt = np.nanmean(azav, axis=(1, 2))
+    else:
+        total_scatt = np.nanmean(azav, axis=1)
+
+    scatterDim = hv.Dimension((f"{detName} Scattering", f"{detName} Scattering"))
+    corrGrid = pn.GridSpec(
+        sizing_mode="stretch_both", max_width=1000, max_height=1000, name=f"{detName} Correlation with IPM"
+    )
+
+    # ip4
+    try:
+        ipmDim = hv.Dimension((f"{detName} DG1", f"{detName} DG1"))
+        ip4_plot = hv.HexTiles(
+            (ipmUpVar, total_scatt), kdims=[ipmDim, scatterDim]
+        ).opts(cmap="viridis", xlabel=ipmDim.label, ylabel=scatterDim.label, title=f"{detName} Scattering vs DG1")
+        corrGrid[0:2, 0:2] = ip4_plot
+    except Exception as e:
+        print(e)
+        ip4_plot = None
+
+    # ip5
+    try:
+        ipmDim = hv.Dimension((f"{detName} DG2", f"{detName} DG2"))
+        ip5_plot = hv.HexTiles(
+            (ipmDownVar, total_scatt), kdims=[ipmDim, scatterDim]
+        ).opts(cmap="viridis", xlabel=ipmDim.label, ylabel=scatterDim.label, title=f"{detName} Scattering vs DG2")
+        corrGrid[0:2, 2:4] = ip5_plot
+    except Exception as e:
+        print(e)
+        ip5_plot = None
+
+
+    try:
+        timeDim = hv.Dimension(("Time", "Time"))
+        time_plot = hv.HexTiles(
+            (eventTimeR, total_scatt), kdims=[timeDim, scatterDim]
+        ).opts(cmap="viridis", xlabel=timeDim.label, ylabel=scatterDim.label, title=f"{detName} Scattering vs Time")
+        corrGrid[2:4, 0:4] = time_plot
+    except Exception as e:
+        print(e)
+        time_plot = None
+
+    if ip4_plot or ip5_plot or time_plot:
+        corrGrids.append(corrGrid)
+
 
 #############
 # XES Plots
@@ -580,7 +680,7 @@ for det in ["epix100_0", "epix100_1"]:  # detNames:
         )
         # dimg_flip = np.fliplr(dimg)
 
-        xes_grid = pn.GridSpec(max_width=700, name=f"XES (Droplet) - {det}")
+        xes_grid = pn.GridSpec(max_width=1000, max_height=1000, name=f"XES (Droplet) - {det}")
         img_dim = hv.Dimension(("Image", "Image"))
         spatial_dim = hv.Dimension(("Spatial Projection", "Spatial Projection"))
         xes_dim = hv.Dimension(("XES Spectrum", "XES Spectrum"))
@@ -609,7 +709,7 @@ for det in ["epix100_0", "epix100_1"]:  # detNames:
         )
 
         # DO ROI PROCESSING -----
-        xes_roi_grid = pn.GridSpec(max_width=700, name=f"XES (ROIs) - {det}")
+        xes_roi_grid = pn.GridSpec(max_width=1000, max_height=1000, name=f"XES (ROIs) - {det}")
         roi_nums, spatial_projs, xes_projs = processROIData(h5=h5, det_name=det)
         for idx in range(len(roi_nums)):
             roi_num: str = roi_nums[idx]
@@ -647,7 +747,7 @@ for det in ["epix100_0", "epix100_1"]:  # detNames:
 ###########
 # FEE Plots
 ###########
-feeGrid = pn.GridSpec(max_width=700, name="FEE Stats")
+feeGrid = pn.GridSpec(max_width=1000, max_height=1000, name="FEE Stats")
 try:
     feeDamageDim = hv.Dimension(("damage/feespec", "FEE Present"))
     feeDamageVar = h5[feeDamageDim.name][()]
@@ -690,6 +790,9 @@ for xes_grid in xesPlots:
 for detGrid in detGrids:
     tabs.append(detGrid)
 
+for corrGrid in corrGrids:
+    tabs.append(corrGrid)
+
 tabs.append(feeGrid)
 
 if int(os.environ.get("RUN_NUM", "-1")) > 0:
@@ -701,7 +804,7 @@ if int(os.environ.get("RUN_NUM", "-1")) > 0:
 if save_elog:
     from summaries.summary_utils import prepareHtmlReport
 
-    pageTitleFormat = "BeamlineSummary/BeamlineSummary_Run{run:04d}"
+    pageTitleFormat = "BeamlineSummary/{run:04d}"
     prepareHtmlReport(tabs, expname, run, pageTitleFormat)
     postDetectorDamageMsg(
         h5=h5,
