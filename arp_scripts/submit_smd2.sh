@@ -9,6 +9,12 @@ $(basename "$0"):
 	OPTIONS:
         -h|--help
             Definition of options
+        -c|--cores
+            Number of MPI ranks to launch with mpirun
+        --gather_interval
+            Number of events per smalldata gather (default: 100)
+        --smd_debug_level
+            Debug level for SMD timing/envs (default: 0)
 EOF
 }
 
@@ -24,24 +30,30 @@ do
         ;;
     -e|--experiment)
         EXP=$2
-        POSITIONAL+=("--experiment $2")
+        POSITIONAL+=("--experiment" "$2")
         shift
         shift
         ;;
     -r|--run)
         RUN=$2
-        POSITIONAL+=("--run $2")
+        POSITIONAL+=("--run" "$2")
         shift
         shift
         ;;
     -d|--directory)
-        POSITIONAL+=("--directory $2")
+        POSITIONAL+=("--directory" "$2")
         shift
         shift
         ;;
     -n|--nevents)
         NEVENTS=$2
-        POSITIONAL+=("--nevents $2")
+        POSITIONAL+=("--nevents" "$2")
+        shift
+        shift
+        ;;
+    -c|--cores)
+        CORES=$2
+        POSITIONAL+=("--cores" "$2")
         shift
         shift
         ;;
@@ -61,6 +73,18 @@ do
         ;;
     --srv_cores)
         SRV_CORES=$2
+        shift
+        shift
+        ;;
+    --gather_interval)
+        GATHER_INTERVAL="$2"
+        GATHER_INTERVAL_SET=1
+        POSITIONAL+=("--gather_interval" "$2")
+        shift
+        shift
+        ;;
+    --smd_debug_level)
+        SMD_DEBUG_LEVEL="$2"
         shift
         shift
         ;;
@@ -104,6 +128,11 @@ do
         ;;
     esac
 done
+if [ -z "${GATHER_INTERVAL_SET}" ]; then
+    GATHER_INTERVAL=100
+    POSITIONAL+=("--gather_interval" "$GATHER_INTERVAL")
+fi
+
 set -- "${POSITIONAL[@]}"
 
 umask 002 # set permission of newly created files and dir to 664 (rwxrwxr--)
@@ -129,6 +158,7 @@ echo "Sourcing LCLS-II environment"
 source $SIT_ENV_DIR/sw/conda2/manage/bin/psconda.sh
 # source /sdf/home/e/espov/dev/lcls2/setup_env.sh
 # source /sdf/group/lcls/ds/ana/sw/conda2/manage/bin/pscondatest.sh  # test env for new interface
+echo "PYTHONPATH after sourcing env: $PYTHONPATH"
 
 # Figure out the right base path for the data (or use S3DF in force case)
 if [ -v FORCE_S3DF ]; then
@@ -138,10 +168,43 @@ else
 fi
 export SIT_PSDM_DATA=$DATAPATH
 
+# Choose between NODE (default) or NUMA for shared memory scope.
+export PS_SHMEM_SCOPE=NUMA
+
+SMD_DEBUG_LEVEL=${SMD_DEBUG_LEVEL:=0}
+export SMD_DEBUG_TIMING=0
+export SMD_DEBUG_EVT_TIMING=0
+export SMD_DEBUG_DET=0
+export SMD_DEBUG_DETOBJ=0
+export SMD_DEBUG_AZAV_SHM=0
+
+if [ "$SMD_DEBUG_LEVEL" -ge 1 ]; then
+    export SMD_DEBUG_TIMING=1
+    export SMD_DEBUG_EVT_TIMING=1
+    export SMD_DEBUG_DET=1
+fi
+if [ "$SMD_DEBUG_LEVEL" -ge 2 ]; then
+    export SMD_DEBUG_DETOBJ=1
+    export SMD_DEBUG_AZAV_SHM=1
+fi
+
+if [ "$SMD_DEBUG_LEVEL" -gt 0 ]; then
+    echo "[DEBUG] SMD_DEBUG_LEVEL: $SMD_DEBUG_LEVEL"
+    echo "[DEBUG] SMD_DEBUG_TIMING: $SMD_DEBUG_TIMING"
+    echo "[DEBUG] SMD_DEBUG_EVT_TIMING: $SMD_DEBUG_EVT_TIMING"
+    echo "[DEBUG] SMD_DEBUG_DET: $SMD_DEBUG_DET"
+    echo "[DEBUG] SMD_DEBUG_DETOBJ: $SMD_DEBUG_DETOBJ"
+    echo "[DEBUG] SMD_DEBUG_AZAV_SHM: $SMD_DEBUG_AZAV_SHM"
+fi
+
 if [ -v INTERACTIVE ]; then
-    export PS_SRV_NODES=1
-    export PS_EB_NODES=1
-    $SMD_ROOT/arp_scripts/run_smd2.sh $*
+    DEFAULT_SRV_CORES=1
+    SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}
+    export PS_SRV_NODES=$SRV_CORES
+    DEFAULT_EB_CORES=1
+    EB_CORES=${EB_CORES:=$DEFAULT_EB_CORES}
+    export PS_EB_NODES=$EB_CORES
+    $SMD_ROOT/arp_scripts/run_smd2.sh "$@"
     exit 0
 fi
 
@@ -153,17 +216,22 @@ ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
 # EB, BD and SRV core allocation
 if [[ "$PARTITION" == "milano" ]]; then
-    # For milano:
-    CORES_PER_NODE=120
-    DEFAULT_NODES=2
+    # For milano
+    CORES_PER_NODE=50
+    DEFAULT_NODES=1
     NODES=${NODES:=$DEFAULT_NODES}
+
+    if [ -v MPI_OPTIM ] && [ "$NODES" -le 1 ]; then
+        echo "[ERROR] --mpi_optim requires --nodes >= 2 (current NODES=$NODES)"
+        exit 1
+    fi
 
     if [ -v MPI_OPTIM ]; then
         MPI_SLOTS=$(($CORES_PER_NODE*($NODES-1)))  # Number of cores on all nodes but the one for SMD0
-        DEFAULT_SRV_CORES=$((16*($NODES-1)))  # 16 writers per node minus the SMD0 node
+        DEFAULT_SRV_CORES=$(($NODES-1))  # 1 writer per node minus the SMD0 node
     else
         MPI_SLOTS=$(($CORES_PER_NODE*$NODES-1))  # Total number of cores minus SMD0
-        DEFAULT_SRV_CORES=$((16*$NODES))  # 16 writers per node seems to be a good number for milano
+        DEFAULT_SRV_CORES=$NODES  # 1 writer per node
     fi
 
     if [ -v PSPLOT_LIVE ]; then
@@ -174,7 +242,16 @@ if [[ "$PARTITION" == "milano" ]]; then
     SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}
 
     DEFAULT_EB_CORES=$((($MPI_SLOTS-$SRV_CORES)/16))  # 1/16 is the recommended ratio for generic jobs.
-    EB_CORES=${EB_NODES:=$DEFAULT_EB_CORES}
+    EB_CORES=${EB_CORES:=$DEFAULT_EB_CORES}
+else
+    # Non-milano default fallback
+    CORES_PER_NODE=${CORES_PER_NODE:=50}
+    DEFAULT_NODES=${DEFAULT_NODES:=1}
+    NODES=${NODES:=$DEFAULT_NODES}
+    DEFAULT_SRV_CORES=1
+    SRV_CORES=${SRV_CORES:=$DEFAULT_SRV_CORES}
+    DEFAULT_EB_CORES=1
+    EB_CORES=${EB_CORES:=$DEFAULT_EB_CORES}
 fi
 
 export PS_SRV_NODES=$SRV_CORES
@@ -183,8 +260,8 @@ export PS_EB_NODES=$EB_CORES
 # If we run into the chunk size error:
 # export PS_SMD_CHUNKSIZE=1073741824
 
-SBATCH_ARGS="--nodes $NODES --account $ACCOUNT -p $PARTITION"
+SBATCH_ARGS="--nodes $NODES --account $ACCOUNT -p $PARTITION --tasks-per-node $CORES_PER_NODE --exclusive"
 
 echo "sbatch arguments: $SBATCH_ARGS"
 
-sbatch $SBATCH_ARGS $SMD_ROOT/arp_scripts/run_smd2.sh $*
+sbatch $SBATCH_ARGS $SMD_ROOT/arp_scripts/run_smd2.sh "$@"
