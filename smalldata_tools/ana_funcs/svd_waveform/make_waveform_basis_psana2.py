@@ -10,7 +10,6 @@ import h5py as h5
 import smalldata_tools.lcls2.DetObject as dobj
 import smalldata_tools.ana_funcs.svd_waveform.svd_waveform_processing as proc
 
-
 BASE = os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/")
 
 

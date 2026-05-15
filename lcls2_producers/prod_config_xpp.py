@@ -3,21 +3,22 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detectors = [ 'alvium_1','jungfrau1M']
+detectors = ["alvium_1", "jungfrau1M"]
+
 
 def getROIs(run):
 
     # full_roi = {"thresADU": None, "writeArea": True, "calcPars": False, "ROI": None}
     # sum_thresh = {"thresADU": [8.0,9.0], "writeArea": True, "ROI": [ [[0,1], [0, 300], [200,700]],
-                             # [[1,2], [0, 200], [200,700]] ] }
-    if isinstance(run,str):
-        run=int(run)
+    # [[1,2], [0, 200], [200,700]] ] }
+    if isinstance(run, str):
+        run = int(run)
     ret_dict = {}
-    if (run>= 0):
+    if run >= 0:
         roi_dict = {}
-        roi_dict['ROI'] = None # can define more than one ROI
-        roi_dict['writeArea'] = True
-        ret_dict['alvium_1'] = [roi_dict]
+        roi_dict["ROI"] = None  # can define more than one ROI
+        roi_dict["writeArea"] = True
+        ret_dict["alvium_1"] = [roi_dict]
     return ret_dict
 
 
