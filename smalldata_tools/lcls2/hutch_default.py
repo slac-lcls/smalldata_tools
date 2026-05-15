@@ -32,6 +32,8 @@ def defaultDetectors(hutch, run=None, env=None):
         dets = uedDetectors(run)
     elif hutch.lower() == "mfx":
         dets = mfxDetectors(run)
+    elif hutch.lower() == "xpp":
+        dets = xppDetectors(run)
     else:
         dets = []
     detsInRun = [det for det in dets if det.in_run()]
@@ -105,4 +107,21 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     dets.append(epicsDetector(PVlist=["lxt", "txt"], run=run))
     dets.append(damageDetector(run=run))
     dets.append(usbEncoder(detname="MfxUsbEncoder01", run=run))
+    return dets
+
+
+def xppDetectors(run, beamCodes=[[-137], [89]]):
+    dets = []
+    dets.append(scanDetector("scan", run))
+    dets.append(genericDetector("timing", run))
+    dets.append(genericDetector("ebeam", run))
+    dets.append(genericDetector("gasdet", run))
+    # dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("Em3l0BmMon", run))
+    dets.append(genericDetector("Sp1L2Wv8", run))
+    dets.append(genericDetector("XppSb2BmMon", run))
+    dets.append(genericDetector("XppSb3BmMon", run))
+    dets.append(genericDetector("XppUsrDio", run))
+    dets.append(damageDetector(run=run))
+    # dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
     return dets
