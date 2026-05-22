@@ -115,6 +115,7 @@ def xppDetectors(run, beamCodes=[[-137], [89]]):
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
     dets.append(genericDetector("ebeam", run))
+    dets.append(genericDetector("ebeamh", run))
     dets.append(genericDetector("gasdet", run))
     # dets.append(genericDetector("pcav", run))
     dets.append(genericDetector("Em3l0BmMon", run))
