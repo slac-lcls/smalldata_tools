@@ -21,7 +21,8 @@ size = COMM.Get_size()
 logger = logging.getLogger(__name__)
 
 
-H5_BASE= "/sdf/data/lcls/ds/"
+H5_BASE = "/sdf/data/lcls/ds/"
+
 
 class SrvMsgType(Enum):
     """
