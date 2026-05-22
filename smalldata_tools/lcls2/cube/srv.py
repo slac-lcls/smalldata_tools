@@ -21,8 +21,7 @@ size = COMM.Get_size()
 logger = logging.getLogger(__name__)
 
 
-SIT_PSDM_DATA = Path(os.environ.get("SIT_PSDM_DATA", "/sdf/data/lcls/ds/"))
-
+H5_BASE= "/sdf/data/lcls/ds/"
 
 class SrvMsgType(Enum):
     """
@@ -149,7 +148,7 @@ class CubeSrv:
             logger.info(f"User custom filepath {filepath}.")
             filepath = Path(filepath)
         else:
-            filepath = Path(SIT_PSDM_DATA) / exp[:3] / exp / "hdf5/smalldata/cube"
+            filepath = Path(H5_BASE) / exp[:3] / exp / "hdf5/smalldata/cube"
             logger.info(f"Using default filepath {filepath}.")
 
         filename = f"cube_{exp}_r{run_num:04d}.h5"
