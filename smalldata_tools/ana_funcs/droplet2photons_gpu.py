@@ -12,20 +12,23 @@ Usage (exactly like droplet2Photons in a smalldata pipeline):
     f = droplet2photons_gpu(aduspphot=172, use_gpu=True)             # GPU path
 It consumes the same data dict {_image, _imgDrop, _mask} produced upstream by dropletFunc.
 """
+
 import numpy as np
 import scipy.ndimage as ndi
 
 try:
     import cupy as cp
+
     _HAS_CUPY = True
 except ImportError:
     cp = None
     _HAS_CUPY = False
 
 from smalldata_tools.common.detector_base import DetObjectFunc
-try:                                          # vendored inside smalldata_tools/ana_funcs/
+
+try:  # vendored inside smalldata_tools/ana_funcs/
     from smalldata_tools.ana_funcs.droplets_gpu import find_photons, _labeled_sum_gpu
-except ImportError:                           # or droplets_gpu on PYTHONPATH (dev)
+except ImportError:  # or droplets_gpu on PYTHONPATH (dev)
     from droplets_gpu import find_photons, _labeled_sum_gpu
 
 
@@ -55,22 +58,32 @@ class droplet2photons_gpu(DetObjectFunc):
             img_drop = cp.asarray(imgDrop).astype(cp.int32)
             n_drop = int(img_drop.max()) if img_drop.size else 0
             drop_ind = cp.arange(1, n_drop + 1, dtype=cp.int32)
-            adu_drop = (_labeled_sum_gpu(img, img_drop, n_drop) if n_drop
-                        else cp.zeros(0, dtype=cp.float32))
+            adu_drop = (
+                _labeled_sum_gpu(img, img_drop, n_drop)
+                if n_drop
+                else cp.zeros(0, dtype=cp.float32)
+            )
         else:
             img = np.asarray(img, dtype=np.float32)
             img_drop = np.asarray(imgDrop).astype(np.int32)
             n_drop = int(img_drop.max()) if img_drop.size else 0
             drop_ind = np.arange(1, n_drop + 1, dtype=np.int32)
-            adu_drop = (ndi.sum_labels(img, labels=img_drop, index=drop_ind).astype(np.float32)
-                        if n_drop else np.zeros(0, dtype=np.float32))
+            adu_drop = (
+                ndi.sum_labels(img, labels=img_drop, index=drop_ind).astype(np.float32)
+                if n_drop
+                else np.zeros(0, dtype=np.float32)
+            )
 
         if n_drop == 0:
             self.dat = {k: np.array([]) for k in ("tile", "row", "col", "data")}
             return self._collect()
 
-        droplet_dict = {"img": img, "img_drop": img_drop,
-                        "drop_ind": drop_ind, "adu_drop": adu_drop}
+        droplet_dict = {
+            "img": img,
+            "img_drop": img_drop,
+            "drop_ind": drop_ind,
+            "adu_drop": adu_drop,
+        }
         # photon_pts=None → find_photons sizes the (uniform) edges to the data; identical
         # classification to self.photpts, without shipping a 1e6 array to the GPU.
         photons = find_photons(droplet_dict, float(self.aduspphot), photon_pts=None)
