@@ -7,13 +7,14 @@ faster implementation of the droplet → photon step, with an optional GPU path.
 
 `droplet2Photons` does the multi-photon split with `loopdrops`/`greedyguess`, a per-droplet
 **Python** loop. It's fine for sparse frames but collapses on dense ones: on a real XPP
-`epix_alc5` frame (the direct-beam blob is one ~160 k-photon droplet) it takes **~2.3 s/frame**.
-This drop-in (a) adds a dedicated path for saturated/giant droplets, and (b) **compiles the
-greedyguess per-droplet loop** (numba-jitted driver, no Python-level loop) — so the same frame
-is **~23 ms on CPU / ~4–7 ms on a GPU** with **identical photon counts**. Compiling the driver
-alone is ~4× over the interpreted per-droplet loop (single-threaded); an optional `parallel=True`
-adds numba `prange` threading, but that's only worth it on dense frames *and* when the producer
-isn't already parallel across events, so the serial compiled path is the default.
+`epix_alc5` frame (the direct-beam blob is one ~160 k-photon droplet) it takes **~2.8 s/frame**
+(worse on the brightest shots). This drop-in (a) adds a dedicated path for saturated/giant
+droplets, and (b) **compiles the greedyguess per-droplet loop** (numba-jitted driver, no
+Python-level loop) — so the same frame is **~18 ms on CPU / ~5–8 ms on a GPU** with **identical
+photon counts**. Compiling the driver alone is ~4× over the interpreted per-droplet loop
+(single-threaded); an optional `parallel=True` adds numba `prange` threading, but that's only
+worth it on dense frames *and* when the producer isn't already parallel across events, so the
+serial compiled path is the default.
 
 ## What it adds (2 files, both in `smalldata_tools/ana_funcs/`)
 
@@ -66,24 +67,33 @@ python tests/example_pipeline_psana1.py [exp] [run] [detector]   # defaults: xpp
 runs a psana1 `DataSource` through `dropletFunc` → `droplet2photons_gpu` and reports
 droplets/event and photons/event (e.g. ~33 droplets → ~19 photons/event on the default run).
 
-## Benchmarks (real XPP `xpplw3920` r130, 704×768, identical photon counts across all rows)
+## Benchmarks (real XPP `xpplw3920` r130, 704×768, identical photon counts across all rows; end-to-end, incl. host↔device transfers)
 
-| method | sparse (epix_alc4) | dense (epix_alc5) |
-|---|---|---|
-| `droplet2Photons` (reference) | 115 ms | 2.3 s |
-| this drop-in, **CPU** (compiled greedyguess) | 21 ms | 23 ms |
-| this drop-in, **GPU** (A100) | 3.5 ms | 7.3 ms |
+| method | sparse speckle (`epix_alc4`) | dense · beam **masked** (`epix_alc5`) | dense · beam **unmasked** (`epix_alc5`) |
+|---|---|---|---|
+| `droplet2Photons` (reference, jitted) | 24 ms | 60 ms | ~2.8 s |
+| this drop-in, **CPU** | 5.0 ms | 15 ms | 18 ms |
+| this drop-in, **GPU** (A100 / H100) | 3.3 / 2.3 ms | 7.2 / 4.3 ms | 8.0 / 4.8 ms |
 
-(CPU times are compute-only on a recent server core, fused serial driver. The dense gain over the
-reference is the giant-blob path + compiled loop; on dense frames an opt-in `parallel=True` shaves
-a further ~1.4×.)
+**Sparse speckle is the operating point** — that's where XPCS actually runs. The beam blob is
+pile-up (≥2 photons/pixel, where photon counting is undefined) and is **masked** out of the
+analysis, so the *unmasked* column is the worst case: the reference stalls at seconds/frame
+(a DAQ hazard on a saturated shot), while the drop-in stays in the tens of ms regardless — the
+giant-blob path is robustness insurance, not the headline. The everyday CPU speedup (~4–5×) is
+the faster reductions, not the numba JIT (the reference's master jits its driver too); the GPU
+adds the placement kernels.
+
+Note: on small frames the GPU is launch/transfer-bound and can be **slower than the CPU**
+(~2.4 vs ~1.1 ms/frame on a 256² frame) — it wins on the full detector and dense frames. Pick the
+path per workload (`use_gpu=True` is opt-in). On dense frames an opt-in `parallel=True` shaves a
+further ~1.4× on CPU.
 
 ## Known differences (by design)
 
 - **Counts are identical** to `droplet2Photons` in every test.
 - **Positions differ only inside saturated/giant droplets** (> 64 photons, e.g. the beam blob).
   There the drop-in uses integer placement + a centroid for the residual instead of running
-  full greedyguess (which is the bulk of the ~2.3 s cost and where sub-pixel position is
+  full greedyguess (which is the bulk of the ~2.8 s cost and where sub-pixel position is
   meaningless anyway).
   Outside such blobs, positions match 100% (sparse) / pixel-exact (dense). Mask the beam
   (`max_drop_adu=`) and the difference vanishes entirely.
