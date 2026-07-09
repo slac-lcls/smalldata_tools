@@ -126,7 +126,10 @@ class DetObjectClass(object):
         self.run = run
         self._storeSum = {}
         self.applyMask = kwargs.get("applyMask", 0)
-        self.maskCentral = kwargs.get("maskCentral", True)
+        self.maskCentral = kwargs.get("maskCentral", 1)
+        self.nedges = kwargs.get("nedges", 1)
+        self.rneighbors = kwargs.get("rneighbors", 0)
+        self.cmpars = kwargs.get("cmpars", None)
 
         self.dataAccessTime = 0.0
         self.rawShape = None
@@ -239,14 +242,19 @@ class DetObjectClass(object):
 
     def _getMasks(self):
         try:
-            self.statusMask = self.det.mask(self.run, status=True)
-            self.mask = self.det.mask(
+            self.statusMask = self.det.mask_v2(self.run, status=True)
+            self.mask = self.det.mask_v2(
                 self.run,
                 unbond=True,
-                unbondnbrs=True,
                 status=True,
-                edges=True,
-                central=self.maskCentral,
+                edges=(self.nedges > 0),
+                central=(self.maskCentral > 0),
+                mrows=self.nedges,
+                mcols=self.nedges,
+                wcentral=self.maskCentral,
+                neighbors=(self.rneighbors > 0),
+                rad=(self.rneighbors > 0),
+                ptrn="r",  # r:rhombus, 'c': circle, square: else
             )
 
             if rank == 0 and self.mask is not None:
@@ -257,14 +265,19 @@ class DetObjectClass(object):
                         np.ones_like(self.mask).sum(),
                     )
                 )
-            self.cmask = self.det.mask(
+            self.cmask = self.det.mask_v2(
                 self.run,
                 unbond=True,
-                unbondnbrs=True,
                 status=True,
-                edges=True,
-                central=self.maskCentral,
+                edges=(self.nedges > 0),
+                central=(self.maskCentral > 0),
                 calib=True,
+                mrows=self.nedges,
+                mcols=self.nedges,
+                wcentral=self.maskCentral,
+                neighbors=(self.rneighbors > 0),
+                rad=(self.rneighbors > 0),
+                ptrn="r",  # r:rhombus, 'c': circle, square: else
             )
             if (
                 self.cmask is not None
@@ -313,12 +326,10 @@ class DetObjectClass(object):
     # make this a private function?
     def getMask(self, ROI):
         ROI = np.array(ROI)
-        # print 'DEBUG getMask: ',ROI.shape
         if ROI.shape != (2, 2):
             return np.ones_like(self.ped)
 
         mask_roi = np.zeros(self.imgShape)  # <-- no, like image. Need image size.
-        # print 'DEBUG getMask: img shape ',self.imgShape, self.ped.shape
         mask_roi[ROI[0, 0] : ROI[0, 1], ROI[1, 0] : ROI[1, 1]] = 1
         if self._needsGeo:
             mask_r_nda = np.array(
@@ -326,7 +337,6 @@ class DetObjectClass(object):
             )
         else:
             mask_r_nda = mask_roi
-        # print 'mask from rectangle (shape):',mask_r_nda.shape
         return mask_r_nda
 
     def getData(self, evt):
@@ -501,7 +511,7 @@ class ImpObject(WaveformObject):
 class CameraObject(DetObjectClass):
     def __init__(self, det, env, run, **kwargs):
         super(CameraObject, self).__init__(det, env, run, **kwargs)
-        self._common_mode_list = [0, -1, 30]  # none, raw, calib
+        self._common_mode_list = [0, -1, 30, 40]  # none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
@@ -522,7 +532,9 @@ class CameraObject(DetObjectClass):
         self.gain_mask = self.det.gain_mask(run)
         self.gain = self.det.gain(run)
 
-        self.common_mode_pars = self.det.common_mode(run)
+        self.common_mode_pars = self.det.common_mode(
+            run
+        )  # this just stores the default!
         self.local_gain = None
         self._getImgShape()  # sets self.imgShape
         self._getMasks()  # sets mask, cmask, statusMask
@@ -557,6 +569,11 @@ class CameraObject(DetObjectClass):
                         self.evt.dat *= self.gain
         elif self.common_mode % 100 == 30:
             self.evt.dat = self.det.calib(evt)
+        elif self.common_mode % 100 == 40:
+            if self.cmpars is not None:
+                self.evt.dat = self.det.calib(evt, cmpars=self.cmpars)
+            else:
+                self.evt.dat = self.det.calib(evt)
         # override gain if desired
         if (
             self.local_gain is not None
@@ -961,6 +978,7 @@ class JungfrauObject(TiledCameraObject):
             72,
             -1,
             30,
+            40,
         ]  # none, epix-style corr on row*col, row, col, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -1027,6 +1045,7 @@ class CsPadObject(TiledCameraObject):
             0,
             -1,
             30,
+            40,
         ]  # zero-peak, unbonded, unbonded (high no-correcion threshold), mixed, none, raw data, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -1105,6 +1124,7 @@ class CsPad2MObject(CsPadObject):
             10,
             -1,
             30,
+            40,
         ]  # none, zero-peak, unbonded, mixed, raw data, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
@@ -1140,7 +1160,8 @@ class EpixObject(TiledCameraObject):
             0,
             -1,
             30,
-        ]  # Jacob (norm), Jacob, def, def(ami-like), mine, mine (norm), mine (norm-bank), none, raw, calib
+            40,
+        ]  # Jacob (norm), Jacob, def, def(ami-like), mine, mine (norm), mine (norm-bank), none, raw, calib, calib w/cmpars
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
         if self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
@@ -1205,7 +1226,6 @@ class EpixObject(TiledCameraObject):
         elif self.common_mode % 100 == 47:
             self.evt.dat = self.det.raw_data(evt) - self.ped
             for ib, bMask in enumerate(self.bankMasks):
-                # print ib, np.median(self.evt.dat[bMask]), bMask.sum()
                 self.evt.dat[bMask] -= np.median(self.evt.dat[bMask])
             self.evt.dat = cm_epix(self.evt.dat, self.rms, mask=self.statusMask)
 
@@ -1455,10 +1475,6 @@ class Epix10kObject(TiledCameraObject):
                     + (0.882 / 0.0082 + 100)
                 )
 
-            # print 'temp1',temp1
-            # print 'temp1H',temp1H
-            # print 'hum',hum
-            # print 'humH',humH
             self.evt.__dict__["env_temp1"] = np.array(temp1)
             self.evt.__dict__["env_temp2"] = np.array(temp2)
             self.evt.__dict__["env_temp3"] = np.array(temp3)
@@ -1819,10 +1835,6 @@ class Epix10k2MObject(TiledCameraObject):
                     + (0.882 / 0.0082 + 100)
                 )
 
-            # print 'temp1',temp1
-            # print 'temp1H',temp1H
-            # print 'hum',hum
-            # print 'humH',humH
             self.evt.__dict__["env_temp1"] = np.array(temp1)
             self.evt.__dict__["env_temp2"] = np.array(temp2)
             self.evt.__dict__["env_temp3"] = np.array(temp3)
@@ -1967,7 +1979,6 @@ class UxiObject(DetObjectClass):
                 continue
             if key.find("lcls_ts") >= 0:
                 continue
-            # print 'append key to event: ',key
             if isinstance(self._uxiDict[key][uxiIdx], basestring):
                 if self._uxiDict[key][uxiIdx].find(".") >= 0:
                     self.evt.__dict__["env_%s" % key] = float(
