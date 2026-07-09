@@ -239,11 +239,10 @@ class azimuthalBinning(DetObjectFunc):
         # include geometrical corrections
         geom = (self.dis_to_sam + self.z_off) / r
         # pixels are not perpendicular to scattered beam
-        geom *= (self.dis_to_sam + self.z_off) / r**2
+        geom *= ((self.dis_to_sam + self.z_off) / r)**2
         # scattered radiation is proportional to 1/r^2
         self.msg("calculating normalization...", cr=0)
         self.geom = geom
-        self.geom /= self.geom.max()
         if not self.geomCorr:
             self.geom = np.ones_like(self.geom).astype(float)
         if not self.polCorr:
