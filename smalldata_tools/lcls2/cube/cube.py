@@ -192,7 +192,7 @@ class CubeStepScan(Cube):
         event_screener: event_screener.EventScreener = None,
         **kwargs: dict,
     ):
-        super().__init__(ds,run, engine, processors, event_screener, **kwargs)
+        super().__init__(ds, run, engine, processors, event_screener, **kwargs)
         self.step = None
         self.step_data = {}
 
@@ -316,5 +316,5 @@ def get_cube(
         is_scan = True
         if ds.unique_user_rank():
             logger.info("Instantiating CubeStepScan.")
-        cube = CubeStepScan(ds,run, engine=engine, **kwargs)
+        cube = CubeStepScan(ds, run, engine=engine, **kwargs)
     return cube
