@@ -256,6 +256,8 @@ class usbEncoder(DefaultDetector):
                 for i in range(4):
                     if (desc := channel_descriptions[i]) != "":
                         dl[desc] = data[i]
+                    else:
+                        dl[f"ch{i}"] = data[i]
         return dl
 
 

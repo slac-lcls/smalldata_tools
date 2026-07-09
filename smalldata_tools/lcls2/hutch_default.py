@@ -123,6 +123,7 @@ def xppDetectors(run, beamCodes=[[-137], [89]]):
     dets.append(genericDetector("XppSb2BmMon", run))
     dets.append(genericDetector("XppSb3BmMon", run))
     dets.append(genericDetector("XppUsrDio", run))
+    dets.append(usbEncoder("XppUsbEncoder02", run))
     dets.append(damageDetector(run=run))
     # dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
     return dets
