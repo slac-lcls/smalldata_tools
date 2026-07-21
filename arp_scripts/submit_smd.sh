@@ -150,7 +150,7 @@ ARP_LOCATION="${ARP_LOCATION:=LOCAL}"
 export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
-export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+export MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 # Default queue and S3DF flag
 DEFQUEUE='psanaq'
