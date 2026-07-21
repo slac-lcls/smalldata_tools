@@ -489,9 +489,17 @@ class Epix100Object(TiledCameraObject):
             30,
         ]  # Jacob (norm), Jacob, def, def(ami-like), mine, mine (norm), mine (norm-bank), none, raw, calib
         self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
-        if self.common_mode is None:
+        if isinstance(self.common_mode, tuple) or isinstance(self.common_mode, list):
+            self.common_mode = tuple(self.common_mode)
+            if len(self.common_mode) > 4:
+                print("Too many common mode parameters, taking only first 4!", self.common_mode)
+                self.common_mode = self.common_mode[:4]
+            elif len(self.common_mode) == 3:
+                print("Too few common mode parameters, but alg (cmpars[0]) is ignored. Extending!", self.common_mode)
+                self.common_mode = (0,) + self.common_mode
+        elif self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
-        if self.common_mode not in self._common_mode_list:
+        elif self.common_mode not in self._common_mode_list:
             print(
                 "Common mode %d is not an option for as Epix detector, please choose from: "
                 % self.common_mode,
@@ -527,9 +535,13 @@ class Epix100Object(TiledCameraObject):
         mbits = 0  # do not apply mask (would set pixels to zero)
         # mbits=1 #set bad pixels to 0
 
+        if isinstance(self.common_mode, tuple):
+            self.evt.dat = self.det.raw.calib(
+                evt, cmpars=self.common_mode, rms=self.rms, normAll=True
+            )
         # Common Mode currently NOT working for ePix100
         # Skip all options that pass cmpars
-        if self.common_mode % 100 == 6:
+        elif self.common_mode % 100 == 6:
             # Was using cmpars=[6] -> This doesn't work for psana2
             # Some of these other kwargs may not do anything
             # self.evt.dat = self.det.raw.calib(
