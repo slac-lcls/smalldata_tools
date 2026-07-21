@@ -7,6 +7,26 @@ detectors = ["epix100_0", "epix100_1", "alvium"]  # , 'qadc1']
 # detectors = []
 integrating_detectors = []
 
+def get_det_params(run):
+    ret_dict = {}
+
+    # cmpars (tuple) - common mode parameters
+    #      [0] - (int) algorithm number - currently this number does not matter,
+    #            median algorithm is used everywhere.
+    #      [1] - (uint) mode bitword - 1/2/4 : correction applied in rows per
+    #            bank / columns per bank / banks.
+    #      [2] - (float) absolute maximal allowed correction. Correction is not
+    #            applied if exceeds this value.
+    #      [3] - (uint) minimal number of (anmasked) pixels to evaluate correction.
+    epix_params = {
+        "cmpars": (7, 7, 100, 10)
+    }
+
+    if run > 0:
+        ret_dict["epix100_0"] = epix_params
+        ret_dict["epix100_1"] = epix_params
+
+    return ret_dict
 
 def getROIs(run):
     ret_dict = {}

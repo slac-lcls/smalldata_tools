@@ -654,7 +654,7 @@ for evt_num, evt in enumerate(ds.events()):
 
     #the ARP will pass run & exp via the enviroment, if I see that info, the post updates
     if ( (evt_num<100 and evt_num%10==0) or (evt_num<1000 and evt_num%100==0) or (evt_num%1000==0)):
-        if os.environ.get('ARP_JOB_ID', None) is not None:
+        if os.environ.get('ARP_JOB_ID', None) is not None and os.getenv("JID_UPDATE_COUNTERS") is not None:
             if ds.size == 1:
                 requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Current Event</b>", "value": evt_num+1}])
             elif ds.rank == 0:
@@ -703,7 +703,7 @@ if ds.rank==0:
 
 #finishing up here....
 logger.debug('rank {0} on {1} is finished'.format(ds.rank, hostname))
-if os.environ.get('ARP_JOB_ID', None) is not None:
+if os.environ.get('ARP_JOB_ID', None) is not None and os.getenv("JID_UPDATE_COUNTERS") is not None:
     if ds.size > 1:
         if ds.rank == 0:
             requests.post(os.environ["JID_UPDATE_COUNTERS"], json=[{"key": "<b>Last Event</b>", "value": "~ %d cores * %d evts"%(ds.size,evt_num)},{"key": "<b>Duration</b>", "value": "%f min"%(prod_time)}])
