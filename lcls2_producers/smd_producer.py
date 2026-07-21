@@ -1062,7 +1062,10 @@ logger.debug("rank {0} on {1} is finished".format(rank, hostname))
 #        cmd = ['timestamp_sort_h5', h5_f_name, h5_f_name]
 
 if ds.unique_user_rank():
-    if os.environ.get("ARP_JOB_ID", None) is not None and os.getenv("JID_UPDATE_COUNTERS") is not None:
+    if (
+        os.environ.get("ARP_JOB_ID", None) is not None
+        and os.getenv("JID_UPDATE_COUNTERS") is not None
+    ):
         requests.post(
             os.environ["JID_UPDATE_COUNTERS"],
             json=[

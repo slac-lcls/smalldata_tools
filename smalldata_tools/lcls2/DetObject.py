@@ -492,10 +492,16 @@ class Epix100Object(TiledCameraObject):
         if isinstance(self.common_mode, tuple) or isinstance(self.common_mode, list):
             self.common_mode = tuple(self.common_mode)
             if len(self.common_mode) > 4:
-                print("Too many common mode parameters, taking only first 4!", self.common_mode)
+                print(
+                    "Too many common mode parameters, taking only first 4!",
+                    self.common_mode,
+                )
                 self.common_mode = self.common_mode[:4]
             elif len(self.common_mode) == 3:
-                print("Too few common mode parameters, but alg (cmpars[0]) is ignored. Extending!", self.common_mode)
+                print(
+                    "Too few common mode parameters, but alg (cmpars[0]) is ignored. Extending!",
+                    self.common_mode,
+                )
                 self.common_mode = (0,) + self.common_mode
         elif self.common_mode is None:
             self.common_mode = self._common_mode_list[0]
