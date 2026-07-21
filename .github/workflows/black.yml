@@ -9,19 +9,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0                     # v7
         with:
           ref: "${{ github.event.pull_request.head.ref }}"
           repository: "${{ github.event.pull_request.head.repo.full_name }}"
       
       - name: apply-black
-        uses: psf/black@stable
-        with:
+        uses: psf/black@87928e6d6761a4a6d22250e1fee5601b3998086e                            # v26.5.1
+        with:                                                                               # (equal to stable on 2026/06/30)
           options: "--verbose --color"
           src: "./smalldata_tools ./setup_scripts ./lcls2_producers"
       
       - name: commit-black
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7
         with:
           commit_message: "Auto-commit black formatting"
           commit_user_name: "Autoformatter"
