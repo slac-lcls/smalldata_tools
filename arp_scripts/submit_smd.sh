@@ -23,6 +23,8 @@ $(basename "$0"):
             Number of cores to be utilized
         --maxnodes
             Max number of nodes to use
+        --mem
+            Memory per job (default is 4GB)
         -f|--full
             If specified, translate everything (do not use)
         -D|--default
@@ -74,6 +76,11 @@ do
         ;;
     --maxnodes)
         MAX_NODES="$2"
+        shift
+        shift
+        ;;
+    --mem)
+        MEM="$2"
         shift
         shift
         ;;
@@ -150,7 +157,7 @@ ARP_LOCATION="${ARP_LOCATION:=LOCAL}"
 export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
-export MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 # Default queue and S3DF flag
 DEFQUEUE='psanaq'
@@ -243,6 +250,9 @@ fi
 SBATCH_ARGS="-p $QUEUE --nodes 0-$MAX_NODES --ntasks $CORES --use-min-nodes -o $LOGFILE"
 MPI_CMD="mpirun -np $CORES python -u -m mpi4py.run ${ABS_PATH}/${PYTHONEXE} $*"
 
+if [ -v MEM ]; then
+    SBATCH_ARGS="$SBATCH_ARGS --mem ${MEM}"
+fi
 
 if [[ $QUEUE == *milano* ]]; then
     if [ -v RESERVATION ]; then
