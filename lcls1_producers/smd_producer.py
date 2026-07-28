@@ -468,7 +468,7 @@ else:
     epicsPVlist = ds.env().epicsStore().aliases()
 if (args.full or args.epicsAll) and len(epicsPVlist)>0:
     logger.debug('adding all epicsPVs....')
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+    default_dets.append(epicsDetector(PVlist=epicsPVlist, name='epicsAll'))
 #save specified list of PVs once/run, not nothing has been passed, save all.
 if len(config.epicsOncePV) > 0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')
