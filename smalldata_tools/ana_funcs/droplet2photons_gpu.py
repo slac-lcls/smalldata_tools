@@ -39,11 +39,11 @@ class droplet2photons_gpu(DetObjectFunc):
         self.aduspphot = kwargs.get("aduspphot", 0)
         self.offset = self.aduspphot * 0.5
         # photpts[n] = n*aduspphot - offset  (identical convention to droplet2Photons)
-        #photpts = np.arange(1000000) * self.aduspphot - self.offset
+        # photpts = np.arange(1000000) * self.aduspphot - self.offset
         self.photpts = kwargs.get("photpts", None)
-        if self.aduspphot <= 0.:
+        if self.aduspphot <= 0.0:
             try:
-                self.aduspphot = np.median(pta[1:]-pta[:-1])
+                self.aduspphot = np.median(pta[1:] - pta[:-1])
             except:
                 pass
         self.use_gpu = bool(kwargs.get("use_gpu", False)) and _HAS_CUPY
