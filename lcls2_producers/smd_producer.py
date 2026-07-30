@@ -54,6 +54,7 @@ def define_dets(run, det_list):
     # Assumes that the config file with function parameters definition
     # has been imported under "config"
 
+    user_det_params = {}
     rois_args = []  # special implementation as a list to support multiple ROIs.
     dimgs_args = {}
     wfs_int_args = {}
@@ -68,6 +69,8 @@ def define_dets(run, det_list):
     pressio_compression_args = {}
 
     # Get the functions arguments from the production config
+    if "get_det_params" in dir(config):
+        user_det_params = config.get_det_params(run)
     if "getROIs" in dir(config):
         rois_args = config.getROIs(run)
     if "getDetImages" in dir(config):
@@ -100,6 +103,8 @@ def define_dets(run, det_list):
 
         # Common mode (default: None)
         common_mode = None
+        if detname in user_det_params and "cmpars" in user_det_params[detname]:
+            common_mode = user_det_params[detname]["cmpars"]
 
         if not havedet:
             continue
@@ -1057,7 +1062,10 @@ logger.debug("rank {0} on {1} is finished".format(rank, hostname))
 #        cmd = ['timestamp_sort_h5', h5_f_name, h5_f_name]
 
 if ds.unique_user_rank():
-    if os.environ.get("ARP_JOB_ID", None) is not None:
+    if (
+        os.environ.get("ARP_JOB_ID", None) is not None
+        and os.getenv("JID_UPDATE_COUNTERS") is not None
+    ):
         requests.post(
             os.environ["JID_UPDATE_COUNTERS"],
             json=[
