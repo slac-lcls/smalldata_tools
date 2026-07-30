@@ -43,13 +43,9 @@ class droplet2photons_gpu(DetObjectFunc):
         self.photpts = kwargs.get("photpts", None)
         if self.aduspphot <= 0.:
             try:
-                if isinstance( self.photpts, np.ndarray):
-                    pta = self.photpts
-                else:
-                    pta = np.array(self.photpts)
-                    self.aduspphot = np.median(pta[1:]-pta[:-1])
+                self.aduspphot = np.median(pta[1:]-pta[:-1])
             except:
-                print('droplet2photons_gpu: aduspphot was not passed a physical value and it cannot be deduced from the photon energy boundaries')
+                pass
         self.use_gpu = bool(kwargs.get("use_gpu", False)) and _HAS_CUPY
         return
 
