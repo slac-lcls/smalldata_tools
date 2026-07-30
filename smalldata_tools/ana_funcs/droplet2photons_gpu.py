@@ -39,7 +39,6 @@ class droplet2photons_gpu(DetObjectFunc):
         self.aduspphot = kwargs.get("aduspphot", 0)
         self.offset = self.aduspphot * 0.5
         # photpts[n] = n*aduspphot - offset  (identical convention to droplet2Photons)
-<<<<<<< HEAD
         #the find_photon functions will create the default array
         self.photpts = kwargs.get("photpts", None) 
         if self.aduspphot <= 0.:
@@ -53,12 +52,6 @@ class droplet2photons_gpu(DetObjectFunc):
                 print('droplet2photons_gpu: 
                 aduspphot was not passed a physical value
                 and it cannot be deduced from the photon energy boundaries')
-=======
-        photpts = np.arange(1000000) * self.aduspphot - self.offset
-        self.photpts = kwargs.get("photpts", photpts)
-        if self.aduspphot <= 0.0:
-            self.aduspphot = np.median(self.photpts[1:] - self.photpts[:-1])
->>>>>>> d254eaeaefe25749d32a6a91ba8d122f944e2561
         self.use_gpu = bool(kwargs.get("use_gpu", False)) and _HAS_CUPY
         return
 
