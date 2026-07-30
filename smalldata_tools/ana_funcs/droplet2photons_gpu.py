@@ -39,10 +39,13 @@ class droplet2photons_gpu(DetObjectFunc):
         self.aduspphot = kwargs.get("aduspphot", 0)
         self.offset = self.aduspphot * 0.5
         # photpts[n] = n*aduspphot - offset  (identical convention to droplet2Photons)
-        photpts = np.arange(1000000) * self.aduspphot - self.offset
-        self.photpts = kwargs.get("photpts", photpts)
+        # photpts = np.arange(1000000) * self.aduspphot - self.offset
+        self.photpts = kwargs.get("photpts", None)
         if self.aduspphot <= 0.0:
-            self.aduspphot = np.median(self.photpts[1:] - self.photpts[:-1])
+            try:
+                self.aduspphot = np.median(pta[1:] - pta[:-1])
+            except:
+                pass
         self.use_gpu = bool(kwargs.get("use_gpu", False)) and _HAS_CUPY
         return
 
@@ -88,15 +91,11 @@ class droplet2photons_gpu(DetObjectFunc):
         }
         # photon_pts=None → find_photons sizes the (uniform) edges to the data; identical
         # classification to self.photpts, without shipping a 1e6 array to the GPU.
-
-        photons = find_photons(
-            droplet_dict, float(self.aduspphot), photon_pts=self.photpts
-        )
+        photons = find_photons(droplet_dict, float(self.aduspphot), photon_pts=None)
         if self.use_gpu:
             photons = photons.get()
 
         n = int(photons.shape[0])
-
         self.dat = {
             "tile": np.zeros(n),
             "row": photons[:, 0],

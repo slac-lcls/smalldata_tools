@@ -994,7 +994,7 @@ def _dropletize_cpu(
     }
 
 
-def _find_photons_cpu(droplet_dict, adu_per_photon, photon_pts):
+def _find_photons_cpu(droplet_dict, adu_per_photon, photon_pts=None):
     img = droplet_dict["img"]
     img_drop = droplet_dict["img_drop"]
     drop_ind = droplet_dict["drop_ind"]
