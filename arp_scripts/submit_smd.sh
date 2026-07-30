@@ -24,7 +24,7 @@ $(basename "$0"):
         --maxnodes
             Max number of nodes to use
         --mem
-            Memory per job (default is 4GB)
+            Memory per job (default on milano is 4G - 480 GB for 120 cores)
         -f|--full
             If specified, translate everything (do not use)
         -D|--default
