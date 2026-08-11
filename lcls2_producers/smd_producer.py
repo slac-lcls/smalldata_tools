@@ -863,7 +863,7 @@ for evt_num, evt in enumerate(event_iter):
                     "data": det.evt.dat.copy(),
                     "timestamp": evt.timestamp,
                 }
-        # Use algn_group to not pad data per events
+        # Use align_group to not pad data per events
         if subsample_data:  
             small_data.event(evt, subsample_data, align_group="subsample")
 

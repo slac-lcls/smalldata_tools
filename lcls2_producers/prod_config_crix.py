@@ -3,8 +3,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-# detectors = ["hsd", "rix_fim0", "rix_fim1", "crix_w8", "c_piranha", "c_atmopal", "c_epixm"]
-detectors = ["c_epixm"]
+detectors = ["hsd", "rix_fim0", "rix_fim1", "crix_w8", "c_piranha", "c_atmopal", "c_epixm"]
 
 
 def get_intg(run):
