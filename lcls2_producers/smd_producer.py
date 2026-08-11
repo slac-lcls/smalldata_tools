@@ -854,7 +854,10 @@ for evt_num, evt in enumerate(event_iter):
                 continue
 
             last_saved = subsample_config["last_saved"].get(det._name)
-            if last_saved is None or (current_evt_time - last_saved) >= subsample_config["rank_interval"]:
+            if (
+                last_saved is None
+                or (current_evt_time - last_saved) >= subsample_config["rank_interval"]
+            ):
                 logger.debug(
                     f"Rank {rank}: Saving subsampled data for {det._name} at time {current_evt_time:.3f}s"
                 )
@@ -864,7 +867,7 @@ for evt_num, evt in enumerate(event_iter):
                     "timestamp": evt.timestamp,
                 }
         # Use align_group to not pad data per events
-        if subsample_data:  
+        if subsample_data:
             small_data.event(evt, subsample_data, align_group="subsample")
 
     # Integrating detectors
