@@ -14,7 +14,7 @@ def getROIs(run):
     if isinstance(run, str):
         run = int(run)
     ret_dict = {}
-    if run >= 0:
+    if run < 0:
         roi_dict = {}
         roi_dict["ROI"] = None  # can define more than one ROI
         roi_dict["writeArea"] = True

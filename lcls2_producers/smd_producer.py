@@ -756,6 +756,58 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     for det in int_dets:
         normdict[det._name] = {"count": 0, "timestamp_min": 0, "timestamp_max": 0}
 
+    # Initialize subsampling configuration
+    # All BD-node worker ranks save; per-rank interval is scaled by n_bd_nodes so
+    # align_group="subsample" gets contributions from every worker while the aggregate
+    # save rate stays at 1 / configured_interval.
+    subsample_config = {
+        "enabled": False,
+        "detectors": [],
+        "interval": 1.0,
+        "rank_interval": 1.0,
+        "n_bd_nodes": 1,
+        "last_saved": {},
+    }
+
+    if "get_subsample_config" in dir(config):
+        file_config = config.get_subsample_config(run)
+        if file_config:
+            subsample_config["detectors"] = file_config.get("detectors", [])
+            subsample_config["interval"] = file_config.get("interval", 1.0)
+
+        # Safeguard: enforce minimum 0.1s aggregate interval (max 10 Hz)
+        MIN_SUBSAMPLE_INTERVAL = 0.1
+        if subsample_config["interval"] < MIN_SUBSAMPLE_INTERVAL:
+            if ds.unique_user_rank():
+                logger.warning(
+                    f"Subsample interval {subsample_config['interval']}s is below minimum "
+                    f"({MIN_SUBSAMPLE_INTERVAL}s). Setting to {MIN_SUBSAMPLE_INTERVAL}s."
+                )
+            subsample_config["interval"] = MIN_SUBSAMPLE_INTERVAL
+
+        # Number of BD-node workers = total ranks - smd0 - EB nodes - SRV nodes.
+        n_bd_nodes = max(
+            1,
+            size
+            - int(os.environ.get("PS_EB_NODES", 0) or 0)
+            - int(os.environ.get("PS_SRV_NODES", 0) or 0)
+            - 1,
+        )
+        subsample_config["n_bd_nodes"] = n_bd_nodes
+        subsample_config["rank_interval"] = subsample_config["interval"] * n_bd_nodes
+
+        # Enable on every worker rank so align_group="subsample" gets contributions from all.
+        if subsample_config["detectors"]:
+            subsample_config["enabled"] = True
+            for det_name in subsample_config["detectors"]:
+                subsample_config["last_saved"][det_name] = None
+            if ds.unique_user_rank():
+                logger.info(
+                    f"Subsampled full image saving enabled for: {subsample_config['detectors']} "
+                    f"at {subsample_config['interval']}s aggregate interval "
+                    f"({subsample_config['rank_interval']}s per-rank across {n_bd_nodes} BD nodes)"
+                )
+
 event_iter = thisrun.events()
 
 for evt_num, evt in enumerate(event_iter):
@@ -788,6 +840,32 @@ for evt_num, evt in enumerate(event_iter):
 
     # Combine default data & user data into single dict.
     det_data.update(userDict)
+
+    # Subsampled full image saving: every BD-node worker rank participates so that
+    # align_group="subsample" is satisfied. Per-rank interval is already scaled.
+    if subsample_config["enabled"]:
+        subsample_data = {}
+        current_evt_time = evt._seconds + evt._nanoseconds * 1e-9
+
+        for det in dets:
+            if det._name not in subsample_config["detectors"]:
+                continue
+            if det.evt.dat is None:
+                continue
+
+            last_saved = subsample_config["last_saved"].get(det._name)
+            if last_saved is None or (current_evt_time - last_saved) >= subsample_config["rank_interval"]:
+                logger.debug(
+                    f"Rank {rank}: Saving subsampled data for {det._name} at time {current_evt_time:.3f}s"
+                )
+                subsample_config["last_saved"][det._name] = current_evt_time
+                subsample_data[det._name] = {
+                    "data": det.evt.dat.copy(),
+                    "timestamp": evt.timestamp,
+                }
+        # Use algn_group to not pad data per events
+        if subsample_data:  
+            small_data.event(evt, subsample_data, align_group="subsample")
 
     # Integrating detectors
 
