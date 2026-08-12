@@ -133,6 +133,29 @@ def get_wf_svd(run):
     return det_kwargs
 
 
+def get_subsample_config(run):
+    """
+    Configure subsampled full detector image saving.
+
+    Returns
+    -------
+    dict or None:
+        'detectors': list of str - detector names to save full images for
+        'interval': float - seconds between saves (minimum 0.1s enforced)
+        Returns None to disable subsampling.
+    """
+    run = int(run)
+    config = None
+
+    # Example: enable for specific runs
+    # if run > 100:
+    #     config = {
+    #         'detectors': ['epix100_0'],
+    #         'interval': 1.0  # Save every 1.0 seconds
+    #     }
+    return config
+
+
 ##########################################################
 # run independent parameters
 ##########################################################

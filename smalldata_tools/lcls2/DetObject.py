@@ -36,6 +36,7 @@ def DetObject(srcName, run, **kwargs):
         "archon": ArchonObject,
         "jungfrau": JungfrauObject,
         "axis": SimpleCameraObject,
+        "epixm320": EpixMObject,
         "generic_container": GenericContainerObject,
     }
 
@@ -721,6 +722,39 @@ class JungfrauObject(TiledCameraObject):
         # if self.areas is not None:
         #    self.evt.dat /= self.areas
         # self._getRawShape()
+
+
+class EpixMObject(TiledCameraObject):
+    def __init__(self, det, run, **kwargs):
+        super().__init__(det, run, **kwargs)
+        self._common_mode_list = [
+            0,
+            -1,
+        ]  # calib, raw
+        self.common_mode = kwargs.get("common_mode", self._common_mode_list[0])
+        if self.common_mode is None:
+            self.common_mode = self._common_mode_list[0]
+        if self.common_mode not in self._common_mode_list:
+            print(
+                "Common mode %d is not an option for epix_M, please choose from: "
+                % self.common_mode,
+                self._common_mode_list,
+            )
+        self.pixelsize = None
+        self.isGainswitching = True
+
+        try:
+            self.imgShape = self.det.raw.image(run, self.ped[0]).shape
+        except:
+            pass
+        self._gainSwitching = True
+
+    def getData(self, evt):
+        super().getData(evt)
+        mbits = 0  # do not apply mask (would set pixels to zero)
+        # mbits=1 #set bad pixels to 0
+        if self.common_mode == 0:
+            self.evt.dat = self.det.raw.calib(evt)
 
 
 class PVObject(CameraObject):

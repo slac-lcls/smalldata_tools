@@ -3,14 +3,22 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detectors = ["hsd", "rix_fim0", "rix_fim1", "crix_w8", "c_piranha", "c_atmopal"]
+detectors = [
+    "hsd",
+    "rix_fim0",
+    "rix_fim1",
+    "crix_w8",
+    "c_piranha",
+    "c_atmopal",
+    "c_epixm",
+]
 
 
 def get_intg(run):
     """
     Returns
     -------
-    intg_main (str):  This detector ill be passed to the psana datasource. It should be the SLOWEST of
+    intg_main (str):  This detector will be passed to the psana datasource. It should be the SLOWEST of
                 all integrating detectors in the data
     intg_addl (list of str): The detectors in this list will be analyzed as integrating detectors. It is
                              important that the readout frequency of these detectors is commensurate and
@@ -164,6 +172,35 @@ def get_wf_svd(run):
                 }
                 det_kwargs[w8].append(kwargs)
     return det_kwargs
+
+
+def get_subsample_config(run):
+    """
+    Configure subsampled full detector image saving.
+
+    Returns
+    -------
+    dict or None:
+        'detectors': list of str - detector names to save full images for
+        'interval': float - seconds between saves (minimum 0.1s enforced)
+        Returns None to disable subsampling.
+    """
+    run = int(run)
+    config = None
+
+    if run > 0:
+        config = {
+            "detectors": ["c_epixm"],
+            "interval": 1.0,  # Save every ~1.0 seconds
+        }
+
+    # Example: enable for specific runs
+    # if run > 100:
+    #     config = {
+    #         'detectors': ['epix100_0'],
+    #         'interval': 1.0  # Save every 1.0 seconds
+    #     }
+    return config
 
 
 ##########################################################

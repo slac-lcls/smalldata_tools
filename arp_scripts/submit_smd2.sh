@@ -185,6 +185,8 @@ export PS_EB_NODES=$EB_CORES
 
 SBATCH_ARGS="--nodes $NODES --account $ACCOUNT -p $PARTITION"
 
+export OMPI_MCA_osc=^ucx
+
 echo "sbatch arguments: $SBATCH_ARGS"
 
 sbatch $SBATCH_ARGS $SMD_ROOT/arp_scripts/run_smd2.sh $*
