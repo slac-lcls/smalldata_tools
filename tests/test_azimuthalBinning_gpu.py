@@ -121,7 +121,8 @@ def test_gpu_matches_cpu(phiBins):
     gpu = _make(azimuthalBinning_gpu, phiBins=phiBins, use_gpu=True)
     img = _frames(1)[0]
     a = cpu.doCake(img.copy())
-    b = cupy.asnumpy(gpu.doCake(img.copy()))
+    b = gpu.doCake(img.copy())
+    assert isinstance(b, np.ndarray)  # host contract: small_data rejects device arrays
     np.testing.assert_allclose(b, a, rtol=1e-11, atol=0)
 
 
@@ -129,9 +130,57 @@ def test_gpu_matches_cpu(phiBins):
 def test_batch_matches_loop():
     gpu = _make(azimuthalBinning_gpu, use_gpu=True)
     imgs = _frames(6)
-    loop = np.stack([cupy.asnumpy(gpu.doCake(im.copy())) for im in imgs])
-    batch = cupy.asnumpy(gpu.doCake_batch(imgs))
+    loop = np.stack([gpu.doCake(im.copy()) for im in imgs])
+    batch = gpu.doCake_batch(imgs)
+    assert isinstance(batch, np.ndarray)
     np.testing.assert_allclose(batch, loop, rtol=1e-11, atol=0)
+
+
+@pytest.mark.skipif(not _HAS_GPU, reason="CuPy/GPU not available")
+def test_gpu_applies_calibration_images_to_device_frame():
+    """darkImg/gainImg configured + a GPU-resident frame: the advertised fast path. This used
+    to raise (device frame minus host darkImg); now the calibration images are device-cached
+    and applied on the GPU, matching the parent's CPU result."""
+    rng = np.random.default_rng(7)
+    dark = rng.random(SHAPE) * 5.0
+    gainim = rng.random(SHAPE) * 0.5 + 0.75
+    cpu = _make(azimuthalBinning_gpu, use_gpu=False, darkImg=dark, gainImg=gainim)
+    gpu = _make(azimuthalBinning_gpu, use_gpu=True, darkImg=dark, gainImg=gainim)
+    img = _frames(1)[0]
+    a = cpu.doCake(img.copy())
+    b = gpu.doCake(cupy.asarray(img))  # device-resident input
+    assert isinstance(b, np.ndarray)
+    np.testing.assert_allclose(b, a, rtol=1e-11, atol=0)
+
+
+@pytest.mark.skipif(not _HAS_GPU, reason="CuPy/GPU not available")
+def test_batch_applies_calibration_like_loop():
+    """doCake_batch must produce what a loop of doCake produces when darkImg/gainImg are set
+    (the GPU batch path used to skip both while the CPU fallback applied them)."""
+    rng = np.random.default_rng(8)
+    dark = rng.random(SHAPE) * 5.0
+    gainim = rng.random(SHAPE) * 0.5 + 0.75
+    gpu = _make(azimuthalBinning_gpu, use_gpu=True, darkImg=dark, gainImg=gainim)
+    imgs = _frames(5)
+    loop = np.stack([gpu.doCake(im.copy()) for im in imgs])
+    batch = gpu.doCake_batch(imgs)
+    np.testing.assert_allclose(batch, loop, rtol=1e-11, atol=0)
+
+
+def test_batch_cpu_fallback_matches_loop_and_preserves_inputs():
+    """The CPU fallback of doCake_batch, with darkImg/gainImg set: must equal a loop of
+    doCake AND must not mutate the caller's batch (the parent's doCake corrects in place;
+    the fallback therefore has to hand it copies)."""
+    rng = np.random.default_rng(9)
+    dark = rng.random(SHAPE) * 5.0
+    gainim = rng.random(SHAPE) * 0.5 + 0.75
+    f = _make(azimuthalBinning_gpu, use_gpu=False, darkImg=dark, gainImg=gainim)
+    imgs = _frames(4)
+    keep = imgs.copy()
+    loop = np.stack([f.doCake(im.copy()) for im in imgs])
+    batch = f.doCake_batch(imgs)
+    np.testing.assert_array_equal(imgs, keep)  # caller's data untouched
+    np.testing.assert_allclose(batch, loop, rtol=0)
 
 
 def test_falls_back_without_cupy(monkeypatch):

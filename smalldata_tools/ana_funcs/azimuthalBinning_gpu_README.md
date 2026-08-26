@@ -41,6 +41,11 @@ For many frames at once:
 Icake = f.doCake_batch(imgs)     # (B, ...) -> (B, nphi, nradial) in one SpMM
 ```
 
+Both paths apply `darkImg`/`gainImg` exactly as the parent does (device-cached, applied
+on-GPU) and return **host NumPy** arrays — the parent's contract, which the
+`process()` → `getUserData` → `small_data.event` chain requires; the binned result is tiny,
+so the copy is negligible.
+
 ## When it is worth using — and when it is not
 
 Measured on one A100 against the parent, 3000x3000 (9 Mpix) frame:
@@ -78,22 +83,26 @@ cupyx SpMM  vs bincount : max rel 5.2e-16
 
 ## Testing
 
-`tests/test_azimuthalBinning_gpu.py` — 9 passing, no psana and no data files needed. It asserts
-the CPU path is *identical* to the parent (not merely close), that the sparse operator reproduces
-the parent's `bincount` to 1e-12 with masked pixels and multiple phi bins, that masked pixels
-cannot contribute however bright, and that the no-CuPy fallback still returns the parent's answer.
+`tests/test_azimuthalBinning_gpu.py` — 15 tests (10 CPU-runnable, 5 GPU-marked), no psana and
+no data files needed. It asserts the CPU path is *identical* to the parent (not merely close),
+that the sparse operator reproduces the parent's `bincount` to 1e-12 with masked pixels and
+multiple phi bins, that masked pixels cannot contribute however bright, that the no-CuPy fallback
+still returns the parent's answer, that `darkImg`/`gainImg` are applied on-device to GPU-resident
+frames, that `doCake_batch` matches a loop of `doCake` on both backends (and never mutates the
+caller's batch), and that both paths return host NumPy.
 
-The GPU-marked tests skip unless CuPy and a device are present. They could not be run in either
-S3DF environment — `ana-4.0.68-py3` has smalldata_tools' `skimage` dependency but no CuPy, and
-`xpp_drp_gpu_311` has CuPy but not `skimage` — so the GPU arithmetic was validated separately by
-the standalone equivalence check whose numbers are quoted above.
+**The full suite has run 15/15 on an S3DF A100**: the GPU-marked tests need CuPy *and*
+smalldata_tools' import chain, which no stock S3DF env has together, but a small shim
+(`pip install --no-deps --target=$HOME/skshim scikit-image lazy_loader imageio tifffile
+networkx packaging pillow`, then `PYTHONPATH=$HOME/skshim`) lets the class suite run in
+`xpp_drp_gpu_311`. On CPU-only nodes the 10 CPU tests run and the 5 GPU tests skip.
 
 ## Running the GPU path in practice
 
-There is currently no single S3DF environment with both smalldata_tools' dependency chain and
-CuPy: `ana-4.0.68-py3` has `skimage`/psana but no CuPy, and `xpp_drp_gpu_311` has CuPy but not
-`skimage`. So `use_gpu=True` only helps where CuPy happens to be importable alongside
-smalldata_tools.
+There is currently no single stock S3DF environment with both smalldata_tools' dependency chain
+and CuPy: `ana-4.0.68-py3` has `skimage`/psana but no CuPy, and `xpp_drp_gpu_311` has CuPy but
+not `skimage`. The skimage shim above closes that gap for testing; for production,
+`use_gpu=True` helps wherever CuPy is importable alongside smalldata_tools.
 
 The proven way around this in a real producer is a shared-memory env bridge, prototyped for GPU
 droplet finding (`py2py/shm_bridge/` on `slac-lcls/drp-benchmarks`, branch `add-droplet-gpu`): a

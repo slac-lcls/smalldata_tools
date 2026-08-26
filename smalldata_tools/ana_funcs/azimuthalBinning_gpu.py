@@ -35,6 +35,8 @@ WHEN THIS IS WORTH IT
     parent: this class is a GPU accelerator, not a CPU rewrite.
 
 NUMERICS
+    Both paths return HOST NumPy arrays (the parent's contract -- downstream small_data
+    rejects device arrays); the binned result is tiny, so the copy is negligible.
     ``M @ img`` and ``np.bincount`` compute the same sum in a different order, so results agree
     to floating-point tolerance rather than bit-exactly (typically <1e-12 relative on float64
     frames). ``tests/test_azimuthalBinning_gpu.py`` asserts that against the parent on random
@@ -80,6 +82,7 @@ class azimuthalBinning_gpu(azimuthalBinning):
         # cache: applyCorrection -> operator. Built lazily, after the parent's _setup() has
         # produced Cake_idxs/correction (which happens in setFromDet/setFromFunc, not __init__).
         self._M = {}
+        self._dev = {}  # device-cached constants (good-mask, norm, darkImg, gainImg)
         self._warned_no_cupy = False
 
     # ------------------------------------------------------------------ operator
@@ -132,6 +135,37 @@ class azimuthalBinning_gpu(azimuthalBinning):
         self._M[key] = M
         return M
 
+    def _dev_const(self, name, src, build):
+        """Device copy of a host constant, cached until the source object is replaced."""
+        cur = self._dev.get(name)
+        if cur is not None and cur[0] is src:
+            return cur[1]
+        val = build(src)
+        self._dev[name] = (src, val)
+        return val
+
+    def _dev_good(self):
+        return self._dev_const(
+            "good", self._mask, lambda m: cp.asarray(np.asarray(m).ravel() == 0)
+        )
+
+    def _dev_norm(self):
+        return self._dev_const("norm", self.Cake_norm, cp.asarray)
+
+    def _dev_dark(self):
+        if self.darkImg is None:
+            return None
+        return self._dev_const(
+            "dark", self.darkImg, lambda a: cp.asarray(a, dtype=cp.float64)
+        )
+
+    def _dev_gain(self):
+        if self.gainImg is None:
+            return None
+        return self._dev_const(
+            "gain", self.gainImg, lambda a: cp.asarray(a, dtype=cp.float64)
+        )
+
     # ------------------------------------------------------------------ per frame
     def doCake(self, img, applyCorrection=True):
         """One frame -> Icake, shape (nphi, nradial). Same contract as the parent."""
@@ -140,26 +174,27 @@ class azimuthalBinning_gpu(azimuthalBinning):
                 img, applyCorrection=applyCorrection
             )
 
-        # Mirror the parent's pre-processing exactly, in the same order.
-        if self.darkImg is not None:
-            img = img - self.darkImg
-        if self.gainImg is not None:
-            img = img / self.gainImg
-
-        good = np.asarray(self._mask).ravel() == 0
-        flat = (
-            img.ravel()[good]
-            if not isinstance(img, cp.ndarray)
-            else img.ravel()[cp.asarray(good)]
-        )
-        x = cp.asarray(flat, dtype=cp.float64)
+        # One backend for the whole pre-processing: upload the frame first, then apply the
+        # device-cached calibration images (mirroring the parent's order). Mixing a device
+        # frame with host darkImg/gainImg would raise -- CuPy refuses host operands.
+        g = cp.asarray(img, dtype=cp.float64).ravel()
+        dark = self._dev_dark()
+        if dark is not None:
+            g = g - dark.ravel()
+        gain = self._dev_gain()
+        if gain is not None:
+            g = g / gain.ravel()
+        x = g[self._dev_good()]
 
         M = self._operator(applyCorrection)
         I = M @ x
 
         nradial = self._nradial() if applyCorrection else self.nq
         I = I[: nradial * self.nphi].reshape(self.nphi, nradial)
-        self.Icake = I / cp.asarray(self.Cake_norm)
+        # Host result: the parent's contract is a NumPy Icake, and the inherited process() ->
+        # getUserData -> small_data.event path rejects device arrays. The binned result is
+        # tiny, so the copy is negligible (same convention as droplet2photons_gpu).
+        self.Icake = cp.asnumpy(I / self._dev_norm())
         return self.Icake
 
     def doCake_batch(self, imgs, applyCorrection=True):
@@ -168,26 +203,33 @@ class azimuthalBinning_gpu(azimuthalBinning):
         A single small frame does not saturate a GPU: the matvec is dominated by launch and
         per-call cuSPARSE setup rather than by pixels, so on per-panel-sized data the batch
         path is the one that pays (the crossover sits around B~32 for a ~0.19 Mpix panel).
-        Frames must already be dark/gain corrected the same way doCake() would.
+        Applies darkImg/gainImg exactly as ``doCake()`` does and returns host NumPy, so a
+        batch call matches a loop of ``doCake()`` on either backend.
         """
         if not self._on_gpu():
+            # np.array (a COPY, not np.asarray's view): the parent's doCake mutates its
+            # input in place when darkImg/gainImg are set -- don't corrupt the caller's batch.
             return np.stack(
                 [
                     super(azimuthalBinning_gpu, self).doCake(
-                        np.asarray(im), applyCorrection=applyCorrection
+                        np.array(im), applyCorrection=applyCorrection
                     )
                     for im in imgs
                 ]
             )
 
-        good = np.asarray(self._mask).ravel() == 0
-        X = cp.asarray(imgs, dtype=cp.float64).reshape(len(imgs), -1)[
-            :, cp.asarray(good)
-        ]
+        G = cp.asarray(imgs, dtype=cp.float64).reshape(len(imgs), -1)
+        dark = self._dev_dark()
+        if dark is not None:
+            G = G - dark.ravel()[None, :]
+        gain = self._dev_gain()
+        if gain is not None:
+            G = G / gain.ravel()[None, :]
+        X = G[:, self._dev_good()]
         M = self._operator(applyCorrection)
         # csrmm prefers an F-contiguous dense RHS; X.T of a C-contiguous X is exactly that.
         I = (M @ X.T).T
 
         nradial = self._nradial() if applyCorrection else self.nq
         I = I[:, : nradial * self.nphi].reshape(len(imgs), self.nphi, nradial)
-        return I / cp.asarray(self.Cake_norm)
+        return cp.asnumpy(I / self._dev_norm())
