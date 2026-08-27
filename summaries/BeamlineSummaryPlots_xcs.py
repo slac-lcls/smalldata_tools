@@ -34,6 +34,7 @@ from smalldata_tools.utilities import rebin
 from smalldata_tools.utilities import evtt2Rt
 from smalldata_tools.utilities import postRunTable
 
+
 def makeRunTableData(ana, ipmUpDim, ipmDownDim, Filter, scanName):
     n162 = ana.getVar("evr/code_162").sum()
     ana.addCut("evr/code_162", -0.5, 0.5, "xon")
@@ -170,6 +171,16 @@ ipmDownMed = [
 try:
     azav = ana.getVar("epix10k2M/azav_azav", useFilter=iniFilter)
     azav_sum = np.nanmean(azav, axis=0)
+    if azav_sum.ndim > 1:
+        # Collapse phi BEFORE the argmax, matching the collapse applied to azav below.
+        # azav is (nevt, nphi, nq) whenever the producer sets phiBins > 1 (production XCS/MFX
+        # use phiBins=11), so azav_sum is 2-D and a bare np.argmax returns a FLAT index into
+        # nphi*nq -- which was then used to slice the phi-collapsed (nevt, nq) array. Unless the
+        # brightest bin happened to fall in phi row 0 that index overshoots nq, the slice comes
+        # out empty (the lower bound is clamped only at 0, the upper at nq), and nanmean of an
+        # empty slice returns NaN with a RuntimeWarning -- not an exception, so the enclosing
+        # try/except never caught it and scatterVar was silently all-NaN.
+        azav_sum = np.nanmean(azav_sum, axis=0)
     azav_peak = np.argmax(azav_sum)
     if len(azav.shape) > 2:
         azav = np.nanmean(azav, axis=1)
