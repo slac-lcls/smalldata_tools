@@ -674,11 +674,9 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     if args.full or args.epicsAll:
         epicsPV = [k[0] for k in thisrun.epicsinfo]
         if len(epicsPV) > 0:
-            try:
-                logger.info("epicsStore names for epicsAll", epicsPV)
-            except:
-                pass
-            logger.info("adding all epicsPVs....")
+            if ds.unique_user_rank():
+                logger.info(f"epicsStore names for epicsAll: {epicsPV}")
+                logger.info("adding all epicsPVs....")
             default_dets.append(
                 epicsDetector(PVlist=epicsPV, name="epicsAll", run=thisrun)
             )
@@ -854,7 +852,10 @@ for evt_num, evt in enumerate(event_iter):
                 continue
 
             last_saved = subsample_config["last_saved"].get(det._name)
-            if last_saved is None or (current_evt_time - last_saved) >= subsample_config["rank_interval"]:
+            if (
+                last_saved is None
+                or (current_evt_time - last_saved) >= subsample_config["rank_interval"]
+            ):
                 logger.debug(
                     f"Rank {rank}: Saving subsampled data for {det._name} at time {current_evt_time:.3f}s"
                 )
@@ -864,7 +865,7 @@ for evt_num, evt in enumerate(event_iter):
                     "timestamp": evt.timestamp,
                 }
         # Use align_group to not pad data per events
-        if subsample_data:  
+        if subsample_data:
             small_data.event(evt, subsample_data, align_group="subsample")
 
     # Integrating detectors
@@ -1173,7 +1174,7 @@ if args.postRuntable and ds.unique_user_rank():
     time.sleep(5)
 
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    logger.debug("URL: ", ws_url)
+    logger.debug("URL:{ws_url}")
     user = (args.experiment[:3] + "opr").replace("dia", "mcc")
     if os.environ.get("ARP_LOCATION", None) == "S3DF":
         with open("/sdf/group/lcls/ds/tools/forElogPost.txt") as reader:

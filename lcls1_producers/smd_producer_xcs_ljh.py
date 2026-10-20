@@ -546,7 +546,7 @@ if args.ttRaw:
 if len(epicsPV)>0:
     default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsUser'))
 # make a list of all PVs in data
-logger.debug('epicsStore names', ds.env().epicsStore().pvNames())
+logger.debug(f'epicsStore names: {ds.env().epicsStore().pvNames()}')
 if args.experiment.find('dia')>=0:
     epicsPVlist=ds.env().epicsStore().pvNames()
 else:
