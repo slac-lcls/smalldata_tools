@@ -452,6 +452,7 @@ class SimpleCameraObject(CameraObject):
         ):
             self.evt.dat *= self.local_gain  # apply own gain
 
+
 class TiledCameraObject(CameraObject):
     def __init__(self, det, run, **kwargs):
         # super().__init__(det,env,run, **kwargs)
