@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Export useful path
-MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 SMD_ROOT=`echo $MYDIR | sed  "s|/arp_scripts||g"`
 
 PY_EXE="$SMD_ROOT/smalldata_tools/ana_funcs/svd_waveform/make_waveform_basis_psana2.py"

@@ -3,7 +3,7 @@ import numpy as np
 try:
     import pyFAI
 except ModuleNotFoundError:
-    print("pyFAI not available on LCLS-II env")
+    print("pyFAI not available on LCLS env")
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.utilities import image_from_dxy
@@ -52,7 +52,7 @@ class azav_pyfai(DetObjectFunc):
 
         self.mask = kwargs.pop("userMask", None)
         self.threshold = kwargs.pop("thres", None)
-        self.return2d = kwargs.pop("return2d", "False")
+        self.return2d = kwargs.pop("return2d", False)
 
         # azimuthal integrator argument
         self.poni_file = kwargs.pop("poni_file", None)
@@ -149,7 +149,7 @@ class azav_pyfai(DetObjectFunc):
 
     def process(self, data):
         if self.threshold is not None:
-            data[data < threshold] = 0
+            data[data < self.threshold] = 0
         if data.ndim == 3:
             data = image_from_dxy(data, self.ix, self.iy)
         out = self._process(data)

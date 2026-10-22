@@ -72,7 +72,7 @@ umask 002
 QUEUE=${QUEUE:=0}
 CUBE=${CUBE:=0}
 PSPLOT_LIVE=${PSPLOT_LIVE:=0}
-MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
+MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" # gets the script directory.
 
 # check that the script is run on relevant nodes
 if [ $(echo $HOSTNAME | grep -ic -e "sdf") -eq 0 ]

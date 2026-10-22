@@ -51,6 +51,7 @@ def define_dets(run):
     mectt_args = {}
     azint_args = {}
     azintpyfai_args = {}
+    azintlclsgeom_args = {}
     drop_args = {}
     d2p_args = {}
     detsum_args = {}
@@ -64,6 +65,8 @@ def define_dets(run):
         azint_args = config.getAzIntParams(run)
     if "getAzIntPyFAIParams" in dir(config):
         azintpyfai_args = config.getAzIntPyFAIParams(run)
+    if "getAzIntLCLSGeomParams" in dir(config):
+        azintlclsgeom_args = config.getAzIntLCLSGeomParams(run)
     if "get_droplet" in dir(config):
         drop_args = config.get_droplet(run)
     if "get_droplet2photon" in dir(config):
@@ -104,6 +107,10 @@ def define_dets(run):
             if detname in azintpyfai_args:
                 for az_pyfai in azintpyfai_args[detname]:
                     det.addFunc(azav_pyfai(**az_pyfai))
+            # Azimuthal binning - LCLSGeom PyFAI
+            if detname in azintlclsgeom_args:
+                for az_lclsgeom in azintlclsgeom_args[detname]:
+                    det.addFunc(azav_lclsgeom(**az_lclsgeom))
             # Droplet algo
             if detname in drop_args:
                 for tdrop in drop_args[detname]:
@@ -193,6 +200,7 @@ from smalldata_tools.ana_funcs.droplet import dropletFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
+from smalldata_tools.ana_funcs.azav_lclsgeom import azav_lclsgeom
 # from smalldata_tools.ana_funcs.smd_svd import svdFit
 from smalldata_tools.ana_funcs.correlations.smd_autocorr import Autocorrelation
 
@@ -468,7 +476,7 @@ else:
     epicsPVlist = ds.env().epicsStore().aliases()
 if (args.full or args.epicsAll) and len(epicsPVlist)>0:
     logger.debug('adding all epicsPVs....')
-    default_dets.append(epicsDetector(PVlist=epicsPV, name='epicsAll'))
+    default_dets.append(epicsDetector(PVlist=epicsPVlist, name='epicsAll'))
 #save specified list of PVs once/run, not nothing has been passed, save all.
 if len(config.epicsOncePV) > 0:
     EODet = epicsDetector(PVlist=epicsOncePV, name='epicsOnce')

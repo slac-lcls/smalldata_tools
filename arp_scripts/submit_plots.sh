@@ -86,7 +86,7 @@ SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
 QUEUE=${QUEUE:='milano'}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
-export MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+export MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 RUN="${RUN_NUM:=$RUN}" # default to the environment variable if submitted from the elog
 EXP="${EXPERIMENT:=$EXP}" # default to the environment variable if submitted from the elog

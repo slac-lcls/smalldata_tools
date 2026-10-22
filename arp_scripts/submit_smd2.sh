@@ -119,7 +119,7 @@ export EXPERIMENT=$EXP
 export RUN_NUM=$RUN
 
 # Export useful path
-MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+MYDIR="$( builtin cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 export SMD_ROOT=`echo $MYDIR | sed  "s|/arp_scripts||g"`
 
 export SIT_ENV_DIR="/sdf/group/lcls/ds/ana"
