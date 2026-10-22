@@ -186,10 +186,10 @@ class ttDetector(DefaultDetector):
                     if field == "value":
                         dl["fltpos"] = dat[0]
                         dl["fltpos_ps"] = dat[1]
-                        dl["fltposfwhm"] = dat[2]
-                        dl["ampl"] = dat[3]
+                        dl["ampl"] = dat[2]
+                        dl["refampl"] = dat[3]
                         dl["amplnxt"] = dat[4]
-                        dl["refampl"] = dat[5]
+                        dl["fltposfwhm"] = dat[5]
                         return dl
                     else:
                         continue
