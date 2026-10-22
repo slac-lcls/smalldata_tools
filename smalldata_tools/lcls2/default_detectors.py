@@ -187,8 +187,8 @@ class ttDetector(DefaultDetector):
                         dl["fltpos"] = dat[0]
                         dl["fltpos_ps"] = dat[1]
                         dl["ampl"] = dat[2]
-                        dl["refampl"] = dat[3]
-                        dl["amplnxt"] = dat[4]
+                        dl["amplnxt"] = dat[3]
+                        dl["refampl"] = dat[4]
                         dl["fltposfwhm"] = dat[5]
                         return dl
                     else:
