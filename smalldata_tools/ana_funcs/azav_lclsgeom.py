@@ -57,10 +57,14 @@ class azav_lclsgeom(DetObjectFunc):
         self.poni_file = kwargs.pop("poni_file", None)
         self._ai_kwargs = kwargs.pop("ai_kwargs", None)
         if self.poni_file is None and self._ai_kwargs is None:
-            raise ValueError("Either a poni file or ai_kwargs must be provided to initialize the azimuthal integrator.")
+            raise ValueError(
+                "Either a poni file or ai_kwargs must be provided to initialize the azimuthal integrator."
+            )
 
         # integration arguments
-        self.pol_factor = kwargs.pop("polarization_factor", -1)  # Vertical Polarization by default post Run 18
+        self.pol_factor = kwargs.pop(
+            "polarization_factor", -1
+        )  # Vertical Polarization by default post Run 18
         self.npts = kwargs.pop("npts", 256)
         self.npts_az = kwargs.pop("npts_az", 360)
         self._units = kwargs.pop("int_units", "2th_deg")  # q_A^-1, 2th_deg, r_mm
@@ -74,7 +78,9 @@ class azav_lclsgeom(DetObjectFunc):
             from LCLSGeom.manager import get_geometry
             from LCLSGeom.converter import PsanaToPyFAI
         except ModuleNotFoundError:
-            raise ModuleNotFoundError("azav_lclsgeom requires LCLSGeom; run smalldata through LUTE")
+            raise ModuleNotFoundError(
+                "azav_lclsgeom requires LCLSGeom; run smalldata through LUTE"
+            )
         super(azav_lclsgeom, self).setFromDet(det)
         if (
             self.mask is not None
@@ -96,11 +102,13 @@ class azav_lclsgeom(DetObjectFunc):
                     except:
                         self.mask = None
         if self.mask is not None and self.mask.ndim == 3:
-            self.mask = np.reshape(self.mask, (self.mask.shape[0]*self.mask.shape[1], self.mask.shape[2]))
-      
+            self.mask = np.reshape(
+                self.mask, (self.mask.shape[0] * self.mask.shape[1], self.mask.shape[2])
+            )
+
         # template geometry on purpose: poni from BayFAI / manual calibration is fitted against it
         metrology = get_geometry(det.det.alias)
-        # instantiate PyFAI detector first 
+        # instantiate PyFAI detector first
         detector = PsanaToPyFAI.convert(metrology, det.det.alias)
         # if detector is 3D (panels, slow, fast), then this converts 3D multipanels detector into
         # a fake 2D detector by squeezing the panel and slow dimensions.
@@ -110,7 +118,9 @@ class azav_lclsgeom(DetObjectFunc):
             self._ai_kwargs = ai.getPyFAI()
 
         if self._units == "q_A^-1" and "wavelength" not in self._ai_kwargs:
-            raise ValueError("Wavelength must be provided when using q_A^-1 units. Check poni file or ai_kwargs inputs.")
+            raise ValueError(
+                "Wavelength must be provided when using q_A^-1 units. Check poni file or ai_kwargs inputs."
+            )
         self.ai = pyFAI.AzimuthalIntegrator(
             detector=detector,
             dist=self._ai_kwargs["dist"],
@@ -146,7 +156,7 @@ class azav_lclsgeom(DetObjectFunc):
         if data.ndim == 3:
             # instead of assembling the image, now we just squeeze the panel and slow dimensions
             # so that image and detector have same shape.
-            data = np.reshape(data, (data.shape[0]*data.shape[1], data.shape[2]))
+            data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
         out = self._process(data)
         return out
 
