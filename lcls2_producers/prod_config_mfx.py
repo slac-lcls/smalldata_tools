@@ -8,6 +8,7 @@ detectors = ["epix100_0", "epix100_1", "alvium"]  # , 'qadc1']
 integrating_detectors = []
 
 
+# 1) REGIONS OF INTEREST
 def getROIs(run):
     ret_dict = {}
 
@@ -37,6 +38,7 @@ def getROIs(run):
     return ret_dict
 
 
+# 2) DROPLET TO PHOTON
 def get_droplet2photon(run):
     ret_dict = {}
 
@@ -68,6 +70,7 @@ def get_droplet2photon(run):
     return ret_dict
 
 
+# 3) DROPLET
 def get_droplet(run):
     ret_dict = {}
     if run > 0:
@@ -80,6 +83,7 @@ def get_droplet(run):
     return ret_dict
 
 
+# 4) AZIMUTHAL INTEGRATION
 def get_azav(run):
     ret_dict = {}
     if run > 0:
@@ -96,6 +100,22 @@ def get_azav(run):
     return ret_dict
 
 
+def get_azav_lclsgeom(run):
+    ret_dict = {}
+    if run > 0:
+        az_dict = {}
+        az_dict["poni_file"] = "path/to/poni/calib.poni"
+        az_dict["npts"] = 256
+        az_dict["npts_az"] = 36
+        az_dict["int_units"] = "q_A^-1"
+        az_dict["return2d"] = False
+        az_dict["azav_kwargs"] = {}
+        # ret_dict["jungfrau"] = az_dict
+
+    return ret_dict
+
+
+# 5) DETECTOR SUMS
 def get_sum_algos(run):
     """Specify detector sum algorithms for specific detectors or `all` detectors.
 

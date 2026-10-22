@@ -5,14 +5,6 @@ try:
 except ModuleNotFoundError:
     print("pyFAI not available on LCLS env")
 
-try:
-    from LCLSGeom.manager import get_geometry
-    from LCLSGeom.converter import PsanaToPyFAI
-except ModuleNotFoundError:
-    print("LCLSGeom not available on LCLS env")
-    print("Please run smalldata tools using LUTE")
-    get_geometry = None
-
 from smalldata_tools.common.detector_base import DetObjectFunc
 
 
@@ -57,8 +49,6 @@ class azav_lclsgeom(DetObjectFunc):
     """
 
     def __init__(self, **kwargs):
-        if get_geometry is None:
-            raise ImportError("azav_lclsgeom requires LCLSGeom; run through LUTE")
         self._name = kwargs.get("name", "lclsgeom")
         super(azav_lclsgeom, self).__init__(**kwargs)
         self.mask = kwargs.pop("userMask", None)
@@ -80,6 +70,11 @@ class azav_lclsgeom(DetObjectFunc):
         return
 
     def setFromDet(self, det):
+        try:
+            from LCLSGeom.manager import get_geometry
+            from LCLSGeom.converter import PsanaToPyFAI
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("azav_lclsgeom requires LCLSGeom; run smalldata through LUTE")
         super(azav_lclsgeom, self).setFromDet(det)
         if (
             self.mask is not None
