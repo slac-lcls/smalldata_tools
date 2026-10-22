@@ -81,7 +81,7 @@ def get_mectt(run):
     return ret_dict
 
 
-# pyFAI function. 
+# 2) AZIMUTHAL INTEGRATION
 def getAzIntPyFAIParams(run):
     if isinstance(run,str):
         run=int(run)
@@ -110,6 +110,23 @@ def getAzIntPyFAIParams(run):
     return ret_dict
 
 
+def getAzIntLCLSGeomParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        az_dict = {}
+        az_dict["poni_file"] = 'path/to/poni/calib3.poni'
+        az_dict["npts"] = 256
+        az_dict["npts_az"] = 36
+        az_dict["int_units"] = 'q_A^-1'
+        az_dict["return2d"] = False
+        az_dict["azav_kwargs"] = {}
+        #ret_dict["Epix10kaQuad3"] = [az_dict]
+    return ret_dict
+
+
+# 3) DETECTOR SUMS
 def getDetSums(run):
     if isinstance(run,str):
         run=int(run)

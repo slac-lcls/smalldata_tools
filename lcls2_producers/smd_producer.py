@@ -63,6 +63,7 @@ def define_dets(run, det_list):
     droplet_args = {}
     azav_args = {}
     azav_pyfai_args = {}
+    azav_lclsgeom_args = {}
     polynomial_args = {}
     sum_algo_args = {}
     pressio_compression_args = {}
@@ -86,6 +87,8 @@ def define_dets(run, det_list):
         azav_args = config.get_azav(run)
     if "get_azav_pyfai" in dir(config):
         azav_pyfai_args = config.get_azav_pyfai(run)
+    if "get_azav_lclsgeom" in dir(config):
+        azav_lclsgeom_args = config.get_azav_lclsgeom(run)
     if "get_polynomial_correction" in dir(config):
         polynomial_args = config.get_polynomial_correction(run)
     if "get_sum_algos" in dir(config):
@@ -147,6 +150,9 @@ def define_dets(run, det_list):
 
         if detname in azav_pyfai_args:
             det.addFunc(azav_pyfai(**azav_pyfai_args[detname]))
+
+        if detname in azav_lclsgeom_args:
+            det.addFunc(azav_lclsgeom(**azav_lclsgeom_args[detname]))
 
         if detname in rois_args:
             # ROI extraction
@@ -313,6 +319,7 @@ from smalldata_tools.ana_funcs.photons import photonFunc
 from smalldata_tools.ana_funcs.droplet2Photons import droplet2Photons
 from smalldata_tools.ana_funcs.azimuthalBinning import azimuthalBinning
 from smalldata_tools.ana_funcs.azav_pyfai import azav_pyfai
+from smalldata_tools.ana_funcs.azav_lclsgeom import azav_lclsgeom
 from smalldata_tools.ana_funcs.smd_svd import SvdFit
 from smalldata_tools.ana_funcs.detector_corrections import PolynomialCurveCorrection
 from smalldata_tools.ana_funcs.compression import pressioCompressDecompress

@@ -5,7 +5,7 @@ import numpy as np
 # These lists are needed, do not delete them
 # If no detector in a given category, leave the corresponding
 # list empty.
-detnames = ['epix_2']
+detnames = ['epix10k2M']
 
 # 1) REGIONS OF INTEREST
 roi_detname: str = "epix_2"
@@ -27,7 +27,38 @@ def getROIs(run):
         ret_dict[roi_detname] = [ roi_dict ]
     return ret_dict
 
+# 2) AZIMUTHAL INTEGRATION
+def getAzIntPyFAIParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        az_dict = {}
+        az_dict["poni_file"] = 'path/to/poni/r0244_image.poni'
+        az_dict["npts"] = 256
+        az_dict["npts_az"] = 36
+        az_dict["int_units"] = 'q_A^-1'
+        az_dict["return2d"] = False
+        #ret_dict["epix10k2M"] = [az_dict]
+    return ret_dict
 
+
+def getAzIntLCLSGeomParams(run):
+    if isinstance(run,str):
+        run=int(run)
+    ret_dict = {}
+    if run>0:
+        az_dict = {}
+        az_dict["poni_file"] = 'path/to/poni/r0244.poni'
+        az_dict["npts"] = 256
+        az_dict["npts_az"] = 36
+        az_dict["int_units"] = 'q_A^-1'
+        az_dict["return2d"] = False
+        az_dict["azav_kwargs"] = {}
+        #ret_dict["epix10k2M"] = [az_dict]
+    return ret_dict
+
+# 3) DETECTOR SUMS
 def getDetSums(run):
     if isinstance(run,str):
         run=int(run)
@@ -35,7 +66,7 @@ def getDetSums(run):
     
     ret_dict['epix_2']=['calib','calib_thresADU1',
                         'calib_dropped','calib_dropped_square']
-    
+
     return ret_dict
 
 
