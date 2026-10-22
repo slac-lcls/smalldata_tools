@@ -85,8 +85,10 @@ class ROIFunc(DetObjectFunc):
     def _reshapeToRaw(self, array):
         """Restore axes squeezed out of the detector coordinate arrays."""
         rawShape = getattr(self, "_rawShape", None)
-        if rawShape is not None and array.shape != rawShape and array.size == np.prod(
-            rawShape
+        if (
+            rawShape is not None
+            and array.shape != rawShape
+            and array.size == np.prod(rawShape)
         ):
             return array.reshape(rawShape)
         return array
