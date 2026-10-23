@@ -50,6 +50,9 @@ class ROIFunc(DetObjectFunc):
         if self._rms is not None:
             if self._rms.ndim == 4:
                 self._rms = self._rms[0]  # .squeeze()
+            # Shape of a single frame of raw data, used below to undo the
+            # squeeze applied to det.x/det.y.
+            self._rawShape = self._rms.shape
             self._rms = self.applyROI(self._rms)
         if (
             self.mask is not None
@@ -69,15 +72,26 @@ class ROIFunc(DetObjectFunc):
                     except:
                         self.mask = None
         if self.mask is not None:
-            try:
-                self.mask = self.applyROI(self.mask)
-            except:
-                pass
-        try:
-            self._x = self.applyROI(det.x)
-            self._y = self.applyROI(det.y)
-        except:
-            pass
+            self.mask = self.applyROI(self.mask)
+        detx = getattr(det, "x", None)
+        dety = getattr(det, "y", None)
+        if detx is not None and dety is not None:
+            # CameraObject squeezes det.x/det.y but not the data, so for
+            # single-panel tiled detectors (e.g. jungfrau512k) the coordinates
+            # lose the panel axis the ROI is defined against. Put it back.
+            self._x = self.applyROI(self._reshapeToRaw(detx))
+            self._y = self.applyROI(self._reshapeToRaw(dety))
+
+    def _reshapeToRaw(self, array):
+        """Restore axes squeezed out of the detector coordinate arrays."""
+        rawShape = getattr(self, "_rawShape", None)
+        if (
+            rawShape is not None
+            and array.shape != rawShape
+            and array.size == np.prod(rawShape)
+        ):
+            return array.reshape(rawShape)
+        return array
 
     def addFunc(self, func):
         if isinstance(func, dropletFunc) and isinstance(self, ROIFunc):
@@ -91,34 +105,35 @@ class ROIFunc(DetObjectFunc):
 
     def applyROI(self, array):
         # array = np.squeeze(array) #added for jungfrau512k. Look here if other detectors are broken now...
-        if array.ndim < self.bound.ndim:
-            print(
-                "array has fewer dimensions that bound: ",
-                array.ndim,
-                " ",
-                len(self.bound),
+        # Number of array dimensions the ROI describes. A 1-dim bound slices
+        # axis 0 only; a multi-dim bound has one [min,max] row per dimension.
+        # Note this is NOT self.bound.ndim: that is 2 for any multi-dim ROI,
+        # which conflated 2- and 3-dim ROIs and silently truncated self.bound.
+        nROIdim = 1 if self.bound.ndim == 1 else self.bound.shape[0]
+
+        if array.ndim < nROIdim:
+            raise ValueError(
+                f"{self._name}: ROI describes {nROIdim} dimensions but the array "
+                f"has {array.ndim} (shape {array.shape}). Check the ROI definition."
             )
-            return array
 
         # ideally would check this from FrameFexConfig and not on every events
-        if array.ndim == self.bound.ndim:
-            new_bound = []
-            if array.ndim == 1:
-                new_bound = [
-                    max(min(self.bound), 0),
-                    min(max(self.bound), array.shape[0]),
-                ]
-            else:
-                for dim, arsz in zip(self.bound, array.shape):
-                    if max(dim) > arsz:
-                        new_bound.append([min(dim), arsz])
-                    else:
-                        new_bound.append([min(dim), max(dim)])
-            self.bound = np.array(new_bound).astype(int)
-        elif self.bound.ndim == 1:
+        if self.bound.ndim == 1:
+            # Also casts the default full ROI ([0, 1e6]) to int for slicing.
             self.bound = np.array(
-                [min(self.bound), min(max(self.bound), array.shape[0])]
+                [max(min(self.bound), 0), min(max(self.bound), array.shape[0])]
             ).astype(int)
+        elif array.ndim == nROIdim:
+            # Only clamp against an array of matching rank: zipping the bounds
+            # with a shorter shape drops ROI dimensions and corrupts self.bound
+            # for every subsequent call (and for the bounds written to the h5).
+            new_bound = []
+            for dim, arsz in zip(self.bound, array.shape):
+                if max(dim) > arsz:
+                    new_bound.append([max(min(dim), 0), arsz])
+                else:
+                    new_bound.append([max(min(dim), 0), max(dim)])
+            self.bound = np.array(new_bound).astype(int)
 
         if self.bound.shape[0] == 2 and len(self.bound.shape) == 1:
             subarr = array[self.bound[0] : self.bound[1]]

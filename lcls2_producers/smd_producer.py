@@ -681,11 +681,9 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
     if args.full or args.epicsAll:
         epicsPV = [k[0] for k in thisrun.epicsinfo]
         if len(epicsPV) > 0:
-            try:
-                logger.info("epicsStore names for epicsAll", epicsPV)
-            except:
-                pass
-            logger.info("adding all epicsPVs....")
+            if ds.unique_user_rank():
+                logger.info(f"epicsStore names for epicsAll: {epicsPV}")
+                logger.info("adding all epicsPVs....")
             default_dets.append(
                 epicsDetector(PVlist=epicsPV, name="epicsAll", run=thisrun)
             )
@@ -1183,7 +1181,7 @@ if args.postRuntable and ds.unique_user_rank():
     time.sleep(5)
 
     ws_url = args.url + "/run_control/{0}/ws/add_run_params".format(args.experiment)
-    logger.debug("URL: ", ws_url)
+    logger.debug("URL:{ws_url}")
     user = (args.experiment[:3] + "opr").replace("dia", "mcc")
     if os.environ.get("ARP_LOCATION", None) == "S3DF":
         with open("/sdf/group/lcls/ds/tools/forElogPost.txt") as reader:
