@@ -35,6 +35,9 @@ class SvdFit(DetObjectFunc):
             basis_file (str or Path object): if not given will take the latest one in the detector calib folder
             mode (str): 'max', 'norm' or 'both', method to calculate the pulse amplitudes. Default: 'max'
             return_reconstructed (bool): return reconstructed waveforms or not
+            compute_score (bool): compute and return the per-shot fit score (R^2).
+                Default: True. Set to False to skip it when the score is not used:
+                no "score" field is then written.
         """
         self._name = kwargs.get("name", "svdFit")
         super().__init__(**kwargs)
@@ -47,6 +50,7 @@ class SvdFit(DetObjectFunc):
         self.basis_file = kwargs.get("basis_file", None)
         self._mode = kwargs.get("mode", "max")
         self._return_reconstructed = kwargs.get("return_reconstructed", False)
+        self._compute_score = kwargs.get("compute_score", True)
         self.channel = None
 
     def setFromDet(self, det):
@@ -113,12 +117,10 @@ class SvdFit(DetObjectFunc):
             waveform = waveform - np.mean(waveform[:, : self.bkg_idx], axis=1)
         waveform = waveform[:, self.roi[0] : self.roi[1]]
         intensities = self.regressor.get_pulse_intensity(waveform, mode=self._mode)
-        score = self.regressor.score(waveform)
-        output = {
-            "intensities": np.squeeze(intensities),
-            "score": np.squeeze(score),
-            "coefficients": np.squeeze(self.regressor.coeffs_),
-        }
+        output = {"intensities": np.squeeze(intensities)}
+        if self._compute_score:
+            output["score"] = np.squeeze(self.regressor.score(waveform))
+        output["coefficients"] = np.squeeze(self.regressor.coeffs_)
         if self._return_reconstructed:
             output["reconstructed"] = np.squeeze(self.regressor.reconstruct())
         return output
