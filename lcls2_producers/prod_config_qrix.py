@@ -172,6 +172,7 @@ epicsPV = [
     "EM2K0:XGMD:HPS:AvgPulseIntensity",
 ]
 epicsOncePV = []
+h5_compression = True  # lossless gzip-1+shuffle for integer/bool datasets
 
 
 ##########################################################
