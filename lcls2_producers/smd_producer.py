@@ -516,6 +516,16 @@ if rank == 0:
     logger.info(f"Producer cfg file: <{prod_cfg}>.")
 config = import_module(prod_cfg)
 
+# Opt-in lossless compression of integer/bool datasets (gzip-1 + shuffle), off unless
+# the config sets h5_compression = True. Must run before any h5 file is created.
+h5_compression_on = False
+if getattr(config, "h5_compression", False):
+    from smalldata_tools.lcls2 import h5_compression
+
+    h5_compression_on = h5_compression.enable()
+if rank == 0:
+    logger.info(f"h5 compression of integer/bool datasets: {h5_compression_on}")
+
 
 # Figure out where we are running from and check that the
 # xtc files are where we expect them.
