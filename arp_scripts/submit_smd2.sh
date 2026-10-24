@@ -98,6 +98,17 @@ do
         POSITIONAL+=("--psplot_live_mode")
         shift
         ;;
+    --config)
+        CONFIG=$2
+        POSITIONAL+=("--config $2")
+        shift
+        shift
+        ;;
+    --config=*)
+        CONFIG=${1#*=}
+        POSITIONAL+=("$1")
+        shift
+        ;;
     *)
         POSITIONAL+=("$1")
         shift
@@ -151,6 +162,17 @@ PARTITION=${PARTITION:=$DEFPARTITION}
 ACCOUNT=${ACCOUNT:="lcls:$EXP"}
 
 
+# Integrating-detector mode (get_intg in the producer config): default to 4 writers
+# (SRV cores) per node instead of 16. Each writer writes its own h5 file.
+PROD_CONFIG=${CONFIG:-$HUTCH}
+if [ "$(python $SMD_ROOT/arp_scripts/intg_probe.py $PROD_CONFIG $RUN)" == "1" ]; then
+    SRV_PER_NODE=4
+    echo "Integrating-detector mode (config $PROD_CONFIG, run $RUN): default $SRV_PER_NODE SRV cores per node"
+else
+    SRV_PER_NODE=16
+    echo "Not in integrating-detector mode (config $PROD_CONFIG, run $RUN): default $SRV_PER_NODE SRV cores per node"
+fi
+
 # EB, BD and SRV core allocation
 if [[ "$PARTITION" == "milano" ]]; then
     # For milano:
@@ -160,10 +182,10 @@ if [[ "$PARTITION" == "milano" ]]; then
 
     if [ -v MPI_OPTIM ]; then
         MPI_SLOTS=$(($CORES_PER_NODE*($NODES-1)))  # Number of cores on all nodes but the one for SMD0
-        DEFAULT_SRV_CORES=$((16*($NODES-1)))  # 16 writers per node minus the SMD0 node
+        DEFAULT_SRV_CORES=$(($SRV_PER_NODE*($NODES-1)))  # SRV_PER_NODE writers per node minus the SMD0 node
     else
         MPI_SLOTS=$(($CORES_PER_NODE*$NODES-1))  # Total number of cores minus SMD0
-        DEFAULT_SRV_CORES=$((16*$NODES))  # 16 writers per node seems to be a good number for milano
+        DEFAULT_SRV_CORES=$(($SRV_PER_NODE*$NODES))  # SRV_PER_NODE writers per node (16 seems to be a good number for milano)
     fi
 
     if [ -v PSPLOT_LIVE ]; then
