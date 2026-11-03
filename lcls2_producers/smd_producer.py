@@ -891,7 +891,7 @@ for evt_num, evt in enumerate(event_iter):
                         if k not in normdict[det._name]:
                             normdict[det._name][k] = {}
                             normdict[det._name][k][sumkey] = np.array(vv)
-                        if sumkey in normdict[det._name][k].keys():
+                        elif sumkey in normdict[det._name][k].keys():
                             normdict[det._name][k][sumkey] += np.array(vv)
                         else:
                             normdict[det._name][k][sumkey] = np.array(vv)
