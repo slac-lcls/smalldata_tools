@@ -48,7 +48,7 @@ def tmoDetectors(run, beamCodes=[[162], [91]]):
     dets.append(genericDetector("gmd", run))
     dets.append(genericDetector("xgmd", run))
     dets.append(genericDetector("ebeam", run))
-    dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("pcavs", run))
     dets.append(fimfexDetector("tmo_fim0", run))
     dets.append(fimfexDetector("tmo_fim1", run))
     dets.append(ttDetector("tmoopal2", run, saveTraces=True))
@@ -64,7 +64,7 @@ def rixDetectors(run, beam_destination=BeamDestination.SC_SXR, laser_codes=[273]
     dets.append(genericDetector("gmd", run))
     dets.append(genericDetector("xgmd", run))
     dets.append(genericDetector("ebeam", run))
-    dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("pcavs", run))
     dets.append(fimfexDetector("rix_fim0", run))
     dets.append(fimfexDetector("rix_fim1", run))
     dets.append(fimfexDetector("rix_fim2", run))
@@ -93,7 +93,7 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     dets.append(genericDetector("MfxDg1BmMon", run))
     dets.append(genericDetector("MfxDg2BmMon", run))
     dets.append(genericDetector("ebeamh", run))
-    dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("pcavs", run))
     dets.append(genericDetector("gasdet", run))
     dets.append(genericDetector("qadc_ch0", run))
     dets.append(genericDetector("qadc_ch1", run))
@@ -110,14 +110,14 @@ def mfxDetectors(run, beamCodes=[[-137], [-203]]):
     return dets
 
 
-def xppDetectors(run, beamCodes=[[-137], [89]]):
+def xppDetectors(run, beamCodes=[[-137], [257]]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
     dets.append(genericDetector("ebeam", run))
     dets.append(genericDetector("ebeamh", run))
     dets.append(genericDetector("gasdet", run))
-    # dets.append(genericDetector("pcav", run))
+    dets.append(genericDetector("pcavs", run))
     dets.append(genericDetector("Em3l0BmMon", run))
     dets.append(genericDetector("Sp1L2Wv8", run))
     dets.append(genericDetector("XppSb2BmMon", run))
@@ -125,5 +125,6 @@ def xppDetectors(run, beamCodes=[[-137], [89]]):
     dets.append(genericDetector("XppUsrDio", run))
     dets.append(usbEncoder("XppUsbEncoder02", run))
     dets.append(damageDetector(run=run))
-    # dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
+    dets.append(ttDetector("alvium_tt", run, saveTraces=False, iocTimetool=True))
+    dets.append(lightStatusLcls1Timing(beam_las_codes=beamCodes, run=run))
     return dets
