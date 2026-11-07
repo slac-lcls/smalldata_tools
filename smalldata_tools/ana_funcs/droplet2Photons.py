@@ -5,7 +5,6 @@ import scipy.ndimage as ndi
 
 # use that??
 # import skimage.measure as measure
-import scipy.ndimage.filters as filters
 from scipy import sparse
 import time
 from numba import jit
@@ -102,7 +101,7 @@ class droplet2Photons(DetObjectFunc):
             # twoPixAdu.append((np.sort(adus)[-1*(min(2, len(adus))):]).sum())
             piximg1 = sparse.coo_matrix((adus, (i, j))).todense()
             # find maximum, find maximum of footprint_nbradd neighbor, maximum.
-            nbrpix = filters.maximum_filter(
+            nbrpix = ndi.maximum_filter(
                 piximg1, mode="constant", footprint=self._footprintnbr
             ).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1] + nbrpix)

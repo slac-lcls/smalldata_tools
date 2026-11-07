@@ -2,7 +2,6 @@ import numpy as np
 import time
 import scipy.ndimage as ndi
 import skimage.measure as measure
-import scipy.ndimage.filters as filters
 from scipy import sparse
 from smalldata_tools.common.detector_base import DetObjectFunc
 
@@ -112,7 +111,7 @@ class dropletFunc(DetObjectFunc):
         return
 
     def neighborImg(self, img):
-        return filters.maximum_filter(img, footprint=self._footprint2d)
+        return ndi.maximum_filter(img, footprint=self._footprint2d)
 
     def prepareImg(self, img, donut=False, invert=False, low=False):
         imgIn = img.copy()
@@ -257,11 +256,11 @@ class dropletFunc(DetObjectFunc):
             dat_dict["col"] = np.array(pos_drop)[:, 1]
 
         if self._flagMasked:
-            maxImg = filters.maximum_filter(imgDrop, footprint=self.footprint)
+            maxImg = ndi.maximum_filter(imgDrop, footprint=self.footprint)
             maskMax = ndi.sum_labels(self._mask, labels=maxImg, index=drop_ind)
             imgDropMin = imgDrop.copy()
             imgDropMin[imgDrop == 0] = imgDrop.max() + 1
-            minImg = filters.minimum_filter(imgDropMin, footprint=self.footprint)
+            minImg = ndi.minimum_filter(imgDropMin, footprint=self.footprint)
             minImg[minImg == (imgDrop.max() + 1)] = 0
             maskMin = ndi.sum(self._mask, label=maxImg, index=drop_ind)
             maskDrop = maskMax + maskMin
