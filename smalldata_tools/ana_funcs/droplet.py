@@ -183,7 +183,7 @@ class dropletFunc(DetObjectFunc):
         if self.thresADU is not None:
             # Apply threshold to droplet total ADU (i.e. all pixels in droplet)
             vThres = np.where(adu_drop < self.thresADU)[0]
-            vetoed = np.in1d(imgDrop.ravel(), (vThres + 1)).reshape(imgDrop.shape)
+            vetoed = np.isin(imgDrop.ravel(), (vThres + 1)).reshape(imgDrop.shape)
             imgDrop[vetoed] = 0
             drop_ind_thres = np.delete(drop_ind, vThres)
             ret_dict["nDroplets"] = len(drop_ind_thres)

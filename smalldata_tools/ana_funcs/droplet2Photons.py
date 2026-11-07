@@ -165,7 +165,7 @@ class droplet2Photons(DetObjectFunc):
         vThres_1_veto = np.where(
             (adu_drop >= self.photpts[1]) | (adu_drop < self.photpts[2])
         )[0]
-        vetoed = np.in1d(imgDrop.ravel(), (vThres_1_veto + 1)).reshape(imgDrop.shape)
+        vetoed = np.isin(imgDrop.ravel(), (vThres_1_veto + 1)).reshape(imgDrop.shape)
         imgDrop1[vetoed] = 0
         drop_ind_thres1 = np.delete(drop_ind, vThres_1_veto)
 
@@ -206,7 +206,7 @@ class droplet2Photons(DetObjectFunc):
             pixtwoadus:
                 Adus for pixels in droplets
         """
-        vetoed = ~np.in1d(imgDrop.ravel(), drop_ind).reshape(imgDrop.shape)
+        vetoed = ~np.isin(imgDrop.ravel(), drop_ind).reshape(imgDrop.shape)
         imgDrop[vetoed] = 0  # remove the single photon droplet
         drop_ind_thres = drop_ind
 
