@@ -1,9 +1,22 @@
 import numpy as np
 
+# See the matching comment in azav_pyfai.py. The integrator
+# class moved in pyFAI 2024.10, and the top-level pyFAI.AzimuthalIntegrator
+# shortcut has been deprecated since 0.16, so prefer the newest non-deprecated
+# path the installed version offers. No single path covers both the py3.9
+# release (pyFAI 2024.9) and the py3.13 one (pyFAI 2026.5).
 try:
     import pyFAI
-except ModuleNotFoundError:
-    print("pyFAI not available on LCLS env")
+
+    try:
+        from pyFAI.integrator.azimuthal import AzimuthalIntegrator
+    except ImportError:
+        from pyFAI.azimuthalIntegrator import AzimuthalIntegrator
+    _PYFAI_IMPORT_ERROR = None
+except ModuleNotFoundError as _e:
+    raise ModuleNotFoundError(
+        "pyFAI is needed but not available."
+    ) from _e
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 
@@ -121,7 +134,7 @@ class azav_lclsgeom(DetObjectFunc):
             raise ValueError(
                 "Wavelength must be provided when using q_A^-1 units. Check poni file or ai_kwargs inputs."
             )
-        self.ai = pyFAI.AzimuthalIntegrator(
+        self.ai = AzimuthalIntegrator(
             detector=detector,
             dist=self._ai_kwargs["dist"],
             poni1=self._ai_kwargs["poni1"],
@@ -142,8 +155,13 @@ class azav_lclsgeom(DetObjectFunc):
         for k, v in dcfg.items():
             setattr(self, "azcfg_det_%s" % k, v)
         setattr(self, "azcfg_detorientation", ocfg.value)
-        setattr(self, "azcfg_qvals", self.ai.get_qa())
-        # setattr(self,'azcfg_qvals',self.ai.get_qa())
+        # ai.get_qa() is deprecated since pyFAI 2025.09 in favour of the .qa
+        # property, which is available in both 2024.9 and 2026.5.
+        setattr(self, "azcfg_qvals", self.ai.qa)
+        # The radial axis pyFAI produces for a given geometry is not identical
+        # across pyFAI releases (see azav_pyfai.py), so record the version to
+        # keep stored results interpretable.
+        setattr(self, "azcfg_pyfai_version", str(getattr(pyFAI, "version", "unknown")))
         print(f"Azimuthal integrator:\n{self.ai}")
         return
 

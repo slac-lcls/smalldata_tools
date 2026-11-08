@@ -1,12 +1,41 @@
 import numpy as np
 
+# The integrator class has moved twice, so pick the newest non-deprecated path
+# the installed version offers:
+#   <= 2024.9    pyFAI.azimuthalIntegrator.AzimuthalIntegrator
+#   >= 2024.10   pyFAI.integrator.azimuthal.AzimuthalIntegrator
+# The top-level pyFAI.AzimuthalIntegrator shortcut works in both but has been
+# deprecated since pyFAI 0.16. There is no single non-deprecated path covering
+# both releases, hence the nested try/except rather than one import.
 try:
     import pyFAI
-except ModuleNotFoundError:
-    print("pyFAI not available on LCLS env")
+
+    try:
+        from pyFAI.integrator.azimuthal import AzimuthalIntegrator
+    except ImportError:
+        from pyFAI.azimuthalIntegrator import AzimuthalIntegrator
+    _PYFAI_IMPORT_ERROR = None
+except ModuleNotFoundError as _e:
+    raise ModuleNotFoundError(
+        "pyFAI is needed but not available."
+    ) from _e
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 from smalldata_tools.utilities import image_from_dxy
+
+
+def _require_pyfai():
+    """Fail at construction time with a clear message if pyFAI is absent.
+
+    Previously a missing pyFAI only printed a warning at import, so the class
+    constructed fine and then died with a confusing NameError on first use.
+    """
+    if pyFAI is None:
+        raise ModuleNotFoundError(
+            "azav_pyfai requires pyFAI, which is not installed in this "
+            "environment. Use azimuthalBinning instead, or run in an "
+            "environment that provides pyFAI."
+        ) from _PYFAI_IMPORT_ERROR
 
 
 class azav_pyfai(DetObjectFunc):
@@ -63,8 +92,7 @@ class azav_pyfai(DetObjectFunc):
             assert (
                 self._ai_kwargs is not None
             ), "Need either a calibration file or a set of keywords arguments to instantiate the pyFAI integrator."
-            # self.ai = pyFAI.azimuthalIntegrator.AzimuthalIntegrator(**self._ai_kwargs) # why does it not work?
-            self.ai = pyFAI.AzimuthalIntegrator(**self._ai_kwargs)
+            self.ai = AzimuthalIntegrator(**self._ai_kwargs)
         print(f"Created azimuthal integrator for {self._name}")
         # we should have code that extract setup parameters
         #    in case people mess w/ the input
@@ -77,8 +105,12 @@ class azav_pyfai(DetObjectFunc):
         for k, v in dcfg.items():
             setattr(self, "azcfg_det_%s" % k, v)
         setattr(self, "azcfg_detorientation", ocfg.value)
-        setattr(self, "azcfg_qvals", self.ai.get_qa())
-        # setattr(self,'azcfg_qvals',self.ai.get_qa())
+        setattr(self, "azcfg_qvals", self.ai.qa)
+        # The radial axis pyFAI produces for a given geometry is not identical
+        # across pyFAI releases (2024.9 -> 2026.5 shifts it by ~3e-8 of the
+        # angular range, which can move pixels sitting on a bin boundary into
+        # the adjacent bin). Record the version so results stay interpretable.
+        setattr(self, "azcfg_pyfai_version", str(getattr(pyFAI, "version", "unknown")))
 
         # integration arguments
         self.pol_factor = kwargs.pop("polarization_factor", 1)
