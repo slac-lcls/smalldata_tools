@@ -14,9 +14,7 @@ try:
         from pyFAI.azimuthalIntegrator import AzimuthalIntegrator
     _PYFAI_IMPORT_ERROR = None
 except ModuleNotFoundError as _e:
-    raise ModuleNotFoundError(
-        "pyFAI is needed but not available."
-    ) from _e
+    raise ModuleNotFoundError("pyFAI is needed but not available.") from _e
 
 from smalldata_tools.common.detector_base import DetObjectFunc
 
