@@ -6,7 +6,7 @@ try:
     from ImgAlgos.PyAlgos import photons
 except:
     pass
-import scipy.ndimage.filters as filters
+import scipy.ndimage as ndi
 import itertools
 from smalldata_tools.common.detector_base import DetObjectFunc
 
@@ -88,7 +88,6 @@ class photonFunc(DetObjectFunc):
 #
 #
 #
-import scipy.ndimage.measurements as measurements
 
 
 class photon2(DetObjectFunc):
@@ -134,12 +133,10 @@ class photon2(DetObjectFunc):
         fpi = fphotons // 1
         fpf = fphotons % 1
         # label the fractional image
-        img_drop = measurements.label(fpf)
+        img_drop = ndi.label(fpf)
         drop_ind = np.arange(1, img_drop[1] + 1)
-        adu_drop = measurements.sum(fpf, img_drop[0], drop_ind)
-        pos_drop = np.array(
-            measurements.center_of_mass(fpf, img_drop[0], drop_ind)
-        ).astype(int)
+        adu_drop = ndi.sum(fpf, img_drop[0], drop_ind)
+        pos_drop = np.array(ndi.center_of_mass(fpf, img_drop[0], drop_ind)).astype(int)
         # for sum ADU > threshold: 1 @ COM(x,y) as int (sparse array -> add to full photon image)
         vThres = np.where(adu_drop > self.thresADU)[0]
         adu_phot = adu_drop[vThres]
@@ -192,8 +189,8 @@ class photon2(DetObjectFunc):
         ret_dict["evtTime"] = time.time() - tstart
 
         # re-label this img, and make hist of relabelled ADU histo as well.
-        img_drop_phot = measurements.label(photImg)
-        adu_drop = measurements.sum(
+        img_drop_phot = ndi.label(photImg)
+        adu_drop = ndi.sum(
             photImg, img_drop_phot[0], np.arange(1, img_drop_phot[1] + 1)
         )
         ret_dict["pHist_RL"] = np.histogram(adu_drop, np.arange(0, self.nphotMax))[0]
@@ -253,14 +250,14 @@ class photon3(DetObjectFunc):
         fpf_seed[fpf < 0.5] = 0
         if self.maxMethod == -1:
             # generic filter is not fast: likely loop in python as pre-optimization is not possible
-            fpf_max = filters.generic_filter(
+            fpf_max = ndi.generic_filter(
                 fpf,
                 fcn,
                 footprint=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]),
                 mode="constant",
             )
         else:
-            fpf_max = filters.maximum_filter(
+            fpf_max = ndi.maximum_filter(
                 fpf,
                 footprint=np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]),
                 mode="constant",
@@ -268,7 +265,7 @@ class photon3(DetObjectFunc):
         fpf_max[fpf < 0.5] = 0
         if self.maxMethod > 0:
             if self.maxMethod >= 2:
-                fpf_max2nd = filters.rank_filter(
+                fpf_max2nd = ndi.rank_filter(
                     fpf,
                     rank=-2,
                     footprint=np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]),
@@ -312,8 +309,8 @@ class photon3(DetObjectFunc):
         ret_dict["evtTime"] = time.time() - tstart
 
         # re-label this img, and make hist of relabelled ADU histo as well.
-        img_drop_phot = measurements.label(photImg)
-        adu_drop = measurements.sum(
+        img_drop_phot = ndi.label(photImg)
+        adu_drop = ndi.sum(
             photImg, img_drop_phot[0], np.arange(1, img_drop_phot[1] + 1)
         )
         ret_dict["pHist_RL"] = np.histogram(adu_drop, np.arange(0, self.nphotMax))[0]

@@ -5,7 +5,6 @@ import scipy.ndimage as ndi
 
 # use that??
 # import skimage.measure as measure
-import scipy.ndimage.filters as filters
 from scipy import sparse
 import time
 from numba import jit
@@ -102,7 +101,7 @@ class droplet2Photons(DetObjectFunc):
             # twoPixAdu.append((np.sort(adus)[-1*(min(2, len(adus))):]).sum())
             piximg1 = sparse.coo_matrix((adus, (i, j))).todense()
             # find maximum, find maximum of footprint_nbradd neighbor, maximum.
-            nbrpix = filters.maximum_filter(
+            nbrpix = ndi.maximum_filter(
                 piximg1, mode="constant", footprint=self._footprintnbr
             ).flatten()[np.argmax(piximg)]
             twonbrPixAdu.append(maxPixAdu[-1] + nbrpix)
@@ -165,7 +164,7 @@ class droplet2Photons(DetObjectFunc):
         vThres_1_veto = np.where(
             (adu_drop >= self.photpts[1]) | (adu_drop < self.photpts[2])
         )[0]
-        vetoed = np.in1d(imgDrop.ravel(), (vThres_1_veto + 1)).reshape(imgDrop.shape)
+        vetoed = np.isin(imgDrop.ravel(), (vThres_1_veto + 1)).reshape(imgDrop.shape)
         imgDrop1[vetoed] = 0
         drop_ind_thres1 = np.delete(drop_ind, vThres_1_veto)
 
@@ -206,7 +205,7 @@ class droplet2Photons(DetObjectFunc):
             pixtwoadus:
                 Adus for pixels in droplets
         """
-        vetoed = ~np.in1d(imgDrop.ravel(), drop_ind).reshape(imgDrop.shape)
+        vetoed = ~np.isin(imgDrop.ravel(), drop_ind).reshape(imgDrop.shape)
         imgDrop[vetoed] = 0  # remove the single photon droplet
         drop_ind_thres = drop_ind
 
