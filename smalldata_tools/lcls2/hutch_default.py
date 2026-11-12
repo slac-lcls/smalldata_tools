@@ -81,6 +81,7 @@ def uedDetectors(run, beamCodes=[[162], [91]]):
     dets = []
     dets.append(scanDetector("scan", run))
     dets.append(genericDetector("timing", run))
+    dets.append(genericDetector("wave8", run))
     # dets.append(lightStatus(beamCodes, run))
     dets.append(epicsDetector(PVlist=["MOTR_AS01_MC06_CH6"], run=run))
     return dets
