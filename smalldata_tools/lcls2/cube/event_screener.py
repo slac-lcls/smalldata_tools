@@ -190,6 +190,16 @@ class ThresholdFilter(EventScreener):
         label_str = f" [{self.label}]" if self.label else ""
         return f"{self.detector_name} {operator} {self.threshold}{label_str}"
 
+class ThresholdPeakFilter(ThresholdFilter):
+    """
+    ThresholdFilter that compares the threshold to
+    the maximum value of an array
+    """
+    def get_scalar_value(self, evt: psana.event.Event) -> bool:
+        data = self.detector.data(evt)
+        if isinstance(data, dict):
+            data = data[self.data_key]
+        return np.max(data)
 
 class RangeFilter(EventScreener):
     """Filter that checks if a detector's value is within a specified range."""
