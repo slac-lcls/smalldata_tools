@@ -825,6 +825,7 @@ for evt_num, evt in enumerate(event_iter):
 
     # detector data using DetObject
     userDict = {}
+    sum_dets = []
     for det in dets:
         try:
             det.getData(evt)
@@ -836,7 +837,7 @@ for evt_num, evt in enumerate(event_iter):
                     userDict[det._name + "_env"] = envData
             except:
                 pass
-            det.processSums()
+            sum_dets.append(det)
             # print(userDict[det._name])
         except Exception as e:
             logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
@@ -874,6 +875,14 @@ for evt_num, evt in enumerate(event_iter):
         # Use align_group to not pad data per events
         if subsample_data:
             small_data.event(evt, subsample_data, align_group="subsample")
+
+    # Sums last: their thresholds change det.evt.dat in place.
+    for det in sum_dets:
+        try:
+            det.processSums()
+        except Exception as e:
+            logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
+            print(e)
 
     # Integrating detectors
 
