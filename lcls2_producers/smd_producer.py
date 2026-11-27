@@ -424,6 +424,12 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--strict",
+    help="Exit non-zero at the end if any detector analysis failed.",
+    action="store_true",
+    default=False,
+)
+parser.add_argument(
     "--psdm_dir",
     help="Override SIT_PSDM_DATA regardless of environment variables set.",
     type=str,
@@ -814,6 +820,7 @@ if not ds.is_srv():  # srv nodes do not have access to detectors.
                 )
 
 event_iter = thisrun.events()
+det_failures = {}  # detector name -> events whose analysis raised
 
 for evt_num, evt in enumerate(event_iter):
     det_data = detData(default_dets, evt)
@@ -839,9 +846,13 @@ for evt_num, evt in enumerate(event_iter):
             det.processSums()
             # print(userDict[det._name])
         except Exception as e:
-            logger.warning(f"Failed analyzing det {det} on evt {evt_num}")
-            print(e)
-            pass
+            det_failures[det._name] = det_failures.get(det._name, 0) + 1
+            if det_failures[det._name] == 1:
+                logger.exception(f"Failed analyzing det {det._name} on evt {evt_num}")
+            else:
+                logger.warning(
+                    f"Failed analyzing det {det._name} on evt {evt_num}: {e!r}"
+                )
 
     # Combine default data & user data into single dict.
     det_data.update(userDict)
@@ -1013,6 +1024,13 @@ if not ds.is_srv():
                 print("Problem with data sum for %s and key %s" % (det._name, key))
     if len(sumDict["Sums"].keys()) > 0 and small_data.summary:
         small_data.save_summary(sumDict)
+    # Events whose analysis raised, per detector, summed over ranks
+    failDict = {"failed_events": {}}
+    for det in dets:
+        n_failed = small_data.sum(det_failures.get(det._name, 0))
+        failDict["failed_events"][det._name] = n_failed
+    if len(dets) > 0 and small_data.summary:
+        small_data.save_summary(failDict)
 
     if ds.unique_user_rank():
         logger.info("Saving detector configuration to UserDataCfg")
@@ -1049,6 +1067,11 @@ if not ds.is_srv():
 # The filesystem seems to make smalldata.done fail. Some dirty tricks
 # are needed here.
 # Hopefully this can be removed soon.
+for name, n_failed in det_failures.items():
+    logger.error(
+        f"Detector {name}: analysis failed on {n_failed} events on rank {rank}; "
+        f"its user data are missing from the h5 for those events"
+    )
 logger.debug(f"Smalldata type for rank {rank}: {small_data._type}")
 
 logger.debug(f"smalldata.done() on rank {rank}")
@@ -1202,3 +1225,6 @@ if args.postRuntable and ds.unique_user_rank():
             auth=HTTPBasicAuth(args.experiment[:3] + "opr", answer[:-1]),
         )
         logger.debug(rp)
+
+if args.strict and MPI.COMM_WORLD.allreduce(sum(det_failures.values())) > 0:
+    sys.exit(1)
