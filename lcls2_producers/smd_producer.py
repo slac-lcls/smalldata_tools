@@ -1007,7 +1007,10 @@ if not ds.is_srv():
     for det in dets:
         for key in det.storeSum().keys():
             try:
-                sumData = small_data.sum(det.storeSum()[key])
+                if "max" in key:
+                    sumData = small_data.max(det.storeSum()[key])
+                else:
+                    sumData = small_data.sum(det.storeSum()[key])
                 sumDict["Sums"]["%s_%s" % (det._name, key)] = sumData
             except:
                 print("Problem with data sum for %s and key %s" % (det._name, key))
